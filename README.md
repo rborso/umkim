@@ -30,6 +30,9 @@ Harbor, FleetClusterJoin provisioning, and optional fleet-edge routing.
 The complete safe path is [docs/install.md](docs/install.md). Do not use a
 pre-filled `inventory/` as a public template.
 
+After the hub is up, see the
+[console walkthrough](https://docs.umkim.com/getting-started/console-walkthrough/).
+
 ## How it works
 
 UMKIM runs a **management hub** and any number of **independent workload
