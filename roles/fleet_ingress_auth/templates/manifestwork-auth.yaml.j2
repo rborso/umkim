@@ -1,0 +1,29 @@
+# OCM ManifestWork — LLDAP + Authelia + spoke Traefik forward-auth middleware
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  name: {{ fleet_ingress_auth_manifestwork_name }}
+  namespace: {{ ocm_target_cluster }}
+  labels:
+    fleet.umkim.com/component: ingress-auth
+spec:
+  manifestConfigs:
+    - resourceIdentifier:
+        group: ""
+        resource: persistentvolumeclaims
+        name: authelia-data
+        namespace: {{ fleet_ingress_auth_namespace }}
+      updateStrategy:
+        type: CreateOnly
+    - resourceIdentifier:
+        group: ""
+        resource: persistentvolumeclaims
+        name: lldap-data
+        namespace: {{ fleet_ingress_auth_namespace }}
+      updateStrategy:
+        type: CreateOnly
+  workload:
+    manifests:
+{% for doc in auth_manifests %}
+      - {{ doc | to_json }}
+{% endfor %}

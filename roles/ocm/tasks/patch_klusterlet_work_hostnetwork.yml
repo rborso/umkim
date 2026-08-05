@@ -1,0 +1,43 @@
+---
+# Scale klusterlet work agent after hub-kubeconfig exists. Do NOT use hostNetwork here:
+# registration-agent already binds :8443 on the host network and work-agent would crash.
+- name: OCM | Ensure pod-to-overlay routing before work agent
+  ansible.builtin.import_role:
+    name: k3s
+    tasks_from: spoke_overlay_nat.yml
+  when:
+    - ocm_hub_apiserver | default('') | length > 0
+    - not (ocm_hub | default(false) | bool)
+    - ocm_klusterlet_overlay_hostnetwork | default(true) | bool
+  tags: [ocm, ocm_approve_csr, ocm_spoke, ocm_klusterlet_hostnetwork]
+
+- name: OCM | Wait for klusterlet work agent deployment
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management-agent get deploy klusterlet-work-agent
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  register: ocm_work_agent_deploy
+  until: ocm_work_agent_deploy.rc == 0
+  retries: 36
+  delay: 5
+  changed_when: false
+  when:
+    - not (ocm_hub | default(false) | bool)
+  tags: [ocm, ocm_approve_csr, ocm_spoke, ocm_klusterlet_hostnetwork]
+
+- name: OCM | Scale klusterlet work agent (pod network)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl -n open-cluster-management-agent patch deploy klusterlet-work-agent --type=merge \
+      -p '{"spec":{"replicas":1,"template":{"spec":{"hostNetwork":false,"dnsPolicy":"ClusterFirst"}}}}'
+    kubectl -n open-cluster-management-agent rollout status deploy/klusterlet-work-agent --timeout=300s
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  when:
+    - not (ocm_hub | default(false) | bool)
+  changed_when: true
+  tags: [ocm, ocm_approve_csr, ocm_spoke, ocm_klusterlet_hostnetwork]

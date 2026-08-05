@@ -1,0 +1,249 @@
+---
+# Seed demo-webapp catalog item (routing via fleet policies + per-cluster site-container-*).
+- name: DCM demo | API base for seed tasks
+  ansible.builtin.set_fact:
+    dcm_demo_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+    dcm_demo_catalog_fields:
+      - path: image.reference
+        display_name: Container image
+        editable: true
+        default: "{{ fleet_dcm_demo_catalog_image }}"
+        validation_schema:
+          type: string
+          x-ui-tier: common
+      - path: metadata.name
+        display_name: Container name (DNS label)
+        editable: true
+        default: "{{ fleet_dcm_demo_catalog_container_name }}"
+        validation_schema:
+          type: string
+          x-ui-tier: required
+          x-ui-widget: dns-label
+          x-required: true
+      - path: metadata.labels.app
+        display_name: App label
+        editable: true
+        default: demo-webapp
+        validation_schema:
+          type: string
+          x-ui-tier: common
+      - path: network.ports
+        display_name: Exposed ports
+        editable: true
+        default:
+          - container_port: 80
+            visibility: internal
+        description: "internal visibility creates a ClusterIP Service (required for hub/site ingress)"
+        validation_schema:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [container_port, visibility]
+            properties:
+              container_port:
+                type: integer
+                minimum: 1
+                maximum: 65535
+              visibility:
+                type: string
+                enum: [none, internal, external]
+          x-ui-tier: advanced
+      - path: routing.mode
+        display_name: Routing mode
+        editable: true
+        default: hub
+        validation_schema:
+          type: string
+          enum: [hub, site, none]
+          x-ui-tier: common
+      - path: routing.require_auth
+        display_name: Require ingress authentication
+        editable: true
+        default: false
+        description: "Opt in to Authelia forward-auth on hub (hub mode) or spoke ingress (site mode)."
+        validation_schema:
+          type: boolean
+          x-ui-tier: common
+          x-ui-widget: boolean
+          x-ui-depends-on:
+            path: routing.mode
+            in: [hub, site]
+      - path: routing.hub_host
+        display_name: Hub hostname (optional FQDN)
+        editable: true
+        default: ""
+        description: "Override hub URL. Leave empty for {release}.{hub-zone} from the fleet edge registry."
+        validation_schema:
+          type: string
+          x-ui-tier: common
+          x-ui-widget: hostname
+          x-ui-depends-on:
+            path: routing.mode
+            in: [hub]
+      - path: routing.site_host
+        display_name: Site hostname (optional FQDN)
+        editable: true
+        default: ""
+        validation_schema:
+          type: string
+          x-ui-tier: common
+          x-ui-widget: hostname
+          x-ui-depends-on:
+            path: routing.mode
+            in: [site]
+      - path: routing.cluster
+        display_name: Target cluster (OCM name)
+        editable: true
+        default: ""
+        description: "Optional — pin to a cluster; otherwise policy selects from fleet.site + capabilities"
+        validation_schema:
+          type: string
+          x-ui-tier: advanced
+      - path: resources.cpu.min
+        display_name: CPU min
+        editable: true
+        default: 200m
+        validation_schema:
+          type: string
+          format: k8s-cpu-quantity
+          x-ui-tier: advanced
+          x-ui-widget: cpu-quantity
+      - path: resources.cpu.max
+        display_name: CPU max
+        editable: true
+        default: 500m
+        validation_schema:
+          type: string
+          format: k8s-cpu-quantity
+          x-ui-tier: advanced
+          x-ui-widget: cpu-quantity
+      - path: resources.memory.min
+        display_name: Memory min
+        editable: true
+        default: 64MB
+        validation_schema:
+          type: string
+          pattern: '^[0-9]+(MB|GB|TB)$'
+          x-ui-tier: advanced
+      - path: resources.memory.max
+        display_name: Memory max
+        editable: true
+        default: 256MB
+        validation_schema:
+          type: string
+          pattern: '^[0-9]+(MB|GB|TB)$'
+          x-ui-tier: advanced
+      - path: workload.replicas
+        display_name: Replicas per placed cluster
+        editable: true
+        default: 1
+        validation_schema:
+          type: integer
+          minimum: 1
+          x-ui-tier: advanced
+          x-ui-widget: number
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | Disable legacy allow-all policy (invalid for placement)
+  ansible.builtin.uri:
+    url: "{{ dcm_demo_api_url }}/policies/fc631664-b676-49b1-83bf-06ff359b0f2e"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body:
+      enabled: false
+  when: fleet_dcm_demo_disable_allow_all_policy | default(true) | bool
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | Ensure demo catalog item exists
+  ansible.builtin.uri:
+    url: "{{ dcm_demo_api_url }}/catalog-items?id={{ fleet_dcm_demo_catalog_item_id }}"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body:
+      api_version: v1alpha1
+      display_name: "{{ fleet_dcm_demo_catalog_display_name }}"
+      spec:
+        resources:
+          - name: app
+            service_type: container
+            fields: "{{ dcm_demo_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | Resolve demo catalog item uid
+  ansible.builtin.uri:
+    url: "{{ dcm_demo_api_url }}/catalog-items/{{ fleet_dcm_demo_catalog_item_id }}"
+    method: GET
+    status_code: [200, 404]
+    return_content: true
+  register: dcm_demo_catalog_get_by_id
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | List catalog items (fallback uid lookup)
+  ansible.builtin.uri:
+    url: "{{ dcm_demo_api_url }}/catalog-items"
+    method: GET
+    return_content: true
+  register: dcm_demo_catalog_list
+  when: dcm_demo_catalog_get_by_id.status == 404
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | Set catalog uid fact
+  ansible.builtin.set_fact:
+    fleet_dcm_demo_catalog_resolved_uid: >-
+      {{
+        (
+          dcm_demo_catalog_get_by_id.json.uid
+          if dcm_demo_catalog_get_by_id.status == 200
+          else (
+            dcm_demo_catalog_list.json.results
+            | selectattr('display_name', 'equalto', fleet_dcm_demo_catalog_display_name)
+            | map(attribute='uid')
+            | first
+            | default('')
+          )
+        )
+      }}
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | Refresh demo catalog fields on existing item
+  ansible.builtin.uri:
+    url: "{{ dcm_demo_api_url }}/catalog-items/{{ fleet_dcm_demo_catalog_resolved_uid }}"
+    method: PATCH
+    body_format: json
+    status_code: [200]
+    headers:
+      Content-Type: application/merge-patch+json
+    body:
+      display_name: "{{ fleet_dcm_demo_catalog_display_name }}"
+      spec:
+        resources:
+          - name: app
+            service_type: container
+            fields: "{{ dcm_demo_catalog_fields }}"
+  when: fleet_dcm_demo_catalog_resolved_uid | length > 0
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]
+
+- name: DCM demo | Catalog seed result
+  ansible.builtin.debug:
+    msg: >-
+      Demo catalog "{{ fleet_dcm_demo_catalog_display_name }}"
+      id={{ fleet_dcm_demo_catalog_item_id }}
+      uid={{ fleet_dcm_demo_catalog_resolved_uid }}.
+      Deploy: POST {{ phase5_registration_url }}/catalog-item-instances
+      catalog_item_id={{ fleet_dcm_demo_catalog_resolved_uid }}
+      label_selector={{ fleet_dcm_demo_instance_label_selector }}
+      (see QUICKGUIDE.md).
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_demo]

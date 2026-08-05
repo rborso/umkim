@@ -1,0 +1,16 @@
+---
+# Disable retired virt01/virt02 spoke routing policies (VBM console clusters use site-* per cluster).
+- name: DCM policies | API base
+  ansible.builtin.set_fact:
+    dcm_policy_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_policies, dcm_disable_legacy_policies]
+
+- name: DCM policies | Disable legacy lab policy
+  ansible.builtin.uri:
+    url: "{{ dcm_policy_api_url }}/policies/{{ item }}"
+    method: DELETE
+    status_code: [204, 404]
+  loop: "{{ fleet_dcm_legacy_policy_ids }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_policies, dcm_disable_legacy_policies]

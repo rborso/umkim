@@ -1,0 +1,15 @@
+# Org1 (acme) registry site — dedicated hardware site for acme-lab01.
+#   ansible-playbook $INV playbooks/flows/site-create.yml -e @playbooks/flows/examples/acme-site.yml
+
+fleet_flow_site_name: acme-site
+fleet_flow_site_spec:
+  siteName: acme-site
+  siteId: acme-site
+  orgId: acme
+  provisioningMode: registry
+  displayName: Acme dedicated site
+  region: homelab
+  edge:
+    exposureMode: none
+    wanEgress:
+      enabled: false

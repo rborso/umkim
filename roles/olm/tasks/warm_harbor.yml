@@ -1,0 +1,15 @@
+---
+- name: OLM | Warm Harbor pull-through cache for spoke platform images
+  ansible.builtin.command:
+    cmd: >-
+      skopeo copy
+      docker://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_quay }}/{{ item }}
+      dir:/tmp/phase4-warm-{{ item | regex_replace('[^a-zA-Z0-9._-]', '_') }}
+      --src-creds=admin:{{ harbor_admin_password }}
+      --src-tls-verify=false
+  loop: "{{ phase4_harbor_warm_images }}"
+  register: olm_harbor_warm
+  changed_when: olm_harbor_warm.rc == 0
+  failed_when: false
+  when: inventory_hostname in groups['hub']
+  tags: [olm, phase4, phase4_warm_harbor]

@@ -1,0 +1,20 @@
+---
+description: Documentation tiers and mandatory updates for fleet changes
+alwaysApply: true
+---
+
+# Documentation policy
+
+## Tiers
+
+- **Design** ([docs/design.md](../../docs/design.md), [docs/components/](../../docs/components/)): patterns only — no lab IPs (`192.168.1.*`, `10.10.0.*`) or hostnames like `virt01`.
+- **Install** ([docs/install.md](../../docs/install.md)): greenfield deploy runbook.
+- **Inventory:** `inventory/` + [examples/inventory/hub-only/](../../examples/inventory/hub-only/) for host-specific values.
+
+## On behavioral changes
+
+Follow the **change → doc map** in [AGENTS.md](../../AGENTS.md). Update linked docs in the same PR/session.
+
+## Subagents
+
+Task subagents must use **`composer-2.5`**. Do not use `composer-2.5-fast` unless the user explicitly requests it.

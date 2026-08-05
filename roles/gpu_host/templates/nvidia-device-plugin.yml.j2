@@ -1,0 +1,60 @@
+# Fleet NVIDIA device plugin — K3s needs runtimeClassName nvidia and explicit discovery strategy.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-device-plugin-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    version: v1
+    flags:
+      deviceDiscoveryStrategy: {{ gpu_host_device_plugin_discovery_strategy | default('nvml') }}
+      failOnInitError: false
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      runtimeClassName: {{ gpu_host_device_plugin_runtime_class | default('nvidia') }}
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      containers:
+        - image: {{ gpu_host_device_plugin_image | default('nvcr.io/nvidia/k8s-device-plugin:v0.17.0') }}
+          name: nvidia-device-plugin-ctr
+          env:
+            - name: CONFIG_FILE
+              value: /config/config.yaml
+            - name: FAIL_ON_INIT_ERROR
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+        - name: config
+          configMap:
+            name: nvidia-device-plugin-config
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins

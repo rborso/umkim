@@ -1,0 +1,16 @@
+---
+- name: Fleet edge controller | E2E dual-route smoke script
+  ansible.builtin.command:
+    cmd: "{{ playbook_dir }}/scripts/test-fleet-edge-dual-route.sh"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    HUB_GATEWAY: "http://127.0.0.1:{{ phase5_gateway_nodeport }}"
+    FLEET_ROUTE_NAMESPACE: "{{ fleet_edge_controller_namespace }}"
+  register: fleet_edge_e2e
+  changed_when: false
+  tags: [fleet_edge_controller, fleet_edge_e2e]
+
+- name: Fleet edge controller | E2E result
+  ansible.builtin.debug:
+    var: fleet_edge_e2e.stdout_lines
+  tags: [fleet_edge_controller, fleet_edge_e2e]

@@ -1,0 +1,28 @@
+# Current topology examples (all addresses in flow files are RFC 5737 placeholders):
+#   lab-sn01 @ 203.0.113.29 — single node, one control
+#   lab-3n01 @ 203.0.113.26–.28 — three controls, no workers
+#   lab-ha01 @ 203.0.113.21–.25 — three controls plus two workers
+
+lab-sn01:
+  flow: playbooks/flows/examples/lab-sn01.yml
+  site_flow: playbooks/flows/examples/homelab-shared-site.yml
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]
+
+lab-3n01:
+  flow: playbooks/flows/examples/lab-3n01.yml
+  site_flow: playbooks/flows/examples/homelab-shared-site.yml
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]
+
+lab-ha01:
+  flow: playbooks/flows/examples/lab-ha01.yml
+  site_flow: playbooks/flows/examples/homelab-shared-site.yml
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]

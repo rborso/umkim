@@ -1,0 +1,11 @@
+---
+# Run before fleet-deploy.yml (especially production):
+#   ansible-playbook playbooks/preflight.yml -e fleet_profile=production --vault-password-file …
+
+- name: UMKIM v1 preflight
+  hosts: hub
+  gather_facts: false
+  tasks:
+    - name: Preflight | production Ansible checks
+      ansible.builtin.import_tasks: tasks/preflight-production.yml
+      when: (fleet_profile | default('lab')) == 'production'

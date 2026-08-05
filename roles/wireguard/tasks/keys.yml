@@ -1,0 +1,63 @@
+---
+- name: WireGuard | Check for existing private key
+  ansible.builtin.stat:
+    path: "{{ wireguard_private_key_path }}"
+  register: wireguard_privatekey_stat
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Generate private key
+  ansible.builtin.command:
+    cmd: wg genkey
+  register: wireguard_genkey
+  changed_when: true
+  no_log: true
+  when: not wireguard_privatekey_stat.stat.exists
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Store private key
+  ansible.builtin.copy:
+    dest: "{{ wireguard_private_key_path }}"
+    content: "{{ wireguard_genkey.stdout | trim }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: not wireguard_privatekey_stat.stat.exists
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Read private key
+  ansible.builtin.slurp:
+    src: "{{ wireguard_private_key_path }}"
+  register: wireguard_privatekey_slurp
+  no_log: true
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Set private key fact
+  ansible.builtin.set_fact:
+    wireguard_private_key: "{{ wireguard_privatekey_slurp.content | b64decode | trim }}"
+  no_log: true
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Derive public key
+  ansible.builtin.command:
+    cmd: wg pubkey
+  register: wireguard_pubkey_cmd
+  changed_when: false
+  no_log: true
+  args:
+    stdin: "{{ wireguard_private_key }}\n"
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Store public key on disk
+  ansible.builtin.copy:
+    dest: "{{ wireguard_public_key_path }}"
+    content: "{{ wireguard_pubkey_cmd.stdout | trim }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Publish public key for hub peer templates
+  ansible.builtin.set_fact:
+    wireguard_public_key: "{{ wireguard_pubkey_cmd.stdout | trim }}"
+  tags: [wireguard, wireguard_install]

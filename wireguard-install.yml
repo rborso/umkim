@@ -1,0 +1,25 @@
+---
+# Install per-node WireGuard from bootstrap bundle (ha_3_node / overlay).
+#
+#   ansible-playbook wireguard-install.yml -e fleet_cluster_name=virt01-k3s \
+#     -e fleet_cluster_bundle_dir=/tmp/bootstrap-virt01-k3s -i inventory.ini
+
+- name: Fleet cluster ssh | Distribute bundle SSH key
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_bundle_dir: "{{ fleet_cluster_bundle_dir | default(playbook_dir) }}"
+  roles:
+    - role: fleet_cluster_ssh
+      tags: [ssh, fleet_cluster_ssh]
+
+- name: Fleet cluster wireguard | All nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_bundle_dir: "{{ fleet_cluster_bundle_dir | default(playbook_dir) }}"
+  roles:
+    - role: fleet_cluster_wireguard
+      tags: [wireguard, fleet_cluster_wireguard]

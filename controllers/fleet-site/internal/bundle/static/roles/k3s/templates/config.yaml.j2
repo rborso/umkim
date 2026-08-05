@@ -1,0 +1,4 @@
+# Extra TLS SANs for clients reaching the hub on mgmt LAN (do not change node-ip).
+tls-san:
+  - {{ ansible_host }}
+  - {{ wireguard_address | ansible.utils.ipaddr('address') }}

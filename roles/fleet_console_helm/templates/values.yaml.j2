@@ -1,0 +1,62 @@
+namespace: {{ fleet_console_helm_namespace }}
+
+registry:
+  prefix: {{ fleet_console_helm_registry_prefix | quote }}
+
+auth:
+  enabled: true
+  image:
+    repository: {{ fleet_console_auth_image_name }}
+    tag: {{ fleet_console_auth_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.1.0'))) }}
+    pullPolicy: Always
+  port: {{ fleet_console_auth_http_port }}
+  sessionSecret: {{ fleet_console_auth_session_secret | quote }}
+  sessionTTL: {{ fleet_console_auth_session_ttl | quote }}
+  sessionSecure: {{ fleet_console_auth_session_secure | bool }}
+  bypass: {{ fleet_console_auth_bypass | bool }}
+  bootstrapAdminUser: {{ fleet_console_auth_htpasswd_admin_user if (fleet_console_auth_bootstrap_admin | bool) else '' }}
+  bootstrapInstallToken: {{ fleet_console_auth_bootstrap_install_token | quote }}
+  bootstrapLdapGroup: fleet-admins
+  bootstrapLdapGroupCN: {{ fleet_console_auth_bootstrap_ldap_admin_group | default('fleet-admins') | quote }}
+  htpasswdLine: {{ fleet_console_helm_htpasswd_line | default('') | quote }}
+  dcmUpstream: {{ fleet_console_auth_dcm_upstream | quote }}
+  fleetUpstream: {{ fleet_console_auth_fleet_upstream | quote }}
+  llmUpstream: {{ fleet_console_auth_llm_upstream | default('http://litellm.dcm.svc.cluster.local:4000') | quote }}
+  llmMasterKeySecretNamespace: {{ fleet_console_auth_llm_master_key_secret_ns | default('dcm') | quote }}
+  llmMasterKeySecretName: {{ fleet_console_auth_llm_master_key_secret_name | default('fleet-llm-master-key') | quote }}
+  llmMasterKeySecretKey: {{ fleet_console_auth_llm_master_key_secret_key | default('master_key') | quote }}
+  ldap:
+    url: {{ (fleet_auth_ldap_url if (fleet_auth_lldap_enabled | default(false) | bool) else '') | quote }}
+    baseDN: {{ fleet_auth_ldap_base_dn | quote }}
+    bindDN: {{ fleet_auth_ldap_bind_dn | quote }}
+    bindPassword: {{ fleet_auth_ldap_bind_password | quote }}
+    userFilter: {{ fleet_auth_ldap_user_filter | default('(uid=%s)') | quote }}
+    groupFilter: {{ fleet_auth_ldap_group_filter | default('(member={dn})') | quote }}
+  oidc:
+    issuer: {{ fleet_auth_oidc_issuer | quote }}
+    clientId: {{ fleet_auth_oidc_client_id | quote }}
+    clientSecret: {{ fleet_auth_oidc_client_secret | quote }}
+    redirectUrl: {{ fleet_auth_oidc_redirect_url | quote }}
+
+dashboard:
+  enabled: {{ dcm_fleet_dashboard_enabled | default(true) | bool }}
+  image:
+    repository: {{ dcm_fleet_console_image_name }}
+    tag: {{ dcm_fleet_console_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.1.0'))) }}
+    pullPolicy: {{ dcm_fleet_image_pull_policy | default('Always') }}
+  nodePort: {{ dcm_fleet_dashboard_nodeport }}
+  buildId: {{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) | quote }}
+  fleetAuthHost: "fleet-console-auth.{{ fleet_console_helm_namespace }}.svc.cluster.local:{{ fleet_console_auth_http_port }}"
+  fleetSiteHost: "fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080"
+
+lldap:
+  enabled: {{ fleet_auth_lldap_enabled | default(false) | bool }}
+  image: {{ fleet_auth_lldap_image | default('ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8') | quote }}
+  ldapPort: {{ fleet_auth_lldap_ldap_port | default(3890) }}
+  httpPort: {{ fleet_auth_lldap_http_port | default(17170) }}
+  baseDN: {{ fleet_auth_ldap_base_dn | quote }}
+  jwtSecret: {{ fleet_auth_lldap_jwt_secret | default('change-me-lldap-jwt') | quote }}
+  adminPassword: {{ fleet_auth_lldap_admin_password | default('change-me-lldap-admin') | quote }}
+  bootstrap:
+    enabled: {{ fleet_auth_lldap_bootstrap_enabled | default(true) | bool }}
+    groups: {{ fleet_auth_lldap_bootstrap_groups | default(['fleet-admins', 'fleet-site-admins', 'fleet-cluster-admins', 'fleet-org-admins', 'fleet-customers']) }}

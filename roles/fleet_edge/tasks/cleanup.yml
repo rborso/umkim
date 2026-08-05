@@ -1,0 +1,33 @@
+---
+- name: Fleet edge | Delete Spoke ingress ManifestWorks from hub
+  ansible.builtin.command:
+    cmd: >-
+      kubectl delete manifestwork {{ phase6_manifestwork_name }}
+      -n {{ item }} --ignore-not-found --wait=false --timeout=30s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ fleet_edge_phase6_clusters | default([]) }}"
+  register: fleet_edge_mw_delete
+  changed_when: "'deleted' in fleet_edge_mw_delete.stdout"
+  tags: [fleet_edge, fleet_edge_cleanup]
+
+- name: Fleet edge | Wait for ManifestWork deletions
+  ansible.builtin.pause:
+    seconds: "{{ fleet_edge_cleanup_wait_seconds | default(30) }}"
+  tags: [fleet_edge, fleet_edge_cleanup]
+
+- name: Fleet edge | Clear hub Traefik fleet route fragments
+  ansible.builtin.set_fact:
+    fleet_edge_routers_fragment: ""
+    fleet_edge_middlewares_fragment: ""
+    fleet_edge_services_fragment: ""
+  tags: [fleet_edge, fleet_edge_cleanup]
+
+- name: Fleet edge | Apply hub Traefik without re-rendering fleet routes
+  ansible.builtin.import_role:
+    name: dcm
+    tasks_from: traefik_config.yml
+  vars:
+    fleet_edge_skip_render: true
+  tags: [fleet_edge, fleet_edge_cleanup]

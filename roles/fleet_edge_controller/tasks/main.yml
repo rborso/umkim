@@ -1,0 +1,77 @@
+---
+- name: Fleet edge controller | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_edge_controller_enabled | default(true) | bool)
+
+- name: Fleet edge controller | Align ingress auth with FleetIngressAuth CR
+  ansible.builtin.import_tasks: detect_ingress_auth.yml
+
+- name: Fleet edge controller | Detect hub ACME profile from gateway
+  ansible.builtin.import_tasks: detect_acme_profile.yml
+
+- name: Fleet edge controller | Validate hub WAN IP for ACME
+  ansible.builtin.import_tasks: validate_wan_ip.yml
+
+- name: Fleet edge controller | Ensure namespace
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create namespace {{ fleet_edge_controller_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Fleet edge controller | Stage RBAC manifest
+  ansible.builtin.copy:
+    src: "{{ fleet_edge_controller_playbook_dir | default(playbook_dir) }}/deploy/fleet-edge/rbac.yaml"
+    dest: /tmp/fleet-edge-rbac.yaml
+    mode: "0644"
+
+- name: Fleet edge controller | Apply RBAC
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-edge-rbac.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fec_rbac_apply
+  changed_when: >-
+    'created' in fec_rbac_apply.stdout or 'configured' in fec_rbac_apply.stdout
+
+- name: Fleet edge controller | Render Deployment manifest
+  ansible.builtin.template:
+    src: deployment.yaml.j2
+    dest: /tmp/fleet-edge-controller-deploy.yaml
+    mode: "0644"
+
+- name: Fleet edge controller | Apply Deployments
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-edge-controller-deploy.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fec_deploy_apply
+  changed_when: >-
+    'created' in fec_deploy_apply.stdout or 'configured' in fec_deploy_apply.stdout
+
+- name: Fleet edge controller | Wait for controller rollout
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_edge_controller_namespace }} rollout status
+      deployment/fleet-edge-controller --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+
+- name: Fleet edge controller | Wait for route-sync rollout
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_edge_controller_namespace }} rollout status
+      deployment/fleet-edge-route-sync --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  when: fleet_edge_route_sync_enabled | default(true) | bool

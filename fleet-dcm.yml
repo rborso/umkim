@@ -1,0 +1,50 @@
+---
+# DCM control-plane monolith on hub; k8s-container-service-provider on spokes via OCM.
+# Prerequisites: host_prepare, wireguard, ocm.yml, spokes.yml, fleet-platform.yml, harbor.yml
+#
+# Usage:
+#   ansible-playbook fleet-dcm.yml
+#   ansible-playbook fleet-dcm.yml --tags dcm_hub -l hub
+#   ansible-playbook fleet-dcm.yml --tags dcm_push_spokes -l hub
+#   ansible-playbook fleet-dcm.yml --tags dcm_verify -l hub
+#   ansible-playbook fleet-dcm.yml --tags dcm_seed_catalog -l hub
+#
+# Legacy: phase5.yml imports this playbook.
+
+- name: DCM control plane on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: dcm
+      tags: [dcm, dcm_hub, phase5, phase5_hub]
+
+- name: DCM | Push k8s-container-service-provider to spokes
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: dcm
+        tasks_from: push_spokes
+      tags: [dcm, dcm_push_spokes, phase5, phase5_push]
+
+- name: DCM | Swagger UI on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_webui
+        tasks_from: dcm
+      tags: [dcm, dcm_webui, phase5, phase5_webui, fleet_webui]
+
+- name: DCM | Verify hub and spoke workers
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: dcm
+        tasks_from: verify
+      tags: [dcm, dcm_verify, phase5, phase5_verify]

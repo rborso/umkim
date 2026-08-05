@@ -1,0 +1,15 @@
+---
+# Remove k8s-container-service-provider from a console-provisioned cluster.
+
+- name: Fleet cluster provider | Delete k8s SP
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_name: "{{ fleet_cluster_name }}"
+    fleet_site_ocm_name: "{{ fleet_cluster_name }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: delete_site_k8s_provider.yml
+      tags: [fleet_cluster_provider, fleet_cluster_provider_k8s]

@@ -1,0 +1,12 @@
+---
+# Hub gateway only — workload clusters register via FleetClusterJoin (console).
+# Copy to inventory/group_vars/fleet_edge.yml for greenfield hub installs.
+
+fleet_edge_enable: true
+fleet_edge_direct_ingress_default: true
+fleet_edge_public_nodeport: "{{ phase5_gateway_nodeport }}"
+
+fleet_edge_clusters: {}
+fleet_edge_apps: []
+fleet_edge_phase6_clusters: []
+ocm_spoke_kubeconfig_sync_targets: []

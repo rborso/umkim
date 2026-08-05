@@ -1,0 +1,29 @@
+---
+- name: DCM gateway | Read live gateway networking for assert
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ phase5_dcm_namespace }} get deployment gateway
+      -o jsonpath={.spec.replicas}{"\n"}{.spec.template.spec.hostNetwork}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: dcm_gateway_networking_assert_raw
+  changed_when: false
+  failed_when: false
+  when: (dcm_gateway_replicas | default(1) | int) > 1
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM gateway | Assert HA gateway does not use hostNetwork
+  ansible.builtin.assert:
+    that:
+      - dcm_gateway_networking_assert_raw.stdout_lines | length >= 1
+      - (dcm_gateway_networking_assert_raw.stdout_lines[1] | default('', true) | trim) != 'true'
+    fail_msg: >-
+      gateway Deployment has hostNetwork=true with dcm_gateway_replicas={{ dcm_gateway_replicas }}.
+      Only one pod can bind host :80/:443 on a single node. Re-run fleet-dcm.yml --tags dcm_hub,dcm_traefik
+      or patch hostNetwork to false before scaling replicas.
+  when:
+    - (dcm_gateway_replicas | default(1) | int) > 1
+    - not (fleet_gateway_wireguard_upstream | default((groups.get('spokes', {}) | default({}) | length > 0)) | bool)
+    - dcm_gateway_networking_assert_raw.rc == 0
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]

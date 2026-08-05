@@ -1,0 +1,18 @@
+---
+host_prepare: {}
+host_prepare_sysctl: {}
+host_prepare_packages: []
+host_prepare_nm_connections: []
+host_prepare_nm_extra: []
+host_prepare_openwrt: {}
+
+fleet_node: false
+openwrt_node: false
+
+host_prepare_sysctl_file: /etc/sysctl.d/99-fleet-host-prepare.conf
+host_prepare_modules_load_file: /etc/modules-load.d/fleet-br-netfilter.conf
+host_prepare_ipv6_sysctl_file: /etc/sysctl.d/99-fleet-disable-ipv6.conf
+host_prepare_nm_ipv6_method: disabled
+host_prepare_nm_ipv6_connection_types:
+  - bridge
+  - ethernet

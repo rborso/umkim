@@ -1,0 +1,436 @@
+openapi: 3.0.3
+info:
+  title: DCM Fleet API
+  description: Sovereign cloud control plane (DCM API gateway). UI uses camelCase for writes where noted.
+  version: v1alpha1
+servers:
+  - url: /api/v1alpha1
+paths:
+  /health/providers:
+    get:
+      summary: Service Provider Manager health
+  /health/catalog:
+    get:
+      summary: Catalog Manager health
+  /health/policies:
+    get:
+      summary: Policy Manager health
+  /health/placement:
+    get:
+      summary: Placement Manager health
+  /providers:
+    get:
+      summary: List service providers
+    post:
+      summary: Register a service provider
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderRegistration'
+  /providers/{id}:
+    get:
+      summary: Get provider
+    put:
+      summary: Update provider
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderRegistration'
+    delete:
+      summary: Delete provider
+  /service-types:
+    get:
+      summary: List service types
+  /catalog-items:
+    get:
+      summary: List catalog items
+    post:
+      summary: Create catalog item
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogItemCreate'
+  /catalog-items/{id}:
+    get:
+      summary: Get catalog item
+    patch:
+      summary: Update catalog item
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogItemCreate'
+    delete:
+      summary: Delete catalog item
+  /catalog-item-instances:
+    get:
+      summary: List catalog item instances (deployed workloads)
+    post:
+      summary: Deploy a catalog item instance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogItemInstanceCreate'
+  /catalog-item-instances/{id}:
+    get:
+      summary: Get catalog item instance
+    patch:
+      summary: Upgrade instance (helm user_values re-provision)
+    delete:
+      summary: Delete catalog item instance
+      parameters:
+        - name: deletion_mode
+          in: query
+          schema:
+            type: string
+            enum: [strict, deferred, abandon]
+            default: strict
+          description: |
+            strict = require provider uninstall; deferred = background cleanup;
+            abandon = drop control-plane records even if provider is gone.
+  /catalog-item-instances/{id}/helm/history:
+    get:
+      summary: Helm release history for instance
+  /catalog-item-instances/{id}/helm/rollback:
+    post:
+      summary: Helm rollback for instance
+  /policies:
+    get:
+      summary: List policies
+    post:
+      summary: Create policy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyCreate'
+  /policies/{id}:
+    get:
+      summary: Get policy
+    patch:
+      summary: Update policy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyPatch'
+    delete:
+      summary: Delete policy
+components:
+  schemas:
+    ProviderRegistration:
+      type: object
+      required: [name, serviceType, schemaVersion, operations, endpoint]
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        serviceType:
+          type: string
+        schemaVersion:
+          type: string
+        operations:
+          type: array
+          items:
+            type: string
+        endpoint:
+          type: string
+        region:
+          type: string
+        zone:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    Provider:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        display_name:
+          type: string
+        service_type:
+          type: string
+        health_status:
+          type: string
+        endpoint:
+          type: string
+        operations:
+          type: array
+          items:
+            type: string
+        schema_version:
+          type: string
+        metadata:
+          type: object
+    ClusterRequirements:
+      type: object
+      properties:
+        matchLabels:
+          type: object
+          additionalProperties:
+            type: string
+        matchExpressions:
+          type: array
+          items:
+            type: object
+    PlacementSpec:
+      type: object
+      properties:
+        cluster_count:
+          type: integer
+          minimum: 1
+        strategy:
+          type: string
+          enum: [single, spread, all_matching]
+    CatalogFieldDef:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: Catalog field path (e.g. routing.mode, metadata.name)
+        display_name:
+          type: string
+        description:
+          type: string
+          description: Help text explaining what this field controls
+        example:
+          type: string
+          description: Example value shown in the console field help popover
+        examples:
+          type: array
+          items:
+            type: string
+        editable:
+          type: boolean
+        required:
+          type: boolean
+        ui_tier:
+          type: string
+          enum: [required, common, advanced, hidden]
+          description: Form section visibility (required, common, advanced, hidden)
+        ui_widget:
+          type: string
+          enum: [text, password, boolean, number, domain, hostname, dns-label, yaml]
+          description: Dedicated UI control for this field
+        default: {}
+        validation_schema:
+          type: object
+          properties:
+            type:
+              type: string
+            enum:
+              type: array
+              items: {}
+            minimum:
+              type: number
+            maximum:
+              type: number
+            minLength:
+              type: integer
+            maxLength:
+              type: integer
+            pattern:
+              type: string
+            format:
+              type: string
+              description: "dns-label, hostname, k8s-quantity, yaml"
+            x-ui-tier:
+              type: string
+              enum: [required, common, advanced, hidden]
+            x-ui-widget:
+              type: string
+              enum: [text, password, boolean, number, domain, hostname, dns-label, yaml]
+            x-required:
+              type: boolean
+          additionalProperties: true
+    CatalogWorkloadSpec:
+      type: object
+      properties:
+        replicas:
+          type: integer
+          minimum: 1
+          description: Replicas per placed cluster (not fleet-wide total)
+    CatalogItemCreate:
+      type: object
+      required: [name, serviceType, schemaVersion]
+      properties:
+        name:
+          type: string
+        serviceType:
+          type: string
+        schemaVersion:
+          type: string
+        description:
+          type: string
+        spec:
+          type: object
+          properties:
+            workload:
+              $ref: '#/components/schemas/CatalogWorkloadSpec'
+    CatalogItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        service_type:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+    UserValue:
+      type: object
+      required: [path, value]
+      properties:
+        path:
+          type: string
+          description: Catalog field path (e.g. routing.mode, metadata.name)
+        value:
+          description: Field value (string, number, or object per field schema)
+    CatalogItemInstanceCreate:
+      type: object
+      required: [display_name, spec]
+      properties:
+        api_version:
+          type: string
+          default: v1alpha1
+        display_name:
+          type: string
+        spec:
+          type: object
+          required: [catalog_item_id, user_values]
+          properties:
+            catalog_item_id:
+              type: string
+              description: Catalog item uid
+            user_values:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserValue'
+            label_selector:
+              type: object
+              additionalProperties:
+                type: string
+              description: Instance labels matched against policy label_selector
+            placement_override:
+              type: object
+              properties:
+                cluster_count:
+                  type: integer
+                  minimum: 1
+    CatalogItemInstance:
+      type: object
+      properties:
+        uid:
+          type: string
+        id:
+          type: string
+        display_name:
+          type: string
+        resource_id:
+          type: string
+        spec:
+          type: object
+        create_time:
+          type: string
+    PolicyCreate:
+      type: object
+      required: [display_name, policy_type, rego_code]
+      properties:
+        display_name:
+          type: string
+        policy_type:
+          type: string
+          enum: [GLOBAL, USER]
+        rego_code:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+        label_selector:
+          type: object
+          additionalProperties:
+            type: string
+        cluster_requirements:
+          $ref: '#/components/schemas/ClusterRequirements'
+        placement:
+          $ref: '#/components/schemas/PlacementSpec'
+    PolicyPatch:
+      type: object
+      properties:
+        display_name:
+          type: string
+        policy_type:
+          type: string
+          enum: [GLOBAL, USER]
+        rego_code:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+        label_selector:
+          type: object
+          additionalProperties:
+            type: string
+        cluster_requirements:
+          $ref: '#/components/schemas/ClusterRequirements'
+        placement:
+          $ref: '#/components/schemas/PlacementSpec'
+    Policy:
+      type: object
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        description:
+          type: string
+        policy_type:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+        rego_code:
+          type: string
+        label_selector:
+          type: object
+          additionalProperties:
+            type: string
+        cluster_requirements:
+          $ref: '#/components/schemas/ClusterRequirements'
+        placement:
+          $ref: '#/components/schemas/PlacementSpec'
+        create_time:
+          type: string
+        update_time:
+          type: string
+        path:
+          type: string
+    ServiceType:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string

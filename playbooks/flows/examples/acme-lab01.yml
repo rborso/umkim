@@ -1,0 +1,32 @@
+# acme-lab01 — dedicated single-node cluster for org acme.
+# Site: acme-site (orgId=acme). Cluster gets fleet.org=acme, fleet.pool=dedicated.
+#
+#   ansible-playbook $INV playbooks/flows/site-create.yml -e @playbooks/flows/examples/acme-site.yml
+#   ansible-playbook $INV playbooks/flows/cluster-create.yml -e @playbooks/flows/examples/acme-lab01.yml
+
+fleet_flow_cluster_name: acme-lab01
+fleet_flow_site_id: acme-site
+fleet_flow_bootstrap_host: 203.0.113.11
+# Optional SSH jump (omit or set to your bastion):
+# fleet_flow_jumphost: linux@jumphost.example.com:22
+fleet_flow_topology: single_node
+fleet_flow_install_k8s: true
+fleet_flow_install_helm: true
+fleet_flow_ingress_auth_password: ""
+fleet_flow_cluster_labels:
+  fleet.pool: dedicated
+fleet_flow_edge:
+  exposureMode: none
+fleet_flow_nodes:
+  - hostname: acme-lab01
+    address: 203.0.113.11
+    role: control
+
+# Single-node local NFS (node exports /srv/fleet-nfs for RWX without external server).
+fleet_flow_storage:
+  backend: nfs_local
+  rwo: true
+  rwx: true
+  nfs:
+    exportBase: /srv/fleet-nfs
+    storageClass: nfs-client

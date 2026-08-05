@@ -1,0 +1,59 @@
+---
+# API-first cluster delete (console-equivalent).
+#
+# Default: detach from fleet (keeps K3s + user workloads).
+# Set fleet_flow_cleanup_kubernetes=true to reset K3s on all nodes.
+#
+#   ansible-playbook $INV playbooks/flows/cluster-delete.yml \
+#     -e fleet_flow_cluster_name=lab-gpu03 \
+#     -e fleet_flow_cleanup_kubernetes=true
+#
+#   ansible-playbook $INV playbooks/flows/cluster-delete.yml \
+#     -e @playbooks/flows/examples/lab-gpu03.yml \
+#     -e fleet_flow_cleanup_kubernetes=true
+
+- name: Fleet flow | Cluster delete
+  hosts: hub
+  gather_facts: false
+  become: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+    _flow_poll_interval_default: 20
+    _flow_poll_retries_default: 30
+  tasks:
+    - name: Require cluster name
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster_name | length > 0
+
+    - name: Build delete URL
+      ansible.builtin.set_fact:
+        fleet_flow_delete_url: >-
+          {{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}{{
+            '?cleanupKubernetes=true' if (fleet_flow_cleanup_kubernetes | default(false) | bool) else ''
+          }}
+
+    - name: DELETE /clusters/{name}
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_delete_url }}"
+        method: DELETE
+        status_code: [202, 204, 404]
+      register: fleet_flow_delete
+
+    - name: Wait until cluster removed from API
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}"
+        method: GET
+        status_code: [200, 404]
+      register: fleet_flow_delete_poll
+      until: fleet_flow_delete_poll.status == 404
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+      when: fleet_flow_delete.status != 404
+
+    - name: Flow complete
+      ansible.builtin.debug:
+        msg: >-
+          Cluster {{ fleet_flow_cluster_name }} deleted{{
+            ' (K3s reset on nodes)' if (fleet_flow_cleanup_kubernetes | default(false) | bool) else ''
+          }}

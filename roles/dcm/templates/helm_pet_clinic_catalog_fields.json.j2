@@ -1,0 +1,174 @@
+[
+  {
+    "path": "metadata.name",
+    "display_name": "Helm release name",
+    "editable": true,
+    "validation_schema": {
+      "type": "string",
+      "x-ui-tier": "required",
+      "x-ui-widget": "dns-label",
+      "x-required": true
+    }
+  },
+  {
+    "path": "chart.repository",
+    "display_name": "Chart OCI repository",
+    "editable": false,
+    "default": "{{ dcm_helm_chart_oci }}",
+    "validation_schema": { "type": "string" }
+  },
+  {
+    "path": "chart.name",
+    "display_name": "Chart name",
+    "editable": false,
+    "default": "pet-clinic-helm",
+    "validation_schema": { "type": "string" }
+  },
+  {
+    "path": "chart.version",
+    "display_name": "Chart version",
+    "editable": false,
+    "default": "0.1.1",
+    "validation_schema": { "type": "string" }
+  },
+  {
+    "path": "release.namespace",
+    "display_name": "Target namespace",
+    "editable": true,
+    "default": "default",
+    "validation_schema": { "type": "string", "x-ui-tier": "common" }
+  },
+  {
+    "path": "values.database.version",
+    "display_name": "Postgres version",
+    "editable": true,
+    "default": "18",
+    "validation_schema": {
+      "type": "string",
+      "enum": ["18", "17", "16"],
+      "x-ui-tier": "common"
+    }
+  },
+  {
+    "path": "values.database.storageSize",
+    "display_name": "Database PVC size",
+    "editable": true,
+    "default": "2Gi",
+    "validation_schema": {
+      "type": "string",
+      "pattern": "^[0-9]+(Gi|Mi)$",
+      "x-ui-tier": "common"
+    }
+  },
+  {
+    "path": "values.database.storageClass",
+    "display_name": "Database storage class (optional)",
+    "editable": true,
+    "default": "",
+    "description": "Leave empty to use the cluster default StorageClass",
+    "validation_schema": { "type": "string", "x-ui-tier": "advanced" }
+  },
+  {
+    "path": "values.replicaCount",
+    "display_name": "Web tier replicas",
+    "editable": true,
+    "default": 1,
+    "validation_schema": {
+      "type": "integer",
+      "minimum": 1,
+      "x-ui-tier": "advanced",
+      "x-ui-widget": "number"
+    }
+  },
+  {
+    "path": "values",
+    "display_name": "Helm values (full YAML)",
+    "editable": true,
+    "default": {{ dcm_pet_clinic_helm_values_default | to_json }},
+    "validation_schema": {
+      "type": "string",
+      "format": "yaml",
+      "x-ui-tier": "advanced",
+      "x-ui-widget": "yaml"
+    }
+  },
+  {
+    "path": "install.wait",
+    "display_name": "Wait for readiness",
+    "editable": true,
+    "default": false,
+    "description": "Leave off for Pet Clinic — install returns immediately; check Placement status while Postgres and Spring start.",
+    "validation_schema": { "type": "boolean", "x-ui-tier": "advanced", "x-ui-widget": "boolean" }
+  },
+  {
+    "path": "install.timeout",
+    "display_name": "Install timeout (seconds)",
+    "editable": true,
+    "default": 1200,
+    "validation_schema": {
+      "type": "integer",
+      "minimum": 120,
+      "x-ui-tier": "advanced",
+      "x-ui-widget": "number"
+    }
+  },
+  {
+    "path": "install.atomic",
+    "display_name": "Atomic install",
+    "editable": true,
+    "default": false,
+    "description": "Use with install.wait; rollback release on failure.",
+    "validation_schema": { "type": "boolean", "x-ui-tier": "advanced", "x-ui-widget": "boolean" }
+  },
+  {
+    "path": "routing.mode",
+    "display_name": "Routing mode",
+    "editable": true,
+    "default": "hub",
+    "validation_schema": {
+      "type": "string",
+      "enum": ["hub", "site", "none"],
+      "x-ui-tier": "common"
+    }
+  },
+  {
+    "path": "routing.require_auth",
+    "display_name": "Require Authelia (FleetAppRoute only)",
+    "editable": true,
+    "default": false,
+    "validation_schema": {
+      "type": "boolean",
+      "x-ui-widget": "boolean",
+      "x-ui-tier": "common",
+      "x-ui-depends-on": { "path": "routing.mode", "in": ["hub", "site"] }
+    }
+  },
+  {
+    "path": "routing.hub_host",
+    "display_name": "Hub hostname (custom FQDN)",
+    "editable": true,
+    "default": "",
+    "description": "Override hub URL. Leave empty for {release}.{hub-zone} from the fleet edge registry.",
+    "validation_schema": {
+      "type": "string",
+      "x-ui-widget": "hostname",
+      "x-ui-tier": "common",
+      "x-ui-depends-on": { "path": "routing.mode", "in": ["hub"] }
+    }
+  },
+  {
+    "path": "routing.site_host",
+    "display_name": "Site hostname (optional FQDN)",
+    "editable": true,
+    "default": "",
+    "validation_schema": { "type": "string", "x-ui-tier": "common" }
+  },
+  {
+    "path": "routing.cluster",
+    "display_name": "Target cluster (OCM name)",
+    "editable": true,
+    "default": "",
+    "description": "Optional — pin to a cluster; otherwise policy selects from fleet.site + capabilities",
+    "validation_schema": { "type": "string", "x-ui-tier": "advanced" }
+  }
+]

@@ -1,0 +1,16 @@
+---
+# Remove kubevirt-service-provider from a console-provisioned cluster.
+
+- name: Fleet cluster provider | Delete kubevirt SP
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_name: "{{ fleet_cluster_name }}"
+    fleet_site_ocm_name: "{{ fleet_cluster_name }}"
+    phase5_kubevirt_sp_manifestwork_name: phase5-kubevirt-sp
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: delete_site_kubevirt_provider.yml
+      tags: [fleet_cluster_provider, fleet_cluster_provider_kubevirt]

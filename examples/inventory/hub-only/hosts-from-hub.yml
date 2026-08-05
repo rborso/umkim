@@ -1,0 +1,15 @@
+---
+# Use when Ansible runs ON the hub (connection: local).
+#   ansible-playbook -i inventory/hosts.yml -i inventory/hosts-from-hub.yml …
+#
+# Copy alongside inventory/hosts.yml when the control node is the hub itself.
+
+all:
+  children:
+    fleet_nodes:
+      children:
+        hub:
+          hosts:
+            umkim-hub:
+              ansible_host: 127.0.0.1
+              ansible_connection: local

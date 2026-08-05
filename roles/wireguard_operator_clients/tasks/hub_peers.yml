@@ -1,0 +1,79 @@
+---
+# Add operator-client peers on hub wg0 without rewriting the full server config.
+# FleetClusterJoin / FleetSite peers are applied at runtime by fleet-site-controller (wg set);
+# a full wg0-server.conf.j2 deploy would drop those peers on wg-quick restart.
+
+- name: WG operator clients | Apply operator peers on hub wg0 (additive)
+  ansible.builtin.command:
+    cmd: >-
+      wg set {{ wireguard_interface | default('wg0') }}
+      peer {{ item.public_key }}
+      allowed-ips {{ item.allowed_ips }}
+      persistent-keepalive 25
+  loop: "{{ wireguard_operator_dynamic_peers | default([]) }}"
+  loop_control:
+    label: "{{ item.name | default('operator') }}"
+  changed_when: true
+  tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
+
+- name: WG operator clients | Route operator overlay via wg0
+  ansible.builtin.command:
+    cmd: >-
+      ip route replace {{ item.allowed_ips }}
+      dev {{ wireguard_interface | default('wg0') }}
+  loop: "{{ wireguard_operator_dynamic_peers | default([]) }}"
+  loop_control:
+    label: "{{ item.name | default('operator') }}"
+  changed_when: true
+  when: item.allowed_ips is match('/32$')
+  tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
+
+- name: WG operator clients | Collect FleetClusterJoin WireGuard peers
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export KUBECONFIG={{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}
+    kubectl get fleetclusterjoin -n {{ fleet_site_controller_namespace | default('fleet-console') }} -o json \
+      | python3 -c '
+    import json, sys
+    doc = json.load(sys.stdin)
+    for item in doc.get("items", []):
+      for node in (item.get("status") or {}).get("nodes") or []:
+        pk = (node.get("wireguardPublicKey") or "").strip()
+        addr = (node.get("wireguardAddress") or "").strip()
+        if not pk or not addr:
+          continue
+        host = addr.split("/")[0]
+        print(f"{pk}\t{host}/32")
+    '
+  args:
+    executable: /bin/bash
+  register: wg_fcj_peers
+  changed_when: false
+  failed_when: false
+  tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
+
+- name: WG operator clients | Re-apply FleetClusterJoin peers on hub wg0
+  ansible.builtin.command:
+    cmd: >-
+      wg set {{ wireguard_interface | default('wg0') }}
+      peer {{ item.split()[0] }}
+      allowed-ips {{ item.split()[1] }}
+      persistent-keepalive 25
+  loop: "{{ wg_fcj_peers.stdout_lines | default([]) | select('match', '.+') | list }}"
+  loop_control:
+    label: "{{ item.split()[1] | default(item) }}"
+  when: wg_fcj_peers.stdout_lines | default([]) | length > 0
+  changed_when: true
+  tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
+
+- name: WG operator clients | Route FleetClusterJoin overlay IPs via wg0
+  ansible.builtin.command:
+    cmd: >-
+      ip route replace {{ item.split()[1] }}
+      dev {{ wireguard_interface | default('wg0') }}
+  loop: "{{ wg_fcj_peers.stdout_lines | default([]) | select('match', '.+') | list }}"
+  loop_control:
+    label: "{{ item.split()[1] | default(item) }}"
+  when: wg_fcj_peers.stdout_lines | default([]) | length > 0
+  changed_when: true
+  tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]

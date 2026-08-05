@@ -1,0 +1,13 @@
+# Deprecated — use acme-site.yml (org acme dedicated site).
+fleet_flow_site_name: acme-site
+fleet_flow_site_spec:
+  siteName: acme-site
+  siteId: acme-site
+  orgId: acme
+  provisioningMode: registry
+  displayName: Acme dedicated site
+  region: homelab
+  edge:
+    exposureMode: none
+    wanEgress:
+      enabled: false

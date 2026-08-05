@@ -1,0 +1,66 @@
+---
+# Install NVIDIA host driver on a FCJ node before bootstrap (console-equivalent prep).
+#
+# Run from the hub with jumphost reachability to bootstrapHost:
+#
+#   ansible-playbook $INV playbooks/flows/gpu-host-prep.yml \
+#     -e @playbooks/flows/examples/lab-gpu03.yml
+#
+# Post-provision (container toolkit + device plugin) after cluster Ready:
+#
+#   ansible-playbook $INV playbooks/flows/gpu-cluster-enable.yml \
+#     -e @playbooks/flows/examples/lab-gpu03.yml
+
+- name: GPU host prep | Register target node
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _flow_remote_user_default: linux
+  tasks:
+    - name: Require flow variables
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_bootstrap_host | length > 0
+        fail_msg: Set fleet_flow_bootstrap_host (e.g. -e @playbooks/flows/examples/lab-gpu03.yml).
+
+    - name: Parse jumphost user@host:port
+      ansible.builtin.set_fact:
+        fleet_flow_jump_ssh_user: "{{ fleet_flow_jumphost.split('@')[0] if ('@' in fleet_flow_jumphost) else (fleet_flow_ssh_user | default(_flow_remote_user_default)) }}"
+        fleet_flow_jump_hostport: "{{ fleet_flow_jumphost.split('@')[-1] }}"
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Build jumphost proxy args
+      ansible.builtin.set_fact:
+        fleet_flow_jump_host: "{{ fleet_flow_jump_hostport.split(':')[0] }}"
+        fleet_flow_jump_port: "{{ fleet_flow_jump_hostport.split(':')[1] if (':' in fleet_flow_jump_hostport) else '22' }}"
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Set fleet_flow_ssh_proxy
+      ansible.builtin.set_fact:
+        fleet_flow_ssh_proxy: '-o ProxyCommand="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -p {{ fleet_flow_jump_port }} -W %h:%p {{ fleet_flow_jump_ssh_user }}@{{ fleet_flow_jump_host }}"'
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Register GPU prep host
+      ansible.builtin.add_host:
+        name: "{{ fleet_flow_cluster_name | default('gpu-host') }}"
+        ansible_host: "{{ fleet_flow_bootstrap_host }}"
+        ansible_user: "{{ fleet_flow_ssh_user | default(_flow_remote_user_default) }}"
+        ansible_ssh_common_args: "{{ fleet_flow_ssh_proxy | default('') }}"
+        groups: gpu_prep_hosts
+
+- name: GPU host prep | Install NVIDIA driver
+  hosts: gpu_prep_hosts
+  become: true
+  gather_facts: true
+  vars:
+    gpu_host_install_container_toolkit: false
+    gpu_host_install_device_plugin: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: gpu_host
+        tasks_from: detect
+      tags: [gpu_host, gpu_host_detect]
+    - ansible.builtin.import_role:
+        name: gpu_host
+        tasks_from: driver
+      tags: [gpu_host, gpu_host_driver]

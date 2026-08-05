@@ -1,0 +1,74 @@
+---
+- name: OLM | Check if already installed
+  ansible.builtin.command:
+    cmd: kubectl -n olm get deployment olm-operator
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: olm_check
+  changed_when: false
+  failed_when: false
+  tags: [olm, phase4]
+
+- name: OLM | Apply CRDs (server-side; CSV CRD exceeds annotation size limit on k3s)
+  ansible.builtin.command:
+    cmd: kubectl apply --server-side --force-conflicts -f {{ phase4_olm_crds_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: olm_crds
+  changed_when: >-
+    'created' in olm_crds.stdout or 'configured' in olm_crds.stdout
+    or 'serverside-applied' in olm_crds.stdout
+  when: olm_check.rc != 0
+  tags: [olm, phase4]
+
+- name: OLM | Wait for OLM CRDs to be established
+  ansible.builtin.command:
+    cmd: >-
+      kubectl wait --for condition=Established --timeout=600s
+      crd/catalogsources.operators.coreos.com
+      crd/clusterserviceversions.operators.coreos.com
+      crd/installplans.operators.coreos.com
+      crd/olmconfigs.operators.coreos.com
+      crd/operatorconditions.operators.coreos.com
+      crd/operatorgroups.operators.coreos.com
+      crd/operators.operators.coreos.com
+      crd/subscriptions.operators.coreos.com
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  when: olm_check.rc != 0
+  tags: [olm, phase4]
+
+- name: OLM | Apply OLM deployment
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_olm_deploy_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: olm_deploy
+  changed_when: "'created' in olm_deploy.stdout or 'configured' in olm_deploy.stdout"
+  when: olm_check.rc != 0
+  tags: [olm, phase4]
+
+- name: OLM | Wait for olm-operator
+  ansible.builtin.command:
+    cmd: kubectl -n olm wait --for=condition=Available deployment -l app=olm-operator --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  failed_when: false
+  tags: [olm, phase4]
+
+- name: OLM | Wait for catalog-operator
+  ansible.builtin.command:
+    cmd: kubectl -n olm wait --for=condition=Available deployment -l app=catalog-operator --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  failed_when: false
+  tags: [olm, phase4]

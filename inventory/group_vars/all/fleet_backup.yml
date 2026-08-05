@@ -1,0 +1,10 @@
+---
+# Velero spoke backup / restore settings (topology examples).
+# Configure only after the example clusters and backup infrastructure exist.
+fleet_velero_storage_class_map:
+  lab-sn01:
+    lab-ha01:
+      local-path: local-path
+
+# Instance backup artifact root on hub.
+fleet_instance_backup_root: /var/backups/umkim/instances

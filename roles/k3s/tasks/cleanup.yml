@@ -1,0 +1,46 @@
+---
+- name: K3s cleanup | Remove stale control plane VIP before stop
+  ansible.builtin.import_role:
+    name: kube_vip
+    tasks_from: remove_vip.yml
+  tags: [k3s, k3s_cleanup, kube_vip]
+
+- name: K3s cleanup | Stop K3s server
+  ansible.builtin.systemd:
+    name: k3s
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [k3s, k3s_cleanup]
+
+- name: K3s cleanup | Uninstall K3s server
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-uninstall.sh
+  register: k3s_cleanup_server
+  changed_when: k3s_cleanup_server.rc == 0
+  failed_when: false
+  tags: [k3s, k3s_cleanup]
+
+- name: K3s cleanup | Uninstall K3s agent
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-agent-uninstall.sh
+  register: k3s_cleanup_agent
+  changed_when: k3s_cleanup_agent.rc == 0
+  failed_when: false
+  tags: [k3s, k3s_cleanup]
+
+- name: K3s cleanup | Remove leftover state directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher/k3s
+    - /var/lib/rancher/k3s
+    - /etc/rancher/node
+  tags: [k3s, k3s_cleanup]
+
+- name: K3s cleanup | Remove control plane VIP after uninstall
+  ansible.builtin.import_role:
+    name: kube_vip
+    tasks_from: remove_vip.yml
+  tags: [k3s, k3s_cleanup, kube_vip]

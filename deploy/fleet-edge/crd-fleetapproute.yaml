@@ -1,0 +1,194 @@
+# FleetAppRoute — catalog instance public routing (hub + optional site ingress).
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetapproutes.edge.umkim.com
+spec:
+  group: edge.umkim.com
+  names:
+    kind: FleetAppRoute
+    listKind: FleetAppRouteList
+    plural: fleetapproutes
+    singular: fleetapproute
+    shortNames:
+      - far
+      - fleetroute
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - instanceId
+                - cluster
+                - mode
+                - hubHost
+                - service
+              properties:
+                instanceId:
+                  type: string
+                catalogItemId:
+                  type: string
+                cluster:
+                  type: string
+                  description: OCM ManagedCluster name
+                mode:
+                  type: string
+                  enum:
+                    - hub
+                    - site
+                    - dual
+                effectiveMode:
+                  type: string
+                  enum:
+                    - hub
+                    - site
+                    - dual
+                  description: After direct_ingress gate
+                hubHost:
+                  type: string
+                siteHost:
+                  type: string
+                standbyCluster:
+                  type: string
+                healthPath:
+                  type: string
+                  default: /
+                failoverMode:
+                  type: string
+                  enum:
+                    - manual
+                    - relocatable
+                    - standby
+                requireAuth:
+                  type: boolean
+                  description: Apply Authelia forward-auth middleware on hub (hub mode) or spoke ingress (site mode)
+                service:
+                  type: object
+                  required:
+                    - name
+                    - port
+                  properties:
+                    namespace:
+                      type: string
+                      default: default
+                    name:
+                      type: string
+                    port:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                clusterTargets:
+                  type: array
+                  description: Per-provider spoke services (primary and standby SPRMs)
+                  items:
+                    type: object
+                    required:
+                      - cluster
+                      - service
+                    properties:
+                      cluster:
+                        type: string
+                      provider:
+                        type: string
+                      role:
+                        type: string
+                      sprmId:
+                        type: string
+                      service:
+                        type: object
+                        required:
+                          - name
+                          - port
+                        properties:
+                          namespace:
+                            type: string
+                            default: default
+                          name:
+                            type: string
+                          port:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Applied
+                    - Degraded
+                    - Deleted
+                message:
+                  type: string
+                tlsPhase:
+                  type: string
+                  enum:
+                    - PendingDNS
+                    - Queued
+                    - Issuing
+                    - Ready
+                    - FailedDNS
+                    - FailedRateLimit
+                    - Failed
+                tlsMessage:
+                  type: string
+                hubPathHealthy:
+                  type: boolean
+                lastProbeAt:
+                  type: string
+                  format: date-time
+                consecutiveFailures:
+                  type: integer
+                consecutiveSuccess:
+                  type: integer
+                activeCluster:
+                  type: string
+                failoverPhase:
+                  type: string
+                  enum:
+                    - Idle
+                    - Degraded
+                    - Relocating
+                    - Failed
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      additionalPrinterColumns:
+        - name: Mode
+          type: string
+          jsonPath: .spec.effectiveMode
+        - name: Cluster
+          type: string
+          jsonPath: .spec.cluster
+        - name: HubHost
+          type: string
+          jsonPath: .spec.hubHost
+        - name: TLS
+          type: string
+          jsonPath: .status.tlsPhase
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}

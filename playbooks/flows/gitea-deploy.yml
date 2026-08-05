@@ -1,0 +1,85 @@
+---
+# Deploy gitea-helm catalog instance (stateful backup/restore E2E).
+#
+#   ansible-playbook $INV playbooks/flows/gitea-deploy.yml \
+#     -e @playbooks/flows/examples/gitea-lab-int01.yml
+
+- name: Fleet flow | Deploy gitea-helm instance
+  hosts: hub
+  gather_facts: false
+  vars:
+    fleet_flow_dcm_api: "{{ fleet_dcm_seed_api_url | default('http://127.0.0.1:' ~ (phase5_gateway_nodeport | default(30908)) ~ '/api/v1alpha1') }}"
+    fleet_flow_catalog_item_id: gitea-helm
+    fleet_flow_release_name: gitea-br-test
+    fleet_flow_namespace: gitea
+    fleet_flow_routing_mode: hub
+    fleet_flow_admin_user: fleet
+    fleet_flow_admin_password: "{{ fleet_gitea_admin_password_vault | default('FleetGitea-ChangeMe') }}"
+  tasks:
+    - name: Require flow variables
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster is defined
+          - fleet_flow_cluster | length > 0
+        fail_msg: Set fleet_flow_cluster (e.g. -e @playbooks/flows/examples/gitea-lab-int01.yml).
+      tags: [fleet_flow_gitea]
+
+    - name: POST gitea-helm catalog-item-instance
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_dcm_api }}/catalog-item-instances"
+        method: POST
+        body_format: json
+        status_code: [200, 201, 409]
+        body:
+          api_version: v1alpha1
+          display_name: "{{ fleet_flow_release_name }}"
+          spec:
+            catalog_item_id: "{{ fleet_flow_catalog_item_id }}"
+            label_selector:
+              fleet.workload/profile: demo
+              fleet.placement/scope: single
+            user_values:
+              - path: metadata.name
+                value: "{{ fleet_flow_release_name }}"
+              - path: release.namespace
+                value: "{{ fleet_flow_namespace }}"
+              - path: routing.mode
+                value: "{{ fleet_flow_routing_mode }}"
+              - path: routing.cluster
+                value: "{{ fleet_flow_cluster }}"
+              - path: values.gitea.gitea.admin.username
+                value: "{{ fleet_flow_admin_user }}"
+              - path: values.gitea.gitea.admin.password
+                value: "{{ fleet_flow_admin_password }}"
+              - path: install.wait
+                value: false
+              - path: install.timeout
+                value: 900
+      register: fleet_flow_gitea_create
+      tags: [fleet_flow_gitea]
+
+    - name: Wait for helm release history
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_dcm_api }}/catalog-item-instances/{{ fleet_flow_gitea_instance_id }}/helm/history"
+        method: GET
+        status_code: 200
+      register: fleet_flow_gitea_helm_history
+      until: >-
+        fleet_flow_gitea_helm_history.json is defined
+        and (fleet_flow_gitea_helm_history.json.releases | default([]) | length) >= 1
+      retries: 30
+      delay: 10
+      vars:
+        fleet_flow_gitea_instance_id: >-
+          {{ fleet_flow_gitea_create.json.id
+             | default(fleet_flow_gitea_create.json.path | default('') | regex_replace('^catalog-item-instances/', '')) }}
+      when: fleet_flow_gitea_create.status in [200, 201]
+      tags: [fleet_flow_gitea]
+
+    - name: Deploy result
+      ansible.builtin.debug:
+        msg: >-
+          gitea-helm {{ fleet_flow_release_name }} on {{ fleet_flow_cluster }}
+          (HTTP {{ fleet_flow_gitea_create.status }}).
+          Hub host: {{ fleet_flow_release_name }}.{{ fleet_edge_domain | default('example.local') }}
+      tags: [fleet_flow_gitea]

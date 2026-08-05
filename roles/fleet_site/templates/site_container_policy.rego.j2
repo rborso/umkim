@@ -1,0 +1,21 @@
+package dcm.fleet.site.container.{{ fleet_site_ocm_cluster | regex_replace('[^a-zA-Z0-9]', '_') }}
+
+import rego.v1
+
+cluster_matches if {
+  some uv in input.spec.user_values
+  uv.path == "routing.cluster"
+  uv.value == "{{ fleet_site_ocm_cluster }}"
+}
+
+cluster_matches if {
+  input.spec.routing.cluster == "{{ fleet_site_ocm_cluster }}"
+}
+
+main := {
+  "rejected": false,
+  "selected_provider": "{{ fleet_site_k8s_provider }}"
+} if {
+  input.spec.service_type == "container"
+  cluster_matches
+}

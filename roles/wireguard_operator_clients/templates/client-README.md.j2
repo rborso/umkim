@@ -1,0 +1,24 @@
+# WireGuard client — {{ item.name }}
+
+Split tunnel: only **{{ wireguard_operator_client_allowed_ips }}** uses the VPN. Other traffic stays on your normal connection.
+
+| Field | Value |
+|-------|--------|
+| Your overlay IP | `{{ item.address | ansible.utils.ipaddr('address') }}` |
+| Hub endpoint | `{{ wireguard_endpoint_host }}:{{ wireguard_endpoint_port }}` |
+| Fleet Console | `http://10.10.0.1:30908/fleet/` (after tunnel is up) |
+| OCM Lab | `http://10.10.0.1:30910/` |
+
+## Linux
+
+```bash
+sudo cp {{ wireguard_operator_clients_config_filename }} /etc/wireguard/
+sudo wg-quick up {{ wireguard_operator_clients_interface_name }}
+ping -c1 10.10.0.1
+```
+
+Down: `sudo wg-quick down {{ wireguard_operator_clients_interface_name }}`
+
+## Windows / macOS
+
+Import `{{ wireguard_operator_clients_config_filename }}` in the WireGuard app. Ensure **Allowed IPs** are only `{{ wireguard_operator_client_allowed_ips }}` (not `0.0.0.0/0`).

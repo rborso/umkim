@@ -1,0 +1,24 @@
+#!/bin/sh
+# Persist SNAT for WAN → hub NodePort forwards (virt03 is dual-homed).
+# Without this, virt03 replies via 192.168.1.1 default route and external clients time out.
+# Managed by Ansible: roles/openwrt_edge
+
+HUB="{{ openwrt_hub_dest_ip }}"
+LAN_NET="{{ openwrt_homelab_subnet | default('172.16.10.0/24') }}"
+ROUTER_LAN="{{ openwrt_lan_ip | default('172.16.10.1') }}"
+HTTP_PORT="{{ phase5_gateway_nodeport | default('30908') }}"
+HTTPS_PORT="{{ phase5_gateway_https_nodeport | default('30909') }}"
+
+_add_snat() {
+  port="$1"
+  comment="$2"
+  if nft list chain inet fw4 srcnat_lan 2>/dev/null | grep -q "$comment"; then
+    return 0
+  fi
+  nft add rule inet fw4 srcnat_lan \
+    meta nfproto ipv4 ip daddr "$HUB" tcp dport "$port" \
+    ip saddr != "$LAN_NET" snat ip to "$ROUTER_LAN" comment "$comment"
+}
+
+_add_snat "$HTTP_PORT" "fleet-hub-snat-http"
+_add_snat "$HTTPS_PORT" "fleet-hub-snat-https"

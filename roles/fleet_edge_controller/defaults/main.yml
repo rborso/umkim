@@ -1,0 +1,29 @@
+---
+fleet_edge_controller_enabled: true
+fleet_edge_controller_namespace: fleet-system
+fleet_edge_controller_tag: "{{ harbor_fleet_image_tag | default(umkim_version | default('0.1.0')) }}"
+fleet_edge_controller_image: "{{ harbor_fleet_image_prefix }}/fleet-edge-controller:{{ fleet_edge_controller_tag }}"
+fleet_edge_controller_replicas: 1
+fleet_edge_route_sync_enabled: true
+# Reach k8s/helm provider NodePorts on WireGuard IPs (10.10.0.x) from the hub.
+fleet_edge_route_sync_host_network: true
+fleet_edge_route_sync_interval_sec: 30
+fleet_edge_cluster_configmap_namespace: fleet-system
+fleet_edge_cluster_configmap_name: fleet-edge-clusters
+# fleet_edge_acme_enabled — inventory/group_vars/all/common.yml
+fleet_routes_cm_namespace: "{{ phase5_dcm_namespace }}"
+fleet_routes_cm_name: dcm-traefik-fleet-routes
+catalog_manager_api_url: "http://control-plane.{{ phase5_dcm_namespace }}.svc.cluster.local:8080/api/v1alpha1"
+fleet_edge_hub_gateway_url: "http://10.10.0.1:30908"
+fleet_edge_hub_gateway_http_url: "http://10.10.0.1:30908"
+fleet_edge_route_health_interval_sec: 60
+fleet_edge_route_requeue_interval_sec: 60
+fleet_edge_route_health_failure_threshold: 3
+fleet_edge_route_health_success_threshold: 2
+# Hub ACME: fleet-edge-controller staging preflight before production (overridden by detect_acme_profile.yml).
+fleet_edge_acme_preflight_enabled: true
+# Seconds between ACME queue sweeps and after a full pass of failed hostnames (default 60).
+fleet_edge_acme_queue_retry_interval_sec: 60
+fleet_edge_acme_debounce_sec: 30
+fleet_edge_acme_dns_check_enabled: true
+# fleet_edge_acme_legacy_gateway_scale and dcm_gateway_acme_solver_enabled are set by detect_acme_profile.yml from live gateway state.

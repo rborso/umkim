@@ -1,0 +1,40 @@
+# Managed by Ansible (fleet_hub_firewall). Do not edit by hand.
+# Fleet Console / DCM API: http://{{ fleet_hub_firewall_overlay_ipv4 }}:{{ fleet_hub_firewall_gateway_http_nodeport }} over WireGuard.
+{% if fleet_hub_firewall_public_ingress_enabled | bool and fleet_hub_firewall_public_ingress_dnat | bool %}
+# Public WAN :80/:443 → gateway NodePorts (iptables REDIRECT when gateway HA).
+{% elif fleet_hub_firewall_public_ingress_enabled | bool and (dcm_gateway_replicas | default(1) | int) > 1 %}
+# Public WAN :80/:443 → gateway Service externalIPs (kube-proxy; gateway HA).
+{% elif fleet_hub_firewall_public_ingress_enabled | bool %}
+# Public WAN :80/:443 → gateway Traefik hostNetwork (single replica).
+{% else %}
+# Public HTTP/S blocked; management overlay only.
+{% endif %}
+
+table inet fleet_hub {
+  chain prerouting {
+    # Before kube-proxy DNAT (nat prerouting ~ -100).
+    # Drop only packets arriving on the WAN NIC — not hairpin/pod traffic to the node IP
+    # after kube-proxy DNAT (ClusterIP 10.43.0.1:443 → node:6443 must reach the API).
+    type filter hook prerouting priority -150; policy accept;
+
+{% if fleet_hub_firewall_block_public_http | bool %}
+    iifname "{{ fleet_hub_firewall_public_interface }}" ip daddr {{ fleet_hub_firewall_public_ipv4 }} tcp dport { 80, 443 } drop
+{% endif %}
+
+    iifname "{{ fleet_hub_firewall_public_interface }}" ip daddr {{ fleet_hub_firewall_public_ipv4 }} tcp dport { {{ fleet_hub_firewall_block_public_tcp_ports | join(', ') }} } drop
+  }
+
+  chain input {
+    type filter hook input priority -20; policy accept;
+
+    iifname "lo" accept
+    ct state established,related accept
+    iifname "{{ fleet_hub_firewall_wireguard_interface }}" accept
+
+    iifname "{{ fleet_hub_firewall_public_interface }}" tcp dport { {{ fleet_hub_firewall_public_tcp_allow | join(', ') }} } accept
+    iifname "{{ fleet_hub_firewall_public_interface }}" udp dport { {{ fleet_hub_firewall_public_udp_allow | join(', ') }} } accept
+{% if fleet_hub_firewall_public_ingress_enabled | bool %}
+    ip daddr { 127.0.0.0/8, {{ fleet_hub_firewall_overlay_ipv4 }}/32 } tcp dport { {{ fleet_hub_firewall_gateway_http_nodeport }}, {{ fleet_hub_firewall_gateway_https_nodeport }} } accept
+{% endif %}
+  }
+}

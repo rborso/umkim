@@ -1,0 +1,72 @@
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: dc-admin
+spec:
+  rules:
+    - resources: ["*"]
+      verbs: ["*"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: site-admin
+spec:
+  rules:
+    - resources: ["sites", "clusters", "infrastructure", "ingress-auth", "acme", "edge", "instances", "catalog-items", "catalog-item-instances", "policies"]
+      verbs: ["get", "list", "create", "update", "delete", "patch"]
+    - resources: ["providers"]
+      verbs: ["get", "list"]
+    - resources: ["health"]
+      verbs: ["get"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: cluster-admin
+spec:
+  rules:
+    - resources: ["clusters", "instances", "catalog-item-instances"]
+      verbs: ["get", "list", "update", "patch"]
+    - resources: ["sites", "catalog-items", "policies", "providers"]
+      verbs: ["get", "list"]
+    - resources: ["health"]
+      verbs: ["get"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: customer
+spec:
+  rules:
+    - resources: ["catalog-items", "policies", "providers"]
+      verbs: ["get", "list"]
+    - resources: ["catalog-item-instances"]
+      verbs: ["get", "list", "create", "delete"]
+    - resources: ["placement-preview"]
+      verbs: ["create"]
+    - resources: ["sites", "clusters"]
+      verbs: ["get", "list", "create", "delete"]
+    - resources: ["health"]
+      verbs: ["get"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: org-admin
+spec:
+  rules:
+    - resources: ["catalog-items", "providers"]
+      verbs: ["get", "list"]
+    - resources: ["policies"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["catalog-item-instances"]
+      verbs: ["get", "list", "create", "delete"]
+    - resources: ["placement-preview"]
+      verbs: ["create"]
+    - resources: ["sites", "clusters"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["users", "role-bindings", "groups", "llm-api-keys"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["health"]
+      verbs: ["get"]

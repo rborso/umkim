@@ -1,0 +1,28 @@
+---
+- name: Fleet Helm SP | Push ManifestWork to each cluster
+  ansible.builtin.template:
+    src: manifestwork-helm-sp.yaml.j2
+    dest: "/tmp/manifestwork-helm-sp-{{ item }}.yaml"
+    mode: "0600"
+  loop: "{{ ocm_helm_sp_clusters | default(groups['spokes']) }}"
+  vars:
+    ocm_target_cluster: "{{ hostvars[item].ocm_cluster_name | default(item) }}"
+    dcm_helm_sp_nodeport: "{{ hostvars[item].dcm_helm_sp_nodeport | default(30192) }}"
+    dcm_helm_sp_name: "{{ hostvars[item].dcm_helm_sp_name | default('helm-' ~ item) }}"
+    dcm_helm_sp_endpoint_host: >-
+      {{ hostvars[item].dcm_helm_sp_endpoint_host
+         | default(hostvars[item].wireguard_address | ansible.utils.ipaddr('address'), true)
+         | default(hostvars[item].ansible_host, true) }}
+    dcm_helm_sp_image: "{{ hostvars[item].dcm_helm_sp_image | default(phase5_helm_sp_image) }}"
+  tags: [fleet_helm_sp, phase5_helm_sp, phase5_push]
+
+- name: Fleet Helm SP | Apply ManifestWork on hub
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/manifestwork-helm-sp-{{ item }}.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_helm_sp_clusters | default(groups['spokes']) }}"
+  register: fleet_helm_sp_mw_apply
+  changed_when: "'created' in fleet_helm_sp_mw_apply.stdout or 'configured' in fleet_helm_sp_mw_apply.stdout"
+  tags: [fleet_helm_sp, phase5_helm_sp, phase5_push]

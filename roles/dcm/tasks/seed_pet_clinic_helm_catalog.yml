@@ -1,0 +1,74 @@
+---
+# Seed pet-clinic-helm catalog item (three-tier Postgres + Spring + nginx via Helm).
+- name: DCM pet-clinic helm | API base for seed tasks
+  ansible.builtin.set_fact:
+    dcm_pet_clinic_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+    dcm_pet_clinic_chart_oci: "{{ harbor_charts_oci_prefix | default('oci://10.10.0.1:30443/charts') }}"
+    dcm_helm_chart_oci: "{{ harbor_charts_oci_prefix | default('oci://10.10.0.1:30443/charts') }}"
+    dcm_pet_clinic_repo_root: "{{ playbook_dir | regex_replace('/playbooks/?$', '') }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]
+
+- name: DCM pet-clinic helm | Read fleet default values
+  ansible.builtin.slurp:
+    src: "{{ dcm_pet_clinic_repo_root }}/deploy/pet-clinic-helm/values-fleet.yaml"
+  register: dcm_pet_clinic_values_slurp
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]
+
+- name: DCM pet-clinic helm | Default values YAML for catalog field
+  ansible.builtin.set_fact:
+    dcm_pet_clinic_helm_values_default: "{{ dcm_pet_clinic_values_slurp.content | b64decode }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]
+
+- name: DCM pet-clinic helm | Build catalog fields
+  ansible.builtin.set_fact:
+    dcm_pet_clinic_catalog_fields: "{{ lookup('template', 'helm_pet_clinic_catalog_fields.json.j2') }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]
+
+- name: DCM pet-clinic helm | Ensure catalog item exists
+  ansible.builtin.uri:
+    url: "{{ dcm_pet_clinic_api_url }}/catalog-items?id=pet-clinic-helm"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body:
+      api_version: v1alpha1
+      display_name: Pet Clinic (Helm)
+      spec:
+        resources:
+          - name: app
+            service_type: helm
+            fields: "{{ dcm_pet_clinic_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]
+
+- name: DCM pet-clinic helm | Patch catalog item
+  ansible.builtin.uri:
+    url: "{{ dcm_pet_clinic_api_url }}/catalog-items/pet-clinic-helm"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body:
+      display_name: Pet Clinic (Helm)
+      spec:
+        resources:
+          - name: app
+            service_type: helm
+            fields: "{{ dcm_pet_clinic_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]
+
+- name: DCM pet-clinic helm | Seed summary
+  ansible.builtin.debug:
+    msg: >-
+      Helm catalog pet-clinic-helm seeded (chart {{ dcm_pet_clinic_chart_oci }}/pet-clinic-helm:0.1.1).
+      Deploy: POST {{ dcm_pet_clinic_api_url }}/catalog-item-instances with catalog_item_id=pet-clinic-helm
+      and label_selector {{ fleet_dcm_demo_instance_label_selector }}.
+      See docs/dcm-catalog-servicetypes/helm-spec.yaml and charts/pet-clinic-helm/README.md.
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_pet_clinic_helm]

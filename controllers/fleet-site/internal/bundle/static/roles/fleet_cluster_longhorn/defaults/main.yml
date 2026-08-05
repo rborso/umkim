@@ -1,0 +1,7 @@
+---
+fleet_cluster_longhorn_device: ""
+fleet_cluster_longhorn_storage_class: longhorn
+fleet_cluster_longhorn_mount_path: /var/lib/longhorn
+fleet_cluster_longhorn_chart_version: 1.6.2
+fleet_cluster_min_data_disk_gi: 40
+fleet_cluster_storage_kubeconfig: /etc/rancher/k3s/k3s.yaml

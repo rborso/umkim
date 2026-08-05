@@ -1,0 +1,30 @@
+# Shared: make wg-quick@ resilient when Peer Endpoint uses a DNS name.
+# Safe on hub (no Endpoint → wait script exits 0) and on spokes/FCJ overlay clients.
+---
+- name: WireGuard | Install umkim DNS-ready helper
+  ansible.builtin.copy:
+    src: umkim-wg-wait-dns.sh
+    dest: /usr/local/libexec/umkim-wg-wait-dns.sh
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [wireguard, wireguard_client, wireguard_server, fleet_cluster_wireguard]
+
+- name: WireGuard | Ensure wg-quick systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/wg-quick@.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [wireguard, wireguard_client, wireguard_server, fleet_cluster_wireguard]
+
+- name: WireGuard | Install wg-quick DNS-ready drop-in
+  ansible.builtin.copy:
+    src: wg-quick-umkim-dns-ready.conf
+    dest: /etc/systemd/system/wg-quick@.service.d/umkim-dns-ready.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd for WireGuard DNS-ready
+  tags: [wireguard, wireguard_client, wireguard_server, fleet_cluster_wireguard]

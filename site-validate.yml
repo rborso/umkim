@@ -1,0 +1,13 @@
+---
+# Validate enrolled site bootstrap node (run from ansible-runner Job or manually).
+#
+#   ansible-playbook site-validate.yml -e fleet_site_name=lab-site1 \
+#     -i output/fleet-sites/lab-site1/inventory.ini
+
+- name: Fleet site validate | Bootstrap host
+  hosts: site_bootstrap
+  become: true
+  gather_facts: true
+  roles:
+    - role: fleet_site_validate
+      tags: [fleet_site_validate]

@@ -1,0 +1,17 @@
+---
+# Install KubeVirt stack + Multus bridge NAD on a spoke (SSH/kubeconfig on node).
+#
+#   ansible-playbook kubevirt-bridge-ready.yml -i inventory/tmp-lab-ext02.ini -l lab-ext02
+
+- name: KubeVirt platform + bridge NAD on spoke
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  roles:
+    - role: kubevirt_stack
+      tags: [kubevirt, kubevirt_platform]
+    - role: kubevirt_bridge_nad
+      tags: [kubevirt, kubevirt_bridge_nad]

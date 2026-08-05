@@ -1,0 +1,141 @@
+---
+- name: Fleet WebUI | Ensure helm is available
+  ansible.builtin.stat:
+    path: "{{ harbor_helm_install_dir | default('/usr/local/bin') }}/helm"
+  register: fleet_webui_helm_stat
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Download pinned helm (for OCM Lab chart)
+  ansible.builtin.get_url:
+    url: https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz
+    dest: /tmp/helm-v3.16.3-linux-amd64.tar.gz
+    checksum: sha256:f5355c79190951eed23c5432a3b920e071f4c00a64f75e077de0dd4cb7b294ea
+    mode: "0644"
+  when: not fleet_webui_helm_stat.stat.exists
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Extract pinned helm
+  ansible.builtin.unarchive:
+    src: /tmp/helm-v3.16.3-linux-amd64.tar.gz
+    dest: /tmp
+    remote_src: true
+  when: not fleet_webui_helm_stat.stat.exists
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Place helm binary
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm
+    dest: "{{ harbor_helm_install_dir | default('/usr/local/bin') }}/helm"
+    mode: "0755"
+    remote_src: true
+  when: not fleet_webui_helm_stat.stat.exists
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Warm Harbor cache for OCM Lab images
+  ansible.builtin.command:
+    cmd: >-
+      skopeo copy --dest-tls-verify=false
+      docker://{{ item }}
+      docker://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_quay }}/{{ item | regex_replace('^quay.io/', '') }}
+  loop:
+    - "{{ ocm_lab_api_image }}:{{ ocm_lab_api_image_tag }}"
+    - "{{ ocm_lab_ui_image }}:{{ ocm_lab_ui_image_tag }}"
+  register: fleet_webui_ocm_warm
+  changed_when: "'Copying blob' in fleet_webui_ocm_warm.stderr or fleet_webui_ocm_warm.stderr == ''"
+  failed_when: false
+  when: harbor_host is defined
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Remove legacy OCM console (frees NodePort {{ ocm_lab_nodeport }})
+  ansible.builtin.command:
+    cmd: kubectl delete deployment,service ocm-console -n {{ fleet_webui_namespace }} --ignore-not-found
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when: not ocm_console_enabled | bool
+  changed_when: false
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Clone OCM Lab Dashboard chart
+  ansible.builtin.git:
+    repo: https://github.com/open-cluster-management-io/lab.git
+    dest: /tmp/ocm-lab-dashboard
+    version: bddcdd31b25d2dd2459699898c179eb6ed085b69
+    depth: 1
+    force: true
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Render OCM Lab Helm values
+  ansible.builtin.template:
+    src: ocm-dashboard-values.yaml.j2
+    dest: /tmp/ocm-dashboard-values.yaml
+    mode: "0600"
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Install or upgrade OCM Lab Dashboard (Helm)
+  ansible.builtin.command:
+    cmd: >-
+      helm upgrade --install {{ ocm_lab_helm_release }}
+      /tmp/ocm-lab-dashboard/dashboard/charts/ocm-dashboard
+      --namespace {{ fleet_webui_namespace }}
+      --create-namespace
+      -f /tmp/ocm-dashboard-values.yaml
+      --wait --timeout 10m
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_webui_ocm_lab_helm
+  changed_when: >-
+    'has been upgraded' in fleet_webui_ocm_lab_helm.stdout
+    or 'has been installed' in fleet_webui_ocm_lab_helm.stdout
+  retries: 2
+  delay: 30
+  until: fleet_webui_ocm_lab_helm.rc == 0
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Render OCM Lab NodePort service
+  ansible.builtin.template:
+    src: ocm-dashboard-nodeport.yaml.j2
+    dest: /tmp/fleet-webui-ocm-lab-nodeport.yaml
+    mode: "0600"
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Apply OCM Lab NodePort service
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-webui-ocm-lab-nodeport.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_webui_ocm_lab_np
+  changed_when: "'created' in fleet_webui_ocm_lab_np.stdout or 'configured' in fleet_webui_ocm_lab_np.stdout"
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Wait for OCM Lab Dashboard deployment
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_webui_namespace }} wait
+      --for=condition=Available deployment/{{ ocm_lab_helm_release }}
+      --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Probe OCM Lab Dashboard HTTP
+  ansible.builtin.command:
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:{{ ocm_lab_nodeport }}/
+  register: fleet_webui_ocm_lab_http
+  changed_when: false
+  retries: 6
+  delay: 10
+  until: fleet_webui_ocm_lab_http.stdout | trim == '200'
+  tags: [fleet_webui, ocm_webui, ocm_lab, fleet_webui_verify]
+
+- name: Fleet WebUI | Probe OCM Lab Dashboard UI health endpoint
+  ansible.builtin.command:
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:{{ ocm_lab_nodeport }}/health
+  register: fleet_webui_ocm_lab_health
+  changed_when: false
+  failed_when: fleet_webui_ocm_lab_health.stdout | trim != '200'
+  tags: [fleet_webui, ocm_webui, ocm_lab, fleet_webui_verify]

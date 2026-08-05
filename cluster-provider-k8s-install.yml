@@ -1,0 +1,23 @@
+---
+# Install k8s-container-service-provider on a console-provisioned cluster.
+#
+#   ansible-playbook cluster-provider-k8s-install.yml -e fleet_cluster_name=my-cluster \
+#     -e fleet_site_dcm_k8s_sp_nodeport=30190 -e fleet_site_sp_endpoint=10.10.0.15 \
+#     -i inventory/from-controller.ini
+
+- name: Fleet cluster provider | Install k8s SP
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_name: "{{ fleet_cluster_name }}"
+    fleet_site_ocm_name: "{{ fleet_cluster_name }}"
+    fleet_site_wg_ip: "{{ fleet_site_sp_endpoint }}/32"
+    harbor_host: "{{ fleet_hub_wireguard_ip | default('10.10.0.1') }}"
+    harbor_proxy_project_quay: "{{ harbor_proxy_project_quay | default('quay-proxy') }}"
+    phase5_dcm_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_quay }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: push_site_k8s_provider.yml
+      tags: [fleet_cluster_provider, fleet_cluster_provider_k8s]

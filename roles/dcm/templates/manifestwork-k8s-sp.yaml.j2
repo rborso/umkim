@@ -1,0 +1,101 @@
+# OCM ManifestWork — k8s-container-service-provider on spoke {{ ocm_target_cluster }}
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  name: {{ phase5_manifestwork_name }}
+  namespace: {{ ocm_target_cluster }}
+  labels:
+    fleet.umkim.com/phase: "5"
+spec:
+  workload:
+    manifests:
+      - apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: {{ phase5_worker_namespace }}
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: k8s-container-sp
+          namespace: {{ phase5_worker_namespace }}
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: fleet-{{ ocm_target_cluster }}-k8s-sp
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-admin
+        subjects:
+          - kind: ServiceAccount
+            name: k8s-container-sp
+            namespace: {{ phase5_worker_namespace }}
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: k8s-container-service-provider
+          namespace: {{ phase5_worker_namespace }}
+        spec:
+          type: NodePort
+          selector:
+            app: k8s-container-service-provider
+          ports:
+            - name: http
+              port: 8080
+              targetPort: 8080
+              nodePort: {{ dcm_k8s_sp_nodeport }}
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: k8s-container-service-provider
+          namespace: {{ phase5_worker_namespace }}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: k8s-container-service-provider
+          template:
+            metadata:
+              labels:
+                app: k8s-container-service-provider
+            spec:
+              serviceAccountName: k8s-container-sp
+              containers:
+                - name: provider
+                  image: >-
+                    {{ hostvars[ocm_target_cluster].dcm_k8s_sp_image
+                       | default(dcm_k8s_sp_image | default(
+                           harbor_fleet_image_prefix ~ '/k8s-container-service-provider:'
+                           ~ (harbor_fleet_image_tag | default(umkim_version)))) }}
+                  imagePullPolicy: Always
+                  ports:
+                    - containerPort: 8080
+                  env:
+                    - name: SP_NAME
+                      value: "{{ dcm_k8s_sp_name }}"
+                    - name: SP_ENDPOINT
+                      value: "http://{{ dcm_k8s_sp_endpoint_host }}:{{ dcm_k8s_sp_nodeport }}"
+                    - name: SP_DISPLAY_NAME
+                      value: "K8s containers on {{ ocm_target_cluster }}"
+                    - name: SP_REGION
+                      value: fleet
+                    - name: SP_ZONE
+                      value: "{{ ocm_target_cluster }}"
+                    - name: SP_SITE
+                      value: "{{ hostvars[ocm_target_cluster].fleet_site | default('') }}"
+                    - name: DCM_REGISTRATION_URL
+                      value: "{{ hostvars[ocm_target_cluster].phase5_registration_url | default(phase5_registration_url) }}"
+                    - name: SP_NATS_URL
+                      value: "{{ hostvars[ocm_target_cluster].phase5_nats_url | default(phase5_nats_url) }}"
+                    - name: SP_K8S_NAMESPACE
+                      value: "{{ phase5_k8s_sp_workload_namespace }}"
+                    - name: SP_K8S_EXTERNAL_SVC_TYPE
+                      value: "{{ phase5_k8s_sp_external_svc_type }}"
+                    - name: SP_SERVER_ADDRESS
+                      value: ":8080"
+                  readinessProbe:
+                    httpGet:
+                      path: /api/v1alpha1/containers/health
+                      port: 8080
+                    initialDelaySeconds: 15
+                    periodSeconds: 10

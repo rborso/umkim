@@ -1,0 +1,58 @@
+---
+# Deploy whoami-helm catalog instance (Helm smoke test before backup E2E).
+#
+#   ansible-playbook $INV playbooks/flows/whoami-helm-deploy.yml \
+#     -e fleet_flow_cluster=lab-int01 -e fleet_flow_release_name=whoami-br-smoke
+
+- name: Fleet flow | Deploy whoami-helm instance
+  hosts: hub
+  gather_facts: false
+  vars:
+    fleet_flow_dcm_api: "{{ fleet_dcm_seed_api_url | default('http://127.0.0.1:' ~ (phase5_gateway_nodeport | default(30908)) ~ '/api/v1alpha1') }}"
+    fleet_flow_catalog_item_id: whoami-helm
+    fleet_flow_namespace: default
+    fleet_flow_routing_mode: hub
+  tasks:
+    - name: Require flow variables
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster is defined
+          - fleet_flow_cluster | length > 0
+          - fleet_flow_release_name is defined
+          - fleet_flow_release_name | length > 0
+        fail_msg: Set fleet_flow_cluster and fleet_flow_release_name.
+      tags: [fleet_flow_whoami_helm]
+
+    - name: POST whoami-helm catalog-item-instance
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_dcm_api }}/catalog-item-instances"
+        method: POST
+        body_format: json
+        status_code: [200, 201, 409]
+        body:
+          api_version: v1alpha1
+          display_name: "{{ fleet_flow_release_name }}"
+          spec:
+            catalog_item_id: "{{ fleet_flow_catalog_item_id }}"
+            label_selector:
+              fleet.workload/profile: demo
+              fleet.placement/scope: single
+            user_values:
+              - path: metadata.name
+                value: "{{ fleet_flow_release_name }}"
+              - path: release.namespace
+                value: "{{ fleet_flow_namespace }}"
+              - path: routing.mode
+                value: "{{ fleet_flow_routing_mode }}"
+              - path: routing.cluster
+                value: "{{ fleet_flow_cluster }}"
+      register: fleet_flow_whoami_create
+      tags: [fleet_flow_whoami_helm]
+
+    - name: Deploy result
+      ansible.builtin.debug:
+        msg: >-
+          whoami-helm {{ fleet_flow_release_name }} on {{ fleet_flow_cluster }}
+          (HTTP {{ fleet_flow_whoami_create.status }}).
+          Hub host: {{ fleet_flow_release_name }}.{{ fleet_edge_domain | default('example.local') }}
+      tags: [fleet_flow_whoami_helm]

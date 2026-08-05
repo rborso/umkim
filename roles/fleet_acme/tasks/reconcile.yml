@@ -1,0 +1,31 @@
+---
+- name: Fleet ACME | Apply hub gateway + edge controller
+  when: fleet_acme_hub_enabled | default(false) | bool
+  block:
+    - ansible.builtin.import_role:
+        name: dcm
+        tasks_from: gateway_acme_migrate.yml
+
+    - ansible.builtin.import_role:
+        name: dcm
+        tasks_from: traefik_config.yml
+
+    - ansible.builtin.import_role:
+        name: fleet_edge_controller
+
+- name: Fleet ACME | Push spoke Traefik with ACME (acme_cluster clusters)
+  ansible.builtin.import_role:
+    name: spoke_ingress
+    tasks_from: push_spokes.yml
+  when: (ocm_manifestwork_phase6_clusters | default([]) | length) > 0
+
+- name: Fleet ACME | Restart fleet-edge route sync
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_edge_controller_namespace | default('fleet-system') }}
+      rollout restart deployment/fleet-edge-controller deployment/fleet-edge-route-sync
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  changed_when: true
+  when: fleet_acme_hub_enabled | default(false) | bool

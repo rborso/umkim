@@ -1,0 +1,53 @@
+---
+# Spoke Traefik NodePort ingress via OCM ManifestWork (+ optional OpenWrt forwards).
+# Prerequisites: fleet-dcm.yml, spokes healthy (OLM/cert-manager, dcm-worker).
+#
+# Usage:
+#   ansible-playbook fleet-spoke-ingress.yml
+#   ansible-playbook fleet-spoke-ingress.yml --tags spoke_ingress_push -l hub
+#   ansible-playbook fleet-spoke-ingress.yml --tags spoke_ingress_verify -l hub
+#
+# Legacy: phase6.yml imports this playbook.
+
+- name: Spoke ingress | Bootstrap IngressClass on spokes
+  hosts: spokes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: bootstrap_spoke
+      tags: [spoke_ingress, spoke_ingress_bootstrap, phase6, phase6_bootstrap]
+
+- name: Spoke ingress | Push Traefik to spokes
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: push_spokes
+      tags: [spoke_ingress, spoke_ingress_push, phase6, phase6_push]
+
+- name: Spoke ingress | OpenWrt WAN port-forwards
+  hosts: openwrt01
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: openwrt_edge
+        tasks_from: port_forwards
+      tags: [spoke_ingress, spoke_ingress_openwrt, phase6, phase6_openwrt, openwrt_edge]
+
+- name: Spoke ingress | Verify and register DCM providers
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: verify
+      tags: [spoke_ingress, spoke_ingress_verify, phase6, phase6_verify]
+    - ansible.builtin.import_role:
+        name: dcm
+        tasks_from: register_providers
+      tags: [spoke_ingress, spoke_ingress_verify, phase6, phase6_verify, dcm]

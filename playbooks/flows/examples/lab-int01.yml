@@ -1,0 +1,19 @@
+# Deprecated alias — use acme-lab01.yml (org acme dedicated @ 203.0.113.11).
+#   ansible-playbook $INV playbooks/flows/cluster-create.yml -e @playbooks/flows/examples/acme-lab01.yml
+
+fleet_flow_cluster_name: acme-lab01
+fleet_flow_site_id: acme-site
+fleet_flow_bootstrap_host: 203.0.113.11
+fleet_flow_jumphost: linux@jumphost.example.com:30200
+fleet_flow_topology: single_node
+fleet_flow_install_k8s: true
+fleet_flow_install_helm: true
+fleet_flow_ingress_auth_password: ""
+fleet_flow_cluster_labels:
+  fleet.pool: dedicated
+fleet_flow_edge:
+  exposureMode: none
+fleet_flow_nodes:
+  - hostname: acme-lab01
+    address: 203.0.113.11
+    role: control

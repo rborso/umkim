@@ -1,0 +1,83 @@
+---
+# Seed operator catalog items + placement policies for fleet-olm-subscription-sp.
+- name: DCM operator | API base for seed tasks
+  ansible.builtin.set_fact:
+    dcm_operator_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_operator]
+
+- name: DCM operator | Register service_type in control-plane catalog API
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl -n {{ phase5_dcm_namespace }} exec deploy/postgres -- psql -U {{ phase5_db_user }} -d {{ phase5_dcm_app_db }} -v ON_ERROR_STOP=1 -c "
+    INSERT INTO service_types (id, api_version, service_type, metadata, spec, path, create_time, update_time)
+    VALUES (
+      'operator',
+      'v1alpha1',
+      'operator',
+      '{}'::jsonb,
+      '{\"subscription\":{\"package\":\"\",\"channel\":\"\",\"source\":\"\",\"sourceNamespace\":\"\"},\"operatorGroup\":{\"targetNamespace\":\"\"},\"installPlanApproval\":\"\"}'::jsonb,
+      'service-types/operator',
+      NOW(),
+      NOW()
+    ) ON CONFLICT (service_type) DO NOTHING;
+    "
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_operator]
+
+- name: DCM operator | Ensure catalog item
+  ansible.builtin.uri:
+    url: "{{ dcm_operator_api_url }}/catalog-items?id={{ item.id }}"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body:
+      api_version: v1alpha1
+      display_name: "{{ item.display_name }}"
+      description: "{{ item.description | default('') }}"
+      spec:
+        resources:
+          - name: app
+            service_type: operator
+            fields: "{{ item.fields }}"
+  loop: "{{ operator_catalog_seed_items }}"
+  loop_control:
+    label: "{{ item.id }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_operator]
+
+- name: DCM operator | Patch catalog item fields
+  ansible.builtin.uri:
+    url: "{{ dcm_operator_api_url }}/catalog-items/{{ item.id }}"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body:
+      display_name: "{{ item.display_name }}"
+      description: "{{ item.description | default('') }}"
+      spec:
+        resources:
+          - name: app
+            service_type: operator
+            fields: "{{ item.fields }}"
+  loop: "{{ operator_catalog_seed_items }}"
+  loop_control:
+    label: "{{ item.id }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_operator]
+
+- name: DCM operator | Seed summary
+  ansible.builtin.debug:
+    msg: >-
+      Operator catalog items seeded: {{ operator_catalog_seed_items | map(attribute='id') | list }}.
+      See docs/dcm-catalog-servicetypes/operator-spec.yaml.
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_operator]

@@ -1,0 +1,20 @@
+model_list:
+{% if fleet_llm_backends | default([]) | length > 0 %}
+{% for b in fleet_llm_backends %}
+  - model_name: {{ b.model | default('llama-cpp') }}
+    litellm_params:
+      model: openai/{{ b.model | default('llama-cpp') }}
+      api_base: {{ b.api_base }}
+      api_key: "none"
+{% endfor %}
+{% else %}
+  - model_name: llama-cpp-demo
+    litellm_params:
+      model: openai/Qwen2.5-0.5B-Instruct
+      api_base: http://127.0.0.1:8080/v1
+      api_key: "none"
+{% endif %}
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false

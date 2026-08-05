@@ -1,0 +1,39 @@
+---
+# Push k8s + OLM SP ManifestWorks for a FleetSite cluster (explicit vars; no inventory host named like MC).
+- name: Fleet site | Resolve cluster and endpoint
+  ansible.builtin.set_fact:
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    fleet_site_sp_endpoint: "{{ fleet_site_sp_endpoint | default((fleet_site_wg_ip | regex_replace('/.*$', ''))) }}"
+
+- name: Fleet site | Resolve DCM SP names
+  ansible.builtin.set_fact:
+    fleet_site_k8s_sp_name: "{{ fleet_site_dcm_k8s_sp_name | default('k8s-' ~ fleet_site_ocm_cluster) }}"
+    fleet_site_olm_sp_name: "{{ fleet_site_dcm_olm_sp_name | default('olm-' ~ fleet_site_ocm_cluster) }}"
+  tags: [fleet_site, fleet_site_provision, phase5]
+
+- name: Fleet site | Register synthetic host for ManifestWork hostvars
+  ansible.builtin.add_host:
+    name: "{{ fleet_site_ocm_cluster }}"
+    dcm_k8s_sp_nodeport: "{{ fleet_site_dcm_k8s_sp_nodeport }}"
+    dcm_k8s_sp_name: "{{ fleet_site_k8s_sp_name }}"
+    dcm_k8s_sp_endpoint_host: "{{ fleet_site_sp_endpoint }}"
+    dcm_olm_sp_nodeport: "{{ fleet_site_dcm_olm_sp_nodeport }}"
+    dcm_olm_sp_name: "{{ fleet_site_olm_sp_name }}"
+    dcm_olm_sp_endpoint_host: "{{ fleet_site_sp_endpoint }}"
+  tags: [fleet_site, fleet_site_provision, phase5]
+
+- name: Fleet site | Push standard UMKIM ManifestWorks
+  ansible.builtin.import_role:
+    name: ocm
+    tasks_from: push_umkim_manifestworks.yml
+  vars:
+    ocm_manifestwork_clusters: ["{{ fleet_site_ocm_cluster }}"]
+  tags: [fleet_site, fleet_site_provision, phase4, phase5]
+
+- name: Fleet site | Push OLM subscription SP
+  ansible.builtin.import_role:
+    name: fleet_olm_sp
+  vars:
+    ocm_olm_sp_clusters: ["{{ fleet_site_ocm_cluster }}"]
+  when: fleet_site_deploy_olm_sp | default(true) | bool
+  tags: [fleet_site, fleet_site_provision, phase5_olm_sp]

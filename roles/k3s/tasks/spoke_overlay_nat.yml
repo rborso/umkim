@@ -1,0 +1,96 @@
+---
+# Masquerade Calico/pod traffic to the fleet WireGuard overlay so klusterlet pods can reach the hub API.
+- name: K3s | Ensure iptables for overlay NAT
+  ansible.builtin.dnf:
+    name:
+      - iptables-nft
+      - iptables
+    state: present
+
+- name: K3s | Detect WireGuard interface for overlay NAT
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ip -o link show | awk -F': ' '{print $2}' | grep -E '^wg(-umkim)?$' | head -1
+  args:
+    executable: /bin/bash
+  register: k3s_overlay_wg_iface
+  changed_when: false
+  failed_when: false
+
+- name: K3s | Detect pod CIDRs for overlay NAT
+  ansible.builtin.shell: |
+    set -euo pipefail
+    KC="{{ k3s_overlay_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    if ! command -v kubectl >/dev/null 2>&1 || [ ! -r "$KC" ]; then
+      exit 0
+    fi
+    {
+      kubectl --kubeconfig "$KC" get nodes -o jsonpath='{range .items[*]}{.spec.podCIDR}{"\n"}{end}' 2>/dev/null || true
+      kubectl --kubeconfig "$KC" get blockaffinities.crd.projectcalico.org -o jsonpath='{range .items[*]}{.spec.cidr}{"\n"}{end}' 2>/dev/null || true
+      kubectl --kubeconfig "$KC" get ippools.crd.projectcalico.org -o jsonpath='{range .items[*]}{.spec.cidr}{"\n"}{end}' 2>/dev/null || true
+    } | awk 'NF' | sort -u
+  args:
+    executable: /bin/bash
+  register: k3s_overlay_pod_cidrs
+  changed_when: false
+  failed_when: false
+
+- name: K3s | Install pod-to-overlay NAT and FORWARD rules
+  ansible.builtin.shell: |
+    set -euo pipefail
+    WG_IF="{{ k3s_overlay_wg_iface.stdout | trim }}"
+    OVERLAY="{{ wireguard_subnet | default('10.10.0.0/16') }}"
+    [ -n "$WG_IF" ] || exit 0
+    while IFS= read -r POD_CIDR; do
+      [ -n "$POD_CIDR" ] || continue
+      iptables -t nat -C POSTROUTING -s "$POD_CIDR" -d "$OVERLAY" -o "$WG_IF" -j MASQUERADE 2>/dev/null \
+        || iptables -t nat -A POSTROUTING -s "$POD_CIDR" -d "$OVERLAY" -o "$WG_IF" -j MASQUERADE
+      iptables -C FORWARD -s "$POD_CIDR" -d "$OVERLAY" -j ACCEPT 2>/dev/null \
+        || iptables -A FORWARD -s "$POD_CIDR" -d "$OVERLAY" -j ACCEPT
+      iptables -C FORWARD -s "$OVERLAY" -d "$POD_CIDR" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null \
+        || iptables -A FORWARD -s "$OVERLAY" -d "$POD_CIDR" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    done <<< "{{ k3s_overlay_pod_cidrs.stdout }}"
+  args:
+    executable: /bin/bash
+  when:
+    - k3s_overlay_wg_iface.stdout | trim | length > 0
+    - k3s_overlay_pod_cidrs.stdout | trim | length > 0
+  changed_when: true
+
+# firewalld's nft FORWARD hook (priority filter+10) runs after iptables ACCEPT and can
+# still reject Calico→wg-umkim (klusterlet work-agent → hub API). Seen on hosts that keep
+# firewalld (e.g. GPU/hypervisor) while host_prepare disable_firewalld is false/skipped.
+- name: K3s | Allow pod CIDRs through firewalld to overlay
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v firewall-cmd >/dev/null 2>&1; then
+      exit 0
+    fi
+    if ! firewall-cmd --state >/dev/null 2>&1; then
+      exit 0
+    fi
+    OVERLAY="{{ wireguard_subnet | default('10.10.0.0/16') }}"
+    WG_IF="{{ k3s_overlay_wg_iface.stdout | trim }}"
+    changed=0
+    firewall-cmd --permanent --zone=trusted --add-interface="$WG_IF" >/dev/null 2>&1 || true
+    while IFS= read -r POD_CIDR; do
+      [ -n "$POD_CIDR" ] || continue
+      if firewall-cmd --permanent --zone=trusted --add-source="$POD_CIDR"; then
+        changed=1
+      fi
+      RULE="rule family=\"ipv4\" source address=\"$POD_CIDR\" destination address=\"$OVERLAY\" accept"
+      if firewall-cmd --permanent --zone=trusted --add-rich-rule="$RULE"; then
+        changed=1
+      fi
+    done <<< "{{ k3s_overlay_pod_cidrs.stdout }}"
+    if [ "$changed" -eq 1 ]; then
+      firewall-cmd --reload
+    fi
+  args:
+    executable: /bin/bash
+  when:
+    - k3s_overlay_wg_iface.stdout | trim | length > 0
+    - k3s_overlay_pod_cidrs.stdout | trim | length > 0
+  register: k3s_overlay_firewalld
+  changed_when: k3s_overlay_firewalld.rc == 0 and (k3s_overlay_firewalld.stdout | default('') | length > 0 or 'success' in (k3s_overlay_firewalld.stderr | default('')))
+  failed_when: false

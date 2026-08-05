@@ -1,0 +1,217 @@
+---
+- name: Host prepare | Gather facts
+  ansible.builtin.setup:
+    gather_subset:
+      - min
+      - network
+  tags: [host_prepare]
+
+- name: Host prepare | Install base packages
+  ansible.builtin.dnf:
+    name: "{{ host_prepare_packages }}"
+    state: present
+  when:
+    - host_prepare_packages | length > 0
+  tags: [host_prepare]
+
+- name: Host prepare | Disable swap immediately
+  ansible.builtin.command:
+    cmd: swapoff -a
+  register: host_prepare_swapoff
+  changed_when: host_prepare_swapoff.rc == 0
+  failed_when: false
+  when: host_prepare.disable_swap | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Remove swap entries from fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\s*[^#].*\bswap\b'
+    state: absent
+  when: host_prepare.disable_swap | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Stop and disable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false
+  when: host_prepare.disable_firewalld | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Load br_netfilter module
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+  when: host_prepare.enable_br_netfilter | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Persist br_netfilter module
+  ansible.builtin.copy:
+    dest: "{{ host_prepare_modules_load_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (host_prepare)
+      br_netfilter
+  when: host_prepare.enable_br_netfilter | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Deploy sysctl settings
+  ansible.builtin.template:
+    src: sysctl-fleet.conf.j2
+    dest: "{{ host_prepare_sysctl_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sysctl
+  when: host_prepare_sysctl | length > 0
+  tags: [host_prepare]
+
+- name: Host prepare | Apply sysctl settings immediately
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "{{ host_prepare_sysctl_file }}"
+    sysctl_set: true
+    state: present
+    reload: false
+  loop: "{{ host_prepare_sysctl | dict2items }}"
+  when: host_prepare_sysctl | length > 0
+  tags: [host_prepare]
+
+- name: Host prepare | List NetworkManager connections
+  ansible.builtin.command:
+    cmd: nmcli -t -f NAME,TYPE connection show
+  register: host_prepare_nm_connections_list
+  changed_when: false
+  when:
+    - host_prepare.disable_ipv6 | default(true) | bool
+      or host_prepare.configure_nm_routing | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Build list of NM profiles that support IPv6 settings
+  ansible.builtin.set_fact:
+    host_prepare_nm_ipv6_targets: "{{ host_prepare_nm_ipv6_targets | default([]) + [item.rsplit(':', 1)[0]] }}"
+  loop: "{{ host_prepare_nm_connections_list.stdout_lines | default([]) }}"
+  when:
+    - host_prepare.disable_ipv6 | default(true) | bool
+    - item | length > 0
+    - item.rsplit(':', 1) | length == 2
+    - item.rsplit(':', 1)[1] in host_prepare_nm_ipv6_connection_types
+  tags: [host_prepare]
+
+- name: Host prepare | Disable IPv6 on eligible NM connections
+  ansible.builtin.command:
+    cmd: nmcli connection modify "{{ item }}" ipv6.method disabled ipv6.addr-gen-mode default
+  loop: "{{ host_prepare_nm_ipv6_targets | default([]) }}"
+  register: host_prepare_nm_ipv6
+  changed_when: host_prepare_nm_ipv6.rc == 0
+  when:
+    - host_prepare.disable_ipv6 | default(true) | bool
+    - host_prepare_nm_ipv6_targets | default([]) | length > 0
+  notify: Restart NetworkManager
+  tags: [host_prepare]
+
+- name: Host prepare | Configure NM connection as default route (manual)
+  ansible.builtin.command:
+    cmd: >-
+      nmcli connection modify "{{ item.name }}"
+      ipv4.method manual
+      ipv4.never-default no
+      ipv4.gateway "{{ item.ipv4_gateway }}"
+      ipv4.route-metric "{{ item.ipv4_route_metric }}"
+  loop: "{{ host_prepare_nm_connections }}"
+  register: host_prepare_nm_default
+  changed_when: host_prepare_nm_default.rc == 0
+  when:
+    - host_prepare.configure_nm_routing | default(true) | bool
+    - host_prepare_nm_connections | length > 0
+    - not (item.ipv4_never_default | default(false) | bool)
+    - item.ipv4_gateway | default('') | length > 0
+    - item.ipv4_method | default('manual') == 'manual'
+  notify: Restart NetworkManager
+  tags: [host_prepare]
+
+- name: Host prepare | Configure NM DHCP connection route metric
+  ansible.builtin.command:
+    cmd: >-
+      nmcli connection modify "{{ item.name }}"
+      ipv4.never-default no
+      ipv4.route-metric "{{ item.ipv4_route_metric }}"
+  loop: "{{ host_prepare_nm_connections }}"
+  register: host_prepare_nm_dhcp
+  changed_when: host_prepare_nm_dhcp.rc == 0
+  when:
+    - host_prepare.configure_nm_routing | default(true) | bool
+    - host_prepare_nm_connections | length > 0
+    - not (item.ipv4_never_default | default(false) | bool)
+    - item.ipv4_method | default('manual') == 'dhcp'
+  notify: Restart NetworkManager
+  tags: [host_prepare]
+
+- name: Host prepare | Configure NM connection without default route
+  ansible.builtin.command:
+    cmd: >-
+      nmcli connection modify "{{ item.name }}"
+      ipv4.method manual
+      ipv4.never-default yes
+      ipv4.gateway ""
+      ipv4.route-metric "{{ item.ipv4_route_metric }}"
+  loop: "{{ host_prepare_nm_connections }}"
+  register: host_prepare_nm_nodefault
+  changed_when: host_prepare_nm_nodefault.rc == 0
+  when:
+    - host_prepare.configure_nm_routing | default(true) | bool
+    - host_prepare_nm_connections | length > 0
+    - item.ipv4_never_default | default(false) | bool
+  notify: Restart NetworkManager
+  tags: [host_prepare]
+
+- name: Host prepare | Extra NM connection tweaks
+  ansible.builtin.command:
+    cmd: nmcli connection modify "{{ item.name }}" connection.autoconnect "{{ 'yes' if (item.autoconnect | bool) else 'no' }}"
+  loop: "{{ host_prepare_nm_extra }}"
+  register: host_prepare_nm_extra_result
+  changed_when: host_prepare_nm_extra_result.rc == 0
+  when: host_prepare_nm_extra | length > 0
+  notify: Restart NetworkManager
+  tags: [host_prepare]
+
+- name: Host prepare | Bring NM connections up
+  ansible.builtin.command:
+    cmd: "nmcli connection up {{ item.name }}"
+  loop: "{{ host_prepare_nm_connections }}"
+  register: host_prepare_nm_up
+  changed_when: >-
+    'successfully activated' in (host_prepare_nm_up.stdout | default('') | lower)
+  failed_when: host_prepare_nm_up.rc != 0
+  when:
+    - host_prepare.configure_nm_routing | default(true) | bool
+    - host_prepare_nm_connections | length > 0
+  tags: [host_prepare]
+
+- name: Host prepare | Flush handlers (apply NM/sysctl before verify)
+  ansible.builtin.meta: flush_handlers
+  tags: [host_prepare]
+
+- name: Host prepare | Verify sysctl ip_forward
+  ansible.builtin.command:
+    cmd: sysctl -n net.ipv4.ip_forward
+  register: host_prepare_verify_forward
+  changed_when: false
+  failed_when: host_prepare_verify_forward.stdout | trim != '1'
+  when: host_prepare.enable_ip_forward | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Verify IPv6 disabled
+  ansible.builtin.command:
+    cmd: sysctl -n net.ipv6.conf.all.disable_ipv6
+  register: host_prepare_verify_ipv6
+  changed_when: false
+  failed_when: host_prepare_verify_ipv6.stdout | trim != '1'
+  when: host_prepare.disable_ipv6 | default(true) | bool
+  tags: [host_prepare]

@@ -1,0 +1,37 @@
+---
+- name: OCM | Set spoke external API URL on Klusterlet CR
+  ansible.builtin.command:
+    cmd: >-
+      kubectl patch klusterlet klusterlet --type=merge -p
+      '{"spec":{"externalServerURLs":[{"url":"https://{{ ansible_host }}:6443"}]}}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_klusterlet_url_patch
+  changed_when: "'patched' in ocm_klusterlet_url_patch.stdout"
+  failed_when: ocm_klusterlet_url_patch.rc != 0 and 'not found' not in ocm_klusterlet_url_patch.stderr
+  tags: [ocm, ocm_patch_klusterlet]
+
+- name: OCM | Restart klusterlet operator to reconcile work agent
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management rollout restart deploy/klusterlet
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when: ocm_klusterlet_url_patch is changed
+  tags: [ocm, ocm_patch_klusterlet]
+
+- name: OCM | Wait for klusterlet-work-agent deployment
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n open-cluster-management-agent rollout status
+      deployment/klusterlet-work-agent --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_work_rollout
+  until: ocm_work_rollout.rc == 0
+  retries: 12
+  delay: 15
+  changed_when: false
+  tags: [ocm, ocm_patch_klusterlet]

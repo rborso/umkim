@@ -1,0 +1,17 @@
+---
+# Delete OCM ManifestWorks for one cluster namespace on the hub.
+- name: Fleet cluster delete | Remove ManifestWorks on hub
+  ansible.builtin.command:
+    cmd: >-
+      kubectl delete manifestwork {{ item }}
+      -n {{ fleet_cluster_name | default(fleet_site_name) }}
+      --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ fleet_cleanup_manifestworks }}"
+  loop_control:
+    label: "{{ fleet_cluster_name | default(fleet_site_name) }}/{{ item }}"
+  register: fleet_cluster_delete_mw
+  changed_when: fleet_cluster_delete_mw.stdout is search('deleted')
+  tags: [fleet_cluster_delete]

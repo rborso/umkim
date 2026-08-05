@@ -1,0 +1,20 @@
+---
+# Sync inventory cluster capabilities to OCM ManagedCluster labels (hub).
+#
+# Usage:
+#   ansible-playbook ocm-cluster-labels.yml -l hub
+
+- name: OCM | Sync fleet labels on ManagedClusters
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: sync_cluster_labels.yml
+      tags: [ocm, ocm_cluster_labels]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: sync_spoke_kubeconfig_secret.yml
+      tags: [ocm, ocm_spoke_kubeconfig]

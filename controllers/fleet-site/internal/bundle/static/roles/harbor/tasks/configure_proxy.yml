@@ -1,0 +1,118 @@
+---
+- name: Harbor | Wait for API
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/health"
+    method: GET
+    validate_certs: false
+    status_code: [200]
+  register: harbor_health
+  until: harbor_health.status == 200
+  retries: 30
+  delay: 10
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Check existing registry endpoints
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/registries"
+    method: GET
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+  register: harbor_registries
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Create Quay registry endpoint
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/registries"
+    method: POST
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [201, 409]
+    body_format: json
+    body:
+      name: quay-upstream
+      type: quay
+      url: https://quay.io
+      insecure: false
+  when: harbor_registries.json | selectattr('name', 'equalto', 'quay-upstream') | list | length == 0
+  register: harbor_quay_registry
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Refresh registry list
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/registries"
+    method: GET
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+  register: harbor_registries
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Set Quay registry id fact
+  ansible.builtin.set_fact:
+    harbor_quay_registry_id: "{{ (harbor_registries.json | selectattr('name', 'equalto', 'quay-upstream') | first).id }}"
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Create Quay proxy cache project
+  ansible.builtin.shell: |
+    curl -sk -u "admin:{{ harbor_admin_password }}" \
+      -H "Content-Type: application/json" \
+      -X POST "{{ harbor_external_url }}/api/v2.0/projects" \
+      -d '{"project_name":"{{ harbor_proxy_project_quay }}","registry_id":{{ harbor_quay_registry_id | int }},"public":true,"metadata":{"public":"true"}}'
+  args:
+    executable: /bin/bash
+  register: harbor_quay_project
+  changed_when: harbor_quay_project.rc == 0
+  failed_when: harbor_quay_project.rc != 0 and 'already exists' not in harbor_quay_project.stderr and 'CONFLICT' not in harbor_quay_project.stdout
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Create GHCR registry endpoint
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/registries"
+    method: POST
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [201, 409]
+    body_format: json
+    body:
+      name: ghcr-upstream
+      type: docker-registry
+      url: https://ghcr.io
+      insecure: false
+  when: harbor_registries.json | selectattr('name', 'equalto', 'ghcr-upstream') | list | length == 0
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Refresh registry list for GHCR
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/registries"
+    method: GET
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+  register: harbor_registries
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Set GHCR registry id fact
+  ansible.builtin.set_fact:
+    harbor_ghcr_registry_id: "{{ (harbor_registries.json | selectattr('name', 'equalto', 'ghcr-upstream') | first).id }}"
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Create GHCR proxy cache project
+  ansible.builtin.shell: |
+    curl -sk -u "admin:{{ harbor_admin_password }}" \
+      -H "Content-Type: application/json" \
+      -X POST "{{ harbor_external_url }}/api/v2.0/projects" \
+      -d '{"project_name":"{{ harbor_proxy_project_ghcr }}","registry_id":{{ harbor_ghcr_registry_id | int }},"public":true,"metadata":{"public":"true"}}'
+  args:
+    executable: /bin/bash
+  register: harbor_ghcr_project
+  changed_when: harbor_ghcr_project.rc == 0
+  failed_when: harbor_ghcr_project.rc != 0 and 'already exists' not in harbor_ghcr_project.stderr and 'CONFLICT' not in harbor_ghcr_project.stdout
+  tags: [harbor, harbor_install]

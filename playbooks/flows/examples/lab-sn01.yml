@@ -1,0 +1,38 @@
+---
+# lab-sn01 — current single-node topology example.
+# Replace the RFC 5737 address and NFS values before running.
+#
+#   ansible-playbook $INV playbooks/flows/site-create.yml \
+#     -e @playbooks/flows/examples/homelab-shared-site.yml
+#   ansible-playbook $INV playbooks/flows/cluster-create.yml \
+#     -e @playbooks/flows/examples/lab-sn01.yml
+
+fleet_flow_cluster_name: lab-sn01
+fleet_flow_site_id: homelab-shared
+fleet_flow_bootstrap_host: 203.0.113.29
+# Optional SSH jump:
+# fleet_flow_jumphost: linux@jumphost.example.com:22
+fleet_flow_topology: single_node
+fleet_flow_install_k8s: true
+fleet_flow_install_helm: true
+fleet_flow_cluster_labels:
+  fleet.pool: shared
+fleet_flow_edge:
+  exposureMode: none
+fleet_flow_nodes:
+  - hostname: lab-sn01
+    address: 203.0.113.29
+    role: control
+
+fleet_flow_storage:
+  backend: nfs_external
+  rwo: true
+  rwx: true
+  nfs:
+    enabled: true
+    server: 203.0.113.40
+    exportBase: /srv/fleet-nfs
+    clusterPath: lab-sn01
+    mountPath: /lab-sn01
+    storageClass: nfs-client
+    delegateHost: 203.0.113.40

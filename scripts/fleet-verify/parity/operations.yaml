@@ -1,0 +1,25 @@
+# Parity operation definitions (API vs console).
+operations:
+  site.create:
+    resource_prefix: verify-synth
+    api:
+      create: POST /fleet/api/v1alpha1/sites
+      delete: DELETE /fleet/api/v1alpha1/sites/{name}
+    console:
+      spec: e2e/parity/site-create.spec.ts
+    compare_fields: [name, phase]
+
+  policy.crud:
+    api:
+      script: ui/dcm-fleet-console/scripts/verify-policy-api.sh
+    console:
+      spec: e2e/parity/policy-crud.spec.ts
+    compare_fields: [display_name, id]
+
+  deploy.submit:
+    catalog_item: whoami-helm
+    api:
+      handler: checks/whoami-deploy.sh
+    console:
+      spec: e2e/parity/deploy-submit.spec.ts
+    compare_fields: [display_name, phase]

@@ -1,0 +1,20 @@
+---
+# Unregister a DCM SPM provider by logical name (k8s-<cluster>, helm-<cluster>, …).
+# SPM DELETE uses provider id (UUID), not name — list first, then delete by id.
+- name: Fleet site | List SPM providers for unregister
+  ansible.builtin.uri:
+    url: "{{ fleet_site_unregister_provider_api_url | default(fleet_site_container_api_url) }}/providers"
+    method: GET
+    status_code: 200
+  register: fleet_site_spm_providers_list
+  tags: [fleet_site, fleet_site_provider_delete, fleet_cluster_delete]
+
+- name: Fleet site | Unregister provider from SPM by name
+  ansible.builtin.uri:
+    url: "{{ fleet_site_unregister_provider_api_url | default(fleet_site_container_api_url) }}/providers/{{ item.id }}"
+    method: DELETE
+    status_code: [200, 204, 404]
+  loop: "{{ fleet_site_spm_providers_list.json.providers | default([]) | selectattr('name', 'equalto', fleet_site_unregister_provider_name) | list }}"
+  loop_control:
+    label: "{{ fleet_site_unregister_provider_name }} ({{ item.id }})"
+  tags: [fleet_site, fleet_site_provider_delete, fleet_cluster_delete]

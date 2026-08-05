@@ -1,0 +1,13 @@
+---
+description: DCM fleet console React UI and fleet-webui role
+globs: ui/dcm-fleet-console/**,roles/fleet_webui/**
+alwaysApply: false
+---
+
+# Fleet console UI (S7)
+
+- App: `ui/dcm-fleet-console/` (Vite/React); DCM API `/api/v1alpha1`, Sites `/fleet/api/v1alpha1`.
+- Nginx: `roles/fleet_webui/templates/dcm-fleet-nginx-spa.conf.j2` — `/api/` → gateway (`dcm_gateway_cluster_port` 80 or 9080); `/fleet/api/` → fleet-site-controller:18080.
+- Deploy: `fleet-console-auth.yml` (+ optional `fleet-webui-lab.yml`); image `fleet/dcm-fleet-console:{{ harbor_fleet_image_tag }}` on Harbor.
+- Dev details: `ui/dcm-fleet-console/README.md`.
+- Skill: `.cursor/skills/fleet-console-ui/SKILL.md`.

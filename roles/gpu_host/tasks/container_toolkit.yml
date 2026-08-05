@@ -1,0 +1,43 @@
+---
+# Post-K3s: container runtime hook so pods can request nvidia.com/gpu.
+- name: GPU host | Add NVIDIA container toolkit repository
+  ansible.builtin.get_url:
+    url: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Install NVIDIA container toolkit
+  ansible.builtin.dnf:
+    name: nvidia-container-toolkit
+    state: present
+  tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Configure K3s containerd with NVIDIA as default runtime
+  ansible.builtin.command:
+    cmd: >-
+      nvidia-ctk runtime configure --runtime=containerd --nvidia-set-as-default
+      --config={{ gpu_host_k3s_config_dir }}/config.toml
+  when: gpu_host_configure_k3s_runtime | bool
+  register: gpu_host_ctk_configure
+  changed_when: gpu_host_ctk_configure.rc == 0
+  notify: GPU host | Restart K3s agent
+  tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Persist NVIDIA default runtime in K3s config.yaml
+  ansible.builtin.shell: |
+    set -euo pipefail
+    CFG=/etc/rancher/k3s/config.yaml
+    mkdir -p /etc/rancher/k3s
+    touch "$CFG"
+    if grep -q '^default-runtime:' "$CFG"; then
+      sed -i 's/^default-runtime:.*/default-runtime: nvidia/' "$CFG"
+    else
+      printf '\ndefault-runtime: nvidia\n' >> "$CFG"
+    fi
+  when: gpu_host_configure_k3s_runtime | bool
+  changed_when: true
+  notify: GPU host | Restart K3s agent
+  tags: [gpu_host, gpu_host_container_toolkit]

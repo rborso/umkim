@@ -1,0 +1,36 @@
+---
+- name: OLM | Wait for ManifestWork to apply on spoke
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ item }} get manifestwork {{ phase4_manifestwork_name }}
+      -o 'jsonpath={.status.conditions[?(@.type=="Applied")].status}{"\n"}{.status.conditions[?(@.type=="Available")].status}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_manifestwork_clusters | default(groups['spokes']) }}"
+  register: olm_mw_applied
+  until: >-
+    (olm_mw_applied.stdout_lines | default([]) | length > 0
+     and (olm_mw_applied.stdout_lines[0] | trim) == 'True')
+    or (olm_mw_applied.stdout_lines | default([]) | length > 1
+        and (olm_mw_applied.stdout_lines[1] | trim) == 'True')
+  retries: 60
+  delay: 15
+  changed_when: false
+  tags: [phase4, phase4_verify]
+
+- name: OLM | Report ManifestWork status
+  ansible.builtin.command:
+    cmd: kubectl -n {{ item }} get manifestwork {{ phase4_manifestwork_name }} -o wide
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_manifestwork_clusters | default(groups['spokes']) }}"
+  register: olm_mw_status
+  changed_when: false
+  tags: [phase4, phase4_verify]
+
+- name: OLM | Show spoke ManifestWork status
+  ansible.builtin.debug:
+    msg: "{{ olm_mw_status.results | map(attribute='stdout_lines') | list }}"
+  tags: [phase4, phase4_verify]

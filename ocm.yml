@@ -1,0 +1,42 @@
+---
+# OCM hub on umkim-hub (ARCHITECTURE.md Phase 3).
+# Requires: host_prepare, wireguard, then K3s + clusteradm init.
+#
+# Usage:
+#   ansible-playbook ocm.yml --tags ocm
+#   ansible-playbook ocm.yml --tags k3s -l hub
+#   ansible-playbook ocm.yml --tags ocm_init -l hub
+
+- name: K3s hub cluster on umkim-hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: k3s
+      tags: [k3s, ocm]
+
+- name: Calico CNI on hub (required before OCM pods schedule)
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: calico
+      tags: [calico, ocm]
+
+- name: OCM hub control plane on umkim-hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: ocm
+      tags: [ocm]
+
+- name: OCM fleet web console on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_webui
+        tasks_from: ocm
+      tags: [ocm, ocm_webui, fleet_webui]

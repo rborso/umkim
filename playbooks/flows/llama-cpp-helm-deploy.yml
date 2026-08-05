@@ -1,0 +1,81 @@
+---
+# Deploy llama-cpp-helm catalog instance (GPU LLM inference).
+#
+#   ansible-playbook $INV playbooks/flows/llama-cpp-helm-deploy.yml \
+#     -e @playbooks/flows/examples/llama-lab-gpu03.yml
+
+- name: Fleet flow | Deploy llama-cpp-helm instance
+  hosts: hub
+  gather_facts: false
+  vars:
+    fleet_flow_dcm_api: "{{ fleet_dcm_seed_api_url | default('http://127.0.0.1:' ~ (phase5_gateway_nodeport | default(30908)) ~ '/api/v1alpha1') }}"
+    fleet_flow_catalog_item_id: llama-cpp-helm
+    fleet_flow_namespace: llm
+    fleet_flow_routing_mode: none
+    fleet_flow_workload_profile: llm
+    fleet_flow_placement_scope: single
+    fleet_flow_placement_pool: shared
+    fleet_flow_model: Qwen2.5-0.5B-Instruct
+    fleet_flow_hf_repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    fleet_flow_hf_quant: Q4_K_M
+    fleet_flow_ctx_size: 2048
+    fleet_flow_llama_base_values: "{{ lookup('file', playbook_dir + '/../../deploy/llama-cpp-helm/values-fleet.yaml') | from_yaml }}"
+    fleet_flow_llama_values: >-
+      {{
+        fleet_flow_llama_base_values
+        | combine({
+            'model': fleet_flow_model,
+            'hfRepo': fleet_flow_hf_repo,
+            'hfQuant': fleet_flow_hf_quant,
+            'ctxSize': fleet_flow_ctx_size | int,
+          }, recursive=True)
+        | to_yaml
+      }}
+  tasks:
+    - name: Require flow variables
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster is defined
+          - fleet_flow_cluster | length > 0
+          - fleet_flow_release_name is defined
+          - fleet_flow_release_name | length > 0
+        fail_msg: Set fleet_flow_cluster and fleet_flow_release_name (e.g. -e @playbooks/flows/examples/llama-lab-gpu03.yml).
+      tags: [fleet_flow_llama_cpp_helm]
+
+    - name: POST llama-cpp-helm catalog-item-instance
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_dcm_api }}/catalog-item-instances"
+        method: POST
+        body_format: json
+        status_code: [200, 201, 409]
+        timeout: 300
+        body:
+          api_version: v1alpha1
+          display_name: "{{ fleet_flow_release_name }}"
+          spec:
+            catalog_item_id: "{{ fleet_flow_catalog_item_id }}"
+            label_selector:
+              fleet.workload/profile: "{{ fleet_flow_workload_profile }}"
+              fleet.placement/scope: "{{ fleet_flow_placement_scope }}"
+              fleet.placement/pool: "{{ fleet_flow_placement_pool }}"
+            user_values:
+              - path: metadata.name
+                value: "{{ fleet_flow_release_name }}"
+              - path: release.namespace
+                value: "{{ fleet_flow_namespace }}"
+              - path: routing.mode
+                value: "{{ fleet_flow_routing_mode }}"
+              - path: routing.cluster
+                value: "{{ fleet_flow_cluster }}"
+              - path: values
+                value: "{{ fleet_flow_llama_values }}"
+      register: fleet_flow_llama_create
+      tags: [fleet_flow_llama_cpp_helm]
+
+    - name: Deploy result
+      ansible.builtin.debug:
+        msg: >-
+          llama-cpp-helm {{ fleet_flow_release_name }} on {{ fleet_flow_cluster }}
+          model={{ fleet_flow_model }} ctx={{ fleet_flow_ctx_size }}
+          (HTTP {{ fleet_flow_llama_create.status }}).
+      tags: [fleet_flow_llama_cpp_helm]

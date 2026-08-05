@@ -1,0 +1,76 @@
+---
+# Patch gateway pod template annotations so Kubernetes starts a rolling update
+# (replaces manual kubectl rollout restart after ConfigMap changes).
+
+- name: DCM Traefik | Ensure gateway HA pod-network mode
+  ansible.builtin.import_tasks: gateway_ensure_ha_networking.yml
+
+- name: DCM Traefik | Read gateway checksum annotations
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ phase5_dcm_namespace }} get deployment gateway
+      -o jsonpath={.spec.template.metadata.annotations.checksum/dcm-traefik-static}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: dcm_gateway_checksum_static_current
+  changed_when: false
+  failed_when: false
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM Traefik | Read gateway dynamic checksum annotation
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ phase5_dcm_namespace }} get deployment gateway
+      -o jsonpath={.spec.template.metadata.annotations.checksum/dcm-traefik-dynamic}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: dcm_gateway_checksum_dynamic_current
+  changed_when: false
+  failed_when: false
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM Traefik | Set gateway rollout needed
+  ansible.builtin.set_fact:
+    dcm_gateway_rollout_needed: >-
+      {{
+        (dcm_gateway_checksum_static_current.stdout | trim) != dcm_traefik_static_checksum
+        or (dcm_gateway_checksum_dynamic_current.stdout | trim) != dcm_traefik_dynamic_checksum
+      }}
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM Traefik | Gateway checksums already current
+  ansible.builtin.debug:
+    msg: Gateway pod template checksums match staged Traefik config; skipping rollout.
+  when: not dcm_gateway_rollout_needed | bool
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM Traefik | Render gateway rollout patch
+  ansible.builtin.template:
+    src: gateway-rollout-patch.yaml.j2
+    dest: /tmp/dcm-gateway-rollout-patch.yaml
+    mode: "0600"
+  when: dcm_gateway_rollout_needed | bool
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM Traefik | Patch gateway pod template checksums
+  ansible.builtin.command:
+    cmd: kubectl patch deployment gateway -n {{ phase5_dcm_namespace }} --type=strategic --patch-file /tmp/dcm-gateway-rollout-patch.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: dcm_gateway_rollout_patch
+  when: dcm_gateway_rollout_needed | bool
+  changed_when: dcm_gateway_rollout_patch.rc == 0
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]
+
+- name: DCM Traefik | Wait for gateway rollout
+  ansible.builtin.command:
+    cmd: kubectl -n {{ phase5_dcm_namespace }} rollout status deployment/gateway --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when: dcm_gateway_rollout_needed | bool
+  changed_when: false
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_traefik]

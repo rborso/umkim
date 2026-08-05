@@ -1,0 +1,14 @@
+# Platform shared site (no orgId) — hosts lab-gpu03 shared pool + GPU/LLM.
+#   ansible-playbook $INV playbooks/flows/site-create.yml -e @playbooks/flows/examples/homelab-shared-site.yml
+
+fleet_flow_site_name: homelab-shared
+fleet_flow_site_spec:
+  siteName: homelab-shared
+  siteId: homelab-shared
+  provisioningMode: registry
+  displayName: Homelab shared pool
+  region: homelab
+  edge:
+    exposureMode: none
+    wanEgress:
+      enabled: false

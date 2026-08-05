@@ -1,0 +1,29 @@
+---
+- name: Spoke ingress | Show ManifestWork status
+  ansible.builtin.command:
+    cmd: kubectl -n {{ item }} get manifestwork {{ phase6_manifestwork_name }} -o wide
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ groups['spokes'] }}"
+  register: spoke_mw_status
+  changed_when: false
+  tags: [spoke_ingress, phase6, spoke_ingress_verify, phase6_verify]
+
+- name: Spoke ingress | ManifestWork summary
+  ansible.builtin.debug:
+    msg: "{{ spoke_mw_status.results | map(attribute='stdout_lines') | list }}"
+  tags: [spoke_ingress, phase6, spoke_ingress_verify, phase6_verify]
+
+- name: Spoke ingress | Probe Traefik /ping on each spoke
+  ansible.builtin.command:
+    cmd: >-
+      curl -sf -o /dev/null -w "%{http_code}"
+      http://127.0.0.1:{{ hostvars[item].spoke_ingress_http_nodeport | default(phase6_http_nodeport) }}/ping
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ groups['spokes'] }}"
+  register: spoke_ping
+  changed_when: false
+  failed_when: spoke_ping.stdout | trim != '200'
+  tags: [spoke_ingress, phase6, spoke_ingress_verify, phase6_verify]

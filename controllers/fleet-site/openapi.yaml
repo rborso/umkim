@@ -1,0 +1,168 @@
+openapi: 3.0.3
+info:
+  title: Fleet Site API — instance backup extensions
+  version: v1alpha1
+  description: |
+    Extensions to `/fleet/api/v1alpha1` for catalog instance backup and restore.
+    Full fleet-site routes are documented in docs/components/fleet-site.md.
+servers:
+  - url: /fleet/api/v1alpha1
+paths:
+  /backup-infrastructure:
+    get:
+      summary: Velero and hub MinIO readiness
+      responses:
+        '200':
+          description: Infrastructure status per cluster
+  /instance-workloads/{instanceId}:
+    get:
+      summary: Resolve cluster, release, namespace for backup
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved workload
+        '409':
+          description: Instance not deployed
+  /instance-backups:
+    get:
+      summary: List instance backups
+      parameters:
+        - name: instance_id
+          in: query
+          schema:
+            type: string
+        - name: cluster
+          in: query
+          schema:
+            type: string
+        - name: phase
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backup list
+    post:
+      summary: Start async backup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instance_id]
+              properties:
+                instance_id:
+                  type: string
+                cluster:
+                  type: string
+                release:
+                  type: string
+                namespace:
+                  type: string
+                wait:
+                  type: boolean
+      responses:
+        '202':
+          description: Backup accepted
+        '409':
+          description: Infra not ready or concurrent operation
+  /instance-backups/{name}:
+    get:
+      summary: Backup operation status
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backup status
+    delete:
+      summary: Delete backup CR
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+  /instance-restores:
+    get:
+      summary: List restore operations
+      parameters:
+        - name: instance_id
+          in: query
+          schema:
+            type: string
+        - name: backup_name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Restore list
+    post:
+      summary: Start async restore
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backup_name, target_cluster]
+              properties:
+                backup_name:
+                  type: string
+                target_cluster:
+                  type: string
+                source_cluster:
+                  type: string
+                rebind:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    mode:
+                      type: string
+                      enum: [supersede, clone]
+                      description: Default supersede — delete backup source instance and reuse display name. Clone keeps the source and appends display_name_suffix.
+                    display_name_suffix:
+                      type: string
+                      description: Used only when mode is clone (default -restored).
+                    user_value_patches:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          path:
+                            type: string
+                          value:
+                            type: string
+                storage_class_hints:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        '202':
+          description: Restore accepted
+  /instance-restores/{name}:
+    get:
+      summary: Restore operation status
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Restore status

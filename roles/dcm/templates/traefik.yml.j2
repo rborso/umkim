@@ -1,0 +1,35 @@
+entryPoints:
+  web:
+    address: "{{ '0.0.0.0:80' if (fleet_edge_acme_enabled | default(false) | bool) else ':9080' }}"
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+  websecure:
+    address: "0.0.0.0:443"
+{% endif %}
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: false
+
+ping:
+  entryPoint: web
+
+log:
+  level: INFO
+
+accessLog: {}
+
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "{{ fleet_edge_acme_email }}"
+      storage: /var/traefik/acme.json
+      tlsChallenge: {}
+  letsencrypt-preflight:
+    acme:
+      email: "{{ fleet_edge_acme_email }}"
+      storage: /var/traefik/acme-preflight.json
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      tlsChallenge: {}
+{% endif %}

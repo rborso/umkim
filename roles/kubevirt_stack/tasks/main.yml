@@ -1,0 +1,134 @@
+---
+- name: KubeVirt stack | Require KVM device
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: kvm_device
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Fail if KVM is missing
+  ansible.builtin.fail:
+    msg: "/dev/kvm not found — KubeVirt stack requires hardware virtualization on this node."
+  when: not kvm_device.stat.exists
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Label node for fleet placement
+  ansible.builtin.command:
+    cmd: kubectl label node --all hardware.capability/vtx=true --overwrite
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  failed_when: false
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Install Multus
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_multus_manifest_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: multus_apply
+  changed_when: "'created' in multus_apply.stdout or 'configured' in multus_apply.stdout"
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Raise Multus memory (thick daemon OOMs at default 50Mi on k3s)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl -n kube-system patch ds kube-multus-ds --type=json -p='[
+      {"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"512Mi"},
+      {"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/memory","value":"128Mi"}
+    ]'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  register: multus_mem_patch
+  changed_when: multus_mem_patch.rc == 0
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Wait for Multus daemonset
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status daemonset/kube-multus-ds --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Install CDI operator
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_cdi_operator_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: cdi_op
+  changed_when: "'created' in cdi_op.stdout or 'configured' in cdi_op.stdout"
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Install CDI CR
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_cdi_cr_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: cdi_cr
+  changed_when: "'created' in cdi_cr.stdout or 'configured' in cdi_cr.stdout"
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Install KubeVirt operator
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_kubevirt_operator_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: kv_op
+  changed_when: "'created' in kv_op.stdout or 'configured' in kv_op.stdout"
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Wait for KubeVirt operator
+  ansible.builtin.command:
+    cmd: kubectl -n kubevirt wait --for=condition=Available deployment/virt-operator --timeout=900s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Install KubeVirt CR
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_kubevirt_cr_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: kv_cr
+  changed_when: "'created' in kv_cr.stdout or 'configured' in kv_cr.stdout"
+  retries: 5
+  delay: 30
+  until: kv_cr.rc == 0
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Wait for KubeVirt control plane
+  ansible.builtin.command:
+    cmd: kubectl -n kubevirt wait kubevirt kubevirt --for=condition=Available --timeout=900s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  failed_when: false
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Report KubeVirt pods
+  ansible.builtin.command:
+    cmd: kubectl get pods -n kubevirt -o wide
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: kv_pods
+  changed_when: false
+  tags: [kubevirt, phase4]
+
+- name: KubeVirt stack | Show status
+  ansible.builtin.debug:
+    var: kv_pods.stdout_lines
+  tags: [kubevirt, phase4]

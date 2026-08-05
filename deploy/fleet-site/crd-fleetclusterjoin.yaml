@@ -1,0 +1,339 @@
+# FleetClusterJoin — greenfield cluster bootstrap (Rocky K3s + OCM join).
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetclusterjoins.fleet.umkim.com
+spec:
+  group: fleet.umkim.com
+  names:
+    kind: FleetClusterJoin
+    listKind: FleetClusterJoinList
+    plural: fleetclusterjoins
+    singular: fleetclusterjoin
+    shortNames:
+      - fcj
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - clusterName
+                - siteId
+                - bootstrapHost
+              properties:
+                clusterName:
+                  type: string
+                  pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                  maxLength: 63
+                siteId:
+                  type: string
+                bootstrapHost:
+                  type: string
+                jumphost:
+                  type: string
+                  description: Optional SSH bastion for operator bundle copy and bootstrap (ProxyJump).
+                minRootDiskGi:
+                  type: integer
+                  minimum: 10
+                  default: 40
+                rockyVersion:
+                  type: string
+                  default: "9"
+                clusterRegion:
+                  type: string
+                clusterLabels:
+                  type: object
+                  additionalProperties:
+                    type: string
+                clusterCapabilities:
+                  type: object
+                  additionalProperties:
+                    type: boolean
+                gpu:
+                  type: boolean
+                  default: false
+                storage:
+                  type: object
+                  properties:
+                    localPath:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                    backend:
+                      type: string
+                      enum: [local_path, nfs_external, nfs_local, longhorn]
+                      description: Deprecated; use storage.nfs.enabled or storage.longhorn.enabled.
+                    minDataDiskGi:
+                      type: integer
+                    rwo:
+                      type: boolean
+                      description: Deprecated; capabilities discovered after Ready.
+                    rwx:
+                      type: boolean
+                      description: Deprecated; capabilities discovered after Ready.
+                    nfs:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        server:
+                          type: string
+                        exportBase:
+                          type: string
+                        clusterPath:
+                          type: string
+                        storageClass:
+                          type: string
+                        delegateHost:
+                          type: string
+                        mountPath:
+                          type: string
+                          description: NFS client mount path (filesystem export path preferred over NFSv4 pseudo-path).
+                    longhorn:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        device:
+                          type: string
+                          description: Dedicated block device (e.g. /dev/sdb or /dev/vdb on virtio VMs).
+                        storageClass:
+                          type: string
+                          default: longhorn
+                controlPlaneVip:
+                  type: string
+                  description: Management LAN IPv4 VIP for K3s API (ha_3_node required).
+                topology:
+                  type: string
+                  enum: [single_node, ha_3_node]
+                  default: single_node
+                networkMode:
+                  type: string
+                  enum: [wireguard, lan]
+                  default: wireguard
+                  description: Deprecated; lan is rejected on create. New clusters use wireguard overlay only.
+                hubLanApi:
+                  type: string
+                  description: Deprecated; ignored for new clusters (wireguard overlay only).
+                nodes:
+                  type: array
+                  minItems: 1
+                  maxItems: 16
+                  items:
+                    type: object
+                    required:
+                      - address
+                    properties:
+                      hostname:
+                        type: string
+                      address:
+                        type: string
+                      role:
+                        type: string
+                        enum: [control, worker]
+                        default: control
+                      gpu:
+                        type: boolean
+                        default: false
+                        description: Deprecated; GPU capability is discovered after Ready.
+                      labels:
+                        type: object
+                        additionalProperties:
+                          type: string
+                domainBindings:
+                  type: array
+                  items:
+                    type: string
+                  description: Site DNS domain binding IDs for ingress and catalog routing.
+                edge:
+                  type: object
+                  properties:
+                    exposureMode:
+                      type: string
+                      enum: [inherit, none, port_forward, reverse_proxy]
+                    tlsPolicy:
+                      type: string
+                      enum: [inherit, external, acme_cluster, acme_hub, passthrough]
+                    ingressEndpointId:
+                      type: string
+                ingressAuth:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    exposeLldapWebUI:
+                      type: boolean
+                      default: false
+                acme:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                providers:
+                  type: object
+                  properties:
+                    k8sNodePort:
+                      type: integer
+                      minimum: 30000
+                      maximum: 32767
+                    helmNodePort:
+                      type: integer
+                      minimum: 30000
+                      maximum: 32767
+                    kubevirtSpNodeport:
+                      type: integer
+                      minimum: 30000
+                      maximum: 32767
+                    install:
+                      type: object
+                      properties:
+                        k8s:
+                          type: boolean
+                        helm:
+                          type: boolean
+                        kubevirt:
+                          type: boolean
+                    kubevirtBridge:
+                      type: object
+                      description: Day-0 host Linux bridge for Multus L2 KubeVirt VMs
+                      properties:
+                        enabled:
+                          type: boolean
+                        bridgeName:
+                          type: string
+                        slaveNic:
+                          type: string
+                        keepIp:
+                          type: boolean
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - ScriptIssued
+                    - Enrolled
+                    - Validated
+                    - Provisioning
+                    - Ready
+                    - Failed
+                    - Deleting
+                message:
+                  type: string
+                wireguardAddress:
+                  type: string
+                wireguardPublicKey:
+                  type: string
+                nodes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      hostname:
+                        type: string
+                      address:
+                        type: string
+                      wireguardAddress:
+                        type: string
+                      wireguardPublicKey:
+                        type: string
+                enrolledAt:
+                  type: string
+                  format: date-time
+                enrolledHostname:
+                  type: string
+                validationErrors:
+                  type: array
+                  items:
+                    type: string
+                validateJobName:
+                  type: string
+                provisionJobName:
+                  type: string
+                deleteJobName:
+                  type: string
+                wgRemoveJobName:
+                  type: string
+                deletionStartedAt:
+                  type: string
+                  format: date-time
+                managedClusterAvailable:
+                  type: boolean
+                storage:
+                  type: object
+                  properties:
+                    phase:
+                      type: string
+                      enum: [Pending, Applying, Applied, Failed]
+                    jobName:
+                      type: string
+                    message:
+                      type: string
+                ingressAuth:
+                  type: object
+                  properties:
+                    phase:
+                      type: string
+                    jobName:
+                      type: string
+                    message:
+                      type: string
+                    secretsRef:
+                      type: string
+                    portalHost:
+                      type: string
+                    lldapWebUIHost:
+                      type: string
+                    accessDomains:
+                      type: array
+                      items:
+                        type: string
+                acme:
+                  type: object
+                  properties:
+                    phase:
+                      type: string
+                    message:
+                      type: string
+                    jobName:
+                      type: string
+                providers:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      phase:
+                        type: string
+                      jobName:
+                        type: string
+                      message:
+                        type: string
+                      providerName:
+                        type: string
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Site
+          type: string
+          jsonPath: .spec.siteId
+        - name: Cluster
+          type: string
+          jsonPath: .spec.clusterName
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

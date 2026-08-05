@@ -1,0 +1,49 @@
+---
+- name: Fleet site | Resolve kubevirt provider cluster
+  ansible.builtin.set_fact:
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    fleet_site_sp_endpoint: "{{ fleet_site_sp_endpoint | default((fleet_site_wg_ip | regex_replace('/.*$', ''))) }}"
+    fleet_site_kubevirt_sp_name: "{{ fleet_site_dcm_kubevirt_sp_name | default('kubevirt-' ~ (fleet_site_ocm_name | default(fleet_site_name))) }}"
+
+- name: Fleet site | Register synthetic host for kubevirt SP ManifestWork
+  ansible.builtin.add_host:
+    name: "{{ fleet_site_ocm_cluster }}"
+    dcm_kubevirt_sp_nodeport: "{{ fleet_site_dcm_kubevirt_sp_nodeport }}"
+    dcm_kubevirt_sp_name: "{{ fleet_site_kubevirt_sp_name }}"
+    dcm_kubevirt_sp_endpoint_host: "{{ fleet_site_sp_endpoint }}"
+    fleet_site: "{{ fleet_site_id | default(fleet_site_name) }}"
+  tags: [fleet_site, fleet_site_provider, phase5]
+
+- name: Fleet site | Push kubevirt SP ManifestWork
+  ansible.builtin.import_role:
+    name: dcm
+    tasks_from: push_kubevirt_sp.yml
+  vars:
+    ocm_manifestwork_clusters: ["{{ fleet_site_ocm_cluster }}"]
+  tags: [fleet_site, fleet_site_provider, phase5]
+
+- name: Fleet site | Wait for kubevirt SP ManifestWork Applied
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_ocm_cluster }} get manifestwork
+      {{ phase5_kubevirt_sp_manifestwork_name | default('phase5-kubevirt-sp') }}
+      -o 'jsonpath={.status.conditions[?(@.type=="Applied")].status}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_site_kubevirt_mw_applied
+  until: fleet_site_kubevirt_mw_applied.stdout | trim == 'True'
+  retries: 20
+  delay: 10
+  changed_when: false
+  tags: [fleet_site, fleet_site_provider, phase5]
+
+- name: Fleet site | Wait for kubevirt provider registration
+  ansible.builtin.import_tasks: wait_dcm_provider.yml
+  vars:
+    fleet_site_wait_provider_name: "{{ fleet_site_kubevirt_sp_name }}"
+  tags: [fleet_site, fleet_site_provider, phase5]
+
+- name: Fleet site | Seed VM routing policy
+  ansible.builtin.import_tasks: seed_vm_policy.yml
+  tags: [fleet_site, fleet_site_provider, phase5]

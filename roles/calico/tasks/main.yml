@@ -1,0 +1,111 @@
+---
+- name: Calico | Skip when K3s disabled on host
+  ansible.builtin.meta: end_host
+  when: not (k3s_enabled | default(true) | bool)
+
+- name: Calico | Resolve autodetection method from cluster node facts
+  ansible.builtin.import_tasks: resolve_autodetection.yml
+  when: calico_ip_autodetection_method | default('auto') == 'auto'
+
+- name: Calico | Check if already applied
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system get daemonset calico-node
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_ds
+  changed_when: false
+  failed_when: false
+  tags: [calico, ocm]
+
+- name: Calico | Apply manifest
+  ansible.builtin.command:
+    cmd: kubectl apply --validate=false -f {{ calico_manifest_url }}
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_apply
+  changed_when: "'created' in calico_apply.stdout or 'configured' in calico_apply.stdout"
+  failed_when: >-
+    calico_apply.rc != 0
+    and 'AlreadyExists' not in (calico_apply.stderr | default(''))
+  when: calico_ds.rc != 0
+  tags: [calico, ocm]
+
+- name: Calico | Set IP autodetection on calico-node
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n kube-system set env daemonset/calico-node
+      IP_AUTODETECTION_METHOD={{ calico_ip_autodetection_method }}
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_env
+  changed_when: calico_env.rc == 0
+  tags: [calico, ocm]
+
+- name: Calico | Wait for calico-node rollout
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status daemonset/calico-node --timeout={{ calico_rollout_timeout }}s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  changed_when: false
+  tags: [calico, ocm]
+
+- name: Calico | Wait for node Ready
+  ansible.builtin.command:
+    cmd: kubectl wait node --all --for=condition=Ready --timeout=600s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  changed_when: false
+  tags: [calico, ocm]
+
+- name: Calico | Wait for IP pool CR
+  ansible.builtin.command:
+    cmd: kubectl get ippool -o jsonpath={.items[0].metadata.name}
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_ippool_wait
+  until: calico_ippool_wait.rc == 0 and calico_ippool_wait.stdout | length > 0
+  retries: 24
+  delay: 5
+  changed_when: false
+  when: calico_encapsulation_disabled | bool
+  tags: [calico, ocm]
+
+- name: Calico | Disable IPIP/VXLAN on default IP pool (homelab BGP prep)
+  ansible.builtin.command:
+    cmd: >-
+      kubectl patch ippool {{ calico_ippool_wait.stdout }}
+      --type=merge -p '{"spec":{"ipipMode":"Never","vxlanMode":"Never"}}'
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_ippool_patch
+  changed_when: "'patched' in calico_ippool_patch.stdout"
+  when: calico_encapsulation_disabled | bool
+  tags: [calico, ocm]
+
+# Pods scheduled while CNI was broken stay in ContainerCreating until recreated.
+- name: Calico | Recycle pods stuck before CNI was ready
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl get pods -A --no-headers 2>/dev/null | awk '$4=="ContainerCreating" || $4=="Pending" {print $1, $2}' |
+    while read -r ns name; do
+      [[ "$ns" == kube-system && "$name" == calico-* ]] && continue
+      kubectl -n "$ns" delete pod "$name" --ignore-not-found
+    done
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  args:
+    executable: /bin/bash
+  when: calico_apply is changed or (calico_ippool_patch is defined and calico_ippool_patch is changed)
+  changed_when: false
+  failed_when: false
+  tags: [calico, ocm]
+
+- name: Calico | Wait for calico-kube-controllers after recycle
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status deployment/calico-kube-controllers --timeout={{ calico_rollout_timeout }}s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  changed_when: false
+  failed_when: false
+  when: calico_apply is changed or (calico_ippool_patch is defined and calico_ippool_patch is changed)
+  tags: [calico, ocm]

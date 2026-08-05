@@ -1,0 +1,63 @@
+---
+- name: Fleet backup | List ManagedClusters
+  ansible.builtin.command:
+    cmd: kubectl get managedclusters -o jsonpath='{.items[*].metadata.name}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_backup_mc_raw
+  changed_when: false
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: Fleet backup | Resolve target clusters
+  ansible.builtin.set_fact:
+    fleet_backup_target_clusters: >-
+      {{
+        (
+          fleet_velero_clusters
+          if (fleet_velero_clusters | default([]) | length > 0)
+          else fleet_backup_mc_raw.stdout.split()
+        )
+        | difference(fleet_velero_exclude_clusters | default([]))
+      }}
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: Fleet backup | Velero CLI present
+  ansible.builtin.stat:
+    path: "{{ fleet_velero_cli_path }}"
+  register: fleet_velero_cli_stat
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: Fleet backup | Ensure bzip2 for Velero CLI archive
+  ansible.builtin.package:
+    name: bzip2
+    state: present
+  when: not fleet_velero_cli_stat.stat.exists
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: Fleet backup | Download and extract Velero CLI
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -fsSL -o /tmp/velero-v{{ fleet_velero_version }}-linux-amd64.tar.gz \
+      "https://github.com/vmware-tanzu/velero/releases/download/v{{ fleet_velero_version }}/velero-v{{ fleet_velero_version }}-linux-amd64.tar.gz"
+    tar -xzf /tmp/velero-v{{ fleet_velero_version }}-linux-amd64.tar.gz -C /tmp \
+      velero-v{{ fleet_velero_version }}-linux-amd64/velero
+    install -m 0755 /tmp/velero-v{{ fleet_velero_version }}-linux-amd64/velero {{ fleet_velero_cli_path }}
+  args:
+    creates: "{{ fleet_velero_cli_path }}"
+  when: not fleet_velero_cli_stat.stat.exists
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: Fleet backup | Render Velero cloud credentials
+  ansible.builtin.template:
+    src: velero-credentials.j2
+    dest: /tmp/fleet-velero-credentials
+    mode: "0600"
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: Fleet backup | Install Velero on each spoke
+  ansible.builtin.include_tasks: install_velero_spoke.yml
+  loop: "{{ fleet_backup_target_clusters }}"
+  loop_control:
+    loop_var: fleet_backup_cluster
+  tags: [fleet_backup, fleet_backup_spokes]

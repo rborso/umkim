@@ -1,0 +1,7 @@
+---
+- name: Fleet console Helm | Update DCM gateway routes for fleet dashboard
+  ansible.builtin.import_role:
+    name: dcm
+    tasks_from: traefik_config.yml
+  when: dcm_fleet_gateway_path | default(false) | bool
+  tags: [fleet_console_auth, fleet_console_helm, fleet_console_gateway_routes]

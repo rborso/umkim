@@ -1,0 +1,74 @@
+---
+# Install nfs-server on the single cluster node and export a local path for RWX.
+# Used when fleet_cluster_storage_backend == nfs_local.
+# Do NOT use meta: end_host here — this file is imported before nfs_nodes/nfs_cluster.
+
+- name: Fleet cluster storage | Configure local NFS server (nfs_local)
+  when: fleet_cluster_storage_backend | default('local_path') == 'nfs_local'
+  tags: [fleet_cluster_storage]
+  block:
+    - name: Fleet cluster storage | Resolve local NFS server address
+      ansible.builtin.set_fact:
+        fleet_cluster_nfs_server: >-
+          {{
+            (
+              fleet_cluster_nfs_server
+              | default(cluster_storage_nfs_server | default(''), true)
+              | trim
+            )
+            if (
+              (
+                fleet_cluster_nfs_server
+                | default(cluster_storage_nfs_server | default(''), true)
+                | trim
+              ) | length > 0
+            )
+            else (ansible_host | default(inventory_hostname))
+          }}
+
+    - name: Fleet cluster storage | Ensure local NFS export directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0777"
+      loop:
+        - "{{ fleet_cluster_nfs_export_base }}"
+        - "{{ fleet_cluster_nfs_path }}"
+
+    - name: Fleet cluster storage | Install nfs-utils (server + client)
+      ansible.builtin.package:
+        name: nfs-utils
+        state: present
+
+    - name: Fleet cluster storage | Enable rpcbind
+      ansible.builtin.service:
+        name: rpcbind
+        state: started
+        enabled: true
+
+    - name: Fleet cluster storage | Configure /etc/exports for local NFS
+      ansible.builtin.copy:
+        dest: /etc/exports
+        mode: "0644"
+        content: |
+          # UMKIM nfs_local — node is NFS server and client for RWX testing
+          # Export to the node address only (localhost/127.0.0.1 duplicate causes exportfs -ra to fail).
+          {{ fleet_cluster_nfs_export_base }} {{ fleet_cluster_nfs_server }}(rw,sync,no_subtree_check,no_root_squash,fsid=0)
+      register: fleet_nfs_local_exports
+
+    - name: Fleet cluster storage | Enable and start nfs-server
+      ansible.builtin.service:
+        name: nfs-server
+        state: started
+        enabled: true
+
+    - name: Fleet cluster storage | Apply NFS exports
+      ansible.builtin.command:
+        cmd: exportfs -ra
+      changed_when: fleet_nfs_local_exports.changed | default(false)
+
+    - name: Fleet cluster storage | Default client mount path for nfs_local
+      ansible.builtin.set_fact:
+        fleet_cluster_nfs_client_path: "{{ fleet_cluster_nfs_path }}"
+        fleet_cluster_nfs_mount_path: "{{ fleet_cluster_nfs_path }}"
+      when: fleet_cluster_nfs_client_path | default('') | length == 0

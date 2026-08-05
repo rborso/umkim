@@ -1,0 +1,188 @@
+---
+# Seed rocky9-vm catalog item (bridge LAN + cloud-init). Reuses demo-vm-single KVM policy.
+- name: DCM rocky9-vm | API base
+  ansible.builtin.set_fact:
+    dcm_rocky_vm_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+    dcm_rocky_vm_catalog_fields:
+      - path: metadata.name
+        display_name: VM name (DNS label)
+        editable: true
+        default: "{{ fleet_dcm_rocky9_vm_default_name }}"
+        validation_schema:
+          type: string
+          x-ui-tier: required
+          x-ui-widget: dns-label
+          x-required: true
+      - path: vcpu.count
+        display_name: vCPUs
+        editable: true
+        default: 2
+        validation_schema:
+          type: integer
+          minimum: 1
+          maximum: 32
+          x-ui-tier: common
+          x-ui-widget: number
+      - path: memory.size
+        display_name: Memory
+        editable: true
+        default: 2GB
+        validation_schema:
+          type: string
+          pattern: '^[0-9]+(MB|GB|TB)$'
+          x-ui-tier: common
+      - path: storage.disks
+        display_name: Disks
+        editable: true
+        default:
+          - name: boot
+            capacity: 20GB
+        validation_schema:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [name, capacity]
+            properties:
+              name:
+                type: string
+              capacity:
+                type: string
+                pattern: '^[0-9]+(MB|GB|TB)$'
+          x-ui-tier: common
+      - path: access.ssh_public_key
+        display_name: SSH public key (cloud-init)
+        editable: true
+        default: ""
+        description: "Injected via cloud-init authorized_keys (ed25519/rsa)"
+        validation_schema:
+          type: string
+          x-ui-tier: required
+          x-required: true
+      - path: network.mode
+        display_name: Network mode
+        editable: true
+        default: bridge
+        description: "bridge = Multus L2 onto host Linux bridge (LAN IP)"
+        validation_schema:
+          type: string
+          enum: [bridge, masquerade]
+          x-ui-tier: advanced
+      - path: network.multus_network
+        display_name: Multus NAD (namespace/name)
+        editable: true
+        default: "{{ fleet_dcm_rocky9_vm_default_multus_network }}"
+        description: "NetworkAttachmentDefinition connecting to the host bridge"
+        validation_schema:
+          type: string
+          x-ui-tier: advanced
+      - path: network.ip
+        display_name: Guest IP (CIDR or address)
+        editable: true
+        default: ""
+        description: "Static address on the host L2, e.g. 203.0.113.15/24"
+        validation_schema:
+          type: string
+          x-ui-tier: required
+          x-required: true
+      - path: network.gateway
+        display_name: Gateway
+        editable: true
+        default: "{{ fleet_dcm_rocky9_vm_default_gateway }}"
+        validation_schema:
+          type: string
+          x-ui-tier: common
+      - path: network.nameservers
+        display_name: DNS nameservers
+        editable: true
+        default: "{{ fleet_dcm_rocky9_vm_default_nameservers }}"
+        validation_schema:
+          type: array
+          items:
+            type: string
+          x-ui-tier: advanced
+      - path: guest_os.type
+        display_name: Guest OS
+        editable: false
+        default: rocky9
+        validation_schema:
+          type: string
+          enum: [rocky9, rocky]
+          x-ui-tier: advanced
+      - path: routing.cluster
+        display_name: Target cluster (OCM name)
+        editable: true
+        default: ""
+        description: "Pin to a cluster with kubevirt provider Ready and Multus NAD present"
+        validation_schema:
+          type: string
+          x-ui-tier: advanced
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_catalog, dcm_seed_vm, dcm_seed_rocky9_vm]
+
+- name: DCM rocky9-vm | Ensure vm service_type allows network fields
+  ansible.builtin.shell: |
+    set -euo pipefail
+    SQL=$(cat <<'EOSQL'
+    UPDATE service_types
+    SET spec = '{"vcpu":{},"memory":{},"storage":{},"guest_os":{},"access":{},"network":{}}'::jsonb,
+        update_time = NOW()
+    WHERE service_type = 'vm';
+    EOSQL
+    )
+    printf '%s\n' "$SQL" | kubectl -n {{ phase5_dcm_namespace }} exec -i deploy/postgres -- \
+      psql -U {{ phase5_db_user }} -d {{ phase5_dcm_app_db }} -v ON_ERROR_STOP=1
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_catalog, dcm_seed_vm, dcm_seed_rocky9_vm]
+
+- name: DCM rocky9-vm | Ensure catalog item exists
+  ansible.builtin.uri:
+    url: "{{ dcm_rocky_vm_api_url }}/catalog-items?id={{ fleet_dcm_rocky9_vm_catalog_item_id }}"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body:
+      api_version: v1alpha1
+      display_name: "{{ fleet_dcm_rocky9_vm_catalog_display_name }}"
+      description: "{{ fleet_dcm_rocky9_vm_catalog_description }}"
+      spec:
+        resources:
+          - name: app
+            service_type: vm
+            fields: "{{ dcm_rocky_vm_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_catalog, dcm_seed_vm, dcm_seed_rocky9_vm]
+
+- name: DCM rocky9-vm | Patch catalog item fields
+  ansible.builtin.uri:
+    url: "{{ dcm_rocky_vm_api_url }}/catalog-items/{{ fleet_dcm_rocky9_vm_catalog_item_id }}"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body:
+      display_name: "{{ fleet_dcm_rocky9_vm_catalog_display_name }}"
+      description: "{{ fleet_dcm_rocky9_vm_catalog_description }}"
+      spec:
+        resources:
+          - name: app
+            service_type: vm
+            fields: "{{ dcm_rocky_vm_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_catalog, dcm_seed_vm, dcm_seed_rocky9_vm]
+
+- name: DCM rocky9-vm | Seed summary
+  ansible.builtin.debug:
+    msg: >-
+      Catalog {{ fleet_dcm_rocky9_vm_catalog_item_id }} seeded.
+      Prereq: kubevirt provider + Multus NAD {{ fleet_dcm_rocky9_vm_default_multus_network }}
+      on the target cluster (roles/kubevirt_bridge_nad).
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_catalog, dcm_seed_vm, dcm_seed_rocky9_vm]

@@ -1,0 +1,14 @@
+---
+# Remove retired / superseded DCM policies (idempotent DELETE).
+- name: DCM policies | API base for disable
+  ansible.builtin.set_fact:
+    dcm_policy_disable_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+  run_once: true
+
+- name: DCM policies | Delete superseded policy
+  ansible.builtin.uri:
+    url: "{{ dcm_policy_disable_api_url }}/policies/{{ item }}"
+    method: DELETE
+    status_code: [204, 404]
+  loop: "{{ fleet_dcm_superseded_policy_ids }}"
+  run_once: true

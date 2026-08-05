@@ -1,0 +1,16 @@
+---
+# Deploy fleet-helm-release-sp to workload clusters via OCM ManifestWork.
+#
+# Prerequisites: phase5 hub DCM, harbor_push_fleet + harbor_push_charts.
+#
+# Usage:
+#   ansible-playbook fleet-helm-sp.yml -l hub
+#   ansible-playbook fleet-helm-sp.yml -e 'ocm_helm_sp_clusters=["virt02"]'
+
+- name: Fleet Helm SP | Push to clusters
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_helm_sp
+      tags: [fleet_helm_sp, phase5_helm_sp, phase5_push]

@@ -1,0 +1,13 @@
+---
+description: WireGuard, K3s, OCM, and spoke join patterns
+globs: roles/wireguard/**,roles/ocm/**,wireguard.yml,ocm.yml,spokes.yml,host-prepare.yml
+alwaysApply: false
+---
+
+# Fleet core (S2)
+
+- Hub OCM: `ocm.yml` on `hub`; spokes: `spokes.yml` + `clusteradm join`.
+- CSR approval: `roles/ocm/tasks/approve_cluster_csr.yml` (polls join host kubeconfig).
+- WireGuard server on umkim-hub `10.10.0.1`; clients dial `wg.umkim.com:51820`.
+- `fleet_autonomous: true` → K3s binds mgmt LAN, not only WG IP.
+- Skill: `.cursor/skills/fleet-ocm-spokes/SKILL.md`.

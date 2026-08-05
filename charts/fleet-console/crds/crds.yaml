@@ -1,0 +1,374 @@
+# Fleet console auth CRDs — console.umkim.com/v1alpha1
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetroles.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetRole
+    listKind: FleetRoleList
+    plural: fleetroles
+    singular: fleetrole
+    shortNames: [frole]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      resources:
+                        type: array
+                        items: { type: string }
+                      verbs:
+                        type: array
+                        items: { type: string }
+                      accessLevel:
+                        type: string
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetrolebindings.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetRoleBinding
+    listKind: FleetRoleBindingList
+    plural: fleetrolebindings
+    singular: fleetrolebinding
+    shortNames: [frb]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                subjects:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      kind: { type: string }
+                      name: { type: string }
+                roleRef:
+                  type: object
+                  properties:
+                    name: { type: string }
+                scopes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      kind: { type: string }
+                      name: { type: string }
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetusers.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetUser
+    listKind: FleetUserList
+    plural: fleetusers
+    singular: fleetuser
+    shortNames: [fuser]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                externalId: { type: string }
+                displayName: { type: string }
+                groups:
+                  type: array
+                  items: { type: string }
+                disabled: { type: boolean }
+                authMethod: { type: string }
+            status:
+              type: object
+              properties:
+                lastLogin: { type: string, format: date-time }
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetgroups.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetGroup
+    listKind: FleetGroupList
+    plural: fleetgroups
+    singular: fleetgroup
+    shortNames: [fgroup]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                displayName: { type: string }
+                ldapGroupCN: { type: string }
+                description: { type: string }
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetserviceaccounts.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetServiceAccount
+    listKind: FleetServiceAccountList
+    plural: fleetserviceaccounts
+    singular: fleetserviceaccount
+    shortNames: [fsa]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                displayName: { type: string }
+                roleBindings:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      roleRef:
+                        type: object
+                        properties:
+                          name: { type: string }
+                      scopes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            kind: { type: string }
+                            name: { type: string }
+            status:
+              type: object
+              properties:
+                tokenSecretName: { type: string }
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetcatalogaccesses.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetCatalogAccess
+    listKind: FleetCatalogAccessList
+    plural: fleetcatalogaccesses
+    singular: fleetcatalogaccess
+    shortNames: [fca]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                catalogItemId: { type: string }
+                visibility:
+                  type: string
+                  enum: [public, private]
+                grants:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      subject:
+                        type: object
+                        properties:
+                          kind: { type: string }
+                          name: { type: string }
+                      accessLevel:
+                        type: string
+                        enum: [read, readWrite]
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetauditevents.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetAuditEvent
+    listKind: FleetAuditEventList
+    plural: fleetauditevents
+    singular: fleetauditevent
+    shortNames: [faudit]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                timestamp: { type: string, format: date-time }
+                actor:
+                  type: object
+                  properties:
+                    kind: { type: string }
+                    name: { type: string }
+                action: { type: string }
+                resource:
+                  type: object
+                  properties:
+                    kind: { type: string }
+                    name: { type: string }
+                scope:
+                  type: object
+                  properties:
+                    kind: { type: string }
+                    name: { type: string }
+                result: { type: string }
+                message: { type: string }
+                http:
+                  type: object
+                  properties:
+                    method: { type: string }
+                    path: { type: string }
+                    clientIP: { type: string }
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetorgs.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetOrg
+    listKind: FleetOrgList
+    plural: fleetorgs
+    singular: fleetorg
+    shortNames: [forg]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [slug]
+              properties:
+                slug: { type: string }
+                displayName: { type: string }
+                sharedQuota:
+                  type: object
+                  properties:
+                    cpuMilli: { type: integer, format: int64 }
+                    memoryBytes: { type: integer, format: int64 }
+                    gpuCount: { type: integer, format: int64 }
+                    llmTokensPerMonth: { type: integer, format: int64 }
+            status:
+              type: object
+              properties:
+                sharedUsage:
+                  type: object
+                  properties:
+                    cpuMilli: { type: integer, format: int64 }
+                    memoryBytes: { type: integer, format: int64 }
+                    gpuCount: { type: integer, format: int64 }
+                    llmTokensPerMonth: { type: integer, format: int64 }
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetllmapikeys.console.umkim.com
+spec:
+  group: console.umkim.com
+  names:
+    kind: FleetLLMApiKey
+    listKind: FleetLLMApiKeyList
+    plural: fleetllmapikeys
+    singular: fleetllmapikey
+    shortNames: [flmak]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [org]
+              properties:
+                org: { type: string }
+                displayName: { type: string }
+                secretRef: { type: string }
+                models:
+                  type: array
+                  items: { type: string }
+            status:
+              type: object
+              properties:
+                keyPrefix: { type: string }
+                active: { type: boolean }

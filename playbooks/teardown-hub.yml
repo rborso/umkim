@@ -1,0 +1,165 @@
+---
+# Complete UMKIM management-hub teardown (after scripts/teardown-hub.sh deletes FCJ clusters).
+# Removes fleet workloads, Harbor, OCM, K3s, and optional WireGuard on the hub.
+#
+# Invoked by scripts/teardown-hub.sh — do not run directly unless you know the order.
+#
+#   ansible-playbook playbooks/teardown-hub.yml -l hub \
+#     -e teardown_hub_delete_harbor=true \
+#     -e teardown_hub_delete_wireguard=true
+
+- name: Teardown hub | Fleet edge routes and spoke ManifestWorks
+  ansible.builtin.import_playbook: ../fleet-edge-cleanup.yml
+  tags: [teardown_hub, teardown_hub_edge]
+
+- name: Teardown hub | Remaining OCM objects and fleet workloads
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    fleet_cleanup_delete_harbor: "{{ teardown_hub_delete_harbor | default(true) | bool }}"
+    fleet_cleanup_delete_hub_platform: true
+    harbor_release: harbor
+    harbor_namespace: harbor
+  tasks:
+    - name: Teardown hub | Cancel in-flight fleet-console Jobs
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG={{ ocm_kubeconfig }}
+        kubectl delete jobs -n fleet-console --all --ignore-not-found --wait=false 2>/dev/null || true
+      args:
+        executable: /bin/bash
+      changed_when: false
+      failed_when: false
+      tags: [teardown_hub, teardown_hub_fleet]
+
+    - name: Teardown hub | Delete all ManifestWorks on hub
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG={{ ocm_kubeconfig }}
+        kubectl get manifestwork -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{end}' \
+          | while IFS=$'\t' read -r ns name; do
+              [[ -z "${ns}" || -z "${name}" ]] && continue
+              kubectl delete manifestwork "${name}" -n "${ns}" --ignore-not-found --wait=false
+            done
+      args:
+        executable: /bin/bash
+      changed_when: false
+      failed_when: false
+      tags: [teardown_hub, teardown_hub_ocm]
+
+    - name: Teardown hub | Delete all ManagedClusters
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG={{ ocm_kubeconfig }}
+        kubectl get managedcluster -o name 2>/dev/null \
+          | xargs -r kubectl delete --ignore-not-found --wait=false
+      args:
+        executable: /bin/bash
+      changed_when: false
+      failed_when: false
+      tags: [teardown_hub, teardown_hub_ocm]
+
+    - name: Teardown hub | Fleet workload cleanup (DCM, Harbor, platform)
+      ansible.builtin.import_role:
+        name: fleet_cleanup
+      tags: [teardown_hub, teardown_hub_fleet]
+
+    - name: Teardown hub | Delete FleetSite and related CRs
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG={{ ocm_kubeconfig }}
+        for kind in fleetsites fleetclusterjoins fleetnestedclusters fleetingressauths fleetacmes fleetapproutes fleetclusterbootstraps; do
+          kubectl delete "${kind}" --all --all-namespaces --ignore-not-found --wait=false 2>/dev/null || true
+        done
+      args:
+        executable: /bin/bash
+      changed_when: false
+      failed_when: false
+      tags: [teardown_hub, teardown_hub_crd]
+
+    - name: Teardown hub | Delete fleet controller CRDs
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG={{ ocm_kubeconfig }}
+        for crd in \
+          fleetsites.fleet.umkim.com \
+          fleetclusterjoins.fleet.umkim.com \
+          fleetnestedclusters.fleet.umkim.com \
+          fleetingressauths.fleet.umkim.com \
+          fleetacmes.fleet.umkim.com \
+          fleetapproutes.fleet.umkim.com \
+          fleetclusterbootstraps.fleet.umkim.com; do
+          kubectl delete crd "${crd}" --ignore-not-found --wait=false 2>/dev/null || true
+        done
+      args:
+        executable: /bin/bash
+      when: teardown_hub_delete_crds | default(true) | bool
+      changed_when: false
+      failed_when: false
+      tags: [teardown_hub, teardown_hub_crd]
+
+    - name: Teardown hub | Remove OCM hub join command and fleet-system secrets
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/ocm/hub-join-command.sh
+        - /etc/ocm
+      tags: [teardown_hub, teardown_hub_host]
+
+    - name: Teardown hub | Remove UMKIM host state directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ dcm_gateway_acme_host_path | default('/var/lib/umkim/traefik-acme') }}"
+        - /var/lib/umkim
+        - /opt/fleet-src
+        - "{{ harbor_umkim_root | default(playbook_dir | regex_replace('/playbooks/?$', '')) }}/.cache/harbor-push"
+      when: teardown_hub_delete_host_paths | default(true) | bool
+      tags: [teardown_hub, teardown_hub_host]
+
+    - name: Teardown hub | Remove staged Ansible temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/dcm-config
+        - /tmp/dcm-hub-stack.yaml
+        - /tmp/fleet-webui-ocm.yaml
+        - /tmp/fleet-webui-dcm.yaml
+        - /tmp/fleet-webui-namespace.yaml
+        - /tmp/manifestwork-kubevirt-sp-lab-ext02.yaml
+      tags: [teardown_hub, teardown_hub_host]
+
+    - name: Teardown hub | Uninstall K3s and Calico on hub
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: cleanup.yml
+      when: teardown_hub_delete_k3s | default(true) | bool
+      tags: [teardown_hub, teardown_hub_k3s, k3s, k3s_cleanup]
+
+- name: Teardown hub | Stop WireGuard overlay
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Teardown hub | Stop wg-quick service
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ wireguard_interface | default('wg0') }}"
+        enabled: false
+        state: stopped
+      failed_when: false
+      when: teardown_hub_delete_wireguard | default(true) | bool
+      tags: [teardown_hub, teardown_hub_wireguard]
+
+    - name: Teardown hub | Bring down WireGuard interface
+      ansible.builtin.command:
+        cmd: wg-quick down {{ wireguard_interface | default('wg0') }}
+      failed_when: false
+      changed_when: false
+      when: teardown_hub_delete_wireguard | default(true) | bool
+      tags: [teardown_hub, teardown_hub_wireguard]

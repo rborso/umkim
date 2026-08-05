@@ -1,0 +1,119 @@
+# OCM ManifestWork — fleet-olm-subscription-sp on spoke {{ ocm_target_cluster }}
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  name: {{ phase5_olm_sp_manifestwork_name }}
+  namespace: {{ ocm_target_cluster }}
+  labels:
+    fleet.umkim.com/phase: "5"
+    fleet.umkim.com/component: olm-subscription-sp
+spec:
+  workload:
+    manifests:
+      - apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: {{ phase5_olm_sp_worker_namespace }}
+{% if fleet_olm_sp_harbor_pull_secret | default(false) | bool %}
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          name: {{ fleet_olm_sp_harbor_pull_secret_name }}
+          namespace: {{ phase5_olm_sp_worker_namespace }}
+        type: kubernetes.io/dockerconfigjson
+        data:
+          .dockerconfigjson: >-
+            {{ {
+              "auths": {
+                (harbor_fleet_registry): {
+                  "username": "admin",
+                  "password": harbor_admin_password,
+                  "auth": ("admin:" ~ harbor_admin_password) | b64encode
+                }
+              }
+            } | to_json | b64encode }}
+{% endif %}
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: olm-subscription-sp
+          namespace: {{ phase5_olm_sp_worker_namespace }}
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: fleet-{{ ocm_target_cluster }}-olm-sp
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-admin
+        subjects:
+          - kind: ServiceAccount
+            name: olm-subscription-sp
+            namespace: {{ phase5_olm_sp_worker_namespace }}
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: fleet-olm-subscription-sp
+          namespace: {{ phase5_olm_sp_worker_namespace }}
+        spec:
+          type: NodePort
+          selector:
+            app: fleet-olm-subscription-sp
+          ports:
+            - name: http
+              port: 8080
+              targetPort: 8080
+              nodePort: {{ dcm_olm_sp_nodeport }}
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: fleet-olm-subscription-sp
+          namespace: {{ phase5_olm_sp_worker_namespace }}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: fleet-olm-subscription-sp
+          template:
+            metadata:
+              labels:
+                app: fleet-olm-subscription-sp
+            spec:
+              serviceAccountName: olm-subscription-sp
+{% if fleet_olm_sp_harbor_pull_secret | default(false) | bool %}
+              imagePullSecrets:
+                - name: {{ fleet_olm_sp_harbor_pull_secret_name }}
+{% endif %}
+              containers:
+                - name: provider
+                  image: "{{ dcm_olm_sp_image | default(phase5_olm_sp_image) }}"
+                  imagePullPolicy: Always
+                  ports:
+                    - containerPort: 8080
+                  env:
+                    - name: SP_NAME
+                      value: "{{ dcm_olm_sp_name }}"
+                    - name: SP_ENDPOINT
+                      value: "http://{{ dcm_olm_sp_endpoint_host }}:{{ dcm_olm_sp_nodeport }}/api/v1alpha1/subscriptions"
+                    - name: SP_DISPLAY_NAME
+                      value: "OLM subscriptions on {{ ocm_target_cluster }}"
+                    - name: SP_REGION
+                      value: fleet
+                    - name: SP_ZONE
+                      value: "{{ ocm_target_cluster }}"
+                    - name: SP_SITE
+                      value: "{{ hostvars[ocm_target_cluster].fleet_site | default('') }}"
+                    - name: DCM_REGISTRATION_URL
+                      value: "{{ hostvars[ocm_target_cluster].phase5_registration_url | default(phase5_registration_url) }}"
+                    - name: SP_SERVER_ADDRESS
+                      value: ":8080"
+                    - name: SP_CSV_WAIT_TIMEOUT_SEC
+                      value: "{{ fleet_olm_sp_csv_wait_timeout_sec | default(900) }}"
+                    - name: SP_WAIT_FOR_CSV
+                      value: "{{ fleet_olm_sp_wait_for_csv | default(false) | string | lower }}"
+                  readinessProbe:
+                    httpGet:
+                      path: /api/v1alpha1/subscriptions/health
+                      port: 8080
+                    initialDelaySeconds: 15
+                    periodSeconds: 10

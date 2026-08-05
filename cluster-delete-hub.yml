@@ -1,0 +1,138 @@
+---
+# Hub + spoke teardown for FleetClusterJoin clusters (unjoin, ManifestWorks, klusterlet cleanup).
+#
+#   ansible-playbook cluster-delete-hub.yml -e fleet_cluster_name=my-cluster \
+#     -i inventory/from-controller.ini
+
+- name: Fleet cluster delete | Hub provider deregistration and OCM teardown
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    ocm_cluster_name: "{{ fleet_cluster_name }}"
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    fleet_cleanup_manifestworks:
+      - phase6-spoke-demo
+      - phase6-spoke-ingress
+      - phase5-helm-release-sp
+      - phase5-olm-subscription-sp
+      - phase5-k8s-container-sp
+      - phase4-platform-bootstrap
+    fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: deregister_cluster_providers.yml
+      tags: [fleet_cluster_delete]
+
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: delete_cluster_manifestworks.yml
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Remove ManagedCluster on hub
+      ansible.builtin.command:
+        cmd: kubectl delete managedcluster {{ fleet_cluster_name }} --ignore-not-found --wait=false
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_mc
+      changed_when: "'deleted' in fleet_cluster_delete_mc.stdout"
+      tags: [fleet_cluster_delete]
+
+- name: Fleet cluster delete | Spoke klusterlet cleanup
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    ocm_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    ocm_force_rejoin: true
+    ocm_hub_host: "{{ fleet_site_hub_inventory_name | default(groups['hub'] | first | default('umkim-hub')) }}"
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+  tasks:
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: reset_spoke_join.yml
+      when: not (fleet_cluster_delete_hub_only | default(false) | bool)
+      tags: [fleet_cluster_delete]
+
+- name: Fleet cluster delete | Hub wait for ManagedCluster removal
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  tasks:
+    - name: Fleet cluster delete | Wait for ManagedCluster removal
+      ansible.builtin.command:
+        cmd: kubectl get managedcluster {{ fleet_cluster_name }}
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_mc_wait
+      until: fleet_cluster_delete_mc_wait.rc != 0
+      retries: 120
+      delay: 10
+      failed_when: false
+      changed_when: false
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Note ManagedCluster still present (non-fatal)
+      ansible.builtin.debug:
+        msg: >-
+          ManagedCluster {{ fleet_cluster_name }} still present after spoke cleanup;
+          hub controller will wait before WireGuard peer removal
+      when: fleet_cluster_delete_mc_wait.rc == 0
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Remove fleet-kubeconfig secret on hub
+      ansible.builtin.command:
+        cmd: kubectl delete secret fleet-kubeconfig-{{ fleet_cluster_name }} -n fleet-system --ignore-not-found
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_kc_secret
+      changed_when: "'deleted' in fleet_cluster_delete_kc_secret.stdout"
+      tags: [fleet_cluster_delete]
+
+- name: Fleet cluster delete | Node detach from fleet (default) or full K3s reset
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
+  tasks:
+    - name: Fleet cluster delete | Stage cleanup script on node
+      when: not (fleet_cluster_delete_hub_only | default(false) | bool)
+      ansible.builtin.copy:
+        src: /ansible/cleanup_node_local.sh
+        dest: /tmp/fleet-node-cleanup.sh
+        mode: "0755"
+      tags: [fleet_cluster_delete]
+
+    # Always background: cleanup tears down wg-umkim last, which kills overlay SSH.
+    # Waiting in the foreground hangs the delete Job forever (seen with --mode reset).
+    # VIP removal for reset is handled inside cleanup_node_local.sh (--vip).
+    - name: Fleet cluster delete | Launch node cleanup in background
+      when: not (fleet_cluster_delete_hub_only | default(false) | bool)
+      ansible.builtin.shell: |
+        set -e
+        LOG="/tmp/fleet-cleanup-{{ fleet_cluster_name }}.log"
+        : > "${LOG}"
+        nohup /tmp/fleet-node-cleanup.sh \
+          --cluster {{ fleet_cluster_name | quote }} \
+          --mode {{ fleet_cluster_cleanup_mode | quote }} \
+          {% if fleet_cluster_cleanup_mode == 'reset' and (k3s_control_plane_vip | default('') | length > 0) %}
+          --vip {{ k3s_control_plane_vip | quote }} \
+          {% endif %}
+          >> "${LOG}" 2>&1 &
+        echo $! > "/tmp/fleet-cleanup-{{ fleet_cluster_name }}.pid"
+      args:
+        executable: /bin/bash
+      changed_when: true
+      tags: [fleet_cluster_delete]

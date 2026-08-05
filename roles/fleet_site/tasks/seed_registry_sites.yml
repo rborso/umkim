@@ -1,0 +1,36 @@
+---
+# Seed FleetSite CRs for inventory datacenters (provisioningMode: registry).
+- name: Fleet site registry | Ensure fleet-console namespace
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create namespace {{ fleet_site_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  run_once: true
+  tags: [fleet_site, fleet_site_seed_registry]
+
+- name: Fleet site registry | Apply FleetSite per fleet_sites entry
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/roles/fleet_site/templates/fleetsite-registry.yaml.j2"
+    dest: "/tmp/fleetsite-registry-{{ item.key }}.yaml"
+    mode: "0600"
+  loop: "{{ fleet_sites | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  run_once: true
+  tags: [fleet_site, fleet_site_seed_registry]
+
+- name: Fleet site registry | kubectl apply FleetSite
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleetsite-registry-{{ item.key }}.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ fleet_sites | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  run_once: true
+  tags: [fleet_site, fleet_site_seed_registry]

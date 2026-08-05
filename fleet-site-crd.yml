@@ -1,0 +1,220 @@
+---
+# Install FleetSite CRD on the hub.
+#
+#   ansible-playbook fleet-site-crd.yml -l hub
+
+- name: Fleet site CRD on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  tags: [fleet_site_crd, fleet_site]
+  tasks:
+    - name: Fleet site | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetsite.yaml"
+        dest: /tmp/fleetsite-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet site | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetsite-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_site_crd_apply
+      changed_when: >-
+        'created' in fleet_site_crd_apply.stdout
+        or 'configured' in fleet_site_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet site | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetsites.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet cluster join | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetclusterjoin.yaml"
+        dest: /tmp/fleetclusterjoin-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet cluster join | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetclusterjoin-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_join_crd_apply
+      changed_when: >-
+        'created' in fleet_cluster_join_crd_apply.stdout
+        or 'configured' in fleet_cluster_join_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet cluster join | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetclusterjoins.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet ingress auth | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetingressauth.yaml"
+        dest: /tmp/fleetingressauth-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet ingress auth | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetingressauth-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_ingress_auth_crd_apply
+      changed_when: >-
+        'created' in fleet_ingress_auth_crd_apply.stdout
+        or 'configured' in fleet_ingress_auth_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet ingress auth | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetingressauths.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet ACME | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetacme.yaml"
+        dest: /tmp/fleetacme-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet ACME | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetacme-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_acme_crd_apply
+      changed_when: >-
+        'created' in fleet_acme_crd_apply.stdout
+        or 'configured' in fleet_acme_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet ACME | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetacmes.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet LLM | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetllm.yaml"
+        dest: /tmp/fleetllm-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet LLM | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetllm-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_llm_crd_apply
+      changed_when: >-
+        'created' in fleet_llm_crd_apply.stdout
+        or 'configured' in fleet_llm_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet LLM | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetllms.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet instance backup | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetinstancebackup.yaml"
+        dest: /tmp/fleetinstancebackup-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet instance backup | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetinstancebackup-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_instance_backup_crd_apply
+      changed_when: >-
+        'created' in fleet_instance_backup_crd_apply.stdout
+        or 'configured' in fleet_instance_backup_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet instance backup | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetinstancebackups.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet instance restore | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetinstancerestore.yaml"
+        dest: /tmp/fleetinstancerestore-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet instance restore | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetinstancerestore-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_instance_restore_crd_apply
+      changed_when: >-
+        'created' in fleet_instance_restore_crd_apply.stdout
+        or 'configured' in fleet_instance_restore_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet instance restore | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetinstancerestores.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]

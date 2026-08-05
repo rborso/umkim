@@ -1,0 +1,8 @@
+---
+# Required when Ansible runs ON the hub (hosts-from-hub.yml sets ansible_host: 127.0.0.1).
+# Set fleet_hub_public_ipv4 to the hub WAN IPv4 from inventory/hosts.yml.
+fleet_hub_public_ipv4: CHANGE_ME
+dcm_gateway_external_ip: "{{ fleet_hub_public_ipv4 }}"
+fleet_hub_firewall_public_ipv4: "{{ fleet_hub_public_ipv4 }}"
+# ACME DNS pre-check and TLS probes: app hostnames resolve to the hub WAN IP (not 10.10.0.1).
+fleet_gateway_probe_host: "{{ fleet_hub_public_ipv4 }}"

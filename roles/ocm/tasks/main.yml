@@ -1,0 +1,21 @@
+---
+- name: OCM | Install clusteradm CLI
+  ansible.builtin.import_tasks: install_clusteradm.yml
+  tags: [ocm, ocm_install]
+
+- name: OCM | Initialize hub control plane
+  ansible.builtin.import_tasks: init_hub.yml
+  when: ocm_hub | default(false) | bool
+  tags: [ocm, ocm_init]
+
+- name: OCM | Verify hub components
+  ansible.builtin.import_tasks: verify.yml
+  when: ocm_hub | default(false) | bool
+  tags: [ocm, ocm_verify]
+
+- name: OCM | Join spoke cluster to hub
+  ansible.builtin.import_tasks: join_spoke.yml
+  when:
+    - not (ocm_hub | default(false) | bool)
+    - ocm_enabled | default(true) | bool
+  tags: [ocm, ocm_join]

@@ -1,0 +1,109 @@
+---
+- name: Harbor | Require hub host
+  ansible.builtin.assert:
+    that: inventory_hostname in groups['hub']
+    fail_msg: Harbor installs on hub (umkim-hub) only — use harbor_registries on fleet_nodes.
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Install prerequisites
+  ansible.builtin.dnf:
+    name:
+      - skopeo
+      - tar
+    state: present
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Check for helm
+  ansible.builtin.stat:
+    path: "{{ harbor_helm_install_dir }}/helm"
+  register: harbor_helm_stat
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Install helm
+  ansible.builtin.unarchive:
+    src: "https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/linux-amd64/helm
+  when: not harbor_helm_stat.stat.exists
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Place helm binary
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm
+    dest: "{{ harbor_helm_install_dir }}/helm"
+    mode: "0755"
+    remote_src: true
+  when: not harbor_helm_stat.stat.exists
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Add Helm repository
+  ansible.builtin.command:
+    cmd: helm repo add harbor {{ harbor_helm_repo }}
+  environment:
+    KUBECONFIG: "{{ harbor_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: harbor_helm_repo_add
+  changed_when: "'has been added' in harbor_helm_repo_add.stdout"
+  failed_when: harbor_helm_repo_add.rc != 0 and 'already exists' not in harbor_helm_repo_add.stderr
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Update Helm repositories
+  ansible.builtin.command:
+    cmd: helm repo update harbor
+  environment:
+    KUBECONFIG: "{{ harbor_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Render Helm values
+  ansible.builtin.template:
+    src: harbor-values.yaml.j2
+    dest: /tmp/harbor-values.yaml
+    mode: "0600"
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Install or upgrade Harbor
+  ansible.builtin.command:
+    cmd: >-
+      helm upgrade --install {{ harbor_release }} harbor/harbor
+      --namespace {{ harbor_namespace }} --create-namespace
+      --version {{ harbor_chart_version }}
+      -f /tmp/harbor-values.yaml --wait --timeout 20m
+  environment:
+    KUBECONFIG: "{{ harbor_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: harbor_helm_install
+  changed_when: "'has been upgraded' in harbor_helm_install.stdout or 'has been installed' in harbor_helm_install.stdout"
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Wait for core deployment
+  ansible.builtin.command:
+    cmd: kubectl -n {{ harbor_namespace }} wait --for=condition=Available deployment/harbor-core --timeout=600s
+  environment:
+    KUBECONFIG: "{{ harbor_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Wait for registry deployment
+  ansible.builtin.command:
+    cmd: kubectl -n {{ harbor_namespace }} wait --for=condition=Available deployment/harbor-registry --timeout=600s
+  environment:
+    KUBECONFIG: "{{ harbor_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Configure proxy cache registries and projects
+  ansible.builtin.include_tasks: configure_proxy.yml
+  tags: [harbor, harbor_install]
+
+- name: Harbor | Configure hosted fleet project (push target)
+  ansible.builtin.include_tasks: configure_hosted.yml
+  tags: [harbor, harbor_install, harbor_push_fleet]
+
+- name: Harbor | Configure hosted charts project
+  ansible.builtin.include_tasks: configure_charts_project.yml
+  tags: [harbor, harbor_install, harbor_push_charts]

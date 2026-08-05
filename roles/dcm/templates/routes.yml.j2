@@ -1,0 +1,224 @@
+http:
+  routers:
+    # ── Health endpoints (GET only) ───────────────────────────────────
+    health-providers:
+      rule: "Path(`/api/v1alpha1/health/providers`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    health-catalog:
+      rule: "Path(`/api/v1alpha1/health/catalog`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    health-policies:
+      rule: "Path(`/api/v1alpha1/health/policies`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    health-placement:
+      rule: "Path(`/api/v1alpha1/health/placement`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    # ── ServiceProviderManager ────────────────────────────────────────
+    providers-collection:
+      rule: "Path(`/api/v1alpha1/providers`) && (Method(`GET`) || Method(`POST`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    providers-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/providers/[^/:]+$`) && (Method(`GET`) || Method(`PUT`) || Method(`DELETE`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    service-type-instances-collection:
+      rule: "Path(`/api/v1alpha1/service-type-instances`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    service-type-instances-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/service-type-instances/[^/:]+$`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    # ── CatalogManager ────────────────────────────────────────────────
+    service-types-collection:
+      rule: "Path(`/api/v1alpha1/service-types`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    service-types-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/service-types/[^/:]+$`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-items-collection:
+      rule: "Path(`/api/v1alpha1/catalog-items`) && (Method(`GET`) || Method(`POST`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-items-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/catalog-items/[^/:]+$`) && (Method(`GET`) || Method(`PATCH`) || Method(`DELETE`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-item-instances-collection:
+      rule: "Path(`/api/v1alpha1/catalog-item-instances`) && (Method(`GET`) || Method(`POST`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-item-instances-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/catalog-item-instances/[^/:]+$`) && (Method(`GET`) || Method(`DELETE`) || Method(`PATCH`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-item-instances-placement-targets:
+      rule: "PathRegexp(`^/api/v1alpha1/catalog-item-instances/[^/]+/placement-targets$`) && Method(`GET`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-item-instances-helm:
+      rule: "PathRegexp(`^/api/v1alpha1/catalog-item-instances/[^/]+/helm/`) && (Method(`GET`) || Method(`POST`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    catalog-item-instances-rehydrate:
+      rule: "PathRegexp(`^/api/v1alpha1/catalog-item-instances/[^/]+:rehydrate$`) && Method(`POST`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    # ── PolicyManager ─────────────────────────────────────────────────
+    policies-collection:
+      rule: "Path(`/api/v1alpha1/policies`) && (Method(`GET`) || Method(`POST`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    policies-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/policies/[^/:]+$`) && (Method(`GET`) || Method(`PATCH`) || Method(`DELETE`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    placement-preview:
+      rule: "Path(`/api/v1alpha1/placement-preview`) && Method(`POST`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    placements-resource:
+      rule: "PathRegexp(`^/api/v1alpha1/placements/[^/]+$`) && (Method(`GET`) || Method(`DELETE`))"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+    placements-relocate:
+      rule: "PathRegexp(`^/api/v1alpha1/placements/[^/]+/relocate$`) && Method(`POST`)"
+      service: control-plane
+      middlewares: [cors-api]
+      entryPoints: [web]
+
+{% if dcm_ui_gateway_path | default(false) | bool %}
+    # ── DCM Swagger UI (fleet-console) ────────────────────────────────
+    dcm-ui:
+      rule: "PathPrefix(`/ui`)"
+      service: dcm-ui
+      entryPoints: [web]
+      middlewares: [strip-ui-prefix]
+{% endif %}
+{% if dcm_fleet_gateway_path | default(false) | bool %}
+    # ── Fleet API + auth (via dcm-fleet-dashboard nginx → fleet-console-auth) ─
+    fleet-site-api:
+      rule: "PathPrefix(`/fleet/api`)"
+      service: dcm-fleet-dashboard
+      entryPoints: [web]
+    fleet-console-auth:
+      rule: "PathPrefix(`/fleet/auth`)"
+      service: dcm-fleet-dashboard
+      entryPoints: [web]
+    # ── DCM fleet dashboard (fleet-console) ───────────────────────────
+    dcm-fleet:
+      rule: "PathPrefix(`/fleet`)"
+      service: dcm-fleet-dashboard
+      entryPoints: [web]
+      middlewares: [strip-fleet-prefix]
+{% endif %}
+{{ fleet_edge_routers_fragment | default('', true) }}
+
+  middlewares:
+    cors-api:
+      headers:
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+          - HEAD
+        accessControlAllowHeaders:
+          - "*"
+        accessControlExposeHeaders:
+          - "*"
+        accessControlMaxAge: 86400
+        addVaryHeader: true
+{% if dcm_ui_gateway_path | default(false) | bool %}
+    strip-ui-prefix:
+      stripPrefix:
+        prefixes:
+          - /ui
+{% endif %}
+{% if dcm_fleet_gateway_path | default(false) | bool %}
+    strip-fleet-api-prefix:
+      stripPrefix:
+        prefixes:
+          - /fleet
+    strip-fleet-prefix:
+      stripPrefix:
+        prefixes:
+          - /fleet
+{% endif %}
+{{ fleet_edge_middlewares_fragment | default('', true) }}
+
+  services:
+    control-plane:
+      loadBalancer:
+        servers:
+          - url: "http://control-plane:8080"
+{% if dcm_ui_gateway_path | default(false) | bool %}
+    dcm-ui:
+      loadBalancer:
+        servers:
+          - url: "http://dcm-ui.{{ fleet_webui_namespace | default('fleet-console') }}.svc.cluster.local:80"
+{% endif %}
+{% if dcm_fleet_gateway_path | default(false) | bool %}
+    fleet-site-controller:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:18080"
+    dcm-fleet-dashboard:
+      loadBalancer:
+        servers:
+          - url: "http://dcm-fleet-dashboard.{{ fleet_webui_namespace | default('fleet-console') }}.svc.cluster.local:80"
+{% endif %}
+{{ fleet_edge_services_fragment | default('', true) }}

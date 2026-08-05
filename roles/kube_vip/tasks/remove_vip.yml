@@ -1,0 +1,14 @@
+---
+- name: Kube-vip | Remove control plane VIP from local interfaces
+  ansible.builtin.shell: |
+    set -euo pipefail
+    vip="{{ k3s_control_plane_vip }}"
+    while IFS= read -r dev; do
+      [[ -z "${dev}" ]] && continue
+      ip addr del "${vip}/32" dev "${dev}" 2>/dev/null || true
+      ip addr del "${vip}/24" dev "${dev}" 2>/dev/null || true
+    done < <(ip -o addr show 2>/dev/null | awk -v v="${vip}" '$0 ~ v {print $2}' | sort -u)
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: k3s_control_plane_vip | default('') | length > 0

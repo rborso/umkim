@@ -1,0 +1,27 @@
+---
+- name: DCM | Push k8s-container-sp ManifestWork to each spoke
+  ansible.builtin.template:
+    src: manifestwork-k8s-sp.yaml.j2
+    dest: "/tmp/manifestwork-phase5-{{ item }}.yaml"
+    mode: "0600"
+  loop: "{{ ocm_manifestwork_clusters | default(groups['spokes']) }}"
+  vars:
+    ocm_target_cluster: "{{ hostvars[item].ocm_cluster_name | default(item) }}"
+    dcm_k8s_sp_nodeport: "{{ hostvars[item].dcm_k8s_sp_nodeport }}"
+    dcm_k8s_sp_name: "{{ hostvars[item].dcm_k8s_sp_name }}"
+    dcm_k8s_sp_endpoint_host: >-
+      {{ hostvars[item].dcm_k8s_sp_endpoint_host
+         | default(hostvars[item].wireguard_address | ansible.utils.ipaddr('address'), true)
+         | default(hostvars[item].ansible_host, true) }}
+  tags: [dcm, phase5, dcm_push_spokes, phase5_push]
+
+- name: DCM | Apply ManifestWork on hub
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/manifestwork-phase5-{{ item }}.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_manifestwork_clusters | default(groups['spokes']) }}"
+  register: dcm_mw_apply
+  changed_when: "'created' in dcm_mw_apply.stdout or 'configured' in dcm_mw_apply.stdout"
+  tags: [dcm, phase5, dcm_push_spokes, phase5_push]

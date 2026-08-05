@@ -1,0 +1,33 @@
+---
+- name: Fleet site | Resolve k8s provider delete
+  ansible.builtin.set_fact:
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    fleet_site_k8s_sp_name: "{{ fleet_site_dcm_k8s_sp_name | default('k8s-' ~ (fleet_site_ocm_name | default(fleet_site_name))) }}"
+    fleet_site_container_api_url: "{{ fleet_site_container_api_url | default(fleet_site_dcm_api_url) }}"
+    phase5_manifestwork_name: "{{ phase5_manifestwork_name | default('phase5-k8s-container-sp') }}"
+  tags: [fleet_site, fleet_site_provider, fleet_site_provider_delete]
+
+- name: Fleet site | Delete k8s SP ManifestWork
+  ansible.builtin.command:
+    cmd: >-
+      kubectl delete manifestwork {{ phase5_manifestwork_name }}
+      -n {{ fleet_site_ocm_cluster }} --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  tags: [fleet_site, fleet_site_provider_delete]
+
+- name: Fleet site | Unregister k8s provider from SPM
+  ansible.builtin.import_tasks: unregister_dcm_provider.yml
+  vars:
+    fleet_site_unregister_provider_name: "{{ fleet_site_k8s_sp_name }}"
+    fleet_site_unregister_provider_api_url: "{{ fleet_site_container_api_url }}"
+  tags: [fleet_site, fleet_site_provider_delete]
+
+- name: Fleet site | Remove site-container policy
+  ansible.builtin.uri:
+    url: "{{ fleet_site_container_api_url }}/policies/site-container-{{ fleet_site_ocm_cluster }}"
+    method: DELETE
+    status_code: [200, 204, 404]
+  tags: [fleet_site, fleet_site_provider_delete]

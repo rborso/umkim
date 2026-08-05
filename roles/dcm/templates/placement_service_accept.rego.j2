@@ -1,0 +1,5 @@
+package {{ rego_package }}
+
+main := {
+  "rejected": false
+} if input.spec.service_type == "{{ service_type }}"

@@ -1,0 +1,9 @@
+hub-only:
+  description: Greenfield hub without workload clusters
+  l1_suites: [hub, core]
+  l2_suites: [core]
+
+homelab:
+  description: Maintainer homelab with FCJ workload clusters
+  l1_suites: [hub, core, edge]
+  l2_suites: [core, tenancy, edge, backup, catalog, regression]

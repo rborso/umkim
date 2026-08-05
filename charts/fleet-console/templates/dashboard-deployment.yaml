@@ -1,0 +1,59 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dcm-fleet-dashboard
+  namespace: {{ include "fleet-console.namespace" . }}
+  labels:
+    app: dcm-fleet-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dcm-fleet-dashboard
+  template:
+    metadata:
+      labels:
+        app: dcm-fleet-dashboard
+      annotations:
+        fleet.umkim.com/build-id: {{ .Values.dashboard.buildId | default "" | quote }}
+    spec:
+      containers:
+        - name: nginx
+          image: {{ include "fleet-console.dashboardImage" . }}
+          imagePullPolicy: {{ .Values.dashboard.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: FLEET_AUTH_HOST
+              value: {{ .Values.dashboard.fleetAuthHost | quote }}
+            - name: FLEET_SITE_HOST
+              value: {{ .Values.dashboard.fleetSiteHost | quote }}
+          readinessProbe:
+            httpGet:
+              path: /fleet/
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcm-fleet-dashboard
+  namespace: {{ include "fleet-console.namespace" . }}
+spec:
+  type: NodePort
+  selector:
+    app: dcm-fleet-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      nodePort: {{ .Values.dashboard.nodePort }}
+{{- end }}

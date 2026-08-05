@@ -1,0 +1,26 @@
+# Merge under fleet_sites: in inventory/group_vars/all/fleet_sites.yml
+# Reverse-proxy — TLS on edge router; HTTP to cluster NodePort 30080.
+# Maps to cluster-B pattern in docs/dual_homed_config.md.
+edge_rp_example:
+  display_name: Edge reverse-proxy site
+  region: edge
+  exposure_mode: reverse_proxy
+  default_exposure_mode: reverse_proxy
+  edge_domain: rp.site.example.com
+  edge_wildcard: "*.rp.site.example.com"
+  external_endpoints:
+    - id: edge-rp-wan
+      address: "203.0.113.51"   # RFC5737 — edge router public IP
+      role: primary
+      description: "Edge router — host-based reverse proxy, TLS on router"
+  domains:
+    - id: rp-zone
+      zone: rp.site.example.com
+      wildcard: "*.rp.site.example.com"
+      tls_policy: external
+      ingress_endpoint_id: edge-rp-wan
+  dns_target_note: "A/AAAA *.rp.site.example.com → 203.0.113.51 (edge-rp-wan) → RP → node 203.0.113.101:30080"
+  wan_egress:
+    enabled: true
+    expected_wan_ip: "203.0.113.51"
+  wireguard_pool: null

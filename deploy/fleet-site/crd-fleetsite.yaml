@@ -1,0 +1,215 @@
+# FleetSite — datacenter registry and greenfield site provisioning.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetsites.fleet.umkim.com
+spec:
+  group: fleet.umkim.com
+  names:
+    kind: FleetSite
+    listKind: FleetSiteList
+    plural: fleetsites
+    singular: fleetsite
+    shortNames:
+      - fsite
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - siteName
+              properties:
+                siteName:
+                  type: string
+                  description: OCM ManagedCluster name for greenfield sites (DNS-safe)
+                  pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                  maxLength: 63
+                orgId:
+                  type: string
+                  description: Organization slug owning this site (customer sites require org prefix)
+                  pattern: '^[a-z][a-z0-9-]{1,30}[a-z0-9]$'
+                siteId:
+                  type: string
+                  description: Datacenter id for fleet.site OCM label
+                provisioningMode:
+                  type: string
+                  enum: [greenfield, registry]
+                  default: greenfield
+                displayName:
+                  type: string
+                region:
+                  type: string
+                  description: Geographic or logical region for placement metadata
+                failureDomain:
+                  type: string
+                  description: Optional failure domain within region
+                edgeDomain:
+                  type: string
+                  description: Legacy; prefer spec.edge.edgeDomain
+                edge:
+                  type: object
+                  properties:
+                    edgeDomain:
+                      type: string
+                    wildcard:
+                      type: string
+                    exposureMode:
+                      type: string
+                      enum: [none, port_forward, reverse_proxy, hub_gateway]
+                    defaultExposureMode:
+                      type: string
+                      enum: [none, port_forward, reverse_proxy, hub_gateway]
+                    externalEndpoints:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, address]
+                        properties:
+                          id:
+                            type: string
+                          address:
+                            type: string
+                          role:
+                            type: string
+                          description:
+                            type: string
+                    domains:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, zone]
+                        properties:
+                          id:
+                            type: string
+                          zone:
+                            type: string
+                          wildcard:
+                            type: string
+                          tlsPolicy:
+                            type: string
+                            enum: [inherit, external, acme_cluster, acme_hub, passthrough]
+                          assignedClusters:
+                            type: array
+                            items:
+                              type: string
+                          ingressEndpointId:
+                            type: string
+                    wanEgress:
+                      type: object
+                      description: Site has internet egress (not cluster ingress)
+                      properties:
+                        enabled:
+                          type: boolean
+                        dnsTargetNote:
+                          type: string
+                        expectedWanIp:
+                          type: string
+                    externalAccess:
+                      type: object
+                      description: Deprecated; use wanEgress
+                      properties:
+                        enabled:
+                          type: boolean
+                        dnsTargetNote:
+                          type: string
+                        expectedWanIp:
+                          type: string
+                bootstrapHost:
+                  type: string
+                mgmtLanIp:
+                  type: string
+                rockyVersion:
+                  type: string
+                  default: "9"
+                clusterRegion:
+                  type: string
+                minRootDiskGi:
+                  type: integer
+                  minimum: 10
+                  default: 40
+                clusterCapabilities:
+                  type: object
+                  additionalProperties:
+                    type: boolean
+                gpu:
+                  type: boolean
+                  default: false
+                storage:
+                  type: object
+                  description: Deprecated on FleetSite; use FleetClusterJoin storage
+                  properties:
+                    minDataDiskGi:
+                      type: integer
+                    rwo:
+                      type: boolean
+                    rwx:
+                      type: boolean
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Draft
+                    - ScriptIssued
+                    - Enrolled
+                    - Validated
+                    - Provisioning
+                    - Ready
+                    - Failed
+                message:
+                  type: string
+                wireguardAddress:
+                  type: string
+                wireguardPublicKey:
+                  type: string
+                enrolledAt:
+                  type: string
+                  format: date-time
+                enrolledHostname:
+                  type: string
+                validationErrors:
+                  type: array
+                  items:
+                    type: string
+                validateJobName:
+                  type: string
+                provisionJobName:
+                  type: string
+                managedClusterAvailable:
+                  type: boolean
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: WG
+          type: string
+          jsonPath: .status.wireguardAddress
+        - name: Site
+          type: string
+          jsonPath: .spec.siteName
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

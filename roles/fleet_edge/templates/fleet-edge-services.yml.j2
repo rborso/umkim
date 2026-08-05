@@ -1,0 +1,25 @@
+{% for app in fleet_edge_apps %}
+{% set app_id = app.name | regex_replace('[^a-zA-Z0-9]+', '-') %}
+{% set ns = namespace(has_backends=false) %}
+{% for cluster in app.clusters | default([]) %}
+{% if cluster in fleet_edge_clusters %}
+{% set ns.has_backends = true %}
+{% endif %}
+{% endfor %}
+{% if ns.has_backends %}
+    fleet-{{ app_id }}:
+      loadBalancer:
+        healthCheck:
+          path: "{{ app.health_path | default('/') }}"
+          hostname: "{{ app.host }}"
+          interval: 10s
+          timeout: 3s
+        servers:
+{% for cluster in app.clusters | default([]) %}
+{% if cluster in fleet_edge_clusters %}
+{% set c = fleet_edge_clusters[cluster] %}
+          - url: "http://{{ c.upstream_host }}:{{ c.traefik_http_port }}"
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}

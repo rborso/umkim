@@ -1,0 +1,61 @@
+---
+# Per-cluster DCM policy: route service_type vm to kubevirt-<cluster>.
+- name: Fleet site | VM policy API base
+  ansible.builtin.set_fact:
+    fleet_site_vm_api_url: "{{ fleet_site_vm_api_url | default(fleet_site_dcm_api_url) }}"
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    fleet_site_kubevirt_provider: "{{ fleet_site_dcm_kubevirt_sp_name | default('kubevirt-' ~ (fleet_site_ocm_name | default(fleet_site_name))) }}"
+    fleet_site_vm_policy_priority: "{{ (fleet_site_dcm_kubevirt_sp_nodeport | default(30220) | int) - 30000 }}"
+    fleet_site_policy_site: "{{ fleet_site_id | default(fleet_site_ocm_cluster) }}"
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Read ManagedCluster topology label for site-vm policy
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get managedcluster {{ fleet_site_ocm_cluster }}
+      -o jsonpath={.metadata.labels.fleet\.topology/topology}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_site_mc_topology
+  changed_when: false
+  failed_when: false
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Render site-vm policy rego
+  ansible.builtin.template:
+    src: site_vm_policy.rego.j2
+    dest: "/tmp/site-vm-{{ fleet_site_ocm_cluster }}.rego"
+    mode: "0644"
+  register: fleet_site_vm_policy_rego
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Read site-vm policy rego
+  ansible.builtin.slurp:
+    src: "{{ fleet_site_vm_policy_rego.dest }}"
+  register: fleet_site_vm_policy_content
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Update site-vm policy when present
+  ansible.builtin.uri:
+    url: "{{ fleet_site_vm_api_url }}/policies/site-vm-{{ fleet_site_ocm_cluster }}"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body: "{{ lookup('template', 'site_vm_policy_patch.json.j2') }}"
+  register: fleet_site_vm_policy_patch
+  run_once: true
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Seed site-vm policy
+  ansible.builtin.uri:
+    url: "{{ fleet_site_vm_api_url }}/policies?id=site-vm-{{ fleet_site_ocm_cluster }}"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body: "{{ lookup('template', 'site_vm_policy_post.json.j2') }}"
+  when: fleet_site_vm_policy_patch.status == 404
+  run_once: true
+  tags: [fleet_site, fleet_site_provider]

@@ -1,0 +1,10 @@
+---
+calico_version: v3.29.0
+calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
+# auto: detect management IPv4 interface per node (fleet cluster bundles).
+# Hub/spoke inventory may override (e.g. interface=wg0 on the management hub).
+calico_ip_autodetection_method: auto
+calico_ip_autodetection_fallback: interface=eth.*,en.*,ens.*,bond.*,n0p0*
+calico_kubeconfig: /etc/rancher/k3s/k3s.yaml
+calico_encapsulation_disabled: false
+calico_rollout_timeout: 600

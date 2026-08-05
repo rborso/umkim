@@ -1,0 +1,7 @@
+---
+# Host-level NFS server for fleet cluster storage (lab / homelab).
+fleet_nfs_server_enabled: false
+fleet_nfs_server_export_base: /srv/fleet-nfs
+fleet_nfs_server_export_clients: "10.10.0.0/16(rw,sync,no_subtree_check,no_root_squash)"
+fleet_nfs_server_extra_clients: []
+# e.g. ["10.244.0.0/16(rw,sync,no_subtree_check,no_root_squash)"] for pod CIDR if needed

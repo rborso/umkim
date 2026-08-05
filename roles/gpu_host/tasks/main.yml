@@ -1,0 +1,18 @@
+---
+- name: GPU host | Detect NVIDIA hardware
+  ansible.builtin.import_tasks: detect.yml
+  tags: [gpu_host, gpu_host_detect]
+
+- name: GPU host | Install proprietary driver
+  ansible.builtin.import_tasks: driver.yml
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Install container toolkit
+  ansible.builtin.import_tasks: container_toolkit.yml
+  when: gpu_host_install_container_toolkit | bool
+  tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Deploy Kubernetes device plugin
+  ansible.builtin.import_tasks: device_plugin.yml
+  when: gpu_host_install_device_plugin | bool
+  tags: [gpu_host, gpu_host_device_plugin]

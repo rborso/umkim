@@ -1,0 +1,55 @@
+# Cluster registry for fleet-edge-controller (direct_ingress gate + upstream targets).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ fleet_edge_cluster_configmap_name }}
+  namespace: {{ fleet_edge_cluster_configmap_namespace }}
+  labels:
+    app.kubernetes.io/name: fleet-edge
+    app.kubernetes.io/component: cluster-registry
+data:
+  clusters.yaml: |
+    clusters:
+{% for name, cfg in fleet_edge_clusters.items() %}
+      {{ name }}:
+        site: "{{ cfg.site | default('') }}"
+{% if cfg.management | default(false) | bool %}
+        management: true
+{% endif %}
+{% if cfg.read_only | default(false) | bool %}
+        read_only: true
+{% endif %}
+        direct_ingress: {{ cfg.direct_ingress | default(fleet_edge_direct_ingress_default) | bool }}
+{% if cfg.exposure_mode is defined %}
+        exposure_mode: {{ cfg.exposure_mode }}
+{% endif %}
+{% if cfg.tls_policy is defined %}
+        tls_policy: {{ cfg.tls_policy }}
+{% endif %}
+{% if cfg.ingress_endpoint_id is defined %}
+        ingress_endpoint_id: {{ cfg.ingress_endpoint_id }}
+{% endif %}
+{% if cfg.domain_bindings is defined %}
+        domain_bindings:
+{% for db in cfg.domain_bindings %}
+          - {{ db }}
+{% endfor %}
+{% endif %}
+        upstream_host: "{{ cfg.upstream_host }}"
+{% if cfg.edge_wan_ip is defined %}
+        edge_wan_ip: "{{ cfg.edge_wan_ip }}"
+{% endif %}
+        traefik_http_port: {{ cfg.traefik_http_port | default(phase6_http_nodeport) }}
+{% if cfg.traefik_hub_http_port is defined %}
+        traefik_hub_http_port: {{ cfg.traefik_hub_http_port }}
+{% endif %}
+{% if cfg.capabilities is defined %}
+        capabilities:
+{% for cap_key, cap_val in cfg.capabilities.items() %}
+          {{ cap_key }}: {{ cap_val | string | lower if cap_val is boolean else cap_val }}
+{% endfor %}
+{% endif %}
+{% if cfg.region is defined %}
+        region: "{{ cfg.region }}"
+{% endif %}
+{% endfor %}

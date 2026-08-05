@@ -1,0 +1,7 @@
+---
+# Console-driven ACME reconcile (ansible-runner Job on hub).
+ocm_kubeconfig: /etc/kube/config
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+fleet_edge_controller_playbook_dir: /ansible
+phase5_dcm_namespace: dcm
+fleet_acme_cert_obtain_wait_sec: 90

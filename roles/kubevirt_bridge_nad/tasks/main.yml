@@ -1,0 +1,74 @@
+---
+# Ensure Multus NetworkAttachmentDefinition + bridge CNI for KubeVirt L2 VMs.
+# Run on the workload cluster (KUBECONFIG points at spoke).
+- name: KubeVirt bridge NAD | Defaults
+  ansible.builtin.set_fact:
+    kubevirt_bridge_nad_name: "{{ kubevirt_bridge_nad_name | default('mgmt-l2') }}"
+    kubevirt_bridge_nad_namespace: "{{ kubevirt_bridge_nad_namespace | default('default') }}"
+    kubevirt_bridge_host_bridge: "{{ kubevirt_bridge_host_bridge | default('n0p0_mgmt_nw') }}"
+    kubevirt_bridge_cni_bin_dir: "{{ kubevirt_bridge_cni_bin_dir | default('/opt/cni/bin') }}"
+  tags: [kubevirt, kubevirt_bridge_nad]
+
+- name: KubeVirt bridge NAD | Ensure bridge CNI plugin present
+  ansible.builtin.shell: |
+    set -euo pipefail
+    BIN="{{ kubevirt_bridge_cni_bin_dir }}/bridge"
+    if [[ -x "$BIN" ]]; then
+      echo "bridge CNI already present"
+      exit 0
+    fi
+    TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+    VER="v1.5.1"
+    curl -fsSL "https://github.com/containernetworking/plugins/releases/download/${VER}/cni-plugins-linux-amd64-${VER}.tgz" \
+      | tar -xz -C "$TMP" ./bridge ./host-device ./tuning
+    install -m 0755 "$TMP/bridge" "$BIN"
+    install -m 0755 "$TMP/tuning" "{{ kubevirt_bridge_cni_bin_dir }}/tuning" 2>/dev/null || true
+    echo "installed bridge CNI"
+  args:
+    executable: /bin/bash
+  become: true
+  register: kubevirt_bridge_cni_install
+  changed_when: "'installed bridge CNI' in kubevirt_bridge_cni_install.stdout"
+  tags: [kubevirt, kubevirt_bridge_nad]
+
+- name: KubeVirt bridge NAD | Ensure host bridge exists
+  ansible.builtin.command:
+    cmd: ip link show {{ kubevirt_bridge_host_bridge }}
+  register: kubevirt_bridge_host_check
+  changed_when: false
+  failed_when: kubevirt_bridge_host_check.rc != 0
+  tags: [kubevirt, kubevirt_bridge_nad]
+
+- name: KubeVirt bridge NAD | Apply NetworkAttachmentDefinition
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cat <<EOF | kubectl apply -f -
+    apiVersion: k8s.cni.cncf.io/v1
+    kind: NetworkAttachmentDefinition
+    metadata:
+      name: {{ kubevirt_bridge_nad_name }}
+      namespace: {{ kubevirt_bridge_nad_namespace }}
+      # Do not set k8s.v1.cni.cncf.io/resourceName — that requires a device plugin
+      # advertising bridge.network.kubevirt.io/<bridge>. Without it, Multus bridge
+      # binding schedules normally on any node that has the host bridge.
+    spec:
+      config: |
+        {
+          "cniVersion": "0.3.1",
+          "name": "{{ kubevirt_bridge_nad_name }}",
+          "type": "bridge",
+          "bridge": "{{ kubevirt_bridge_host_bridge }}",
+          "ipam": {}
+        }
+    EOF
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  register: kubevirt_bridge_nad_apply
+  changed_when: >-
+    'created' in kubevirt_bridge_nad_apply.stdout
+    or 'configured' in kubevirt_bridge_nad_apply.stdout
+  tags: [kubevirt, kubevirt_bridge_nad]

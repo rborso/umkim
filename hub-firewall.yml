@@ -1,0 +1,13 @@
+---
+# Restrict hub management services to WireGuard (nftables on public NIC).
+#
+# Usage:
+#   ansible-playbook hub-firewall.yml -l hub
+
+- name: Fleet hub firewall (WireGuard-only management)
+  hosts: hub
+  become: true
+  gather_facts: true
+  roles:
+    - role: fleet_hub_firewall
+      tags: [fleet_hub_firewall, hub_firewall]

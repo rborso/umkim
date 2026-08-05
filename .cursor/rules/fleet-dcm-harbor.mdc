@@ -1,0 +1,12 @@
+---
+description: DCM phase 4/5, OLM ManifestWorks, Harbor registry
+globs: roles/dcm/**,roles/harbor/**,roles/olm/**,phase4.yml,phase5.yml,harbor.yml
+alwaysApply: false
+---
+
+# DCM & Harbor (S3)
+
+- Hub DCM: `fleet-dcm.yml` on hub; spoke workers via ManifestWork `phase5-k8s-container-sp`.
+- OLM/cert-manager on spokes: `phase4-platform-bootstrap` ManifestWork (`roles/olm`).
+- Harbor hosted project `fleet`; push built images with `harbor_push_fleet` (not docker push to proxy).
+- Skill: `.cursor/skills/fleet-dcm-harbor/SKILL.md`.

@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-edge-controller
+  namespace: {{ fleet_edge_controller_namespace }}
+  labels:
+    app: fleet-edge-controller
+spec:
+  replicas: {{ fleet_edge_controller_replicas }}
+  selector:
+    matchLabels:
+      app: fleet-edge-controller
+  template:
+    metadata:
+      labels:
+        app: fleet-edge-controller
+    spec:
+      serviceAccountName: fleet-edge-controller
+      containers:
+        - name: controller
+          image: {{ fleet_edge_controller_image }}
+          imagePullPolicy: Always
+          env:
+            - name: FLEET_EDGE_CLUSTER_CM_NS
+              value: "{{ fleet_edge_cluster_configmap_namespace }}"
+            - name: FLEET_EDGE_CLUSTER_CM_NAME
+              value: "{{ fleet_edge_cluster_configmap_name }}"
+            - name: FLEET_ROUTES_CM_NS
+              value: "{{ fleet_routes_cm_namespace }}"
+            - name: FLEET_ROUTES_CM_NAME
+              value: "{{ fleet_routes_cm_name }}"
+            - name: FLEET_ROUTES_CM_KEY
+              value: fleet-routes.yml
+            - name: FLEET_EDGE_DOMAIN
+              value: "{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+            - name: FLEET_EDGE_ACME_ENABLED
+              value: "{{ fleet_edge_acme_enabled | bool | ternary('true', 'false') }}"
+            - name: FLEET_EDGE_ACME_PREFLIGHT_ENABLED
+              value: "{{ fleet_edge_acme_preflight_enabled | default(true) | bool | ternary('true', 'false') }}"
+            - name: FLEET_GATEWAY_PROBE_HOST
+              value: "{{ fleet_gateway_probe_host | default(fleet_hub_public_ipv4 | default(dcm_gateway_external_ip | default(''))) }}"
+            - name: FLEET_ACME_QUEUE_RETRY_INTERVAL_SEC
+              value: "{{ fleet_edge_acme_queue_retry_interval_sec | default(60) | string }}"
+            - name: FLEET_ACME_SOLVER_ENABLED
+              value: "{{ dcm_gateway_acme_solver_enabled | default(fleet_edge_acme_enabled | default(false)) | bool | ternary('true', 'false') }}"
+            - name: FLEET_ACME_LEGACY_GATEWAY_SCALE
+              value: "{{ fleet_edge_acme_legacy_gateway_scale | default(false) | bool | ternary('true', 'false') }}"
+            - name: FLEET_ACME_SOLVER_DEPLOYMENT
+              value: "gateway-acme"
+            - name: FLEET_ACME_SOLVER_SERVICE
+              value: "gateway-acme"
+            - name: FLEET_ACME_SOLVER_ROUTES_CM
+              value: "dcm-traefik-acme-routes"
+            - name: FLEET_ACME_DEBOUNCE_SEC
+              value: "{{ fleet_edge_acme_debounce_sec | default(30) | string }}"
+            - name: FLEET_ACME_DNS_CHECK_ENABLED
+              value: "{{ fleet_edge_acme_dns_check_enabled | default(true) | bool | ternary('true', 'false') }}"
+            - name: FLEET_GATEWAY_WAN_IP
+              value: "{{ fleet_hub_public_ipv4 | default(dcm_gateway_external_ip | default('')) }}"
+            - name: FLEET_ROUTE_NAMESPACE
+              value: "{{ fleet_edge_controller_namespace }}"
+            - name: HUB_GATEWAY_URL
+              value: "{{ fleet_edge_hub_gateway_url | default('http://127.0.0.1:30908') }}"
+            - name: HUB_GATEWAY_HTTP_URL
+              value: "{{ fleet_edge_hub_gateway_http_url | default('http://127.0.0.1:30908') }}"
+            - name: ROUTE_HEALTH_INTERVAL_SEC
+              value: "{{ fleet_edge_route_health_interval_sec | default(60) | string }}"
+            - name: ROUTE_HEALTH_FAILURE_THRESHOLD
+              value: "{{ fleet_edge_route_health_failure_threshold | default(3) | string }}"
+            - name: ROUTE_HEALTH_SUCCESS_THRESHOLD
+              value: "{{ fleet_edge_route_health_success_threshold | default(2) | string }}"
+            - name: FLEET_INGRESS_AUTH_ENABLED
+              value: "{{ fleet_ingress_auth_enabled | default(false) | bool | ternary('true', 'false') }}"
+            - name: FLEET_AUTHELIA_FORWARD_AUTH_URL
+              value: "{{ fleet_ingress_auth_forward_auth_url | default('http://authelia.fleet-ingress-auth.svc.cluster.local:9091/api/authz/forward-auth') }}"
+            - name: FLEET_AUTHELIA_PORTAL_HOST
+              value: "{{ fleet_ingress_auth_portal_host | default('auth.' ~ (fleet_edge_domain | default('mgmt.umkim.com'))) }}"
+            - name: FLEET_AUTHELIA_SERVICE_URL
+              value: "http://authelia.{{ fleet_ingress_auth_namespace | default('fleet-ingress-auth') }}.svc.cluster.local:{{ fleet_ingress_auth_authelia_port | default(9091) }}"
+            - name: REQUEUE_INTERVAL_SEC
+              value: "{{ fleet_edge_route_requeue_interval_sec | default(60) | string }}"
+          ports:
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+{% if fleet_edge_route_sync_enabled | default(true) | bool %}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-edge-route-sync
+  namespace: {{ fleet_edge_controller_namespace }}
+  labels:
+    app: fleet-edge-route-sync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleet-edge-route-sync
+  template:
+    metadata:
+      labels:
+        app: fleet-edge-route-sync
+    spec:
+      serviceAccountName: fleet-edge-route-sync
+{% if fleet_edge_route_sync_host_network | default(true) | bool %}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{% endif %}
+      containers:
+        - name: route-sync
+          image: {{ fleet_edge_controller_image }}
+          imagePullPolicy: Always
+          command: ["/usr/local/bin/fleet-edge-route-sync"]
+          env:
+            - name: CATALOG_API_URL
+              value: "{{ catalog_manager_api_url }}"
+            - name: ROUTE_SYNC_INTERVAL_SEC
+              value: "{{ fleet_edge_route_sync_interval_sec }}"
+            - name: FLEET_ROUTE_NAMESPACE
+              value: "{{ fleet_edge_controller_namespace }}"
+            - name: FLEET_EDGE_DOMAIN
+              value: "{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+            - name: FLEET_EDGE_CLUSTER_CM_NS
+              value: "{{ fleet_edge_cluster_configmap_namespace }}"
+            - name: FLEET_EDGE_CLUSTER_CM_NAME
+              value: "{{ fleet_edge_cluster_configmap_name }}"
+{% endif %}

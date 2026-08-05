@@ -1,0 +1,105 @@
+---
+# Host package deps (iscsi/nfs) are installed on all nodes via host_deps.yml.
+- name: Fleet cluster longhorn | Check pinned Helm binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/helm
+  register: fleet_lh_helm
+
+- name: Fleet cluster longhorn | Download pinned Helm archive
+  ansible.builtin.get_url:
+    url: https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz
+    dest: /tmp/helm-v3.16.3-linux-amd64.tar.gz
+    checksum: sha256:f5355c79190951eed23c5432a3b920e071f4c00a64f75e077de0dd4cb7b294ea
+    mode: "0644"
+  when: not fleet_lh_helm.stat.exists
+
+- name: Fleet cluster longhorn | Extract pinned Helm archive
+  ansible.builtin.unarchive:
+    src: /tmp/helm-v3.16.3-linux-amd64.tar.gz
+    dest: /tmp
+    remote_src: true
+  when: not fleet_lh_helm.stat.exists
+
+- name: Fleet cluster longhorn | Install pinned Helm binary
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    mode: "0755"
+    remote_src: true
+  when: not fleet_lh_helm.stat.exists
+  environment:
+    PATH: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  args:
+    executable: /bin/bash
+
+- name: Fleet cluster longhorn | Add Longhorn helm repo
+  ansible.builtin.shell:
+    cmd: helm repo add longhorn https://charts.longhorn.io
+  environment:
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  register: fleet_lh_repo
+  changed_when: "'has been added' in fleet_lh_repo.stdout"
+  failed_when: fleet_lh_repo.rc != 0 and 'already exists' not in (fleet_lh_repo.stderr | default(''))
+
+- name: Fleet cluster longhorn | Update helm repos
+  ansible.builtin.command:
+    cmd: helm repo update
+  environment:
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  changed_when: false
+
+- name: Fleet cluster longhorn | Install Longhorn chart
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      helm upgrade --install longhorn longhorn/longhorn \
+        --namespace longhorn-system \
+        --create-namespace \
+        --version {{ fleet_cluster_longhorn_chart_version }} \
+        --set defaultSettings.defaultDataPath={{ fleet_cluster_longhorn_mount_path }} \
+        --set persistence.defaultClassReplicaCount=3 \
+        --wait --timeout 20m
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  register: fleet_lh_install
+  changed_when: "'STATUS: deployed' in fleet_lh_install.stdout or fleet_lh_install.rc == 0"
+
+- name: Fleet cluster longhorn | Wait for Longhorn manager pods
+  ansible.builtin.command:
+    cmd: kubectl -n longhorn-system wait --for=condition=ready pod -l app=longhorn-manager --timeout=900s
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  changed_when: false
+
+- name: Fleet cluster longhorn | Clear default from local-path StorageClass
+  ansible.builtin.shell:
+    cmd: |
+      if kubectl get storageclass local-path &>/dev/null; then
+        kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' || true
+      fi
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  when: not (fleet_cluster_local_path_enabled | default(false) | bool)
+  changed_when: false
+
+- name: Fleet cluster longhorn | Set Longhorn as default StorageClass
+  ansible.builtin.shell:
+    cmd: |
+      kubectl patch storageclass {{ fleet_cluster_longhorn_storage_class }} \
+        -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  changed_when: false
+
+- name: Fleet cluster longhorn | Verify Longhorn StorageClass exists
+  ansible.builtin.command:
+    cmd: kubectl get storageclass {{ fleet_cluster_longhorn_storage_class }}
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  changed_when: false

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "priority": {{ fleet_site_vm_policy_priority | int }},
+  "cluster_requirements": {
+    "matchLabels": {
+      "fleet.site": "{{ fleet_site_policy_site }}",
+      "fleet.capability/kvm": "true"{% if fleet_site_mc_topology.stdout | default('') | trim | length > 0 %},
+      "fleet.topology/topology": "{{ fleet_site_mc_topology.stdout | trim }}"{% endif %}
+    }
+  },
+  "placement": {
+    "cluster_count": 1,
+    "strategy": "single"
+  },
+  "rego_code": {{ fleet_site_vm_policy_content.content | b64decode | to_json }}
+}

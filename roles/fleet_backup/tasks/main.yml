@@ -1,0 +1,10 @@
+---
+- name: Fleet backup | Hub MinIO object store
+  ansible.builtin.import_tasks: hub_minio.yml
+  when: fleet_backup_enabled | default(true) | bool
+  tags: [fleet_backup, fleet_backup_hub]
+
+- name: Fleet backup | Velero on spokes
+  ansible.builtin.import_tasks: install_velero_spokes.yml
+  when: fleet_backup_enabled | default(true) | bool
+  tags: [fleet_backup, fleet_backup_spokes]

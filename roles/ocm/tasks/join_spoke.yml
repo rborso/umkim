@@ -1,0 +1,140 @@
+---
+- name: OCM | Wait for local K3s API
+  ansible.builtin.command:
+    cmd: kubectl get nodes
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_spoke_k3s
+  until: ocm_spoke_k3s.rc == 0
+  retries: 24
+  delay: 10
+  changed_when: false
+  tags: [ocm, ocm_join]
+
+- name: OCM | Wait for local node Ready
+  ansible.builtin.command:
+    cmd: kubectl wait node --all --for=condition=Ready --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  changed_when: false
+  tags: [ocm, ocm_join]
+
+- name: OCM | Check managed cluster on hub
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get managedcluster {{ ocm_cluster_name }}
+      -o jsonpath={.spec.hubAcceptsClient}
+  environment:
+    KUBECONFIG: "{{ hostvars[ocm_hub_host].ocm_kubeconfig }}"
+  delegate_to: "{{ ocm_hub_host }}"
+  register: ocm_mc_accepted
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_join]
+
+- name: OCM | Check klusterlet agent namespace on spoke
+  ansible.builtin.command:
+    cmd: kubectl get ns open-cluster-management-agent
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_agent_ns
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_join]
+
+- name: OCM | Check klusterlet on spoke
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management get deploy klusterlet
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_klusterlet
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_join]
+
+- name: OCM | Check Klusterlet CR cluster name on spoke
+  ansible.builtin.command:
+    cmd: kubectl get klusterlet klusterlet -o jsonpath={.spec.clusterName}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_klusterlet_cluster_name
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_join]
+
+- name: OCM | Remove stale klusterlet when cluster name mismatches
+  ansible.builtin.command:
+    cmd: kubectl delete {{ item.kind }} {{ item.name }} --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop:
+    - { kind: klusterlet, name: klusterlet }
+    - { kind: ns, name: open-cluster-management }
+    - { kind: ns, name: open-cluster-management-agent }
+    - { kind: ns, name: open-cluster-management-agent-addon }
+  loop_control:
+    label: "{{ item.kind }}/{{ item.name }}"
+  when:
+    - ocm_klusterlet_cluster_name.rc == 0
+    - (ocm_klusterlet_cluster_name.stdout | default('') | trim) != ocm_cluster_name
+  tags: [ocm, ocm_join]
+
+- name: OCM | Determine if spoke needs clusteradm join
+  ansible.builtin.set_fact:
+    ocm_needs_join: >-
+      {{
+        (ocm_agent_ns.rc != 0)
+        or (ocm_klusterlet.rc != 0)
+        or (ocm_mc_accepted.rc != 0)
+        or ((ocm_mc_accepted.stdout | default('') | trim) != 'true')
+        or (
+          ocm_klusterlet_cluster_name.rc == 0
+          and (ocm_klusterlet_cluster_name.stdout | default('') | trim) != ocm_cluster_name
+        )
+      }}
+  tags: [ocm, ocm_join]
+
+- name: OCM | Create join token on hub
+  ansible.builtin.command:
+    cmd: "{{ ocm_clusteradm_path }} get token -o json"
+  environment:
+    KUBECONFIG: "{{ hostvars[ocm_hub_host].ocm_kubeconfig }}"
+  delegate_to: "{{ ocm_hub_host }}"
+  register: ocm_token_out
+  changed_when: false
+  when: ocm_needs_join | bool
+  tags: [ocm, ocm_join]
+
+- name: OCM | Extract hub join token
+  ansible.builtin.set_fact:
+    ocm_hub_token: "{{ (ocm_token_out.stdout | from_json)['hub-token'] }}"
+    ocm_hub_apiserver_from_token: "{{ (ocm_token_out.stdout | from_json)['hub-apiserver'] }}"
+  when: ocm_token_out is not skipped
+  tags: [ocm, ocm_join]
+
+- name: OCM | Join spoke to hub
+  ansible.builtin.command:
+    cmd: >-
+      {{ ocm_clusteradm_path }} join
+      --hub-token {{ ocm_hub_token }}
+      --hub-apiserver {{ ocm_hub_apiserver_lan | default(ocm_hub_apiserver | default(ocm_hub_apiserver_from_token)) }}
+      --cluster-name {{ ocm_cluster_name }}
+      {{ ocm_join_extra_args | join(' ') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_join
+  changed_when: ocm_join.rc == 0
+  when:
+    - ocm_needs_join | bool
+    - ocm_hub_token | default('') | length > 0
+  tags: [ocm, ocm_join]
+
+- name: OCM | Report join result
+  ansible.builtin.debug:
+    msg: >-
+      {{ ocm_join.stdout_lines | default(['Cluster ' ~ ocm_cluster_name ~ ' already joined or pending accept']) }}
+  tags: [ocm, ocm_join]

@@ -1,0 +1,30 @@
+---
+- name: DCM | Render hub stack manifest
+  ansible.builtin.template:
+    src: hub-stack.yaml.j2
+    dest: /tmp/dcm-hub-stack.yaml
+    mode: "0600"
+
+- name: DCM | Apply hub stack
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/dcm-hub-stack.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: dcm_hub_apply
+  changed_when: "'created' in dcm_hub_apply.stdout or 'configured' in dcm_hub_apply.stdout"
+
+- name: DCM | Remove gateway-acme solver when legacy hostNetwork ACME
+  ansible.builtin.import_tasks: gateway_acme_solver_cleanup.yml
+
+- name: DCM | Ensure gateway HA pod-network after hub stack apply
+  ansible.builtin.import_tasks: gateway_ensure_ha_networking.yml
+
+- name: DCM | Assert gateway HA networking after hub stack apply
+  ansible.builtin.import_tasks: gateway_assert_ha_networking.yml
+
+- name: DCM | Sync gateway checksums after hub stack apply
+  ansible.builtin.import_tasks: traefik_gateway_rollout.yml
+  when:
+    - dcm_hub_apply is defined
+    - dcm_hub_apply is changed

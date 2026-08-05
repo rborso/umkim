@@ -1,0 +1,215 @@
+---
+# Seed whoami-helm catalog item (routing via fleet policies + per-cluster site-helm-*).
+- name: DCM helm | API base for seed tasks
+  ansible.builtin.set_fact:
+    dcm_helm_api_url: "{{ fleet_dcm_seed_api_url | default(phase5_registration_url) }}"
+    dcm_helm_chart_oci: "{{ harbor_charts_oci_prefix | default('oci://10.10.0.1:30443/charts') }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_helm]
+
+- name: DCM helm | Catalog field definitions
+  ansible.builtin.set_fact:
+    dcm_helm_catalog_fields:
+      - path: metadata.name
+        display_name: Helm release name
+        editable: true
+        validation_schema:
+          type: string
+          x-ui-tier: required
+          x-ui-widget: dns-label
+          x-required: true
+      - path: chart.repository
+        display_name: Chart OCI repository
+        editable: false
+        default: "{{ dcm_helm_chart_oci }}"
+        validation_schema:
+          type: string
+      - path: chart.name
+        display_name: Chart name
+        editable: false
+        default: whoami
+        validation_schema:
+          type: string
+      - path: chart.version
+        display_name: Chart version
+        editable: false
+        default: "0.1.0"
+        validation_schema:
+          type: string
+      - path: release.namespace
+        display_name: Target namespace
+        editable: true
+        default: default
+        validation_schema:
+          type: string
+          x-ui-tier: common
+      - path: values.replicaCount
+        display_name: Replicas per cluster
+        editable: true
+        default: 1
+        validation_schema:
+          type: integer
+          minimum: 1
+          x-ui-tier: common
+          x-ui-widget: number
+      - path: values
+        display_name: Helm values (full YAML)
+        editable: true
+        validation_schema:
+          type: string
+          format: yaml
+          x-ui-tier: advanced
+          x-ui-widget: yaml
+      - path: install.wait
+        display_name: Wait for readiness
+        editable: true
+        default: true
+        validation_schema:
+          type: boolean
+          x-ui-tier: advanced
+          x-ui-widget: boolean
+      - path: install.timeout
+        display_name: Install timeout (seconds)
+        editable: true
+        default: 600
+        validation_schema:
+          type: integer
+          minimum: 60
+          x-ui-tier: advanced
+          x-ui-widget: number
+      - path: install.atomic
+        display_name: Atomic install
+        editable: true
+        default: true
+        validation_schema:
+          type: boolean
+          x-ui-tier: advanced
+          x-ui-widget: boolean
+      - path: routing.mode
+        display_name: Routing mode
+        editable: true
+        default: hub
+        validation_schema:
+          type: string
+          enum: [hub, site, none]
+          x-ui-tier: common
+      - path: routing.require_auth
+        display_name: Require Authelia (FleetAppRoute only)
+        editable: true
+        default: false
+        validation_schema:
+          type: boolean
+          x-ui-widget: boolean
+          x-ui-tier: common
+          x-ui-depends-on:
+            path: routing.mode
+            in: [hub, site]
+      - path: routing.hub_host
+        display_name: Hub hostname (custom FQDN)
+        editable: true
+        default: ""
+        description: "Override hub URL. Leave empty for {release}.{hub-zone} from the fleet edge registry."
+        validation_schema:
+          type: string
+          x-ui-widget: hostname
+          x-ui-tier: common
+          x-ui-depends-on:
+            path: routing.mode
+            in: [hub]
+      - path: routing.site_host
+        display_name: Site hostname (optional FQDN)
+        editable: true
+        default: ""
+        validation_schema:
+          type: string
+          x-ui-widget: hostname
+          x-ui-tier: common
+          x-ui-depends-on:
+            path: routing.mode
+            in: [site]
+      - path: routing.cluster
+        display_name: Target cluster (OCM name)
+        editable: true
+        default: ""
+        description: "Optional — pin to a cluster; otherwise policy selects from fleet.site + capabilities"
+        validation_schema:
+          type: string
+          x-ui-tier: advanced
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_helm]
+
+- name: DCM helm | Register service_type in control-plane catalog API
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl -n {{ phase5_dcm_namespace }} exec deploy/postgres -- psql -U {{ phase5_db_user }} -d {{ phase5_dcm_app_db }} -v ON_ERROR_STOP=1 -c "
+    INSERT INTO service_types (id, api_version, service_type, metadata, spec, path, create_time, update_time)
+    VALUES (
+      'helm',
+      'v1alpha1',
+      'helm',
+      '{}'::jsonb,
+      '{\"chart\":{\"repository\":\"\",\"name\":\"\",\"version\":\"\"},\"release\":{\"namespace\":\"default\"},\"values\":{},\"install\":{\"wait\":true,\"timeout\":600,\"atomic\":true}}'::jsonb,
+      'service-types/helm',
+      NOW(),
+      NOW()
+    ) ON CONFLICT (service_type) DO NOTHING;
+    UPDATE service_types
+    SET spec = jsonb_set(spec, '{values}', '{}'::jsonb, true),
+        update_time = NOW()
+    WHERE service_type = 'helm'
+      AND (jsonb_typeof(spec->'values') IS DISTINCT FROM 'object');
+    "
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_helm]
+
+- name: DCM helm | Ensure whoami-helm catalog item
+  ansible.builtin.uri:
+    url: "{{ dcm_helm_api_url }}/catalog-items?id=whoami-helm"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body:
+      api_version: v1alpha1
+      display_name: Whoami (Helm / Harbor)
+      spec:
+        resources:
+          - name: release
+            service_type: helm
+            fields: "{{ dcm_helm_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_helm]
+
+- name: DCM helm | Patch whoami-helm catalog item
+  ansible.builtin.uri:
+    url: "{{ dcm_helm_api_url }}/catalog-items/whoami-helm"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body:
+      display_name: Whoami (Helm / Harbor)
+      spec:
+        resources:
+          - name: release
+            service_type: helm
+            fields: "{{ dcm_helm_catalog_fields }}"
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_helm]
+
+- name: DCM helm | Seed summary
+  ansible.builtin.debug:
+    msg: >-
+      Helm catalog whoami-helm seeded (chart {{ dcm_helm_chart_oci }}/whoami:0.1.0).
+      Deploy: POST {{ dcm_helm_api_url }}/catalog-item-instances
+      with catalog_item_id=whoami-helm and label_selector
+      {{ fleet_dcm_demo_instance_label_selector }}
+      (see docs/dcm-catalog-servicetypes/helm-spec.yaml).
+  run_once: true
+  tags: [dcm, phase5, dcm_hub, phase5_hub, dcm_seed_helm]

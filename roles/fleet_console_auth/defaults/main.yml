@@ -1,0 +1,32 @@
+---
+fleet_console_auth_enabled: true
+fleet_console_auth_namespace: "{{ fleet_webui_namespace | default('fleet-console') }}"
+fleet_console_auth_image: "{{ harbor_fleet_image_prefix }}/fleet-console-auth:{{ fleet_console_auth_tag | default('0.1.0') }}"
+fleet_console_auth_tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+fleet_console_auth_http_port: 18090
+fleet_console_auth_session_secret: "{{ fleet_console_auth_session_secret_vault | default('change-me-fleet-console-auth') }}"
+fleet_console_auth_session_ttl: 8h
+fleet_console_auth_session_secure: false
+fleet_console_auth_bypass: false
+fleet_console_auth_htpasswd_admin_user: localadmin
+fleet_console_auth_htpasswd_admin_password: "{{ fleet_console_auth_admin_password_vault | default('fleet-admin-change-me') }}"
+fleet_console_auth_dcm_upstream: "http://gateway.{{ phase5_dcm_namespace | default('dcm') }}.svc.cluster.local:{{ dcm_gateway_cluster_port }}"
+fleet_console_auth_fleet_upstream: "http://fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080"
+
+# LDAP / lldap (optional)
+fleet_auth_ldap_url: ""
+fleet_auth_ldap_base_dn: "dc=umkim,dc=com"
+fleet_auth_ldap_bind_dn: ""
+fleet_auth_ldap_bind_password: ""
+fleet_auth_ldap_user_filter: "(uid=%s)"
+fleet_auth_ldap_group_filter: "(member={dn})"
+
+# OIDC / Keycloak (stub until configured)
+fleet_auth_oidc_issuer: ""
+fleet_auth_oidc_client_id: ""
+fleet_auth_oidc_client_secret: ""
+fleet_auth_oidc_redirect_url: ""
+
+# Bootstrap dc-admin bindings
+fleet_console_auth_bootstrap_admin: true
+fleet_console_auth_bootstrap_ldap_admin_group: fleet-admins

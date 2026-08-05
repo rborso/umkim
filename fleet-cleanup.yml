@@ -1,0 +1,14 @@
+---
+# Tear down fleet workloads on the hub (ManifestWorks, DCM, platform stacks).
+# Keeps K3s, Calico, WireGuard, OCM hub/spoke registration, and Harbor (fleet_cleanup_delete_harbor: false).
+#
+# Usage:
+#   ansible-playbook fleet-cleanup.yml
+
+- name: Fleet cleanup on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_cleanup
+      tags: [fleet_cleanup]

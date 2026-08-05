@@ -1,0 +1,8 @@
+---
+# defaults for roles/kubevirt_bridge_nad
+kubevirt_bridge_nad_name: mgmt-l2
+kubevirt_bridge_nad_namespace: default
+kubevirt_bridge_host_bridge: n0p0_mgmt_nw
+kubevirt_bridge_cni_bin_dir: /opt/cni/bin
+ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

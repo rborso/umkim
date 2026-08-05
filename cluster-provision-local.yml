@@ -1,0 +1,215 @@
+---
+# Local node provision (bootstrap bundle on init node).
+#
+#   ansible-playbook cluster-provision-local.yml -e fleet_cluster_name=virt01-k3s \
+#     -i inventory.ini
+
+- name: Fleet cluster provision | Cleanup leftover K3s on all nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: k3s
+        tasks_from: cleanup.yml
+      tags: [k3s, k3s_cleanup, fleet_cluster_provision]
+
+- name: Fleet cluster provision | K3s standalone on single-node bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: true
+  vars:
+    k3s_role: server
+    k3s_standalone: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: k3s
+      when: not (k3s_cluster_mode | default(false) | bool)
+      tags: [k3s, fleet_cluster_provision]
+
+- name: Fleet cluster provision | K3s cluster-init on first control plane
+  hosts: site_bootstrap
+  become: true
+  gather_facts: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: k3s
+        tasks_from: cluster_init.yml
+      when: k3s_cluster_mode | default(false) | bool
+      tags: [k3s, k3s_cluster, fleet_cluster_provision]
+
+- name: Fleet cluster provision | K3s join additional control plane nodes
+  hosts: fleet_cluster_control
+  become: true
+  gather_facts: true
+  # K3s etcd allows only one learner at a time; join extra servers sequentially.
+  serial: 1
+  tasks:
+    - ansible.builtin.import_role:
+        name: k3s
+        tasks_from: cluster_join.yml
+      when: k3s_cluster_mode | default(false) | bool
+      tags: [k3s, k3s_cluster, fleet_cluster_provision]
+
+- name: Fleet cluster provision | K3s join worker nodes
+  hosts: fleet_cluster_workers
+  become: true
+  gather_facts: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: k3s
+        tasks_from: cluster_agent_join.yml
+      when:
+        - k3s_cluster_mode | default(false) | bool
+        - groups['fleet_cluster_workers'] | default([]) | length > 0
+      tags: [k3s, k3s_cluster, k3s_agent, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Harbor registry mirrors on K3s nodes
+  # Workers need registries.yaml too (Harbor TLS insecure_skip_verify); otherwise
+  # provider images fail ImagePullBackOff when scheduled off the control plane.
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: harbor
+        tasks_from: registries.yml
+      tags: [harbor, harbor_registries, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Detect Calico interface on all nodes
+  hosts: fleet_cluster_nodes
+  become: false
+  gather_facts: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: calico
+        tasks_from: detect_iface.yml
+      when: calico_ip_autodetection_method | default('auto') == 'auto'
+      tags: [calico, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Calico on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  roles:
+    - role: calico
+      tags: [calico, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Wait for metrics-server after CNI Ready
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wait for control-plane node Ready
+      ansible.builtin.command:
+        cmd: kubectl get nodes --no-headers
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+      register: k3s_nodes_ready
+      until: >-
+        k3s_nodes_ready.rc == 0
+        and (k3s_nodes_ready.stdout_lines | select('search', ' Ready ') | list | length) > 0
+      retries: 60
+      delay: 10
+      changed_when: false
+      when: k3s_metrics_server_host_network | default(true) | bool
+      tags: [k3s, k3s_metrics_server, fleet_cluster_provision]
+
+    # Re-apply after Calico: early k3s write is often overwritten by stock Addon extract,
+    # leaving metrics-server on the pod network (firewalld → no route to host → 300s timeout).
+    - name: Re-ensure metrics-server hostNetwork after CNI Ready
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: patch_metrics_server.yml
+      when: k3s_metrics_server_host_network | default(true) | bool
+      tags: [k3s, k3s_metrics_server, fleet_cluster_provision]
+
+    - name: Wait for metrics-server hostNetwork rollout
+      ansible.builtin.command:
+        cmd: kubectl -n kube-system rollout status deploy/metrics-server --timeout=300s
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+      when: k3s_metrics_server_host_network | default(true) | bool
+      tags: [k3s, k3s_metrics_server, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Longhorn host dependencies on all nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_longhorn
+        tasks_from: host_deps.yml
+      when: fleet_cluster_longhorn_enabled | default(false) | bool
+      tags: [fleet_cluster_longhorn, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Longhorn data disk prep on control nodes
+  hosts: fleet_cluster_control
+  become: true
+  gather_facts: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_longhorn
+        tasks_from: disk_prep.yml
+      when: fleet_cluster_longhorn_enabled | default(false) | bool
+      tags: [fleet_cluster_longhorn, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Longhorn install on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_longhorn
+        tasks_from: install.yml
+      when: fleet_cluster_longhorn_enabled | default(false) | bool
+      tags: [fleet_cluster_longhorn, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Local NFS server on bootstrap (nfs_local)
+  hosts: site_bootstrap
+  become: true
+  gather_facts: true
+  roles:
+    - role: fleet_cluster_storage
+      tasks_from: nfs_local_server.yml
+      tags: [fleet_cluster_storage, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Cluster storage (NFS) node packages
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_cluster_storage
+      tasks_from: nfs_nodes.yml
+      tags: [fleet_cluster_storage, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Cluster storage (NFS) provisioner on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_cluster_storage
+      tasks_from: nfs_cluster.yml
+      tags: [fleet_cluster_storage, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Apply node labels from create spec
+  hosts: fleet_cluster_nodes
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Apply fleet_node_labels to Kubernetes node
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - label
+          - node
+          - "{{ inventory_hostname }}"
+          - "{{ item.key }}={{ item.value }}"
+          - --overwrite
+      loop: "{{ fleet_node_labels | default({}) | dict2items }}"
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      when: fleet_node_labels is defined and (fleet_node_labels | default({}) | length > 0)
+      tags: [fleet_cluster_provision]

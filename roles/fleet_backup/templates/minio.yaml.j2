@@ -1,0 +1,70 @@
+# Hub MinIO for Velero backups (WireGuard NodePort {{ fleet_velero_minio_nodeport }}).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ fleet_velero_minio_service_name }}-data
+  namespace: {{ fleet_velero_minio_namespace }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ fleet_velero_minio_pvc_size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ fleet_velero_minio_service_name }}
+  namespace: {{ fleet_velero_minio_namespace }}
+  labels:
+    app.kubernetes.io/name: fleet-velero-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fleet-velero-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fleet-velero-minio
+    spec:
+      containers:
+        - name: minio
+          image: {{ fleet_velero_minio_image }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              value: "{{ fleet_velero_minio_access_key }}"
+            - name: MINIO_ROOT_PASSWORD
+              value: "{{ fleet_velero_minio_secret_key }}"
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ fleet_velero_minio_service_name }}-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ fleet_velero_minio_service_name }}
+  namespace: {{ fleet_velero_minio_namespace }}
+  labels:
+    app.kubernetes.io/name: fleet-velero-minio
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: fleet-velero-minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+      nodePort: {{ fleet_velero_minio_nodeport }}
+    - name: console
+      port: 9001
+      targetPort: console

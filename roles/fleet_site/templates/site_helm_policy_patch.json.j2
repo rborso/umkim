@@ -1,0 +1,17 @@
+{
+  "display_name": "Site helm route {{ fleet_site_ocm_cluster }}",
+  "description": "Route helm instances with routing.cluster={{ fleet_site_ocm_cluster }} to {{ fleet_site_helm_provider }}",
+  "enabled": true,
+  "priority": {{ fleet_site_helm_policy_priority | int }},
+  "cluster_requirements": {
+    "matchLabels": {
+      "fleet.site": "{{ fleet_site_policy_site }}"{% if fleet_site_mc_topology.stdout | default('') | trim | length > 0 %},
+      "fleet.topology/topology": "{{ fleet_site_mc_topology.stdout | trim }}"{% endif %}
+    }
+  },
+  "placement": {
+    "cluster_count": 1,
+    "strategy": "single"
+  },
+  "rego_code": {{ fleet_site_helm_policy_content.content | b64decode | to_json }}
+}

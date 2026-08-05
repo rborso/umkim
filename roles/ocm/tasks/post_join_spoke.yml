@@ -1,0 +1,21 @@
+---
+# Fix clusteradm bootstrap secret when hub init advertises 0.0.0.0 (VPS / overlay hubs).
+- name: OCM | Patch bootstrap hub kubeconfig for overlay API
+  ansible.builtin.import_tasks: patch_bootstrap_hub_kubeconfig.yml
+  when: ocm_hub_apiserver | default('') | length > 0
+  tags: [ocm, ocm_post_join, ocm_spoke]
+
+# LAN-only / mgmt-LAN spokes: patch bootstrap kubeconfig and publish API URL for work agent.
+- name: OCM | Patch bootstrap hub kubeconfig for LAN API
+  ansible.builtin.import_tasks: patch_hub_kubeconfig_lan.yml
+  when: ocm_hub_apiserver_lan is defined and (ocm_hub_apiserver_lan | length > 0)
+  tags: [ocm, ocm_post_join, ocm_spoke]
+
+- name: OCM | Publish spoke API URL on Klusterlet CR
+  ansible.builtin.import_tasks: patch_klusterlet_external_url.yml
+  when: ocm_publish_spoke_api_url | default(ocm_hub_apiserver_lan is defined) | bool
+  tags: [ocm, ocm_post_join, ocm_spoke]
+
+- name: OCM | hostNetwork klusterlet registration for overlay hub API
+  ansible.builtin.import_tasks: patch_klusterlet_hostnetwork.yml
+  tags: [ocm, ocm_post_join, ocm_spoke, ocm_klusterlet_hostnetwork]

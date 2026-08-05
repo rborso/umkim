@@ -1,0 +1,57 @@
+---
+# Resolve the NFS path clients must mount (NFSv4 pseudo-path vs server filesystem path).
+- name: Fleet cluster storage | Resolve NFS client mount path
+  ansible.builtin.shell: |
+    set -euo pipefail
+    SERVER="{{ fleet_cluster_nfs_server }}"
+    OPTS="{{ fleet_cluster_nfs_mount_options | join(',') }}"
+    MP="/tmp/umkim-nfs-resolve"
+    mkdir -p "$MP"
+    cleanup() { umount -f "$MP" 2>/dev/null || true; }
+    trap cleanup EXIT
+    candidates=()
+    explicit="{{ fleet_cluster_nfs_mount_path | default('') | trim }}"
+    if [ -n "$explicit" ] && [ "${explicit#/}" = "$explicit" ]; then
+      explicit="/$explicit"
+    fi
+    if [ -n "$explicit" ]; then
+      candidates+=("$explicit")
+    fi
+    candidates+=("{{ fleet_cluster_nfs_path }}")
+    candidates+=("/{{ fleet_cluster_nfs_cluster_path }}")
+    declare -A seen=()
+    for p in "${candidates[@]}"; do
+      [ -z "$p" ] && continue
+      [ -n "${seen[$p]+x}" ] && continue
+      seen[$p]=1
+      umount -f "$MP" 2>/dev/null || true
+      if mount -t nfs -o "$OPTS" "${SERVER}:${p}" "$MP" 2>/dev/null; then
+        printf '%s' "$p"
+        exit 0
+      fi
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  register: fleet_nfs_resolve_mount
+  failed_when: false
+  changed_when: false
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Set resolved NFS client mount path
+  ansible.builtin.set_fact:
+    fleet_cluster_nfs_client_path: >-
+      {{
+        (fleet_nfs_resolve_mount.stdout | trim)
+        if (
+          fleet_nfs_resolve_mount is defined
+          and fleet_nfs_resolve_mount.rc | default(1) | int == 0
+          and fleet_nfs_resolve_mount.stdout | default('') | trim | length > 0
+        )
+        else ''
+      }}
+  when:
+    - fleet_nfs_resolve_mount is defined
+    - fleet_nfs_resolve_mount.rc | default(1) | int == 0
+    - fleet_nfs_resolve_mount.stdout | default('') | trim | length > 0
+  tags: [fleet_cluster_storage]

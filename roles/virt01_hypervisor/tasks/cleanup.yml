@@ -1,0 +1,48 @@
+---
+- name: Virt01 hypervisor | Stop K3s on bare metal
+  ansible.builtin.systemd:
+    name: k3s
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup]
+
+- name: Virt01 hypervisor | Uninstall K3s server if present
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-uninstall.sh
+  register: virt01_k3s_uninstall
+  changed_when: virt01_k3s_uninstall.rc == 0
+  failed_when: false
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup]
+
+- name: Virt01 hypervisor | Uninstall K3s agent if present
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-agent-uninstall.sh
+  register: virt01_k3s_agent_uninstall
+  changed_when: virt01_k3s_agent_uninstall.rc == 0
+  failed_when: false
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup]
+
+- name: Virt01 hypervisor | Remove leftover K3s state directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher/k3s
+    - /var/lib/rancher/k3s
+    - /etc/rancher/node
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup]
+
+- name: Virt01 hypervisor | Ensure libvirtd is running
+  ansible.builtin.systemd:
+    name: libvirtd
+    state: started
+    enabled: true
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Cleanup complete
+  ansible.builtin.debug:
+    msg: >-
+      Bare-metal K3s removed on {{ inventory_hostname }}.
+      WireGuard (wg0) left intact for optional fleet access.
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup]

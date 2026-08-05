@@ -1,0 +1,7 @@
+# Deploy a cirros vm-test instance on acme-lab01 (requires kubevirt provider Ready).
+#
+#   curl -sf -X POST http://127.0.0.1:18080/api/v1alpha1/clusters/acme-lab01/providers/kubevirt/install
+#   ansible-playbook $INV playbooks/flows/vm-test-deploy.yml -e @playbooks/flows/examples/vm-test-acme-lab01.yml
+
+fleet_flow_vm_name: vm-test-01
+fleet_flow_cluster: acme-lab01

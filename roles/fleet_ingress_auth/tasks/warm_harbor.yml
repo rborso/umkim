@@ -1,0 +1,14 @@
+---
+- name: Fleet ingress auth | Warm Harbor GHCR proxy for auth images
+  ansible.builtin.command:
+    cmd: >-
+      skopeo copy --dest-tls-verify=false
+      docker://ghcr.io/{{ item }}
+      docker://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/{{ item }}
+  loop:
+    - lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
+    - authelia/authelia:4.38.19
+  register: fia_warm
+  changed_when: fia_warm.rc == 0
+  failed_when: false
+  tags: [fleet_ingress_auth, fleet_ingress_auth_harbor]

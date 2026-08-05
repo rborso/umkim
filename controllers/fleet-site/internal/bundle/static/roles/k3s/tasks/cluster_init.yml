@@ -1,0 +1,95 @@
+---
+- name: K3s cluster | Install kube-vip before cluster-init
+  ansible.builtin.import_role:
+    name: kube_vip
+  when: k3s_control_plane_vip | default('') | length > 0
+  tags: [k3s, k3s_cluster, kube_vip]
+
+- name: K3s cluster | Install first server with cluster-init
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="{{ k3s_channel }}" sh -s - server \
+        --cluster-init \
+        --flannel-backend={{ k3s_flannel_backend }} \
+        --disable-network-policy \
+        {% for item in k3s_disable_components %}--disable={{ item }} \
+        {% endfor %}--node-ip={{ k3s_node_ip }} \
+        --bind-address={{ k3s_bind_address }} \
+        --advertise-address={{ k3s_advertise_address | default(k3s_bind_address) }} \
+        --tls-san={{ ansible_host }} \
+        --tls-san={{ hostvars[k3s_cluster_init_host].ansible_host | default(ansible_host) }} \
+        --tls-san={{ wireguard_address | ansible.utils.ipaddr('address') }}{% if k3s_control_plane_vip | default('') | length > 0 %} \
+        --tls-san={{ k3s_control_plane_vip }}{% endif %}
+  args:
+    creates: /etc/rancher/k3s/k3s.yaml
+  notify: Restart k3s
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Enable init server
+  ansible.builtin.systemd:
+    name: k3s
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Wait for kubeconfig
+  ansible.builtin.wait_for:
+    path: "{{ k3s_kubeconfig }}"
+    timeout: 180
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Patch kubeconfig local server URL
+  ansible.builtin.import_tasks: patch_kubeconfig.yml
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Install kubectl wrapper symlink
+  ansible.builtin.file:
+    src: /usr/local/bin/k3s
+    dest: /usr/bin/kubectl
+    state: link
+    force: true
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Wait for init node API
+  ansible.builtin.command:
+    cmd: kubectl get nodes
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: k3s_init_api
+  until: k3s_init_api.rc == 0
+  retries: 36
+  delay: 10
+  changed_when: false
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Wait for kube-vip control plane VIP
+  ansible.builtin.uri:
+    url: "https://{{ k3s_control_plane_vip }}:6443/version"
+    validate_certs: false
+    status_code: [200, 401, 403]
+  register: k3s_vip_api
+  until: k3s_vip_api is succeeded
+  retries: 36
+  delay: 10
+  changed_when: false
+  when: k3s_control_plane_vip | default('') | length > 0
+  tags: [k3s, k3s_cluster, kube_vip]
+
+- name: K3s cluster | Patch metrics-server for WireGuard node-ip
+  ansible.builtin.import_tasks: patch_metrics_server.yml
+  tags: [k3s, k3s_cluster, k3s_metrics_server]
+
+- name: K3s cluster | Read node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_node_token_slurp
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Publish join token for other plays
+  ansible.builtin.set_fact:
+    k3s_cluster_token: "{{ k3s_node_token_slurp.content | b64decode | trim }}"
+    cacheable: true
+  tags: [k3s, k3s_cluster]

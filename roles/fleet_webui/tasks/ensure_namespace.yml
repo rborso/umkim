@@ -1,0 +1,17 @@
+---
+- name: Fleet WebUI | Ensure namespace
+  ansible.builtin.template:
+    src: namespace.yaml.j2
+    dest: /tmp/fleet-webui-namespace.yaml
+    mode: "0600"
+  tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]
+
+- name: Fleet WebUI | Apply namespace
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-webui-namespace.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_webui_ns_apply
+  changed_when: "'created' in fleet_webui_ns_apply.stdout"
+  tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]

@@ -1,0 +1,14 @@
+---
+- name: Fleet edge controller | Require hub WAN IPv4 for ACME
+  ansible.builtin.assert:
+    that:
+      - not (fleet_edge_acme_enabled | default(false) | bool) or (
+          (fleet_hub_public_ipv4 | default('') | length > 0)
+          and (fleet_hub_public_ipv4 | default('')) is not search('CHANGE_ME')
+          and (fleet_hub_public_ipv4 | default('')) != '127.0.0.1'
+          and (fleet_hub_public_ipv4 | default('')) | lower != 'localhost'
+        )
+    fail_msg: >-
+      Set fleet_hub_public_ipv4 in inventory/host_vars/<hub>.yml to the hub WAN IPv4
+      (same as inventory/hosts.yml ansible_host). Required for ACME DNS validation
+      and FLEET_GATEWAY_PROBE_HOST on fleet-edge-controller.

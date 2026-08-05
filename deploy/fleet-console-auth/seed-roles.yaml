@@ -1,0 +1,39 @@
+# Base FleetRoles — applied by Ansible into fleet-console namespace
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: dc-admin
+  namespace: fleet-console
+spec:
+  rules:
+    - resources: ["*"]
+      verbs: ["*"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: site-admin
+  namespace: fleet-console
+spec:
+  rules:
+    - resources: ["sites", "clusters", "edge", "instances", "catalog-items", "catalog-item-instances", "policies"]
+      verbs: ["get", "list", "create", "update", "delete", "patch"]
+    - resources: ["providers"]
+      verbs: ["get", "list"]
+    - resources: ["health"]
+      verbs: ["get"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: cluster-admin
+  namespace: fleet-console
+spec:
+  rules:
+    - resources: ["clusters", "instances", "catalog-item-instances"]
+      verbs: ["get", "list", "update", "patch"]
+    - resources: ["sites", "catalog-items", "policies", "providers"]
+      verbs: ["get", "list"]
+    - resources: ["health"]
+      verbs: ["get"]

@@ -1,0 +1,43 @@
+---
+# lab-3n01 — current three-control-plane HA topology example.
+# This shape has no workers. Replace RFC 5737 addresses and NFS values.
+#
+#   ansible-playbook $INV playbooks/flows/cluster-create.yml \
+#     -e @playbooks/flows/examples/lab-3n01.yml
+
+fleet_flow_cluster_name: lab-3n01
+fleet_flow_site_id: homelab-shared
+fleet_flow_bootstrap_host: 203.0.113.26
+# Optional SSH jump:
+# fleet_flow_jumphost: linux@jumphost.example.com:22
+fleet_flow_topology: ha_3_node
+fleet_flow_control_plane_vip: 203.0.113.35
+fleet_flow_install_k8s: true
+fleet_flow_install_helm: true
+fleet_flow_cluster_labels:
+  fleet.pool: shared
+fleet_flow_edge:
+  exposureMode: none
+fleet_flow_nodes:
+  - hostname: lab-3n01-cp0
+    address: 203.0.113.26
+    role: control
+  - hostname: lab-3n01-cp1
+    address: 203.0.113.27
+    role: control
+  - hostname: lab-3n01-cp2
+    address: 203.0.113.28
+    role: control
+
+fleet_flow_storage:
+  backend: nfs_external
+  rwo: true
+  rwx: true
+  nfs:
+    enabled: true
+    server: 203.0.113.40
+    exportBase: /srv/fleet-nfs
+    clusterPath: lab-3n01
+    mountPath: /lab-3n01
+    storageClass: nfs-client
+    delegateHost: 203.0.113.40

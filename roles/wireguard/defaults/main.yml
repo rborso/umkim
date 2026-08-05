@@ -1,0 +1,31 @@
+---
+wireguard_subnet: 10.10.0.0/16
+wireguard_interface: wg0
+wireguard_port: 51820
+wireguard_endpoint_host: "{{ fleet_dns.wireguard_hub | default('wg.example.com') }}"
+wireguard_endpoint_port: "{{ wireguard_port }}"
+wireguard_persistent_keepalive: 25
+wireguard_allowed_ips: "{{ wireguard_subnet }}"
+wireguard_role: client
+
+wireguard_config_path: "/etc/wireguard/{{ wireguard_interface }}.conf"
+wireguard_private_key_path: /etc/wireguard/privatekey
+wireguard_public_key_path: /etc/wireguard/publickey
+wireguard_config_dir: /etc/wireguard
+
+wireguard_packages:
+  - wireguard-tools
+
+wireguard_peers: "{{ groups['spokes'] | default([]) }}"
+wireguard_hub_host: "{{ groups['hub'] | first | default('umkim-hub') }}"
+
+wireguard_dnf_via_mgmt: false
+wireguard_dnf_mgmt_device: n0p0_mgmt_nw
+wireguard_dnf_mgmt_gateway: 198.51.100.1
+wireguard_dnf_temp_route_metric: 50
+
+wireguard_endpoint_route_via_mgmt: false
+wireguard_endpoint_route_gateway: 198.51.100.1
+wireguard_endpoint_route_device: n0p0_mgmt_nw
+wireguard_endpoint_route_metric: 50
+wireguard_endpoint_route_script: /usr/local/sbin/wg-endpoint-route.sh

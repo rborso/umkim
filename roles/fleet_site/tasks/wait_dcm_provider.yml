@@ -1,0 +1,24 @@
+---
+- name: Fleet site | Wait for DCM provider ready on hub
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -sf "http://127.0.0.1:{{ phase5_gateway_nodeport | default(30908) }}/api/v1alpha1/providers" \
+      | python3 -c "
+    import json,sys
+    data=json.load(sys.stdin)
+    for p in data.get('providers', []):
+        if p.get('name') == '{{ fleet_site_wait_provider_name }}':
+            sys.exit(0 if p.get('health_status') == 'ready' else 1)
+    sys.exit(1)
+    "
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_site_provider_wait
+  until: fleet_site_provider_wait.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+  tags: [fleet_site, fleet_site_provider]

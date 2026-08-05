@@ -1,0 +1,43 @@
+{% if item.ha_standby | default(false) | bool %}
+{% set policy_description = (
+    'Place demo ' ~ item.service_type ~ ' workloads (profile=' ~ fleet_dcm_demo_workload_profile
+    ~ ', scope=ha-standby) on two RWO clusters across sites with hub standby failover'
+  ) %}
+{% elif item.least_utilized | default(false) | bool %}
+{% set policy_description = (
+    'Place demo ' ~ item.service_type ~ ' workloads (profile=' ~ fleet_dcm_demo_workload_profile
+    ~ ', scope=single, picker=least-utilized) on the least utilized RWO cluster'
+  ) %}
+{% else %}
+{% set policy_description = (
+    'Place demo ' ~ item.service_type ~ ' workloads (profile=' ~ fleet_dcm_demo_workload_profile
+    ~ ', scope=single) on one RWO cluster; pod replica count comes from the catalog item'
+  ) %}
+{% endif %}
+{
+  "display_name": {{ item.display_name | to_json }},
+  "description": {{ policy_description | to_json }},
+  "enabled": true,
+  "priority": {{ item.priority | int }},
+  "label_selector": {
+    "fleet.workload/profile": {{ fleet_dcm_demo_workload_profile | to_json }},
+    "fleet.placement/scope": {{ item.scope | to_json }}{% if item.picker is defined %},
+    "fleet.placement/picker": {{ item.picker | to_json }}{% endif %}
+  },
+  "cluster_requirements": {{ dcm_placement_rwo_cluster_requirements | to_json }},
+  "placement": {{ (
+      dcm_placement_demo_multi_cluster
+      if (item.ha_standby | default(false) | bool)
+      else (
+        dcm_placement_demo_least_util_cluster
+        if (item.least_utilized | default(false) | bool)
+        else dcm_placement_demo_single_cluster
+      )
+    ) | to_json }}{% if item.ha_standby | default(false) | bool %},
+  "failover": {{ dcm_placement_demo_failover_standby | to_json }}{% endif %},
+  "rego_code": {{ (
+      (dcm_placement_container_rwo_content.content | b64decode)
+      if item.rego == 'container'
+      else (dcm_placement_helm_rwo_content.content | b64decode)
+    ) | to_json }}
+}

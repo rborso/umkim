@@ -1,0 +1,9 @@
+---
+# Optional maintainer-lab console extras (OCM Lab :30910, Swagger :30911, gateway /fleet/).
+# Not copied by bootstrap-hub-inventory.sh. Greenfield: leave unset (defaults false in hub/main.yml).
+# To enable on a private lab only: copy this file into inventory/group_vars/hub/ and set true.
+
+fleet_lab_webui_extras: false
+ocm_lab_enabled: false
+dcm_ui_enabled: false
+dcm_fleet_gateway_path: false

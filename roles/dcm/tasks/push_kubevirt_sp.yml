@@ -1,0 +1,27 @@
+---
+- name: DCM | Push kubevirt-sp ManifestWork to each spoke
+  ansible.builtin.template:
+    src: manifestwork-kubevirt-sp.yaml.j2
+    dest: "/tmp/manifestwork-kubevirt-sp-{{ item }}.yaml"
+    mode: "0600"
+  loop: "{{ ocm_manifestwork_clusters | default(groups['spokes']) }}"
+  vars:
+    ocm_target_cluster: "{{ item }}"
+    dcm_kubevirt_sp_nodeport: "{{ hostvars[item].dcm_kubevirt_sp_nodeport }}"
+    dcm_kubevirt_sp_name: "{{ hostvars[item].dcm_kubevirt_sp_name }}"
+    dcm_kubevirt_sp_endpoint_host: >-
+      {{ hostvars[item].dcm_kubevirt_sp_endpoint_host
+         | default(hostvars[item].wireguard_address | ansible.utils.ipaddr('address'), true)
+         | default(hostvars[item].ansible_host, true) }}
+  tags: [dcm, phase5, dcm_push_spokes, phase5_push, kubevirt_sp]
+
+- name: DCM | Apply kubevirt-sp ManifestWork on hub
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/manifestwork-kubevirt-sp-{{ item }}.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_manifestwork_clusters | default(groups['spokes']) }}"
+  register: dcm_kubevirt_mw_apply
+  changed_when: "'created' in dcm_kubevirt_mw_apply.stdout or 'configured' in dcm_kubevirt_mw_apply.stdout"
+  tags: [dcm, phase5, dcm_push_spokes, phase5_push, kubevirt_sp]

@@ -1,0 +1,19 @@
+---
+- name: Fleet cluster ssh | Require bundle directory
+  ansible.builtin.assert:
+    that:
+      - fleet_cluster_bundle_dir is defined
+      - fleet_cluster_bundle_dir | length > 0
+    fail_msg: Set fleet_cluster_bundle_dir to the bootstrap bundle root
+
+- name: Fleet cluster ssh | Stat bundle public key
+  ansible.builtin.stat:
+    path: "{{ fleet_cluster_bundle_dir }}/ssh/id_rsa.pub"
+  register: fleet_cluster_ssh_pubkey
+
+- name: Fleet cluster ssh | Install bundle public key for linux
+  ansible.posix.authorized_key:
+    user: linux
+    key: "{{ lookup('file', fleet_cluster_bundle_dir + '/ssh/id_rsa.pub') }}"
+    state: present
+  when: fleet_cluster_ssh_pubkey.stat.exists

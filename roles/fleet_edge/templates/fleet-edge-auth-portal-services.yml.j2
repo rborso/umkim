@@ -1,0 +1,6 @@
+{% if fleet_ingress_auth_enabled | default(false) | bool %}
+    fleet-authelia-portal:
+      loadBalancer:
+        servers:
+          - url: "http://authelia.{{ fleet_ingress_auth_namespace | default('fleet-ingress-auth') }}.svc.cluster.local:{{ fleet_ingress_auth_authelia_port | default(9091) }}"
+{% endif %}

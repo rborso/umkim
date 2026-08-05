@@ -1,0 +1,296 @@
+# DCM control plane on hub — control-plane monolith + gateway
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ phase5_dcm_namespace }}
+  labels:
+    fleet.umkim.com/phase: "5"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dcm-postgres
+  namespace: {{ phase5_dcm_namespace }}
+type: Opaque
+stringData:
+  POSTGRES_USER: "{{ phase5_db_user }}"
+  POSTGRES_PASSWORD: "{{ dcm_postgres_password }}"
+  POSTGRES_DB: postgres
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dcm-postgres-init
+  namespace: {{ phase5_dcm_namespace }}
+data:
+  01-create-databases.sql: |
+{{ lookup('ansible.builtin.file', role_path + '/files/postgres-init-monolith.sql') | indent(4, first=True) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dcm-postgres-data
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ phase5_postgres_pvc_size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  selector:
+    app: dcm-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dcm-postgres
+  template:
+    metadata:
+      labels:
+        app: dcm-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ phase5_postgres_image }}
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: dcm-postgres
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ phase5_db_user }}", "-d", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dcm-postgres-data
+        - name: init
+          configMap:
+            name: dcm-postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  selector:
+    app: dcm-nats
+  ports:
+    - name: client
+      port: 4222
+      targetPort: 4222
+    - name: monitor
+      port: 8222
+      targetPort: 8222
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-external
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  type: NodePort
+  selector:
+    app: dcm-nats
+  ports:
+    - name: client
+      port: 4222
+      targetPort: 4222
+      nodePort: {{ phase5_nats_nodeport }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dcm-nats
+  template:
+    metadata:
+      labels:
+        app: dcm-nats
+    spec:
+      containers:
+        - name: nats
+          image: {{ phase5_nats_image }}
+          args: ["--jetstream", "--store_dir=/data"]
+          ports:
+            - containerPort: 4222
+            - containerPort: 8222
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+{% include 'hub-stack-control-plane.yaml.j2' %}
+---
+{% set gateway_replicas = dcm_gateway_replicas | default(1) | int %}
+{% set gateway_acme = fleet_edge_acme_enabled | default(false) | bool %}
+{% set gateway_ha = gateway_replicas > 1 %}
+{% set gateway_wg_upstream = fleet_gateway_wireguard_upstream | default((groups.get('spokes', {}) | default({}) | length > 0)) | bool %}
+{% set gateway_host_network = gateway_acme and (not gateway_ha or gateway_wg_upstream) %}
+{% set effective_gateway_replicas = 1 if (gateway_host_network and gateway_ha and gateway_wg_upstream) else gateway_replicas %}
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  type: NodePort
+  selector:
+    app: dcm-gateway
+{% if gateway_ha and gateway_acme and not gateway_host_network %}
+  externalIPs:
+    - {{ dcm_gateway_external_ip }}
+{% endif %}
+  ports:
+    - name: http
+      port: {{ 80 if gateway_acme else 9080 }}
+      targetPort: {{ 80 if gateway_acme else 9080 }}
+      nodePort: {{ phase5_gateway_nodeport }}
+{% if gateway_acme %}
+    - name: https
+      port: 443
+      targetPort: 443
+      nodePort: {{ phase5_gateway_https_nodeport }}
+{% endif %}
+---
+{% if gateway_acme and not gateway_ha %}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dcm-traefik-acme
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ phase5_traefik_acme_pvc_size | default('1Mi') }}
+---
+{% endif %}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: {{ phase5_dcm_namespace }}
+spec:
+  replicas: {{ effective_gateway_replicas }}
+{% if gateway_ha and not gateway_host_network %}
+  minReadySeconds: {{ dcm_gateway_min_ready_seconds | default(5) }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ dcm_gateway_rolling_max_surge | default(1) }}
+      maxUnavailable: {{ dcm_gateway_rolling_max_unavailable | default(0) }}
+{% else %}
+  strategy:
+    type: Recreate
+{% endif %}
+  selector:
+    matchLabels:
+      app: dcm-gateway
+  template:
+    metadata:
+      labels:
+        app: dcm-gateway
+      annotations:
+        checksum/dcm-traefik-static: "{{ dcm_traefik_static_checksum }}"
+        checksum/dcm-traefik-dynamic: "{{ dcm_traefik_dynamic_checksum }}"
+    spec:
+{% if gateway_host_network %}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{% endif %}
+      containers:
+        - name: traefik
+          image: {{ phase5_traefik_image }}
+          args:
+            - --configFile=/etc/traefik/traefik.yml
+          ports:
+            - name: http
+              containerPort: {{ 80 if gateway_acme else 9080 }}
+{% if gateway_acme %}
+            - name: https
+              containerPort: 443
+{% endif %}
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 10
+          volumeMounts:
+            - name: static
+              mountPath: /etc/traefik/traefik.yml
+              subPath: traefik.yml
+              readOnly: true
+            - name: traefik-dynamic
+              mountPath: /etc/traefik/dynamic
+              readOnly: true
+{% if gateway_acme %}
+            - name: acme
+              mountPath: /var/traefik
+{% endif %}
+      volumes:
+        - name: static
+          configMap:
+            name: dcm-traefik-static
+        - name: traefik-dynamic
+          projected:
+            sources:
+              - configMap:
+                  name: dcm-traefik-dynamic
+                  items:
+                    - key: routes.yml
+                      path: routes.yml
+              - configMap:
+                  name: dcm-traefik-fleet-routes
+                  items:
+                    - key: fleet-routes.yml
+                      path: fleet-routes.yml
+{% if gateway_acme %}
+        - name: acme
+{% if gateway_ha %}
+          hostPath:
+            path: {{ dcm_gateway_acme_host_path }}
+            type: DirectoryOrCreate
+{% else %}
+          persistentVolumeClaim:
+            claimName: dcm-traefik-acme
+{% endif %}
+{% endif %}
+---
+{% include 'gateway-acme.yaml.j2' %}

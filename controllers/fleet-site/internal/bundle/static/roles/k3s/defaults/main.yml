@@ -1,0 +1,30 @@
+---
+k3s_channel: v1.32
+k3s_role: server
+k3s_cluster_mode: false
+k3s_cluster_init_host: ""
+k3s_bind_address: "{{ ansible_host }}"
+k3s_node_ip: "{{ k3s_bind_address }}"
+k3s_token: ""
+k3s_server_url: ""
+
+k3s_disable_components:
+  - traefik
+  - servicelb
+k3s_flannel_backend: none
+k3s_disable_network_policy: true
+k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
+# Used when k3s_bind_address is 0.0.0.0 (fleet cluster inventory sets bind-all).
+k3s_kubeconfig_server_host: "127.0.0.1"
+# Root login PATH on Rocky often omits /usr/local/bin.
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Metrics-server must use hostNetwork when kubelet listens on WireGuard node-ip
+# (pod scrapes to InternalIP:10250 are rejected by firewalld). secure-port must
+# differ from kubelet's 10250 on the host.
+k3s_metrics_server_host_network: true
+k3s_metrics_server_secure_port: 10251
+k3s_metrics_server_image: "rancher/mirrored-metrics-server:v0.8.1@sha256:b2d2efaf5ac3b366ed0f839d2412a2c4279d4fc2a2a733f12c52133faed36c41"
+
+k3s_install_env:
+  INSTALL_K3S_CHANNEL: "{{ k3s_channel }}"

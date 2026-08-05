@@ -1,0 +1,15 @@
+---
+# Deploy fleet-site-controller on hub (FleetSite CR + enrollment API + provision Jobs).
+#
+#   ansible-playbook fleet-site-crd.yml -l hub
+#   ansible-playbook fleet-site-controller.yml -l hub
+#
+# Prereqs: Harbor image fleet/fleet-site-controller:0.1.0 (harbor_fleet_image_tag / umkim_version)
+
+- name: Fleet site controller on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_site_controller
+      tags: [fleet_site_controller]

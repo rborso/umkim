@@ -1,0 +1,61 @@
+---
+# Per-cluster DCM policy: route service_type container to k8s-<cluster>.
+- name: Fleet site | Container policy API base
+  ansible.builtin.set_fact:
+    fleet_site_container_api_url: "{{ fleet_site_container_api_url | default(fleet_site_dcm_api_url) }}"
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    fleet_site_k8s_provider: "{{ fleet_site_dcm_k8s_sp_name | default('k8s-' ~ (fleet_site_ocm_name | default(fleet_site_name))) }}"
+    fleet_site_container_policy_priority: "{{ (fleet_site_dcm_k8s_sp_nodeport | default(30190) | int) - 30000 }}"
+    fleet_site_policy_site: "{{ fleet_site_id | default(fleet_site_ocm_cluster) }}"
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Read ManagedCluster topology label for site-container policy
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get managedcluster {{ fleet_site_ocm_cluster }}
+      -o jsonpath={.metadata.labels.fleet\.topology/topology}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_site_mc_topology
+  changed_when: false
+  failed_when: false
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Render site-container policy rego
+  ansible.builtin.template:
+    src: site_container_policy.rego.j2
+    dest: "/tmp/site-container-{{ fleet_site_ocm_cluster }}.rego"
+    mode: "0644"
+  register: fleet_site_container_policy_rego
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Read site-container policy rego
+  ansible.builtin.slurp:
+    src: "{{ fleet_site_container_policy_rego.dest }}"
+  register: fleet_site_container_policy_content
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Update site-container policy when present
+  ansible.builtin.uri:
+    url: "{{ fleet_site_container_api_url }}/policies/site-container-{{ fleet_site_ocm_cluster }}"
+    method: PATCH
+    body_format: json
+    status_code: [200, 404]
+    headers:
+      Content-Type: application/merge-patch+json
+    body: "{{ lookup('template', 'site_container_policy_patch.json.j2') }}"
+  register: fleet_site_container_policy_patch
+  run_once: true
+  tags: [fleet_site, fleet_site_provider]
+
+- name: Fleet site | Seed site-container policy
+  ansible.builtin.uri:
+    url: "{{ fleet_site_container_api_url }}/policies?id=site-container-{{ fleet_site_ocm_cluster }}"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409]
+    body: "{{ lookup('template', 'site_container_policy_post.json.j2') }}"
+  when: fleet_site_container_policy_patch.status == 404
+  run_once: true
+  tags: [fleet_site, fleet_site_provider]

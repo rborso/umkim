@@ -1,0 +1,43 @@
+---
+# firewalld runs its own nftables INPUT chain (priority filter+10) and rejects
+# unmatched WAN traffic. Open the same public ports here so WireGuard (UDP 51820)
+# and hub ingress work when firewalld is active alongside fleet_hub nft rules.
+
+- name: Fleet hub firewall | Detect firewalld
+  ansible.builtin.command:
+    cmd: firewall-cmd --state
+  register: fleet_hub_firewall_firewalld_state
+  changed_when: false
+  failed_when: false
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Open public TCP ports in firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ fleet_hub_firewall_public_tcp_allow }}"
+  when: fleet_hub_firewall_firewalld_state.rc == 0
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Open public UDP ports in firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}/udp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ fleet_hub_firewall_public_udp_allow }}"
+  when: fleet_hub_firewall_firewalld_state.rc == 0
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Allow WireGuard overlay to K3s API in firewalld
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family="ipv4" source address="{{ wireguard_subnet | default('10.10.0.0/16') }}"
+      port port="6443" protocol="tcp" accept
+    permanent: true
+    immediate: true
+    state: enabled
+  when: fleet_hub_firewall_firewalld_state.rc == 0
+  tags: [fleet_hub_firewall, hub_firewall]

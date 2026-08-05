@@ -1,0 +1,21 @@
+---
+# Deploy LLDAP + Authelia ingress auth on hub and selected spokes.
+#
+# Usage:
+#   ansible-playbook fleet-ingress-auth.yml -l hub
+#   ansible-playbook fleet-ingress-auth.yml -l hub -e '{"fleet_ingress_auth_spoke_clusters":["virt01"]}'
+
+- name: Fleet ingress auth | Hub + spoke ManifestWorks
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_ingress_auth_hub_enabled: "{{ fleet_ingress_auth_enabled | default(true) | bool }}"
+    fleet_ingress_auth_reconcile_phase6: true
+    fleet_ingress_auth_reconcile_fleet_edge: true
+    fleet_ingress_auth_reconcile_controller: true
+    fleet_ingress_auth_warm_harbor: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_ingress_auth
+        tasks_from: reconcile.yml

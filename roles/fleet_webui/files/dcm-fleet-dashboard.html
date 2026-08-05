@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DCM Fleet Dashboard</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #1a1a1a; background: #f0f4f8; }
+    body { margin: 0; padding: 1.25rem 1.5rem 2rem; max-width: 1280px; }
+    h1 { margin: 0 0 .25rem; font-size: 1.6rem; }
+    .meta { color: #555; margin-bottom: 1rem; }
+    .toolbar { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    button { padding: .45rem .9rem; border: 1px solid #c5cdd8; background: #fff; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #eef2f7; }
+    #status { font-size: .9rem; color: #555; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; margin-bottom: 1.25rem; }
+    .card { background: #fff; border-radius: 8px; padding: .85rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+    .card h3 { margin: 0 0 .35rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+    .card .val { font-size: 1.35rem; font-weight: 600; }
+    .ok { color: #0a7a2f; }
+    .warn { color: #9a6700; }
+    .err { color: #b42318; }
+    section { margin-bottom: 1.5rem; }
+    section h2 { font-size: 1.05rem; margin: 0 0 .5rem; }
+    table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.07); font-size: .9rem; }
+    th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th { background: #eef2f7; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+    td code { font-size: .82rem; word-break: break-all; }
+    .empty { color: #888; font-style: italic; padding: .75rem; }
+    pre.errbox { background: #fef2f2; color: #991b1b; padding: .75rem; overflow: auto; border-radius: 6px; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <h1>DCM Fleet Dashboard</h1>
+  <p class="meta">Control plane health, providers, catalog, and policies via the hub API gateway.</p>
+  <div class="toolbar">
+    <button type="button" id="refresh">Refresh</button>
+    <span id="status">Loading…</span>
+  </div>
+
+  <div class="cards" id="health-cards"></div>
+
+  <section>
+    <h2>Service providers</h2>
+    <table id="providers">
+      <thead><tr><th>Name</th><th>Health</th><th>Endpoint</th><th>ID</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Catalog items</h2>
+    <table id="catalog">
+      <thead><tr><th>Name</th><th>Type</th><th>Status</th><th>ID</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Policies</h2>
+    <table id="policies">
+      <thead><tr><th>Name</th><th>Description</th><th>ID</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Service types</h2>
+    <table id="service-types">
+      <thead><tr><th>Name</th><th>Description</th><th>ID</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const healthCards = document.getElementById('health-cards');
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    async function api(path) {
+      const r = await fetch('/api/v1alpha1' + path);
+      if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('application/json')) return r.json();
+      return { _raw: await r.text() };
+    }
+
+    function listKey(obj, keys) {
+      for (const k of keys) {
+        if (obj && Array.isArray(obj[k])) return obj[k];
+      }
+      if (Array.isArray(obj)) return obj;
+      return [];
+    }
+
+    function fillTable(tbody, rows, emptyMsg) {
+      tbody.innerHTML = '';
+      if (!rows.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="9" class="empty">' + esc(emptyMsg) + '</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+      for (const row of rows) tbody.appendChild(row);
+    }
+
+    function healthCard(label, ok, detail) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = '<h3>' + esc(label) + '</h3>'
+        + '<div class="val ' + (ok ? 'ok' : 'err') + '">' + (ok ? 'OK' : 'FAIL') + '</div>'
+        + '<div style="font-size:.8rem;color:#64748b;margin-top:.25rem">' + esc(detail) + '</div>';
+      return div;
+    }
+
+    async function load() {
+      statusEl.textContent = 'Loading…';
+      healthCards.innerHTML = '';
+      try {
+        const healthPaths = [
+          ['Providers', '/health/providers'],
+          ['Catalog', '/health/catalog'],
+          ['Policies', '/health/policies'],
+          ['Placement', '/health/placement'],
+        ];
+        const healthResults = await Promise.allSettled(
+          healthPaths.map(([, p]) => api(p))
+        );
+        healthPaths.forEach(([label], i) => {
+          const r = healthResults[i];
+          const ok = r.status === 'fulfilled';
+          const detail = ok ? (typeof r.value === 'object' ? JSON.stringify(r.value) : String(r.value)) : r.reason.message;
+          healthCards.appendChild(healthCard(label, ok, detail.slice(0, 120)));
+        });
+
+        const [prov, catalog, policies, types] = await Promise.all([
+          api('/providers'),
+          api('/catalog-items'),
+          api('/policies'),
+          api('/service-types'),
+        ]);
+
+        const providers = listKey(prov, ['providers', 'items']);
+        const provBody = document.querySelector('#providers tbody');
+        fillTable(provBody, providers.map((p) => {
+          const tr = document.createElement('tr');
+          const health = p.health_status || p.status || '—';
+          tr.innerHTML = '<td><strong>' + esc(p.display_name || p.name || '—') + '</strong></td>'
+            + '<td class="' + (health === 'ready' ? 'ok' : 'warn') + '">' + esc(health) + '</td>'
+            + '<td><code>' + esc(p.endpoint || '—') + '</code></td>'
+            + '<td><code>' + esc(p.id || '—') + '</code></td>';
+          return tr;
+        }), 'No providers registered');
+
+        const items = listKey(catalog, ['catalog_items', 'items', 'catalog-items']);
+        const catBody = document.querySelector('#catalog tbody');
+        fillTable(catBody, items.map((c) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td><strong>' + esc(c.name || c.display_name || '—') + '</strong></td>'
+            + '<td>' + esc(c.type || c.service_type || '—') + '</td>'
+            + '<td>' + esc(c.status || c.state || '—') + '</td>'
+            + '<td><code>' + esc(c.id || '—') + '</code></td>';
+          return tr;
+        }), 'No catalog items');
+
+        const pols = listKey(policies, ['policies', 'items']);
+        const polBody = document.querySelector('#policies tbody');
+        fillTable(polBody, pols.map((p) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td><strong>' + esc(p.name || '—') + '</strong></td>'
+            + '<td>' + esc(p.description || '—') + '</td>'
+            + '<td><code>' + esc(p.id || '—') + '</code></td>';
+          return tr;
+        }), 'No policies');
+
+        const sts = listKey(types, ['service_types', 'items', 'service-types']);
+        const stBody = document.querySelector('#service-types tbody');
+        fillTable(stBody, sts.map((s) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td><strong>' + esc(s.name || '—') + '</strong></td>'
+            + '<td>' + esc(s.description || '—') + '</td>'
+            + '<td><code>' + esc(s.id || '—') + '</code></td>';
+          return tr;
+        }), 'No service types');
+
+        statusEl.textContent = 'Updated ' + new Date().toLocaleString();
+      } catch (e) {
+        statusEl.innerHTML = '<span class="err">Failed: ' + esc(e.message) + '</span>';
+        const pre = document.createElement('pre');
+        pre.className = 'errbox';
+        pre.textContent = String(e);
+        document.body.appendChild(pre);
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', load);
+    load();
+    setInterval(load, 30000);
+  </script>
+</body>
+</html>

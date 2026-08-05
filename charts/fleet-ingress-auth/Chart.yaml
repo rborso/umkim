@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fleet-ingress-auth
+description: LLDAP directory + Authelia forward-auth for fleet ingress (hub and spokes)
+type: application
+version: 0.1.4
+appVersion: "1.0"

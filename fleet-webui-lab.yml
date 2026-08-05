@@ -1,0 +1,20 @@
+---
+# Optional maintainer-lab console extras: OCM Lab dashboard, DCM Swagger, gateway /fleet/ routes.
+# Core console (auth + dashboard) is fleet-console-auth.yml — same as greenfield hub-install.
+#
+# Usage:
+#   ansible-playbook fleet-webui-lab.yml -l hub
+#   ansible-playbook fleet-webui-lab.yml -l hub --tags ocm_lab
+
+- name: Fleet WebUI lab extras on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Fleet WebUI lab | Skip when disabled
+      ansible.builtin.meta: end_play
+      when: not (fleet_lab_webui_extras | default(false) | bool)
+  roles:
+    - role: fleet_webui
+      tasks_from: lab_extras.yml
+      tags: [fleet_webui_lab, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]

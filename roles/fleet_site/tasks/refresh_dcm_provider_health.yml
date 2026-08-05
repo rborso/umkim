@@ -1,0 +1,26 @@
+---
+# Merge-patch each cluster provider endpoint so SPM re-runs health checks promptly.
+
+- name: Fleet site | List DCM providers
+  ansible.builtin.uri:
+    url: "{{ fleet_site_container_api_url }}/providers"
+    method: GET
+    status_code: 200
+  register: fleet_site_spm_providers_list
+  run_once: true
+
+- name: Fleet site | Nudge provider health check
+  ansible.builtin.uri:
+    url: "{{ fleet_site_container_api_url }}/providers/{{ item.id }}"
+    method: PATCH
+    headers:
+      Content-Type: application/merge-patch+json
+    body_format: json
+    body:
+      endpoint: "{{ item.endpoint }}"
+    status_code: [200, 404]
+  loop: "{{ fleet_site_spm_providers_list.json.providers | default([]) | selectattr('name', 'search', fleet_site_ocm_cluster) | list }}"
+  loop_control:
+    label: "{{ item.name | default(item.id) }}"
+  run_once: true
+  when: item.endpoint is defined

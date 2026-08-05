@@ -1,0 +1,24 @@
+---
+# Optional: install kubevirt-platform-operator instance on site after OLM SP is up.
+- name: Fleet site | Skip kubevirt auto-install
+  ansible.builtin.meta: end_host
+  when: not (fleet_site_auto_install_kubevirt_operator | default(false) | bool)
+
+- name: Fleet site | Auto-install kubevirt-platform-operator instance
+  ansible.builtin.uri:
+    url: "{{ fleet_site_operator_api_url | default(phase5_registration_url) }}/catalog-item-instances"
+    method: POST
+    body_format: json
+    status_code: [200, 201, 409, 202]
+    body:
+      api_version: v1alpha1
+      display_name: "kubevirt-platform-{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+      spec:
+        catalog_item_id: kubevirt-platform-operator
+        user_values:
+          - path: metadata.name
+            value: kubevirt
+          - path: operatorGroup.targetNamespace
+            value: kubevirt
+  run_once: true
+  tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision]

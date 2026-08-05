@@ -1,0 +1,235 @@
+---
+# Discover fleet cluster capabilities via SSH to nodes + kubectl on bootstrap host.
+#
+#   ansible-playbook cluster-discover-capabilities.yml -e fleet_cluster_name=virt01 \
+#     -i inventory/from-controller.ini
+#
+- name: Fleet discover | KVM on each cluster host
+  hosts: "{{ (groups['fleet_cluster_nodes'] | default([])) + (groups['site_bootstrap'] | default([])) | unique }}"
+  gather_facts: false
+  tasks:
+    - name: Fleet discover | Check /dev/kvm
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: fleet_discover_kvm_dev
+      when: ansible_connection != 'local'
+
+    - name: Fleet discover | Record host KVM
+      ansible.builtin.set_fact:
+        fleet_discover_host_kvm: "{{ fleet_discover_kvm_dev.stat.exists | default(false) | bool }}"
+      when: ansible_connection != 'local'
+
+- name: Fleet discover | Kubernetes probes on bootstrap
+  hosts: site_bootstrap
+  gather_facts: false
+  tasks:
+    - name: Fleet discover | Nodes JSON
+      ansible.builtin.command:
+        cmd: kubectl get nodes -o json
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      register: fleet_discover_nodes_json
+      changed_when: false
+
+    - name: Fleet discover | StorageClasses JSON
+      ansible.builtin.command:
+        cmd: kubectl get storageclass -o json
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      register: fleet_discover_sc_json
+      changed_when: false
+
+    - name: Fleet discover | Parse API resources
+      ansible.builtin.set_fact:
+        fleet_discover_k8s_nodes: "{{ (fleet_discover_nodes_json.stdout | from_json)['items'] }}"
+        fleet_discover_scs: "{{ (fleet_discover_sc_json.stdout | from_json)['items'] }}"
+
+    - name: Fleet discover | Storage capability flags
+      ansible.builtin.set_fact:
+        fleet_discover_storage_rwo: >-
+          {{
+            (fleet_discover_scs | map(attribute='provisioner') | map('lower') | list
+             | select('search', 'local-path') | list | length > 0)
+            or (fleet_discover_scs | length > 0)
+          }}
+        fleet_discover_storage_rwx: >-
+          {{
+            (fleet_discover_scs | map(attribute='metadata') | map(attribute='name') | map('lower') | list
+             | select('search', 'nfs') | list | length > 0)
+            or (fleet_discover_scs | map(attribute='provisioner') | map('lower') | list
+                | select('search', 'nfs') | list | length > 0)
+          }}
+
+    - name: Fleet discover | Count control-plane nodes
+      ansible.builtin.set_fact:
+        fleet_discover_cp_count: "{{ fleet_discover_cp_count | default(0) | int + (1 if cp_node else 0) }}"
+      vars:
+        cp_node: >-
+          {{
+            'node-role.kubernetes.io/control-plane' in (item.metadata.labels | default({}))
+            or 'node-role.kubernetes.io/master' in (item.metadata.labels | default({}))
+          }}
+      loop: "{{ fleet_discover_k8s_nodes }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: Fleet discover | HA topology flag
+      ansible.builtin.set_fact:
+        fleet_discover_ha_topology: "{{ fleet_discover_cp_count | default(0) | int >= 3 }}"
+
+    - name: Fleet discover | Cluster KVM aggregate
+      ansible.builtin.set_fact:
+        fleet_discover_cluster_kvm: >-
+          {{
+            (groups['fleet_cluster_nodes'] | default([]) + groups['site_bootstrap'] | default([]))
+            | unique
+            | map('extract', hostvars, 'fleet_discover_host_kvm')
+            | select
+            | list
+            | length > 0
+          }}
+
+    - name: Fleet discover | Bootstrap KVM fact for node mapping
+      ansible.builtin.set_fact:
+        fleet_discover_bootstrap_kvm: "{{ fleet_discover_host_kvm | default(false) }}"
+
+    - name: Fleet discover | Label spoke nodes
+      ansible.builtin.command:
+        cmd: >-
+          kubectl label node {{ item.metadata.name }}
+          fleet.capability/kvm={{ node_kvm | lower }}
+          fleet.capability/gpu={{ node_gpu | lower }}
+          fleet.resource/gpu.allocatable={{ node_gpu_count }}
+          --overwrite
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      vars:
+        node_kvm: "{{ fleet_discover_bootstrap_kvm | default(false) }}"
+        node_cap: "{{ item.status.capacity | default({}) }}"
+        node_gpu_count: >-
+          {{
+            (node_cap.get('nvidia.com/gpu', 0) | int)
+            if (node_cap.get('nvidia.com/gpu') is not none)
+            else (
+              node_cap.keys()
+              | map('string')
+              | map('lower')
+              | select('search', 'gpu')
+              | list
+              | map('extract', node_cap)
+              | map('int')
+              | sum
+            )
+          }}
+        node_gpu: "{{ node_gpu_count | int > 0 }}"
+      loop: "{{ fleet_discover_k8s_nodes }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+      changed_when: true
+
+    - name: Fleet discover | Build node results
+      ansible.builtin.set_fact:
+        fleet_discover_node_results: "{{ fleet_discover_node_results | default([]) + [node_row] }}"
+      vars:
+        node_cap: "{{ item.status.capacity | default({}) }}"
+        node_gpu_count: >-
+          {{
+            (node_cap.get('nvidia.com/gpu', 0) | int)
+            if (node_cap.get('nvidia.com/gpu') is not none)
+            else (
+              node_cap.keys()
+              | map('string')
+              | map('lower')
+              | select('search', 'gpu')
+              | list
+              | map('extract', node_cap)
+              | map('int')
+              | sum
+            )
+          }}
+        node_row: >-
+          {{
+            {
+              'name': item.metadata.name,
+              'gpu_count': (node_gpu_count | int),
+              'capabilities': {
+                'kvm': (fleet_discover_bootstrap_kvm | default(false) | bool),
+                'gpu': ((node_gpu_count | int) > 0)
+              }
+            }
+          }}
+      loop: "{{ fleet_discover_k8s_nodes }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: Fleet discover | Cluster GPU aggregate
+      ansible.builtin.set_fact:
+        fleet_discover_cluster_gpu: >-
+          {{ fleet_discover_node_results | map(attribute='capabilities') | map(attribute='gpu') | select | list | length > 0 }}
+        fleet_discover_cluster_gpu_total: >-
+          {{ fleet_discover_node_results | map(attribute='gpu_count') | map('int') | sum }}
+
+    - name: Fleet discover | Results document
+      ansible.builtin.set_fact:
+        fleet_discover_results: >-
+          {{
+            {
+              'nodes': fleet_discover_node_results,
+              'cluster_capabilities': {
+                'kvm': (fleet_discover_cluster_kvm | bool),
+                'gpu': (fleet_discover_cluster_gpu | bool),
+                'storage.rwo': (fleet_discover_storage_rwo | bool),
+                'storage.rwx': (fleet_discover_storage_rwx | bool),
+                'ha_topology': (fleet_discover_ha_topology | bool)
+              },
+              'cluster_resources': {
+                'gpu.total': (fleet_discover_cluster_gpu_total | int),
+                'gpu.available': (fleet_discover_cluster_gpu_total | int)
+              }
+            }
+          }}
+
+- name: Fleet discover | Apply hub labels and publish ConfigMap
+  hosts: hub
+  gather_facts: false
+  vars:
+    ocm_cluster_name: "{{ fleet_cluster_name }}"
+    fleet_discover_bootstrap: "{{ groups['site_bootstrap'] | first }}"
+    fleet_discover_payload: "{{ hostvars[fleet_discover_bootstrap].fleet_discover_results }}"
+    fleet_discover_caps: "{{ fleet_discover_payload.cluster_capabilities }}"
+    fleet_discover_resources: "{{ fleet_discover_payload.cluster_resources | default({}) }}"
+  tasks:
+    - name: Fleet discover | Require results from bootstrap
+      ansible.builtin.assert:
+        that: fleet_discover_payload is defined
+        fail_msg: "Discovery results missing from bootstrap host"
+
+    - name: Fleet discover | Patch ManagedCluster capability labels
+      ansible.builtin.command:
+        cmd: >-
+          kubectl label managedcluster {{ ocm_cluster_name }}
+          fleet.capability/gpu={{ fleet_discover_caps.gpu | bool | lower }}
+          fleet.capability/kvm={{ fleet_discover_caps.kvm | bool | lower }}
+          fleet.capability/storage.rwo={{ fleet_discover_caps['storage.rwo'] | bool | lower }}
+          fleet.capability/storage.rwx={{ fleet_discover_caps['storage.rwx'] | bool | lower }}
+          fleet.topology/ha={{ fleet_discover_caps.ha_topology | bool | lower }}
+          fleet.capability/ha_cluster={{ fleet_discover_caps.ha_topology | bool | lower }}
+          fleet.capability/ha_storage={{ (fleet_discover_caps['storage.rwo'] or fleet_discover_caps['storage.rwx']) | bool | lower }}
+          fleet.resource/gpu.total={{ fleet_discover_resources['gpu.total'] | default(0) | int }}
+          fleet.resource/gpu.available={{ fleet_discover_resources['gpu.available'] | default(0) | int }}
+          --overwrite
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      changed_when: true
+
+    - name: Fleet discover | Write results ConfigMap
+      ansible.builtin.shell: |
+        set -euo pipefail
+        CM="fleet-cluster-discover-{{ fleet_cluster_name }}"
+        NS="{{ fleet_site_controller_namespace | default('fleet-console') }}"
+        kubectl -n "$NS" create configmap "$CM" \
+          --from-literal=results.json='{{ fleet_discover_payload | to_json }}' \
+          --dry-run=client -o yaml | kubectl apply -f -
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      changed_when: true

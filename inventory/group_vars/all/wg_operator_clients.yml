@@ -1,0 +1,5 @@
+---
+# Operator PCs — split-tunnel overlay access. Add names here or use scripts/wg-dev-client.sh.
+wireguard_operator_clients: []
+
+wireguard_operator_client_pool_octet: 100

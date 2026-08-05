@@ -1,0 +1,20 @@
+# Deploy Rocky 9 bridge VM on beta-lab02 (virt02, n0p0_mgmt_nw = 203.0.113.0/24).
+#
+# Prereqs:
+#   - kubevirt provider Ready on beta-lab02
+#   - Multus NAD default/mgmt-l2 (roles/kubevirt_bridge_nad)
+#   - catalog seeded: ansible-playbook fleet-dcm.yml -l hub --tags dcm_seed_rocky9_vm
+#
+#   ansible-playbook $INV playbooks/flows/rocky9-vm-deploy.yml \
+#     -e @playbooks/flows/examples/rocky9-vm-beta-lab02.yml
+
+fleet_flow_vm_name: rocky9-lab-01
+fleet_flow_cluster: beta-lab02
+fleet_flow_vm_ip: 203.0.113.15/24
+fleet_flow_vm_gateway: 203.0.113.1
+fleet_flow_vm_vcpu: 2
+fleet_flow_vm_memory: 2GB
+fleet_flow_vm_disk: 20GB
+fleet_flow_vm_multus_network: default/mgmt-l2
+# Override with your key; default is hub linux user pubkey when present.
+fleet_flow_ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_ed25519.pub') }}"

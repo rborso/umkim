@@ -1,0 +1,43 @@
+---
+# Drop fleet management NodePorts on the public NIC; allow SSH + WireGuard only.
+fleet_hub_firewall_enabled: true
+fleet_hub_firewall_public_interface: eth0
+fleet_hub_firewall_wireguard_interface: "{{ wireguard_interface | default('wg0') }}"
+# Drop WAN hits by destination (works for hairpin and NodePort; iif alone is unreliable).
+fleet_hub_firewall_public_ipv4: "{{ ansible_host }}"
+fleet_hub_firewall_overlay_ipv4: "{{ wireguard_address | ansible.utils.ipaddr('address') }}"
+
+# TCP ports bound by K3s NodePort on the hub (not reachable on {{ fleet_hub_firewall_public_interface }}).
+fleet_hub_firewall_block_public_tcp_ports:
+  - 6443
+  - 30080
+  - 30443
+  - 30222
+  - 30908
+  - 30909
+  - 30910
+  - 30911
+  - 30912
+  - 30917
+
+# When true: allow WAN :80/:443 (hub ACME / hub_gateway apps).
+fleet_hub_firewall_public_ingress_enabled: "{{ fleet_edge_acme_enabled | default(false) | bool }}"
+# Legacy iptables REDIRECT (superseded by gateway Service externalIPs when gateway HA).
+fleet_hub_firewall_public_ingress_dnat: false
+fleet_hub_firewall_block_public_http: "{{ not fleet_hub_firewall_public_ingress_enabled | bool }}"
+fleet_hub_firewall_gateway_http_nodeport: "{{ phase5_gateway_nodeport | default(30908) }}"
+fleet_hub_firewall_gateway_https_nodeport: "{{ phase5_gateway_https_nodeport | default(30909) }}"
+
+fleet_hub_firewall_public_tcp_allow: >-
+  {{
+    ['22']
+    + ([80, 443] if fleet_hub_firewall_public_ingress_enabled | bool else [])
+    + ([fleet_hub_firewall_gateway_http_nodeport | int, fleet_hub_firewall_gateway_https_nodeport | int]
+       if fleet_hub_firewall_public_ingress_enabled | bool else [])
+  }}
+
+fleet_hub_firewall_public_udp_allow:
+  - "{{ wireguard_port | default(51820) }}"
+
+fleet_hub_firewall_nftables_conf: /etc/nftables/fleet-hub.nft
+fleet_hub_firewall_nftables_main_conf: /etc/sysconfig/nftables.conf

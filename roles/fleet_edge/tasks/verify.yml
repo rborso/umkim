@@ -1,0 +1,58 @@
+---
+- name: Fleet edge | Gateway ping
+  ansible.builtin.command:
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:{{ fleet_edge_public_nodeport }}/ping
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_ping
+  changed_when: false
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Probe global app routes via hub gateway
+  ansible.builtin.command:
+    cmd: >-
+      curl -sf -o /dev/null -w "%{http_code}"
+      -H "Host: {{ item.host }}"
+      http://127.0.0.1:{{ fleet_edge_public_nodeport }}{{ item.path_prefix | default('/') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ fleet_edge_apps }}"
+  register: fleet_edge_app_probe
+  failed_when: false
+  changed_when: false
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Report app probe results
+  ansible.builtin.debug:
+    msg: "{{ item.item.host }} → HTTP {{ item.stdout | default('failed') }}"
+  loop: "{{ fleet_edge_app_probe.results }}"
+  loop_control:
+    label: "{{ item.item.host }}"
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Probe HTTPS app routes (Let's Encrypt)
+  ansible.builtin.command:
+    cmd: >-
+      curl -sfk -o /dev/null -w "%{http_code}"
+      -H "Host: {{ item.host }}"
+      https://127.0.0.1:{{ phase5_gateway_https_nodeport }}{{ item.path_prefix | default('/') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ fleet_edge_apps }}"
+  register: fleet_edge_app_probe_https
+  failed_when: false
+  changed_when: false
+  when: fleet_edge_acme_enabled | default(false) | bool
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Report HTTPS probe results
+  ansible.builtin.debug:
+    msg: "{{ item.item.host }} → HTTPS {{ item.stdout | default('failed') }}"
+  loop: "{{ fleet_edge_app_probe_https.results }}"
+  loop_control:
+    label: "{{ item.item.host }}"
+  when: fleet_edge_acme_enabled | default(false) | bool
+  tags: [fleet_edge, fleet_edge_verify]

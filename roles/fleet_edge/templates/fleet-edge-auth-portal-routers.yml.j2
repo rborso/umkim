@@ -1,0 +1,16 @@
+{% if fleet_ingress_auth_enabled | default(false) | bool %}
+    fleet-authelia-portal:
+      rule: "Host(`{{ fleet_ingress_auth_portal_host }}`)"
+      service: fleet-authelia-portal
+      entryPoints: [web]
+      middlewares: [{% if fleet_edge_acme_enabled | default(false) | bool %}fleet-edge-redirect-https{% else %}fleet-edge-forward-headers{% endif %}]
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+    fleet-authelia-portal-tls:
+      rule: "Host(`{{ fleet_ingress_auth_portal_host }}`)"
+      service: fleet-authelia-portal
+      entryPoints: [websecure]
+      middlewares: [fleet-edge-forward-headers-https]
+      tls:
+        certResolver: letsencrypt
+{% endif %}
+{% endif %}

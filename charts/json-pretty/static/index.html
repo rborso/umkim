@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JSON Pretty Formatter</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3d8bfd;
+      --ok: #3dd68c;
+      --err: #f87171;
+      --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: linear-gradient(160deg, #0b1020 0%, var(--bg) 40%, #121a28 100%);
+      color: var(--text);
+    }
+    header {
+      padding: 1.25rem 1.5rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(26, 35, 50, 0.85);
+      backdrop-filter: blur(8px);
+    }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 650; }
+    .sub { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.92rem; }
+    main { padding: 1rem 1.5rem 2rem; max-width: 1200px; margin: 0 auto; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      align-items: center;
+    }
+    button, label.btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button.primary { background: var(--accent); border-color: #2f6fd4; color: #fff; }
+    button:hover, label.btn:hover { filter: brightness(1.08); }
+    label.btn input { display: none; }
+    .status {
+      margin-left: auto;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    .panes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      min-height: 55vh;
+    }
+    @media (max-width: 800px) { .panes { grid-template-columns: 1fr; } }
+    .pane {
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .pane h2 {
+      margin: 0;
+      padding: 0.55rem 0.85rem;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    textarea {
+      flex: 1;
+      min-height: 280px;
+      resize: vertical;
+      border: 0;
+      padding: 0.85rem;
+      background: #0d1219;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      line-height: 1.45;
+      outline: none;
+    }
+    .opts { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.88rem; color: var(--muted); }
+    .opts label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>JSON Pretty Formatter</h1>
+    <p class="sub">Format, validate, minify, and sort keys — runs entirely in your browser.</p>
+  </header>
+  <main>
+    <div class="toolbar">
+      <button type="button" class="primary" id="btn-format">Pretty print</button>
+      <button type="button" id="btn-minify">Minify</button>
+      <button type="button" id="btn-validate">Validate</button>
+      <button type="button" id="btn-copy">Copy output</button>
+      <button type="button" id="btn-clear">Clear</button>
+      <label class="btn">Upload JSON<input type="file" id="file-input" accept=".json,application/json,text/plain" /></label>
+      <span class="status" id="status">Ready</span>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="sort-keys" /> Sort object keys</label>
+      <label>Indent <input type="number" id="indent" value="2" min="0" max="8" style="width:3rem" /></label>
+    </div>
+    <div class="panes">
+      <div class="pane">
+        <h2>Input</h2>
+        <textarea id="input" placeholder='{"hello":"world"}'></textarea>
+      </div>
+      <div class="pane">
+        <h2>Output</h2>
+        <textarea id="output" readonly placeholder="Formatted JSON appears here"></textarea>
+      </div>
+    </div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const input = $('input');
+    const output = $('output');
+    const status = $('status');
+
+    function setStatus(msg, kind) {
+      status.textContent = msg;
+      status.className = 'status' + (kind ? ' ' + kind : '');
+    }
+
+    function sortKeysDeep(value) {
+      if (Array.isArray(value)) return value.map(sortKeysDeep);
+      if (value && typeof value === 'object') {
+        return Object.keys(value).sort().reduce((acc, key) => {
+          acc[key] = sortKeysDeep(value[key]);
+          return acc;
+        }, {});
+      }
+      return value;
+    }
+
+    function parseInput() {
+      const raw = input.value.trim();
+      if (!raw) throw new Error('Input is empty');
+      return JSON.parse(raw);
+    }
+
+    function emit(value, minify) {
+      const indent = minify ? undefined : Number($('indent').value) || 2;
+      let data = value;
+      if ($('sort-keys').checked) data = sortKeysDeep(data);
+      output.value = JSON.stringify(data, null, indent);
+    }
+
+    $('btn-format').onclick = () => {
+      try {
+        emit(parseInput(), false);
+        setStatus('Formatted', 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    };
+
+    $('btn-minify').onclick = () => {
+      try {
+        emit(parseInput(), true);
+        setStatus('Minified', 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    };
+
+    $('btn-validate').onclick = () => {
+      try {
+        parseInput();
+        setStatus('Valid JSON', 'ok');
+      } catch (e) {
+        setStatus(e.message, 'err');
+      }
+    };
+
+    $('btn-copy').onclick = async () => {
+      if (!output.value) return setStatus('Nothing to copy', 'err');
+      try {
+        await navigator.clipboard.writeText(output.value);
+        setStatus('Copied to clipboard', 'ok');
+      } catch (e) {
+        setStatus('Copy failed', 'err');
+      }
+    };
+
+    $('btn-clear').onclick = () => {
+      input.value = '';
+      output.value = '';
+      setStatus('Cleared');
+    };
+
+    $('file-input').onchange = (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { input.value = String(reader.result || ''); setStatus('Loaded ' + file.name); };
+      reader.readAsText(file);
+      ev.target.value = '';
+    };
+
+    input.addEventListener('keydown', (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+        ev.preventDefault();
+        $('btn-format').click();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+---
+phase5_olm_sp_manifestwork_name: phase5-olm-subscription-sp
+phase5_olm_sp_worker_namespace: dcm-worker
+phase5_olm_sp_image_tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+phase5_olm_sp_image: >-
+  {{ harbor_fleet_image_prefix | default(phase5_dcm_registry ~ '/fleet/fleet-olm-subscription-sp')
+  }}/fleet-olm-subscription-sp:{{ phase5_olm_sp_image_tag }}
+fleet_olm_sp_harbor_pull_secret: true
+fleet_olm_sp_harbor_pull_secret_name: harbor-fleet-pull

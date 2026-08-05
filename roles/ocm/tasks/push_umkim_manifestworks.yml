@@ -1,0 +1,32 @@
+---
+- name: UMKIM | Push OLM and cert-manager ManifestWorks
+  ansible.builtin.import_role:
+    name: olm
+    tasks_from: push_spokes.yml
+  vars:
+    ocm_manifestwork_clusters: "{{ ocm_register_cluster_names }}"
+  tags: [ocm, ocm_register, ocm_spoke, phase4, phase4_push]
+
+- name: UMKIM | Verify platform ManifestWorks
+  ansible.builtin.import_role:
+    name: olm
+    tasks_from: verify_spokes.yml
+  vars:
+    ocm_manifestwork_clusters: "{{ ocm_register_cluster_names }}"
+  tags: [ocm, ocm_register, ocm_spoke, phase4, phase4_verify]
+
+- name: UMKIM | Push DCM k8s-container-service-provider ManifestWorks
+  ansible.builtin.import_role:
+    name: dcm
+    tasks_from: push_spokes.yml
+  vars:
+    ocm_manifestwork_clusters: "{{ ocm_register_cluster_names }}"
+  tags: [ocm, ocm_register, ocm_spoke, phase5, phase5_push]
+
+- name: UMKIM | Verify DCM workers
+  ansible.builtin.import_role:
+    name: dcm
+    tasks_from: verify.yml
+  vars:
+    ocm_manifestwork_clusters: "{{ ocm_register_cluster_names }}"
+  tags: [ocm, ocm_register, ocm_spoke, phase5, phase5_verify]

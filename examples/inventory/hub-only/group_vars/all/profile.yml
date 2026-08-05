@@ -1,0 +1,24 @@
+---
+# fleet_profile: lab | production (auth/secrets/LDAP only; images always use umkim_version)
+# Hub-only greenfield installs use production (matches install-hub.sh default).
+fleet_profile: production
+
+fleet_secrets_strict: "{{ fleet_profile == 'production' }}"
+
+fleet_secret_placeholder_patterns:
+  - change-me
+  - ChangeMe
+  - REPLACE_ME
+  - fleet-admin-change-me
+  - FleetHarbor-ChangeMe
+  - FleetDCM-ChangeMe
+  - fleet-ingress-auth-change-me
+  - fleet-lldap-jwt-change-me
+  - fleet-lldap-admin-change-me
+  - fleet-authelia-session-change-me
+  - fleet-authelia-storage-change-me
+  - fleet-authelia-reset-jwt-change-me
+
+# Profile-gated settings (lab defaults remain in hub.yml / role defaults)
+fleet_auth_lldap_enabled_profile: "{{ fleet_profile == 'production' }}"
+fleet_console_auth_session_secure_profile: "{{ fleet_profile == 'production' }}"

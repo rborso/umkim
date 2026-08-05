@@ -1,0 +1,24 @@
+---
+- name: Fleet edge | Apply cluster registry ConfigMap for controller
+  ansible.builtin.import_tasks: cluster_registry.yml
+  when: fleet_edge_enable | default(false) | bool
+  tags: [fleet_edge, fleet_edge_registry]
+
+- name: Fleet edge | Apply domain registry ConfigMap
+  ansible.builtin.import_tasks: domain_registry.yml
+  when: fleet_edge_enable | default(false) | bool
+  tags: [fleet_edge, fleet_edge_domains]
+
+- name: Fleet edge | Apply hub Traefik routes (includes fragment render)
+  ansible.builtin.import_role:
+    name: dcm
+    tasks_from: traefik_config.yml
+  tags: [fleet_edge, fleet_edge_traefik]
+
+- name: Fleet edge | Build manual DNS checklist
+  ansible.builtin.import_tasks: build_dns_summary.yml
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Verify hub gateway routes
+  ansible.builtin.import_tasks: verify.yml
+  tags: [fleet_edge, fleet_edge_verify]

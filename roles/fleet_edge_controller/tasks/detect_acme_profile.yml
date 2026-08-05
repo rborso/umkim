@@ -1,0 +1,55 @@
+---
+# Derive ACME issuance profile from the live gateway (matches hubacme.Detect in fleet-site-controller).
+# Console Ansible Jobs do not load inventory/group_vars/hub/fcj-workloads.yml; cluster state is authoritative.
+
+- name: Fleet edge controller | Read gateway hostNetwork
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ phase5_dcm_namespace | default('dcm') }} get deployment gateway
+      -o jsonpath={.spec.template.spec.hostNetwork}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fec_gateway_hostnetwork
+  changed_when: false
+  failed_when: false
+  tags: [fleet_edge_controller, fleet_edge]
+
+- name: Fleet edge controller | Read gateway replicas
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ phase5_dcm_namespace | default('dcm') }} get deployment gateway
+      -o jsonpath={.spec.replicas}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fec_gateway_replicas
+  changed_when: false
+  failed_when: false
+  tags: [fleet_edge_controller, fleet_edge]
+
+- name: Fleet edge controller | Check gateway-acme Service exists
+  ansible.builtin.command:
+    cmd: kubectl -n {{ phase5_dcm_namespace | default('dcm') }} get svc gateway-acme
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fec_gateway_acme_svc
+  changed_when: false
+  failed_when: false
+  tags: [fleet_edge_controller, fleet_edge]
+
+- name: Fleet edge controller | Set ACME profile from gateway cluster state
+  ansible.builtin.set_fact:
+    _fec_gateway_ha: >-
+      {{ (fec_gateway_replicas.stdout | default('1') | int) > 1
+         and (fec_gateway_hostnetwork.stdout | trim) != 'true' }}
+    _fec_solver_exists: "{{ fec_gateway_acme_svc.rc == 0 }}"
+  tags: [fleet_edge_controller, fleet_edge]
+
+- name: Fleet edge controller | Apply ACME profile facts
+  ansible.builtin.set_fact:
+    dcm_gateway_acme_solver_enabled: "{{ _fec_gateway_ha | bool and _fec_solver_exists | bool }}"
+    fleet_edge_acme_legacy_gateway_scale: "{{ not (_fec_gateway_ha | bool and _fec_solver_exists | bool) }}"
+    fleet_edge_acme_preflight_enabled: "{{ _fec_gateway_ha | bool and _fec_solver_exists | bool }}"
+  tags: [fleet_edge_controller, fleet_edge]

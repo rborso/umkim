@@ -1,0 +1,44 @@
+namespace: fleet-ingress-auth
+
+enabled: true
+createNamespace: false
+
+# PVC storage class for LLDAP/Authelia data (use local-path on single-node spokes; empty = cluster default).
+persistence:
+  storageClass: ""
+
+lldap:
+  deploy: true
+  externalUrl: ""
+  image: ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
+  ldapPort: 3890
+  httpPort: 17170
+  baseDN: dc=example,dc=com
+  adminEmail: admin@mgmt.example.com
+  jwtSecret: change-me-lldap-jwt
+  adminPassword: change-me-lldap-admin
+  exposeWebUI: false
+  webUIHost: ""
+
+authelia:
+  image: ghcr.io/authelia/authelia:4.38.19
+  port: 9091
+  sessionSecret: change-me-authelia-session
+  storageEncryptionKey: change-me-authelia-storage
+  resetPasswordJWTSecret: change-me-authelia-reset-jwt
+  ldapPassword: ""
+  cookieDomain: mgmt.example.com
+  portalHost: auth.mgmt.example.com
+  publicURL: "https://auth.mgmt.example.com"
+  accessDomains:
+    - "*.mgmt.example.com"
+    - "mgmt.example.com"
+
+traefik:
+  deploySpokeMiddleware: true
+  middlewareName: fleet-ingress-authelia
+  middlewareNamespace: fleet-ingress
+  stripAuthorizationMiddlewareName: strip-authorization
+
+registry:
+  prefix: ""

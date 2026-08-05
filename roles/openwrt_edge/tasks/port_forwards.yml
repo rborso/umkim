@@ -1,0 +1,149 @@
+---
+- name: OpenWrt edge | Remove legacy virt03 hub redirects
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for name in umkim-fleet-http umkim-fleet-https; do
+      for s in $(uci show firewall 2>/dev/null | grep "=redirect" | cut -d. -f2 | cut -d= -f1 | sort -u); do
+        if [ "$(uci -q get firewall.${s}.name)" = "$name" ]; then
+          uci delete firewall.${s} && echo "removed legacy ${name}"
+        fi
+      done
+    done
+    uci commit firewall
+  args:
+    executable: /bin/sh
+  changed_when: true
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Disable stale WAN redirects
+  ansible.builtin.shell: |
+    set -euo pipefail
+    managed="{{ openwrt_port_forwards | map(attribute='name') | join(' ') }}"
+    stale=""
+    for s in $(uci show firewall 2>/dev/null | grep "=redirect" | cut -d. -f2 | cut -d= -f1 | sort -u); do
+      name="$(uci -q get firewall.${s}.name || true)"
+      [ -z "$name" ] && continue
+      if ! echo " $managed " | grep -q " ${name} "; then
+        stale="${stale} ${s}"
+      fi
+    done
+    for s in $stale; do
+      name="$(uci -q get firewall.${s}.name || true)"
+      uci delete firewall.${s} 2>/dev/null || true
+      echo "removed ${name}"
+    done
+    uci commit firewall
+  args:
+    executable: /bin/sh
+  register: openwrt_stale_forwards
+  changed_when: "'removed' in openwrt_stale_forwards.stdout"
+  when: openwrt_port_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Configure redirect {{ item.name }}
+  ansible.builtin.shell: |
+    set -euo pipefail
+    name="{{ item.name }}"
+    # Find existing redirect by name or create one
+    rid=""
+    for s in $(uci show firewall | grep "=redirect" | cut -d= -f1 | cut -d. -f2); do
+      if [ "$(uci -q get firewall.${s}.name)" = "$name" ]; then
+        rid="$s"
+        break
+      fi
+    done
+    if [ -z "$rid" ]; then
+      rid=$(uci add firewall redirect)
+    fi
+    uci set firewall.${rid}.name='{{ item.name }}'
+    uci set firewall.${rid}.src='{{ item.src_zone | default("wan") }}'
+    uci set firewall.${rid}.dest='{{ item.dest_zone | default("lan") }}'
+    uci set firewall.${rid}.proto='{{ item.proto | default("tcp") }}'
+    uci set firewall.${rid}.src_dport='{{ item.src_dport }}'
+    uci set firewall.${rid}.dest_ip='{{ item.dest_ip }}'
+    uci set firewall.${rid}.dest_port='{{ item.dest_port }}'
+    uci set firewall.${rid}.target='DNAT'
+    uci set firewall.${rid}.enabled='1'
+    uci commit firewall
+  args:
+    executable: /bin/sh
+  loop: "{{ openwrt_port_forwards }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: openwrt_forward_cfg
+  changed_when: "'uci commit' in openwrt_forward_cfg.stdout or openwrt_forward_cfg.rc == 0"
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Install fleet spoke SNAT include script
+  ansible.builtin.template:
+    src: firewall-fleet-spoke-snat.sh.j2
+    dest: /etc/firewall.fleet_spoke_snat.sh
+    mode: "0755"
+  when: openwrt_spoke_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Register fleet spoke SNAT firewall include
+  ansible.builtin.shell: |
+    set -euo pipefail
+    path="/etc/firewall.fleet_spoke_snat.sh"
+    if ! uci show firewall 2>/dev/null | grep -q "fleet_spoke_snat"; then
+      uci add firewall include
+      uci rename firewall.@include[-1]='fleet_spoke_snat'
+    fi
+    uci set firewall.fleet_spoke_snat=include
+    uci set firewall.fleet_spoke_snat.type='script'
+    uci set firewall.fleet_spoke_snat.path="$path"
+    uci set firewall.fleet_spoke_snat.reload='1'
+    uci commit firewall
+  args:
+    executable: /bin/sh
+  when: openwrt_spoke_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Install fleet hub SNAT include script
+  ansible.builtin.template:
+    src: firewall-fleet-hub-snat.sh.j2
+    dest: /etc/firewall.fleet_hub_snat.sh
+    mode: "0755"
+  when: openwrt_hub_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Register fleet hub SNAT firewall include
+  ansible.builtin.shell: |
+    set -euo pipefail
+    path="/etc/firewall.fleet_hub_snat.sh"
+    if ! uci show firewall 2>/dev/null | grep -q "fleet_hub_snat"; then
+      uci add firewall include
+      uci rename firewall.@include[-1]='fleet_hub_snat'
+    fi
+    uci set firewall.fleet_hub_snat=include
+    uci set firewall.fleet_hub_snat.type='script'
+    uci set firewall.fleet_hub_snat.path="$path"
+    uci set firewall.fleet_hub_snat.reload='1'
+    uci commit firewall
+  args:
+    executable: /bin/sh
+  when: openwrt_hub_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Reload firewall
+  ansible.builtin.command:
+    cmd: /etc/init.d/firewall reload
+  changed_when: true
+  when: openwrt_port_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | List redirects
+  ansible.builtin.shell: uci show firewall | grep redirect || true
+  args:
+    executable: /bin/sh
+  register: openwrt_redirects_list
+  changed_when: false
+  when: openwrt_port_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]
+
+- name: OpenWrt edge | Active redirects
+  ansible.builtin.debug:
+    var: openwrt_redirects_list.stdout_lines
+  when: openwrt_port_forwards | length > 0
+  tags: [openwrt_edge, phase6, phase6_openwrt]

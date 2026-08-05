@@ -1,0 +1,35 @@
+---
+- name: Fleet site | Resolve helm provider cluster
+  ansible.builtin.set_fact:
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    fleet_site_sp_endpoint: "{{ fleet_site_sp_endpoint | default((fleet_site_wg_ip | regex_replace('/.*$', ''))) }}"
+    fleet_site_helm_sp_name: "{{ fleet_site_dcm_helm_sp_name | default('helm-' ~ (fleet_site_ocm_name | default(fleet_site_name))) }}"
+  tags: [fleet_site, fleet_site_provider, phase5_helm_sp]
+
+  tags: [fleet_site, fleet_site_provider, phase5_helm_sp]
+
+- name: Fleet site | Register synthetic host for helm SP ManifestWork
+  ansible.builtin.add_host:
+    name: "{{ fleet_site_ocm_cluster }}"
+    dcm_helm_sp_nodeport: "{{ fleet_site_dcm_helm_sp_nodeport }}"
+    dcm_helm_sp_name: "{{ fleet_site_helm_sp_name }}"
+    dcm_helm_sp_endpoint_host: "{{ fleet_site_sp_endpoint }}"
+  tags: [fleet_site, fleet_site_provider, phase5_helm_sp]
+
+- name: Fleet site | Push helm release SP ManifestWork
+  ansible.builtin.import_role:
+    name: fleet_helm_sp
+    tasks_from: push_spokes.yml
+  vars:
+    ocm_helm_sp_clusters: ["{{ fleet_site_ocm_cluster }}"]
+  tags: [fleet_site, fleet_site_provider, phase5_helm_sp]
+
+- name: Fleet site | Wait for helm provider registration
+  ansible.builtin.import_tasks: wait_dcm_provider.yml
+  vars:
+    fleet_site_wait_provider_name: "{{ fleet_site_helm_sp_name }}"
+  tags: [fleet_site, fleet_site_provider, phase5_helm_sp]
+
+- name: Fleet site | Seed helm routing policy
+  ansible.builtin.import_tasks: seed_helm_policy.yml
+  tags: [fleet_site, fleet_site_provider, phase5_helm_sp]

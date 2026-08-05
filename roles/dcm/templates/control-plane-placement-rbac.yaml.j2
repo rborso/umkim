@@ -1,0 +1,29 @@
+# RBAC for control-plane OCM ManagedCluster label reads (placement Phase 2).
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: control-plane
+  namespace: {{ phase5_dcm_namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fleet-control-plane-managedclusters
+rules:
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["managedclusters"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fleet-control-plane-managedclusters
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fleet-control-plane-managedclusters
+subjects:
+  - kind: ServiceAccount
+    name: control-plane
+    namespace: {{ phase5_dcm_namespace }}

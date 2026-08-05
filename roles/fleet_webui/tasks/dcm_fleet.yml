@@ -1,0 +1,39 @@
+---
+# Deprecated — dashboard deploy moved to fleet-console-auth.yml (Helm).
+# Gateway routes: roles/fleet_console_helm/tasks/gateway_routes.yml (fleet-webui-lab.yml).
+- name: Fleet WebUI | Deploy fleet console chart (auth + dashboard)
+  ansible.builtin.import_role:
+    name: fleet_console_helm
+  when: dcm_fleet_dashboard_enabled | bool
+  tags: [fleet_webui, dcm_webui, dcm_fleet]
+
+- name: Fleet WebUI | Gateway /fleet/ routes
+  ansible.builtin.import_role:
+    name: fleet_console_helm
+    tasks_from: gateway_routes.yml
+  when:
+    - dcm_fleet_dashboard_enabled | bool
+    - dcm_fleet_gateway_path | default(false) | bool
+  tags: [fleet_webui, dcm_webui, dcm_fleet, fleet_console_gateway_routes]
+
+- name: Fleet WebUI | Probe DCM fleet dashboard NodePort
+  ansible.builtin.command:
+    cmd: >-
+      curl -sf -o /dev/null -w "%{http_code}"
+      http://127.0.0.1:{{ dcm_fleet_dashboard_nodeport }}/fleet/login
+  register: fleet_webui_dcm_fleet_http
+  changed_when: false
+  failed_when: fleet_webui_dcm_fleet_http.stdout | trim not in ['200', '302']
+  when: dcm_fleet_dashboard_enabled | bool
+  tags: [fleet_webui, dcm_webui, dcm_fleet, fleet_webui_verify]
+
+- name: Fleet WebUI | Probe DCM fleet dashboard via gateway /fleet/
+  ansible.builtin.command:
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:{{ phase5_gateway_nodeport }}/fleet/
+  register: fleet_webui_dcm_fleet_gw_http
+  changed_when: false
+  failed_when: fleet_webui_dcm_fleet_gw_http.stdout | trim not in ['200', '302']
+  when:
+    - dcm_fleet_dashboard_enabled | bool
+    - dcm_fleet_gateway_path | default(false) | bool
+  tags: [fleet_webui, dcm_webui, dcm_fleet, fleet_webui_verify]

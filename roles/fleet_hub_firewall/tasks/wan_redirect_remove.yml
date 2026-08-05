@@ -1,0 +1,12 @@
+---
+- name: Fleet hub firewall | Remove WAN REDIRECT rules
+  ansible.builtin.shell: |
+    set -euo pipefail
+    CMT="fleet-hub-wan-redirect"
+    while iptables-nft -t nat -L PREROUTING -n --line-numbers 2>/dev/null | grep -q "${CMT}"; do
+      line="$(iptables-nft -t nat -L PREROUTING -n --line-numbers | awk -v c="${CMT}" '$0 ~ c {print $1; exit}')"
+      iptables-nft -t nat -D PREROUTING "${line}"
+    done
+  args:
+    executable: /bin/bash
+  tags: [fleet_hub_firewall, hub_firewall]

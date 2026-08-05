@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+FV_LIB="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+# shellcheck source=scripts/fleet-verify/lib/hub-kubectl.sh
+source "${FV_LIB}/hub-kubectl.sh"
+hub_kubectl "$@"

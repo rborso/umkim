@@ -1,0 +1,21 @@
+---
+- name: Fleet ingress auth | Uninstall hub Helm release
+  ansible.builtin.command:
+    cmd: >-
+      helm uninstall {{ fleet_ingress_auth_helm_release }}
+      --namespace {{ fleet_ingress_auth_namespace }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  register: fia_hub_uninstall
+  failed_when: false
+  changed_when: "'uninstalled' in fia_hub_uninstall.stdout"
+
+- name: Fleet ingress auth | Delete hub namespace when empty
+  ansible.builtin.command:
+    cmd: kubectl delete namespace {{ fleet_ingress_auth_namespace }} --ignore-not-found
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  register: fia_ns_delete
+  changed_when: "'deleted' in fia_ns_delete.stdout"

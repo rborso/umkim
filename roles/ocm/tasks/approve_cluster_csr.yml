@@ -1,0 +1,84 @@
+---
+# Approve CSR and wait for klusterlet on one cluster (hub approves, polls join host).
+- name: OCM | Reset registration poll state for cluster
+  ansible.builtin.set_fact:
+    ocm_hub_kc_ok: false
+  tags: [ocm, ocm_approve_csr, ocm_spoke]
+
+- name: OCM | Approve registration CSRs until hub kubeconfig exists
+  ansible.builtin.include_tasks: approve_registration_round.yml
+  loop: "{{ range(1, 37) | list }}"
+  when: not (ocm_hub_kc_ok | default(false) | bool)
+  tags: [ocm, ocm_approve_csr, ocm_spoke]
+
+- name: OCM | Assert hub-kubeconfig-secret on join host
+  ansible.builtin.assert:
+    that: ocm_hub_kc_ok | default(false) | bool
+    fail_msg: >-
+      hub-kubeconfig-secret missing on {{ ocm_spoke_host }} for {{ ocm_cluster_item }}
+      (kubectl get csr | grep {{ ocm_cluster_item }}).
+  tags: [ocm, ocm_approve_csr, ocm_spoke]
+
+- name: OCM | Scale klusterlet work agent for overlay hub API
+  ansible.builtin.import_tasks: patch_klusterlet_work_hostnetwork.yml
+  delegate_to: "{{ ocm_spoke_host }}"
+  become: true
+  vars:
+    # when: on hub play evaluates inventory_host (hub), not delegate_to — pull spoke vars.
+    ocm_kubeconfig: >-
+      {{ ocm_spoke_kubeconfig | default(
+           hostvars[ocm_spoke_host].ocm_kubeconfig
+           | default(hostvars[ocm_spoke_host].k3s_kubeconfig
+           | default('/etc/rancher/k3s/k3s.yaml'))
+         ) }}
+    ocm_hub_apiserver: "{{ hostvars[ocm_spoke_host].ocm_hub_apiserver | default('') }}"
+    ocm_hub: "{{ hostvars[ocm_spoke_host].ocm_hub | default(false) }}"
+    ocm_klusterlet_overlay_hostnetwork: >-
+      {{ hostvars[ocm_spoke_host].ocm_klusterlet_overlay_hostnetwork | default(true) }}
+    k3s_command_path: >-
+      {{ hostvars[ocm_spoke_host].k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}
+    wireguard_subnet: "{{ hostvars[ocm_spoke_host].wireguard_subnet | default('10.10.0.0/16') }}"
+  tags: [ocm, ocm_approve_csr, ocm_spoke, ocm_klusterlet_hostnetwork]
+
+- name: OCM | Wait for klusterlet-work-agent on join host
+  ansible.builtin.shell: |
+    set -euo pipefail
+    replicas="$(kubectl -n open-cluster-management-agent get deploy klusterlet-work-agent \
+      -o jsonpath='{.spec.replicas}')"
+    test "${replicas:-0}" -ge 1
+    kubectl -n open-cluster-management-agent rollout status \
+      deployment/klusterlet-work-agent --timeout=120s
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: >-
+      {{ ocm_spoke_kubeconfig | default(
+           hostvars[ocm_spoke_host].ocm_kubeconfig
+           | default(hostvars[ocm_spoke_host].k3s_kubeconfig)
+         ) }}
+    PATH: "{{ k3s_command_path }}"
+  delegate_to: "{{ ocm_spoke_host }}"
+  become: true
+  changed_when: false
+  retries: 12
+  delay: 10
+  register: ocm_work_agent_rollout
+  until: ocm_work_agent_rollout.rc == 0
+  tags: [ocm, ocm_approve_csr, ocm_spoke]
+
+- name: OCM | Wait for ManagedCluster Available
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl get managedcluster {{ ocm_cluster_item }} \
+      -o 'jsonpath={.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}'
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_mc_avail
+  until: ocm_mc_avail.stdout | trim == 'True'
+  retries: 36
+  delay: 10
+  changed_when: false
+  tags: [ocm, ocm_approve_csr, ocm_spoke]

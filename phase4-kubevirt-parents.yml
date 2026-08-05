@@ -1,0 +1,3 @@
+---
+# Deprecated — use fleet-platform-kubevirt.yml
+- ansible.builtin.import_playbook: fleet-platform-kubevirt.yml

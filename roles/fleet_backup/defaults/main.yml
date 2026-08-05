@@ -1,0 +1,34 @@
+---
+fleet_backup_enabled: true
+fleet_backup_namespace: fleet-system
+fleet_velero_namespace: velero
+fleet_velero_version: "1.15.2"
+fleet_velero_aws_plugin_version: "v1.11.1"
+fleet_velero_image: "docker.io/velero/velero:v{{ fleet_velero_version }}"
+fleet_velero_aws_plugin_image: "docker.io/velero/velero-plugin-for-aws:{{ fleet_velero_aws_plugin_version }}"
+
+# Hub MinIO object store (WireGuard-reachable).
+fleet_velero_minio_namespace: "{{ fleet_backup_namespace }}"
+fleet_velero_minio_service_name: fleet-velero-minio
+fleet_velero_minio_nodeport: 30920
+fleet_velero_minio_pvc_size: 20Gi
+fleet_velero_minio_bucket: velero-fleet
+fleet_velero_minio_image: docker.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+fleet_velero_minio_access_key: "{{ fleet_velero_minio_access_key_vault | default('fleetvelero') }}"
+fleet_velero_minio_secret_key: "{{ fleet_velero_minio_secret_key_vault | default('FleetVelero-ChangeMe') }}"
+fleet_velero_repo_password: "{{ fleet_velero_repo_password_vault | default('FleetVeleroRepo-ChangeMe') }}"
+
+fleet_velero_s3_url: "http://{{ fleet_hub_wireguard_ip }}:{{ fleet_velero_minio_nodeport }}"
+fleet_velero_s3_region: minio
+fleet_velero_s3_force_path_style: true
+
+# ManagedClusters to install Velero on (empty = all except hub management cluster).
+fleet_velero_exclude_clusters:
+  - "{{ fleet_management_cluster_name | default('umkim-hub') }}"
+fleet_velero_clusters: []
+
+fleet_velero_cli_dir: /usr/local/bin
+fleet_velero_cli_path: "{{ fleet_velero_cli_dir }}/velero"
+
+ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

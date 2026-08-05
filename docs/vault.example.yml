@@ -1,0 +1,45 @@
+---
+# Copy to vault.yml, fill values, encrypt:
+#   cp docs/vault.example.yml inventory/group_vars/all/vault.yml
+#   ansible-vault encrypt inventory/group_vars/all/vault.yml
+#
+# Run playbooks:
+#   ansible-playbook fleet-deploy.yml --vault-password-file ~/.umkim-vault-pass
+#
+# Never commit decrypted vault.yml with real secrets to a public repo.
+
+# Shared LLDAP (console + hub ingress-auth when fleet_auth_lldap_enabled)
+fleet_lldap_jwt_secret_vault: "REPLACE_ME_lldap_jwt_secret"
+fleet_lldap_admin_password_vault: "REPLACE_ME_lldap_admin_password"
+
+# Console auth (fleet-console-auth)
+fleet_console_auth_session_secret_vault: "REPLACE_ME_min_32_chars_session"
+fleet_console_auth_admin_password_vault: "REPLACE_ME_break_glass_localadmin"
+fleet_console_auth_bootstrap_install_token_vault: ""  # optional one-time bootstrap
+
+# Console LDAP bind override (optional; default uses fleet_lldap_admin_password_vault via role defaults)
+fleet_auth_ldap_bind_password_vault: ""
+
+# Ingress auth (Authelia) — required when fleet_ingress_auth_enabled on hub/spokes
+fleet_ingress_auth_bootstrap_password_vault: "REPLACE_ME"
+fleet_ingress_auth_session_secret_vault: "REPLACE_ME_authelia_session"
+fleet_ingress_auth_storage_key_vault: "REPLACE_ME_exactly_32_bytes!!"
+fleet_ingress_auth_reset_jwt_secret_vault: "REPLACE_ME_reset_jwt"
+fleet_ingress_auth_lldap_jwt_secret_vault: "REPLACE_ME"  # spokes only; hub uses fleet_lldap_* when shared
+
+# Per-cluster LLDAP (spoke ingress auth) — one key per cluster, min 12 chars; enable via API after Ready
+# lab_int01_lldap_password_vault: "REPLACE_ME_12chars_min"
+# beta_lab02_lldap_password_vault: "REPLACE_ME_another_password"   # preferred
+# lab_ext02_lldap_password_vault: "REPLACE_ME_another_password"    # legacy alias for beta-lab02
+
+# DCM / Harbor
+dcm_postgres_password_vault: "REPLACE_ME_dcm_postgres"
+harbor_admin_password_vault: "REPLACE_ME_harbor_admin"
+
+# Velero backup (hub MinIO + encrypted repo password)
+fleet_velero_minio_access_key_vault: "REPLACE_ME_velero_access_key"
+fleet_velero_minio_secret_key_vault: "REPLACE_ME_velero_secret_key"
+fleet_velero_repo_password_vault: "REPLACE_ME_velero_repo_password"
+
+# Gitea catalog default admin (gitea-helm catalog item)
+fleet_gitea_admin_password_vault: "REPLACE_ME_gitea_admin_password"

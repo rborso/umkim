@@ -1,0 +1,90 @@
+server {
+    listen 8080;
+    server_name _;
+
+    resolver kube-dns.kube-system.svc.cluster.local valid=10s ipv6=off;
+
+    location /fleet/auth/ {
+        set $auth_upstream fleet-console-auth.{{ fleet_webui_namespace }}.svc.cluster.local:{{ fleet_console_auth_http_port | default(18090) }};
+        rewrite ^/fleet/auth/(.*)$ /api/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+    }
+
+    location /fleet/api/v1alpha1/site-enrollments/ {
+        set $site_upstream fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080;
+        rewrite ^/fleet/api/v1alpha1/site-enrollments/(.*)$ /api/v1alpha1/site-enrollments/$1 break;
+        proxy_pass http://$site_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /fleet/api/v1alpha1/cluster-enrollments/ {
+        set $site_upstream fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080;
+        rewrite ^/fleet/api/v1alpha1/cluster-enrollments/(.*)$ /api/v1alpha1/cluster-enrollments/$1 break;
+        proxy_pass http://$site_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /api/ {
+        set $auth_upstream fleet-console-auth.{{ fleet_webui_namespace }}.svc.cluster.local:{{ fleet_console_auth_http_port | default(18090) }};
+        rewrite ^/api/(.*)$ /proxy/dcm/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /fleet/api/ {
+        set $auth_upstream fleet-console-auth.{{ fleet_webui_namespace }}.svc.cluster.local:{{ fleet_console_auth_http_port | default(18090) }};
+        rewrite ^/fleet/api/(.*)$ /proxy/fleet/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /llm/ {
+        set $auth_upstream fleet-console-auth.{{ fleet_webui_namespace }}.svc.cluster.local:{{ fleet_console_auth_http_port | default(18090) }};
+        rewrite ^/llm/(.*)$ /proxy/llm/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /fleet/ {
+        alias /usr/share/nginx/html/fleet/;
+        try_files $uri $uri/ /fleet/index.html;
+    }
+
+    location / {
+        root /usr/share/nginx/html/fleet;
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -1,0 +1,25 @@
+---
+fleet_llm_namespace: "{{ phase5_dcm_namespace | default('dcm') }}"
+fleet_llm_release_name: litellm
+# Pin a release tag — floating :main leaked to multi-GiB on the hub.
+# v1.92.0 baseline is ~1Gi; v1.74.3-stable settles ~280Mi and fits a 512Mi cap.
+fleet_llm_image_repo: ghcr.io/berriai/litellm
+fleet_llm_image_tag: "v1.74.3-stable"
+fleet_llm_image: "{{ fleet_llm_image_repo }}:{{ fleet_llm_image_tag }}"
+fleet_llm_service_port: 4000
+fleet_llm_nodeport: 30918
+fleet_llm_master_key_secret: "{{ fleet_llm_master_key_secret_name | default('fleet-llm-master-key') }}"
+fleet_llm_configmap: litellm-config
+fleet_llm_traefik_fragment_cm: dcm-traefik-llm-routes
+# Pod network cannot route to WireGuard spokes; use hostNetwork so LiteLLM reaches vLLM upstreams.
+fleet_llm_host_network: true
+# Cap RSS — without a limit, floating :main OOM-killed the hub at ~3–4GiB.
+# Steady state for v1.74.3-stable is ~280Mi; 256Mi is below that floor.
+fleet_llm_memory_request: 256Mi
+fleet_llm_memory_limit: 512Mi
+fleet_llm_cpu_request: 50m
+fleet_llm_cpu_limit: "1"
+fleet_console_namespace: fleet-console
+fleet_llm_auth_service: "fleet-console-auth.{{ fleet_console_namespace }}.svc.cluster.local:18090"
+# Mounted under /etc/traefik/dynamic-llm/ (separate Traefik file provider).
+fleet_llm_traefik_dynamic_file: llm-routes.yaml

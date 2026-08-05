@@ -1,0 +1,72 @@
+---
+# WireGuard overlay (Phase 1b).
+# Hub listens on UDP 51820; DNS `fleet_dns.wireguard_hub` must resolve to hub WAN IP.
+#
+# Prerequisite: ansible-playbook host-prepare.yml --tags host_prepare
+#
+# Usage:
+#   ansible-playbook wireguard.yml --tags wireguard
+#   ansible-playbook wireguard.yml --tags wireguard_install
+#   ansible-playbook wireguard.yml --tags wireguard_server
+#   ansible-playbook wireguard.yml --tags wireguard_client
+#   ansible-playbook wireguard.yml --tags wireguard_verify
+
+- name: WireGuard | Install packages and generate keys on all fleet nodes
+  hosts: fleet_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: install.yml
+      tags: [wireguard, wireguard_install]
+
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: keys.yml
+      tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Configure hub server (umkim-hub)
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: keys.yml
+      tags: [wireguard, wireguard_install]
+
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: server.yml
+      tags: [wireguard, wireguard_server]
+
+- name: WireGuard | Configure spoke clients
+  hosts: spokes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: install.yml
+      tags: [wireguard, wireguard_install, wireguard_client]
+
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: keys.yml
+      tags: [wireguard, wireguard_install, wireguard_client]
+
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: client.yml
+      tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Verify overlay connectivity
+  hosts: fleet_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: verify.yml
+      tags: [wireguard, wireguard_verify]

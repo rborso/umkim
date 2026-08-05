@@ -1,0 +1,41 @@
+---
+# Detect the host interface that carries the node management IPv4 (ansible_host / fleet_node_mgmt_address).
+# Sets calico_detected_iface and calico_node_ipv4 on each host before cluster Calico install.
+
+- name: Calico | Resolve node IPv4 for interface detection
+  ansible.builtin.set_fact:
+    calico_node_ipv4: >-
+      {{
+        fleet_node_mgmt_address
+        | default(ansible_host)
+        | default(ansible_default_ipv4.address)
+        | ansible.utils.ipaddr('address')
+      }}
+
+- name: Calico | Detect interface carrying node management IPv4
+  ansible.builtin.shell: |
+    set -euo pipefail
+    want="{{ calico_node_ipv4 }}"
+    ip -4 -o addr show | awk -v want="$want" '
+      {
+        split($4, p, "/")
+        if (p[1] == want) { sub(/:$/, "", $2); print $2; exit }
+      }'
+  args:
+    executable: /bin/bash
+  register: calico_iface_detect
+  changed_when: false
+
+- name: Calico | Store detected interface name
+  ansible.builtin.set_fact:
+    calico_detected_iface: "{{ calico_iface_detect.stdout | trim }}"
+  when: calico_iface_detect.stdout | trim | length > 0
+
+- name: Calico | Fail when management IPv4 interface cannot be detected
+  ansible.builtin.assert:
+    that:
+      - calico_detected_iface | default('') | length > 0
+    fail_msg: >-
+      Could not map management IPv4 {{ calico_node_ipv4 }} to a host interface on {{ inventory_hostname }}.
+      Set calico_ip_autodetection_method explicitly for this node.
+  when: calico_ip_autodetection_method | default('auto') == 'auto'
