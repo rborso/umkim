@@ -1,6 +1,5 @@
 ---
-# Hub gateway only — workload clusters register via FleetClusterJoin (console).
-# Copy to inventory/group_vars/fleet_edge.yml for greenfield hub installs.
+# Hub gateway + FCJ workload clusters (console / cluster-create.yml).
 
 fleet_edge_enable: true
 fleet_edge_direct_ingress_default: true
@@ -17,9 +16,22 @@ fleet_edge_clusters:
     traefik_https_port: 30443
     domain_bindings:
       - homelab-zone
+  lab-single-1:
+    site: lab-jumphost
+    direct_ingress: true
+    exposure_mode: hub_gateway
+    tls_policy: acme_hub
+    upstream_host: 10.10.0.11
+    traefik_http_port: 30081
+    traefik_https_port: 30444
+    domain_bindings:
+      - hub-zone
+
 fleet_edge_apps: []
 fleet_edge_phase6_clusters:
   - lab-single-0
+  - lab-single-1
 ocm_manifestwork_phase6_clusters:
   - lab-single-0
+  - lab-single-1
 ocm_spoke_kubeconfig_sync_targets: []

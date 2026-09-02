@@ -26,6 +26,9 @@ The supported installation workflow is documented in
   `verify-fleet-chart.sh` checks the hub chart library.
 - Backup, restore, cleanup, and asset-staging helpers have operational side
   effects that must be reviewed before use.
+  - `backup-hub.sh` / `restore-hub.sh` — hub etcd, WireGuard, ACME, optional Harbor
+    (see [docs/backup-restore.md](../docs/backup-restore.md)).
+  - Shared logic: [lib/hub-backup-common.sh](lib/hub-backup-common.sh).
 - [lab/](lab/) contains maintainer-oriented helpers outside the supported
   greenfield path.
 

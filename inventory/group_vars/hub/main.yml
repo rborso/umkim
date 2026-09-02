@@ -43,9 +43,8 @@ calico_ip_autodetection_method: interface=wg0
 fleet_edge_acme_enabled: true
 fleet_edge_hub_gateway_url: "{{ 'https://127.0.0.1' if (fleet_ingress_auth_enabled | default(false) | bool) else 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
 
-# Fleet ingress auth (Authelia). Set true to enable on hub at install (requires vault LLDAP password).
-# Reconcile: fleet-site-controller Job (seed_infrastructure.yml) or POST /ingress-auth/reconcile.
-fleet_ingress_auth_enabled: false
+# Fleet ingress auth (Authelia). Enabled at hub install; spokes opt-in per cluster via API.
+fleet_ingress_auth_enabled: true
 fleet_ingress_auth_bootstrap_password: "{{ fleet_lldap_admin_password_vault | default(fleet_ingress_auth_bootstrap_password_vault | default('fleet-ingress-auth-change-me')) }}"
 fleet_ingress_auth_portal_host: "auth.{{ fleet_edge_domain }}"
 fleet_ingress_auth_forward_auth_url: "http://authelia.fleet-ingress-auth.svc.cluster.local:9091/api/authz/forward-auth"

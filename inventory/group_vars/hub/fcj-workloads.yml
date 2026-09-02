@@ -9,3 +9,6 @@
 fleet_gateway_wireguard_upstream: true
 fleet_edge_acme_legacy_gateway_scale: false
 fleet_edge_acme_preflight_enabled: false
+# Spoke Traefik (port_forward / HTTP-01) ships only the letsencrypt resolver — not
+# letsencrypt-staging. Keep controller spoke preflight off to match.
+fleet_spoke_acme_preflight_enabled: false

@@ -1,42 +1,94 @@
 #!/usr/bin/env bash
-# Hub backup — K3s etcd snapshot and WireGuard keys.
-# Run on hub as root or linux with sudo.
-# Usage: sudo ./scripts/backup-hub.sh
+# Hub backup — K3s etcd, WireGuard, optional ACME and Harbor.
+# Run on the hub as root.
+#
+# Usage:
+#   sudo ./scripts/backup-hub.sh
+#   sudo BACKUP_HARBOR=true ./scripts/backup-hub.sh --full
+#   sudo ./scripts/backup-hub.sh --without-acme
 set -euo pipefail
 
-BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/umkim}"
-STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-DEST="${BACKUP_ROOT}/${STAMP}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/hub-backup-common.sh
+source "${ROOT}/scripts/lib/hub-backup-common.sh"
 
-mkdir -p "${DEST}/etcd" "${DEST}/wireguard"
+BACKUP_ACME="${BACKUP_ACME:-true}"
+BACKUP_HARBOR="${BACKUP_HARBOR:-false}"
 
-echo "[backup-hub] writing to ${DEST}"
+usage() {
+  cat <<EOF
+Usage: $0 [options]
 
-if command -v k3s >/dev/null 2>&1; then
-  echo "[backup-hub] k3s etcd snapshot"
-  k3s etcd-snapshot save --name "umkim-${STAMP}"
-  SNAP_DIR="/var/lib/rancher/k3s/server/db/snapshots"
-  if [[ -d "$SNAP_DIR" ]]; then
-    cp -a "${SNAP_DIR}/"* "${DEST}/etcd/" 2>/dev/null || true
-  fi
-else
-  echo "[backup-hub] WARN k3s not found — skip etcd"
-fi
+Options:
+  --full            etcd + wireguard + ACME + Harbor (same as BACKUP_HARBOR=true)
+  --with-harbor     include Harbor PVC archives and DB dump
+  --without-harbor  skip Harbor (default)
+  --with-acme       include Traefik ACME hostPath (default)
+  --without-acme    skip ACME hostPath
+  -h, --help        show this help
 
-if [[ -d /etc/wireguard ]]; then
-  tar -czf "${DEST}/wireguard/wg.tgz" -C /etc/wireguard .
-fi
-
-cat > "${DEST}/manifest.json" <<EOF
-{
-  "umkim_version": "0.2.0-dev",
-  "timestamp": "${STAMP}",
-  "hostname": "$(hostname -f 2>/dev/null || hostname)",
-  "components": ["etcd", "wireguard"]
-}
+Environment:
+  BACKUP_ROOT / HUB_BACKUP_ROOT   backup parent dir (default: /var/backups/umkim)
+  HUB_ACME_HOST_PATH              ACME hostPath (default: /var/lib/umkim/traefik-acme)
+  HARBOR_NAMESPACE                Harbor namespace (default: harbor)
 EOF
+}
 
-echo "[backup-hub] Harbor: backup registry PVC and DB separately (see docs/backup-restore.md)"
-echo "[backup-hub] Off-host copy: rsync -a ${DEST}/ backup-host:umkim/"
-echo "[backup-hub] Remember Ansible inventory + ansible-vault password file"
-echo "[backup-hub] done ${DEST}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --full)
+      BACKUP_ACME=true
+      BACKUP_HARBOR=true
+      ;;
+    --with-harbor) BACKUP_HARBOR=true ;;
+    --without-harbor) BACKUP_HARBOR=false ;;
+    --with-acme) BACKUP_ACME=true ;;
+    --without-acme) BACKUP_ACME=false ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+hub_require_root
+
+STAMP="$(hub_backup_stamp)"
+DEST="${HUB_BACKUP_ROOT}/${STAMP}"
+mkdir -p "${DEST}"
+
+hub_log "writing to ${DEST}"
+components=()
+
+if hub_backup_k3s_datastore "${DEST}" "${STAMP}"; then
+  case "$(hub_k3s_datastore_type)" in
+    sqlite) components+=("k3s-sqlite") ;;
+    etcd) components+=("etcd") ;;
+  esac
+fi
+
+if hub_backup_wireguard "${DEST}"; then
+  components+=("wireguard")
+fi
+
+if [[ "${BACKUP_ACME}" == "true" ]]; then
+  if hub_backup_acme "${DEST}"; then
+    components+=("acme")
+  fi
+fi
+
+if [[ "${BACKUP_HARBOR}" == "true" ]]; then
+  if hub_backup_harbor "${DEST}"; then
+    components+=("harbor")
+  fi
+fi
+
+hub_write_manifest "${DEST}" "${components[@]}"
+hub_backup_inventory_hint
+hub_log "done ${DEST} (components: ${components[*]:-none})"

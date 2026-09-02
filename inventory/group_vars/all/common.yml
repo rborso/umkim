@@ -46,8 +46,8 @@ fleet_edge_acme_email: "fleet@{{ fleet_edge_domain | default('example.local') }}
 
 # After FCJ Ready, auto-enable cluster ACME / ingress auth when hub flags are on.
 fleet_fcj_default_acme_enabled: "{{ fleet_edge_acme_enabled | default(false) }}"
-# Keep false when clusters need distinct LLDAP passwords (use POST …/ingress-auth/enable per cluster).
-fleet_fcj_default_ingress_auth_enabled: false
+# Auto-enable cluster ACME / ingress auth after FCJ Ready (shared LLDAP admin from vault).
+fleet_fcj_default_ingress_auth_enabled: true
 
 # host_prepare — OS baseline before WireGuard / K3s (tag: host_prepare)
 host_prepare:

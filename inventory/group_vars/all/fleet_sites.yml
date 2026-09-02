@@ -45,4 +45,22 @@ fleet_sites:
         tls_policy: acme_cluster
     dns_target_note: "A/AAAA *.{{ fleet_homelab_edge_domain }} → virt03 (port-forward 80→30080, 443→30443)"
 
+  lab-jumphost:
+    display_name: Lab jumphost (hub gateway)
+    region: lab
+    edge_domain: "{{ fleet_edge_domain }}"
+    edge_wildcard: "*.{{ fleet_edge_domain }}"
+    exposure_mode: hub_gateway
+    external_endpoints:
+      - id: hub-wan
+        address: "{{ hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].fleet_hub_public_ipv4 | default(hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].ansible_host | default('')) }}"
+        role: primary
+        description: "Hub public IP — apps via hub Traefik :80/:443"
+    domains:
+      - id: hub-zone
+        zone: "{{ fleet_edge_domain }}"
+        wildcard: "*.{{ fleet_edge_domain }}"
+        tls_policy: acme_hub
+    dns_target_note: "A/AAAA *.<fleet_edge_domain> → hub WAN (no spoke port-forward)"
+
 fleet_site_cluster_hosts: []

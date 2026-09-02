@@ -18,6 +18,10 @@ All notable changes to this project are documented here.
   console UI, and verify scripts).
 - Documentation refresh: hub-centric fleet positioning, hub independence, and
   exposure/routing alignment across README and component guides.
+- Hub backup/restore: `backup-hub.sh` and `restore-hub.sh` with shared
+  `lib/hub-backup-common.sh` (etcd, WireGuard, ACME, optional Harbor PVC/DB).
+  See [docs/backup-restore.md](docs/backup-restore.md) and
+  [docs/plans/hub-backup-restore.md](docs/plans/hub-backup-restore.md).
 - Harbor `charts` project publishes the whoami smoke-test chart.
 - Greenfield path: [docs/install.md](docs/install.md) +
   [examples/inventory/hub-only/](examples/inventory/hub-only/).

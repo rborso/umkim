@@ -1,4 +1,13 @@
 ---
+# Hub disaster recovery and Velero spoke backup settings.
+
+# Hub full backup (scripts/backup-hub.sh / restore-hub.sh)
+hub_backup_root: /var/backups/umkim
+hub_backup_acme: true
+hub_backup_harbor: false
+hub_acme_host_path: /var/lib/umkim/traefik-acme
+harbor_namespace: harbor
+
 # Velero spoke backup / restore settings (topology examples).
 # Configure only after the example clusters and backup infrastructure exist.
 fleet_velero_storage_class_map:

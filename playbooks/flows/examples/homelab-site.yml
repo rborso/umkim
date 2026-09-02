@@ -1,0 +1,23 @@
+---
+fleet_flow_site_name: homelab
+fleet_flow_site_spec:
+  siteName: homelab
+  siteId: homelab
+  provisioningMode: registry
+  displayName: Homelab
+  region: homelab
+  edge:
+    edgeDomain: homelab.otthol.hu
+    wildcard: "*.homelab.otthol.hu"
+    exposureMode: port_forward
+    defaultExposureMode: port_forward
+    domains:
+      - id: homelab-zone
+        zone: homelab.otthol.hu
+        wildcard: "*.homelab.otthol.hu"
+        tlsPolicy: acme_cluster
+    externalEndpoints:
+      - id: virt03-wan
+        address: "134.255.112.204"
+        role: primary
+        description: "WAN forwards TCP 80→30080 and 443→30443 on virt03"

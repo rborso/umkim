@@ -1,38 +1,98 @@
 # Backup and restore
 
-> Status: v0.2 is an experimental proof of concept. Backup and restore are
-> incomplete and must not be treated as a production recovery solution.
+UMKIM ships hub backup and restore helpers for a **single-node management
+cluster**. Test recovery in an isolated lab before relying on the path in
+production.
 
-UMKIM includes hub backup helpers. Test a recovery in an isolated
-environment before relying on the path.
+See also [plans/hub-backup-restore.md](plans/hub-backup-restore.md) for the
+full disaster-recovery design.
 
-## Hub backup
+## What is backed up
 
-`scripts/backup-hub.sh` writes a timestamped backup containing:
+`scripts/backup-hub.sh` writes a timestamped directory under
+`/var/backups/umkim/<UTC-stamp>/`:
 
-- a K3s etcd snapshot, when K3s is installed; and
-- an archive of the hub WireGuard configuration.
+| Component | Default | Contents |
+|---|---|---|
+| K3s cluster state | always | `k3s-db/state.db` (SQLite) or `etcd/*.db` (embedded etcd) |
+| WireGuard | always | `wireguard/wg.tgz` from `/etc/wireguard` |
+| Hub ACME | on (`BACKUP_ACME=true`) | `host/traefik-acme.tgz` from `/var/lib/umkim/traefik-acme` |
+| Harbor | off (`BACKUP_HARBOR=false`) | `harbor/pvc/*.tgz`, `harbor/registry.sql`, `harbor/harbor-pvcs.json` |
 
-Run the helper only from a trusted administrative environment. Encrypt backups
-at rest, store a copy off-host, and protect the backup destination at least as
-carefully as the Ansible Vault and WireGuard private keys. Harbor data and the
-inventory are separate recovery concerns.
+**Not included:** Ansible inventory, vault password, spoke clusters, or Velero
+workload backups. Copy inventory and secrets off-host separately.
 
-## Restore
+### Examples
 
-`scripts/restore-hub.sh` is destructive. A full restore prints the
-manual K3s etcd recovery steps. Schedule a maintenance window, review the
-script for the installed version, and validate the recovered control plane and
-managed clusters before allowing changes.
+```bash
+# Standard hub backup (etcd + WireGuard + ACME)
+sudo ./scripts/backup-hub.sh
 
-The restore path can require cluster re-enrollment or redeployment of
-ManifestWorks. It does not provide a guaranteed zero-data-loss or
-zero-downtime recovery objective.
+# Full backup including Harbor (brief Harbor downtime while scaled down)
+sudo ./scripts/backup-hub.sh --full
+
+# Etcd + WireGuard only
+sudo BACKUP_ACME=false ./scripts/backup-hub.sh
+```
+
+Off-host copy (encrypt in transit and at rest):
+
+```bash
+sudo rsync -a /var/backups/umkim/<stamp>/ backup-host:umkim/
+```
+
+## Hub restore
+
+`scripts/restore-hub.sh` is **destructive**. It stops K3s, restores etcd, and
+optionally restores WireGuard, ACME, and Harbor PVC host paths.
+
+```bash
+# Review steps without changes
+sudo ./scripts/restore-hub.sh --dry-run /var/backups/umkim/<stamp>
+
+# Execute (prompts for confirmation)
+sudo ./scripts/restore-hub.sh /var/backups/umkim/<stamp>
+
+# Non-interactive (automation / runbooks)
+sudo ./scripts/restore-hub.sh --yes /var/backups/umkim/<stamp>
+```
+
+Restore order: WireGuard → etcd → ACME (+ gateway restart) → Harbor.
+
+For seamless spoke reconnect after hub loss:
+
+- Restore the **same** WireGuard hub keys (do not regenerate).
+- Keep the **same** WAN/overlay plan as when the backup was taken.
+- Take Harbor PVC backup in the **same run** as the etcd snapshot when Harbor is enabled.
+
+After restore, run verification (`verify-hub-install.sh`, `verify-fleet.sh`) and
+check `ManagedClusters`. Re-accept CSRs if clusters show `Unknown`.
+
+### K3s SQLite hubs (default single-node)
+
+Many UMKIM hubs use K3s with an embedded **SQLite** datastore (`state.db`), not
+embedded etcd. `backup-hub.sh` detects this automatically and writes
+`k3s-db/state.db` + `k3s-db/token` instead of an etcd snapshot.
+
+After restore on a host that ran a minimal fresh `k3s` install, also re-apply
+host/Ansible state not in the backup bundle:
+
+```bash
+ansible-playbook $INV hub-firewall.yml -l hub
+ansible-playbook $INV harbor.yml -l hub --tags harbor_registries
+ansible-playbook $INV wireguard-clients.yml   # operator laptop/tablet peers (not in wg0.conf backup)
+```
+
+See [runbooks/hub-dr-test-20260902.md](runbooks/hub-dr-test-20260902.md) for a
+full same-host DR test log.
 
 ## Workload recovery
 
-For Helm workloads installed with FleetApp, prefer a chart-aware recovery
-plan: restore hub/cluster state, then re-install the `FleetApp`.
+For Helm workloads installed with FleetApp, prefer a chart-aware recovery plan:
+restore hub/cluster state, then re-install or reconcile the `FleetApp`.
+
+Velero instance backups (spoke workloads) are configured separately — see
+`inventory/group_vars/all/fleet_backup.yml`.
 
 ## Hub detach and spoke independence
 
@@ -55,3 +115,11 @@ Use the read-only and synthetic checks in
 [fleet-verify.md](fleet-verify.md) after a tested recovery. For installation
 and disaster-preparation prerequisites, see [install.md](install.md) and
 [secrets.md](secrets.md).
+
+## Scheduling (optional)
+
+Example daily backup cron on the hub (adjust retention off-host):
+
+```cron
+15 2 * * * root /opt/umkim/scripts/backup-hub.sh --full >> /var/log/umkim-backup.log 2>&1
+```
