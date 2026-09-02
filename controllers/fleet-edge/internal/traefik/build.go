@@ -195,13 +195,8 @@ func Build(routes []fleetv1alpha1.FleetAppRoute, reg clusters.Registry, acme boo
 	}
 
 	if len(cfg.HTTP.Routers) == 0 && len(cfg.HTTP.Services) == 0 {
-		only := struct {
-			HTTP struct {
-				Middlewares map[string]middleware `yaml:"middlewares"`
-			} `yaml:"http"`
-		}{}
-		only.HTTP.Middlewares = sortedMiddlewares(cfg.HTTP.Middlewares)
-		return yaml.Marshal(only)
+		// Traefik v3 rejects middlewares-only dynamic config; emit a comment-only placeholder.
+		return []byte("# fleet-edge: no active routes\n"), nil
 	}
 
 	if len(cfg.HTTP.Routers) == 0 {

@@ -29,8 +29,14 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
     examples: ['none', 'hub', 'site'],
   },
   'apps.hubHost': {
-    description: 'Public hostname on the hub gateway. Defaults to <release>.<edge domain> when empty.',
+    description:
+      'Public hostname on the hub gateway. Leave empty to use <release>.<hub edge domain>. Must resolve to the hub WAN for ACME.',
     example: 'whoami.demo.example.test',
+  },
+  'apps.siteHost': {
+    description:
+      'Public hostname on the cluster site ingress (port-forward or reverse proxy). Leave empty to use <release>.<site edge domain>.',
+    example: 'whoami.homelab.example.com',
   },
   'apps.valuesYaml': {
     description: 'Optional Helm values YAML merged at install time.',

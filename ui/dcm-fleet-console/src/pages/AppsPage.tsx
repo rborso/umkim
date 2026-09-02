@@ -27,9 +27,12 @@ import {
   createFleetChart,
   deleteFleetApp,
   deleteFleetChart,
+  fleetSiteEffectiveDomain,
+  fleetSiteEffectiveId,
   listFleetApps,
   listFleetCharts,
   listFleetClusters,
+  listFleetSites,
   uploadFleetChart,
 } from '../api/client';
 import type {
@@ -40,6 +43,7 @@ import type {
   FleetChart,
   FleetChartImagePolicy,
   FleetCluster,
+  FleetSite,
 } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
@@ -56,6 +60,34 @@ const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
   valuesYaml: '',
   route: { mode: 'none' },
 });
+
+function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
+  if (!cluster?.site) return '';
+  const site = sites.find(
+    (s) => fleetSiteEffectiveId(s) === cluster.site || s.metadata?.name === cluster.site,
+  );
+  if (!site) return '';
+  const zone = fleetSiteEffectiveDomain(site);
+  if (zone) return zone;
+  return site.spec?.edge?.domains?.[0]?.zone || '';
+}
+
+function suggestedRouteHost(release: string, domain: string): string {
+  const rel = release.trim();
+  const zone = domain.trim().replace(/^\./, '');
+  if (!rel || !zone) return '';
+  return `${rel}.${zone}`;
+}
+
+function appRouteHostname(app: FleetApp, hubEdgeDomain?: string): string {
+  if (app.route?.mode === 'hub') {
+    return app.route.hubHost || suggestedRouteHost(app.releaseName, hubEdgeDomain || '');
+  }
+  if (app.route?.mode === 'site') {
+    return app.route.siteHost || '';
+  }
+  return '';
+}
 
 function phaseColor(phase?: string): 'green' | 'red' | 'blue' | 'grey' | 'orange' {
   switch (phase) {
@@ -94,6 +126,7 @@ export function AppsPage() {
   const [charts, setCharts] = useState<FleetChart[]>([]);
   const [defaults, setDefaults] = useState<FleetAppDefaults>({ chartPrefix: '' });
   const [clusters, setClusters] = useState<FleetCluster[]>([]);
+  const [sites, setSites] = useState<FleetSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -120,19 +153,40 @@ export function AppsPage() {
 
   const readyCharts = useMemo(() => charts.filter((c) => c.phase === 'Ready'), [charts]);
 
+  const selectedCluster = useMemo(
+    () => readyClusters.find((c) => c.name === form.clusterName),
+    [readyClusters, form.clusterName],
+  );
+
+  const routeHostPlaceholder = useMemo(() => {
+    const release = form.releaseName || '';
+    if (form.route?.mode === 'hub') {
+      return suggestedRouteHost(release, defaults.hubEdgeDomain || '');
+    }
+    if (form.route?.mode === 'site') {
+      return suggestedRouteHost(release, clusterSiteDomain(sites, selectedCluster));
+    }
+    return '';
+  }, [form.releaseName, form.route?.mode, defaults.hubEdgeDomain, sites, selectedCluster]);
+
+  const routeHostValue =
+    form.route?.mode === 'site' ? form.route?.siteHost || '' : form.route?.hubHost || '';
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [appData, clusterList, chartList] = await Promise.all([
+      const [appData, clusterList, chartList, siteList] = await Promise.all([
         listFleetApps(),
         listFleetClusters(),
         listFleetCharts(),
+        listFleetSites(),
       ]);
       setApps(appData.apps);
       setDefaults(appData.defaults);
       setClusters(clusterList);
       setCharts(chartList);
+      setSites(siteList);
     } catch (e) {
       setError(e);
     } finally {
@@ -178,6 +232,16 @@ export function AppsPage() {
     setSaving(true);
     setActionError(null);
     try {
+      const mode = form.route?.mode || 'none';
+      const route = {
+        mode,
+        ...(mode === 'hub' && form.route?.hubHost?.trim()
+          ? { hubHost: form.route.hubHost.trim() }
+          : {}),
+        ...(mode === 'site' && form.route?.siteHost?.trim()
+          ? { siteHost: form.route.siteHost.trim() }
+          : {}),
+      };
       const body: FleetAppCreate = {
         ...form,
         name: form.releaseName || form.name,
@@ -187,7 +251,7 @@ export function AppsPage() {
         releaseName: form.releaseName,
         namespace: form.namespace || 'default',
         valuesYaml: form.valuesYaml || undefined,
-        route: { mode: form.route?.mode || 'none', hubHost: form.route?.hubHost || undefined },
+        route,
       };
       await createFleetApp(body);
       setModalOpen(false);
@@ -324,6 +388,7 @@ export function AppsPage() {
                   <Th>Release</Th>
                   <Th>Namespace</Th>
                   <Th>Route</Th>
+                  <Th>Hostname</Th>
                   <Th>Phase</Th>
                   <Th>Actions</Th>
                 </Tr>
@@ -340,6 +405,15 @@ export function AppsPage() {
                     <Td>{app.namespace}</Td>
                     <Td>{app.route?.mode || 'none'}</Td>
                     <Td>
+                      {app.route?.mode && app.route.mode !== 'none' ? (
+                        <code style={{ fontSize: '0.8rem' }}>
+                          {appRouteHostname(app, defaults.hubEdgeDomain) || '—'}
+                        </code>
+                      ) : (
+                        '—'
+                      )}
+                    </Td>
+                    <Td>
                       <Label color={phaseColor(app.phase)}>{app.phase || 'Pending'}</Label>
                       {app.message ? (
                         <div style={{ fontSize: '0.75rem', color: '#6a6e73', marginTop: '0.25rem' }}>{app.message}</div>
@@ -354,7 +428,7 @@ export function AppsPage() {
                 ))}
                 {!apps.length && !loading ? (
                   <Tr>
-                    <Td colSpan={8}>No apps installed.</Td>
+                    <Td colSpan={9}>No apps installed.</Td>
                   </Tr>
                 ) : null}
               </Tbody>
@@ -490,17 +564,25 @@ export function AppsPage() {
               <FormSelectOption value="site" label="site — spoke ingress" />
             </FormSelect>
           </LabeledField>
-          {form.route?.mode === 'hub' ? (
-            <LabeledField label="Hub hostname" fieldId="app-hubhost" help={getFieldHelp('apps.hubHost')}>
+          {form.route?.mode === 'hub' || form.route?.mode === 'site' ? (
+            <LabeledField
+              label={form.route?.mode === 'site' ? 'Site hostname' : 'Hub hostname'}
+              fieldId="app-route-host"
+              help={getFieldHelp(form.route?.mode === 'site' ? 'apps.siteHost' : 'apps.hubHost')}
+            >
               <TextInput
-                id="app-hubhost"
-                value={form.route?.hubHost || ''}
-                placeholder={
-                  defaults.hubEdgeDomain && form.releaseName
-                    ? `${form.releaseName}.${defaults.hubEdgeDomain}`
-                    : ''
+                id="app-route-host"
+                value={routeHostValue}
+                placeholder={routeHostPlaceholder}
+                onChange={(_e, v) =>
+                  setForm((f) => ({
+                    ...f,
+                    route:
+                      f.route?.mode === 'site'
+                        ? { ...f.route, siteHost: v, hubHost: undefined }
+                        : { ...f.route, hubHost: v, siteHost: undefined },
+                  }))
                 }
-                onChange={(_e, v) => setForm((f) => ({ ...f, route: { ...f.route, hubHost: v } }))}
               />
             </LabeledField>
           ) : null}

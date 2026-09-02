@@ -65,8 +65,10 @@ Per-app `route.mode` must match the site's exposure model. See
 | Mode | Result | Hub required for public URL? |
 |---|---|---|
 | `none` | Chart-only; no `FleetAppRoute` | No |
-| `hub` | Hub Traefik publishes `hubHost` (default `<release>.<edge domain>`) to this cluster's Service | Yes |
-| `site` | Spoke ingress publishes `siteHost`; requires `port_forward` or `reverse_proxy` site exposure | No |
+| `hub` | Hub Traefik publishes `hubHost` (default `<release>.<hub edge domain>`) to this cluster's Service | Yes |
+| `site` | Spoke ingress publishes `siteHost` (default `<release>.<site edge domain>`); requires `port_forward` or `reverse_proxy` site exposure | No |
+
+Set `route.hubHost` or `route.siteHost` on create to override the default hostname. The console **Install chart** dialog exposes the same fields when route mode is `hub` or `site`.
 
 `requireAuth` opts the route into ingress-auth when that stack is ready. See
 [fleet-edge.md](fleet-edge.md) and [fleet-ingress-auth.md](../fleet-ingress-auth.md).

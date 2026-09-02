@@ -10,7 +10,7 @@ import (
 // BuildACMESolverRoutes renders minimal TLS routers for TLS-ALPN issuance on gateway-acme.
 func BuildACMESolverRoutes(hostnames []string, resolver string) ([]byte, error) {
 	if len(hostnames) == 0 {
-		return []byte("http:\n  middlewares: {}\n"), nil
+		return []byte("# fleet-edge: no ACME solver routes\n"), nil
 	}
 	cfg := fileConfig{}
 	cfg.HTTP.Routers = map[string]router{}

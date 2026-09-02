@@ -285,18 +285,17 @@ func (r *AppReconciler) ensureRoute(ctx context.Context, app *fleetv1alpha1.Flee
 	}
 	hubHost := strings.TrimSpace(app.Spec.Route.HubHost)
 	if hubHost == "" && mode == fleetv1alpha1.AppRouteModeHub {
-		domain := strings.TrimSpace(r.Cfg.HubEdgeDomain)
-		if domain != "" {
-			hubHost = release + "." + domain
-		}
+		hubHost = defaultRouteHostname(release, r.Cfg.HubEdgeDomain)
 	}
 	if hubHost == "" && mode == fleetv1alpha1.AppRouteModeHub {
 		return fmt.Errorf("route.hubHost is required for mode %s", mode)
 	}
-	if mode == fleetv1alpha1.AppRouteModeSite {
-		if strings.TrimSpace(app.Spec.Route.SiteHost) == "" {
-			return fmt.Errorf("route.siteHost is required for mode %s", mode)
-		}
+	siteHost := strings.TrimSpace(app.Spec.Route.SiteHost)
+	if siteHost == "" && mode == fleetv1alpha1.AppRouteModeSite {
+		siteHost = defaultRouteHostname(release, r.clusterEdgeDomain(ctx, app.Spec.ClusterName))
+	}
+	if siteHost == "" && mode == fleetv1alpha1.AppRouteModeSite {
+		return fmt.Errorf("route.siteHost is required for mode %s", mode)
 	}
 	far := &fleetedge.FleetAppRoute{
 		ObjectMeta: metav1.ObjectMeta{
@@ -312,7 +311,7 @@ func (r *AppReconciler) ensureRoute(ctx context.Context, app *fleetv1alpha1.Flee
 			Cluster:     app.Spec.ClusterName,
 			Mode:        mode,
 			HubHost:     hubHost,
-			SiteHost:    strings.TrimSpace(app.Spec.Route.SiteHost),
+			SiteHost:    siteHost,
 			RequireAuth: app.Spec.Route.RequireAuth,
 			HealthPath:  app.Spec.EffectiveHealthPath(),
 			Service: fleetedge.ServiceRef{
