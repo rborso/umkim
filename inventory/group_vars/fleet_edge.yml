@@ -21,17 +21,14 @@ fleet_edge_clusters:
     direct_ingress: true
     exposure_mode: hub_gateway
     tls_policy: acme_hub
-    upstream_host: 10.10.0.11
+    upstream_host: 10.10.0.12
     traefik_http_port: 30081
     traefik_https_port: 30444
     domain_bindings:
       - hub-zone
 
 fleet_edge_apps: []
-fleet_edge_phase6_clusters:
-  - lab-single-0
-  - lab-single-1
-ocm_manifestwork_phase6_clusters:
-  - lab-single-0
-  - lab-single-1
+# Populated after FCJ clusters reach Ready (spoke_ingress push); avoid hub-install failure on greenfield.
+fleet_edge_phase6_clusters: []
+ocm_manifestwork_phase6_clusters: []
 ocm_spoke_kubeconfig_sync_targets: []
