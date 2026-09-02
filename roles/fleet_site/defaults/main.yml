@@ -10,7 +10,5 @@ fleet_site_wireguard_persistent_keepalive: "{{ wireguard_persistent_keepalive | 
 fleet_site_bootstrap_script_filename: bootstrap.sh
 fleet_site_secrets_dir: "{{ playbook_dir }}/secrets/fleet-sites"
 fleet_site_output_dir: "{{ playbook_dir }}/output/fleet-sites"
-# Hub DCM API for console-driven Ansible jobs (use WG/NodePort IP, not 127.0.0.1).
-fleet_site_dcm_api_url: "{{ phase5_registration_url | default('http://' ~ (fleet_site_hub_wireguard_ip | default(fleet_hub_wireguard_ip | default('10.10.0.1'))) ~ ':' ~ (phase5_gateway_nodeport | default(30908)) ~ '/api/v1alpha1') }}"
 # Console hub finalize: Traefik NodePort + IngressClass on new clusters.
 fleet_cluster_spoke_ingress_enabled: true

@@ -115,8 +115,8 @@
 
 - name: Fleet ingress auth | Refresh hub Traefik static routes
   ansible.builtin.import_role:
-    name: dcm
-    tasks_from: traefik_config.yml
+    name: hub_ingress
+    tasks_from: update_routes.yml
   when:
     - fleet_ingress_auth_reconcile_fleet_edge | default(true) | bool
     - fleet_edge_enable | default(false) | bool

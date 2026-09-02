@@ -99,10 +99,14 @@ spec:
               value: "{{ fleet_management_site_id }}"
             - name: FLEET_MANAGEMENT_CLUSTER_NAME
               value: "{{ fleet_management_cluster_name }}"
-            - name: FLEET_DCM_CATALOG_API_URL
-              value: "http://127.0.0.1:{{ phase5_gateway_nodeport | default(30908) }}/api/v1alpha1"
+            - name: FLEET_SITE_ROCKY_MAJOR
+              value: "{{ fleet_site_rocky_major | default('10') }}"
             - name: FLEET_ROUTE_NAMESPACE
               value: "{{ fleet_edge_controller_namespace | default('fleet-system') }}"
+            - name: FLEET_HELM_OCI_PREFIXES
+              value: "{{ helm_chart_oci_prefixes | default('oci://' ~ harbor_host ~ ':' ~ harbor_nodeport_https ~ '/charts') | regex_replace('\\s+', '') }}"
+            - name: FLEET_CHART_INBOX
+              value: /var/lib/umkim/chart-inbox
             - name: FLEET_SITE_HUB_WG_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
@@ -113,6 +117,8 @@ spec:
             - name: kube
               mountPath: /etc/kube
               readOnly: true
+            - name: chart-inbox
+              mountPath: /var/lib/umkim/chart-inbox
           livenessProbe:
             httpGet:
               path: /healthz
@@ -131,6 +137,10 @@ spec:
         - name: kube
           secret:
             secretName: {{ fleet_site_controller_kubeconfig_secret }}
+        - name: chart-inbox
+          hostPath:
+            path: /var/lib/umkim/chart-inbox
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service

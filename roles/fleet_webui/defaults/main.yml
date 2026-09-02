@@ -1,6 +1,5 @@
 ---
 fleet_webui_namespace: fleet-console
-# dcm_gateway_cluster_port — inventory/group_vars/all/common.yml
 
 # OCM Lab Dashboard (open-cluster-management-io/lab) — maintainer lab only; see fleet-webui-lab.yml
 ocm_lab_enabled: false
@@ -22,18 +21,12 @@ ocm_console_nodeport: 30915
 ocm_console_image: docker.io/library/nginx:1.27-alpine
 ocm_kubectl_image: docker.io/bitnami/kubectl@sha256:9e369df7ab3386b736d162348f167bcc02cb4ba3f5203e9151be854437d6e0af
 
-# DCM Swagger API explorer — maintainer lab only
-dcm_ui_enabled: false
-dcm_ui_nodeport: 30911
-dcm_ui_image: docker.io/swaggerapi/swagger-ui:v5.17.14@sha256:cb968cc70260c6027b44f227d054a0f12381736e9ab628ef6b6070a19fdf2172
-dcm_ui_gateway_path: true
-
-# DCM fleet operations dashboard (PatternFly SPA from Harbor fleet/dcm-fleet-console)
+# Fleet operations dashboard (PatternFly SPA; Harbor image name is historical).
 dcm_fleet_dashboard_enabled: true
 dcm_fleet_dashboard_nodeport: 30912
 dcm_fleet_gateway_path: false
 dcm_fleet_use_patternfly: true
-dcm_fleet_image: "{{ harbor_fleet_image_prefix }}/dcm-fleet-console:{{ dcm_fleet_console_tag | default(harbor_fleet_image_tag | default('0.1.0')) }}"
+dcm_fleet_image: "{{ harbor_fleet_image_prefix }}/dcm-fleet-console:{{ dcm_fleet_console_tag | default(harbor_fleet_image_tag | default('0.2.0-dev')) }}"
 dcm_fleet_image_pull_policy: Always
 # Overridden by inventory dcm_fleet_console_tag when set (console-only bumps).
-dcm_fleet_console_tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+dcm_fleet_console_tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"

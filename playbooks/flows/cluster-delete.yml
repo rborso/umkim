@@ -37,6 +37,10 @@
       ansible.builtin.uri:
         url: "{{ fleet_flow_delete_url }}"
         method: DELETE
+        headers:
+          X-Fleet-Subject-Kind: User
+          X-Fleet-Subject-Name: fleet-flow
+          X-Fleet-DC-Admin: "true"
         status_code: [202, 204, 404]
       register: fleet_flow_delete
 

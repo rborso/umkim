@@ -43,10 +43,37 @@
     PATH: "{{ k3s_command_path }}"
   changed_when: true
 
+- name: Fleet site controller | Find Ansible SSH private key on hub
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ fleet_site_controller_ansible_ssh_key_candidates }}"
+  register: fsc_ssh_key_hub_candidates
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Select hub SSH private key path
+  ansible.builtin.set_fact:
+    fleet_site_controller_ansible_ssh_key_path: "{{ (fsc_ssh_key_hub_candidates.results | selectattr('stat.exists') | map(attribute='item') | list | first) | default(fleet_site_controller_ansible_ssh_key_path) }}"
+  tags: [fleet_site_controller]
+
 - name: Fleet site controller | Check Ansible SSH private key on hub
   ansible.builtin.stat:
     path: "{{ fleet_site_controller_ansible_ssh_key_path }}"
   register: fsc_ansible_ssh_key_hub
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Find Ansible SSH private key on controller
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ fleet_site_controller_ansible_ssh_key_local_candidates }}"
+  delegate_to: localhost
+  become: false
+  register: fsc_ssh_key_local_candidates
+  run_once: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Select controller SSH private key path
+  ansible.builtin.set_fact:
+    fleet_site_controller_ansible_ssh_key_local_path: "{{ (fsc_ssh_key_local_candidates.results | selectattr('stat.exists') | map(attribute='item') | list | first) | default(fleet_site_controller_ansible_ssh_key_local_path) }}"
   tags: [fleet_site_controller]
 
 - name: Fleet site controller | Check Ansible SSH private key on controller
@@ -180,6 +207,15 @@
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
   changed_when: true
+
+- name: Fleet site controller | Chart upload inbox
+  ansible.builtin.file:
+    path: /var/lib/umkim/chart-inbox
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
 
 - name: Fleet site controller | Render Deployment
   ansible.builtin.template:

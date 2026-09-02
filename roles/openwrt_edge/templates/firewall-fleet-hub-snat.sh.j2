@@ -6,8 +6,8 @@
 HUB="{{ openwrt_hub_dest_ip }}"
 LAN_NET="{{ openwrt_homelab_subnet | default('172.16.10.0/24') }}"
 ROUTER_LAN="{{ openwrt_lan_ip | default('172.16.10.1') }}"
-HTTP_PORT="{{ phase5_gateway_nodeport | default('30908') }}"
-HTTPS_PORT="{{ phase5_gateway_https_nodeport | default('30909') }}"
+HTTP_PORT="80"
+HTTPS_PORT="443"
 
 _add_snat() {
   port="$1"

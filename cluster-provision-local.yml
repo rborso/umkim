@@ -14,6 +14,17 @@
         tasks_from: cleanup.yml
       tags: [k3s, k3s_cleanup, fleet_cluster_provision]
 
+- name: Fleet cluster provision | Rocky 10 host prepare
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: true
+  vars:
+    fleet_node: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: host_prepare
+      tags: [host_prepare, fleet_cluster_provision]
+
 - name: Fleet cluster provision | K3s standalone on single-node bootstrap
   hosts: site_bootstrap
   become: true

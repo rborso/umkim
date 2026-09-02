@@ -22,6 +22,8 @@ The supported installation workflow is documented in
 - `bootstrap-hub-inventory.sh` and `install-hub.sh` support the greenfield
   inventory and installation workflow.
 - `verify-*.sh` and `fleet-verify/` provide verification entry points.
+  `verify-fleet-app.sh` is the v0.2 Helm smoke test (requires a Ready cluster).
+  `verify-fleet-chart.sh` checks the hub chart library.
 - Backup, restore, cleanup, and asset-staging helpers have operational side
   effects that must be reviewed before use.
 - [lab/](lab/) contains maintainer-oriented helpers outside the supported

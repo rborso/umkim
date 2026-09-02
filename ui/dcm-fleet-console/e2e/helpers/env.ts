@@ -16,10 +16,6 @@ export function fleetConsoleBasePath(): string {
   return `${fleetConsoleUrl()}/fleet/`;
 }
 
-export function dcmApiUrl(): string {
-  return process.env.DCM_API_URL || `${fleetConsoleUrl()}/api/v1alpha1`;
-}
-
 export function fleetApiUrl(): string {
   return process.env.FLEET_API_URL || `${fleetConsoleUrl()}/fleet/api/v1alpha1`;
 }
@@ -47,7 +43,6 @@ export function verifyScriptEnv(): NodeJS.ProcessEnv {
   const jar = authCookieJar();
   return {
     ...process.env,
-    DCM_API_URL: dcmApiUrl(),
     FLEET_API_URL: fleetApiUrl(),
     ...(jar ? { FLEET_AUTH_COOKIE_JAR: jar } : {}),
   };

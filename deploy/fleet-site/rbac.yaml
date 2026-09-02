@@ -10,7 +10,25 @@ metadata:
   name: fleet-site-controller
 rules:
   - apiGroups: ["fleet.umkim.com"]
-    resources: ["fleetsites", "fleetsites/status", "fleetclusterjoins", "fleetclusterjoins/status", "fleetingressauths", "fleetingressauths/status"]
+    resources:
+      - fleetsites
+      - fleetsites/status
+      - fleetclusterjoins
+      - fleetclusterjoins/status
+      - fleetingressauths
+      - fleetingressauths/status
+      - fleetacmes
+      - fleetacmes/status
+      - fleetllms
+      - fleetllms/status
+      - fleetinstancebackups
+      - fleetinstancebackups/status
+      - fleetinstancerestores
+      - fleetinstancerestores/status
+      - fleetapps
+      - fleetapps/status
+      - fleetcharts
+      - fleetcharts/status
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets", "configmaps"]
@@ -34,8 +52,8 @@ rules:
     resources: ["manifestworks"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["edge.umkim.com"]
-    resources: ["fleetapproutes"]
-    verbs: ["get", "list", "watch", "delete"]
+    resources: ["fleetapproutes", "fleetapproutes/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -12,8 +12,9 @@ from an operator-managed router to cluster ingress.
 4. Validate the ingress configuration before applying the relevant playbook.
 
 [`openwrt-uci.example`](openwrt-uci.example) is a commented router example, not
-an executable deployment contract. The snippet declares intent only; it does
-not alter router, DNS, certificate, or controller state.
+an executable deployment contract. Use `FleetApp` `route.mode: site` for apps
+published through spoke ingress. Site-routed apps can remain reachable when
+the hub is down if ingress is healthy.
 
 ## References
 

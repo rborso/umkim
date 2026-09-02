@@ -19,10 +19,9 @@ auth:
   bootstrapLdapGroup: fleet-admins
   bootstrapLdapGroupCN: {{ fleet_console_auth_bootstrap_ldap_admin_group | default('fleet-admins') | quote }}
   htpasswdLine: {{ fleet_console_helm_htpasswd_line | default('') | quote }}
-  dcmUpstream: {{ fleet_console_auth_dcm_upstream | quote }}
   fleetUpstream: {{ fleet_console_auth_fleet_upstream | quote }}
-  llmUpstream: {{ fleet_console_auth_llm_upstream | default('http://litellm.dcm.svc.cluster.local:4000') | quote }}
-  llmMasterKeySecretNamespace: {{ fleet_console_auth_llm_master_key_secret_ns | default('dcm') | quote }}
+  llmUpstream: {{ fleet_console_auth_llm_upstream | default('http://litellm.fleet-llm.svc.cluster.local:4000') | quote }}
+  llmMasterKeySecretNamespace: {{ fleet_console_auth_llm_master_key_secret_ns | default('fleet-llm') | quote }}
   llmMasterKeySecretName: {{ fleet_console_auth_llm_master_key_secret_name | default('fleet-llm-master-key') | quote }}
   llmMasterKeySecretKey: {{ fleet_console_auth_llm_master_key_secret_key | default('master_key') | quote }}
   ldap:

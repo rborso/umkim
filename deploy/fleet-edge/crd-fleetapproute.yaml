@@ -28,7 +28,6 @@ spec:
                 - instanceId
                 - cluster
                 - mode
-                - hubHost
                 - service
               properties:
                 instanceId:
@@ -43,13 +42,11 @@ spec:
                   enum:
                     - hub
                     - site
-                    - dual
                 effectiveMode:
                   type: string
                   enum:
                     - hub
                     - site
-                    - dual
                   description: After direct_ingress gate
                 hubHost:
                   type: string
@@ -132,6 +129,8 @@ spec:
                   type: string
                   enum:
                     - PendingDNS
+                    - PendingPreflight
+                    - PendingStaging
                     - Queued
                     - Issuing
                     - Ready

@@ -40,7 +40,8 @@ done
 
 [[ "$ready" -ge "$N" ]] || fail "only ${ready}/${N} routes reached tlsPhase=Ready"
 
-solver_pods=$(kubectl -n dcm get pods -l app=dcm-gateway-acme --field-selector=status.phase=Running -o name 2>/dev/null | wc -l)
+INGRESS_NS="${HUB_INGRESS_NS:-fleet-ingress}"
+solver_pods=$(kubectl -n "$INGRESS_NS" get pods -l app=gateway-acme --field-selector=status.phase=Running -o name 2>/dev/null | wc -l)
 [[ "$solver_pods" -le 1 ]] || fail "more than one gateway-acme pod running: $solver_pods"
 
 ok "all ${N} hostnames Ready"

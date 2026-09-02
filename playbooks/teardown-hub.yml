@@ -62,7 +62,7 @@
       failed_when: false
       tags: [teardown_hub, teardown_hub_ocm]
 
-    - name: Teardown hub | Fleet workload cleanup (DCM, Harbor, platform)
+    - name: Teardown hub | Fleet workload cleanup (Harbor, platform)
       ansible.builtin.import_role:
         name: fleet_cleanup
       tags: [teardown_hub, teardown_hub_fleet]
@@ -71,7 +71,7 @@
       ansible.builtin.shell: |
         set -euo pipefail
         export KUBECONFIG={{ ocm_kubeconfig }}
-        for kind in fleetsites fleetclusterjoins fleetnestedclusters fleetingressauths fleetacmes fleetapproutes fleetclusterbootstraps; do
+        for kind in fleetsites fleetclusterjoins fleetnestedclusters fleetingressauths fleetacmes fleetapproutes fleetclusterbootstraps fleetusers fleetgroups fleetrolebindings fleetserviceaccounts fleetorgs; do
           kubectl delete "${kind}" --all --all-namespaces --ignore-not-found --wait=false 2>/dev/null || true
         done
       args:
@@ -115,7 +115,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - "{{ dcm_gateway_acme_host_path | default('/var/lib/umkim/traefik-acme') }}"
+        - "{{ hub_ingress_acme_host_path | default('/var/lib/umkim/traefik-acme') }}"
         - /var/lib/umkim
         - /opt/fleet-src
         - "{{ harbor_umkim_root | default(playbook_dir | regex_replace('/playbooks/?$', '')) }}/.cache/harbor-push"
@@ -129,10 +129,26 @@
       loop:
         - /tmp/dcm-config
         - /tmp/dcm-hub-stack.yaml
+        - /tmp/hub-ingress-config
+        - /tmp/hub-ingress-gateway.yaml
+        - /tmp/fleet-edge-controller-deploy.yaml
+        - /tmp/fleet-edge-rbac.yaml
         - /tmp/fleet-webui-ocm.yaml
         - /tmp/fleet-webui-dcm.yaml
         - /tmp/fleet-webui-namespace.yaml
-        - /tmp/manifestwork-kubevirt-sp-lab-ext02.yaml
+      tags: [teardown_hub, teardown_hub_host]
+
+    - name: Teardown hub | Drop nft table fleet_hub
+      ansible.builtin.command:
+        cmd: nft delete table inet fleet_hub
+      failed_when: false
+      changed_when: false
+      tags: [teardown_hub, teardown_hub_host]
+
+    - name: Teardown hub | Remove nftables include file
+      ansible.builtin.file:
+        path: "{{ fleet_hub_firewall_nftables_conf | default('/etc/nftables/fleet-hub.nft') }}"
+        state: absent
       tags: [teardown_hub, teardown_hub_host]
 
     - name: Teardown hub | Uninstall K3s and Calico on hub
@@ -161,5 +177,16 @@
         cmd: wg-quick down {{ wireguard_interface | default('wg0') }}
       failed_when: false
       changed_when: false
+      when: teardown_hub_delete_wireguard | default(true) | bool
+      tags: [teardown_hub, teardown_hub_wireguard]
+
+    - name: Teardown hub | Remove WireGuard config and keys
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ wireguard_config_path | default('/etc/wireguard/wg0.conf') }}"
+        - "{{ wireguard_private_key_path | default('/etc/wireguard/privatekey') }}"
+        - "{{ wireguard_public_key_path | default('/etc/wireguard/publickey') }}"
       when: teardown_hub_delete_wireguard | default(true) | bool
       tags: [teardown_hub, teardown_hub_wireguard]

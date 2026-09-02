@@ -160,11 +160,6 @@ kubectl get secret "fleet-cluster-${TEST_CLUSTER}-bootstrap" -n fleet-console 2>
   exit 1
 } || true
 
-PROV_NAME="k8s-${TEST_CLUSTER}"
-if curl -sf "${FLEET_DCM_API:-http://127.0.0.1:30908/api/v1alpha1}/providers" 2>/dev/null | grep -q "\"name\":\"${PROV_NAME}\""; then
-  echo "WARN: provider ${PROV_NAME} still registered in SPM (may be expected if provider was never installed)"
-fi
-
 MGMT="${FLEET_MANAGEMENT_CLUSTER_NAME:-umkim-hub}"
 MCODE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${API}/clusters/${MGMT}")
 [ "${MCODE}" = "403" ] || echo "WARN: DELETE management cluster expected 403 got ${MCODE}"

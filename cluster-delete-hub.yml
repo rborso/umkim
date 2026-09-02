@@ -24,11 +24,6 @@
   tasks:
     - ansible.builtin.import_role:
         name: fleet_site
-        tasks_from: deregister_cluster_providers.yml
-      tags: [fleet_cluster_delete]
-
-    - ansible.builtin.import_role:
-        name: fleet_site
         tasks_from: delete_cluster_manifestworks.yml
       tags: [fleet_cluster_delete]
 

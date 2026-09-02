@@ -5,7 +5,7 @@
 - name: Fleet edge controller | Read gateway hostNetwork
   ansible.builtin.command:
     cmd: >-
-      kubectl -n {{ phase5_dcm_namespace | default('dcm') }} get deployment gateway
+      kubectl -n {{ hub_ingress_namespace | default('fleet-ingress') }} get deployment gateway
       -o jsonpath={.spec.template.spec.hostNetwork}
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
@@ -18,7 +18,7 @@
 - name: Fleet edge controller | Read gateway replicas
   ansible.builtin.command:
     cmd: >-
-      kubectl -n {{ phase5_dcm_namespace | default('dcm') }} get deployment gateway
+      kubectl -n {{ hub_ingress_namespace | default('fleet-ingress') }} get deployment gateway
       -o jsonpath={.spec.replicas}
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
@@ -30,7 +30,7 @@
 
 - name: Fleet edge controller | Check gateway-acme Service exists
   ansible.builtin.command:
-    cmd: kubectl -n {{ phase5_dcm_namespace | default('dcm') }} get svc gateway-acme
+    cmd: kubectl -n {{ hub_ingress_namespace | default('fleet-ingress') }} get svc gateway-acme
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
@@ -49,7 +49,7 @@
 
 - name: Fleet edge controller | Apply ACME profile facts
   ansible.builtin.set_fact:
-    dcm_gateway_acme_solver_enabled: "{{ _fec_gateway_ha | bool and _fec_solver_exists | bool }}"
+    fleet_edge_acme_solver_enabled: "{{ _fec_gateway_ha | bool and _fec_solver_exists | bool }}"
     fleet_edge_acme_legacy_gateway_scale: "{{ not (_fec_gateway_ha | bool and _fec_solver_exists | bool) }}"
     fleet_edge_acme_preflight_enabled: "{{ _fec_gateway_ha | bool and _fec_solver_exists | bool }}"
   tags: [fleet_edge_controller, fleet_edge]

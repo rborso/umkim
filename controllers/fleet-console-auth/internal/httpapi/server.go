@@ -7,7 +7,6 @@ import (
 
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/audit"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/authorizer"
-	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/catalogacl"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/identity"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/rbac"
@@ -25,7 +24,6 @@ type Server struct {
 	RBAC          *rbac.Engine
 	Checker       *authorizer.Checker
 	Audit         *audit.Recorder
-	CatalogACL    *catalogacl.Manager
 	Tokens        *tokens.Manager
 	loginAttempts map[string][]time.Time
 	loginMu       sync.Mutex
@@ -48,12 +46,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1alpha1/role-bindings/", s.handleRoleBindingByName)
 	mux.HandleFunc("/api/v1alpha1/service-accounts", s.handleServiceAccounts)
 	mux.HandleFunc("/api/v1alpha1/service-accounts/", s.handleServiceAccountByName)
-	mux.HandleFunc("/api/v1alpha1/catalog-access", s.handleCatalogAccess)
-	mux.HandleFunc("/api/v1alpha1/catalog-access/", s.handleCatalogAccessByName)
 	mux.HandleFunc("/api/v1alpha1/orgs", s.handleOrgs)
 	mux.HandleFunc("/api/v1alpha1/orgs/", s.handleOrgSubroutes)
 	mux.HandleFunc("/api/v1alpha1/audit-events", s.handleAuditEvents)
-	mux.HandleFunc("/proxy/dcm/", s.handleProxyDCM)
 	mux.HandleFunc("/proxy/fleet/", s.handleProxyFleet)
 	mux.HandleFunc("/proxy/llm/", s.handleProxyLLM)
 	return mux

@@ -70,8 +70,6 @@ const emptyClusterForm = (siteId = ''): FleetClusterCreate => ({
   minRootDiskGi: 40,
   clusterRegion: '',
   providers: {
-    k8s: false,
-    helm: false,
     kubevirt: false,
     kubevirtBridge: {
       enabled: false,
@@ -536,8 +534,8 @@ export function ClustersPage() {
         <ErrorAlert error={deleteError} />
         <p>
           Delete cluster <strong>{deleteTarget?.name}</strong>? Hub teardown unjoins OCM, removes
-          ManifestWorks, deregisters DCM providers, revokes hub WireGuard peers, and removes the
-          fleet overlay (wg-umkim) on nodes. User workloads on K3s are kept unless you opt in below.
+          ManifestWorks, revokes hub WireGuard peers, and removes the fleet overlay (wg-umkim) on
+          nodes. User workloads on K3s are kept unless you opt in below.
         </p>
         {deleteConsoleProvisioned && (
           <LabeledField
@@ -556,8 +554,8 @@ export function ClustersPage() {
         )}
         {!deleteConsoleProvisioned && deleteTarget?.available && (
           <p>
-            <strong>Warning:</strong> this is a fleet inventory spoke; deleting it removes OCM registration
-            and DCM workers for the whole spoke.
+            <strong>Warning:</strong> this is a fleet inventory spoke; deleting it removes OCM
+            registration for the whole spoke.
           </p>
         )}
       </Modal>
@@ -831,156 +829,6 @@ export function ClustersPage() {
               </LabeledField>
             </>
           )}
-          <LabeledField label="DCM providers (auto-install after Ready)" fieldId="providers" help={getFieldHelp('clusterJoin.providers')}>
-            <Checkbox
-              id="prov-k8s"
-              label="Container workloads (k8s SP)"
-              isChecked={!!form.providers?.k8s}
-              onChange={(_e, checked) =>
-                setForm({
-                  ...form,
-                  providers: { ...form.providers, k8s: checked },
-                })
-              }
-            />
-            <Checkbox
-              id="prov-helm"
-              label="Helm releases (helm SP)"
-              isChecked={!!form.providers?.helm}
-              onChange={(_e, checked) =>
-                setForm({
-                  ...form,
-                  providers: { ...form.providers, helm: checked },
-                })
-              }
-            />
-            <Checkbox
-              id="prov-kubevirt"
-              label="Virtualization (KubeVirt SP)"
-              isChecked={!!form.providers?.kubevirt}
-              onChange={(_e, checked) =>
-                setForm({
-                  ...form,
-                  providers: {
-                    ...form.providers,
-                    kubevirt: checked,
-                    kubevirtBridge: {
-                      enabled: checked ? !!form.providers?.kubevirtBridge?.enabled : false,
-                      bridgeName: form.providers?.kubevirtBridge?.bridgeName || 'n0p0_mgmt_nw',
-                      slaveNic: form.providers?.kubevirtBridge?.slaveNic,
-                      keepIp: form.providers?.kubevirtBridge?.keepIp !== false,
-                    },
-                  },
-                })
-              }
-            />
-            {form.providers?.kubevirt ? (
-              <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <p style={{ fontSize: '0.85rem', margin: 0 }}>
-                  KVM capability enabled; nodes must have <code>/dev/kvm</code>.
-                </p>
-                <Checkbox
-                  id="prov-kubevirt-bridge"
-                  label="Configure host bridge for KubeVirt (LAN VMs)"
-                  isChecked={!!form.providers?.kubevirtBridge?.enabled}
-                  onChange={(_e, checked) =>
-                    setForm({
-                      ...form,
-                      providers: {
-                        ...form.providers,
-                        kubevirtBridge: {
-                          ...form.providers?.kubevirtBridge,
-                          enabled: checked,
-                          bridgeName: form.providers?.kubevirtBridge?.bridgeName || 'n0p0_mgmt_nw',
-                          keepIp: form.providers?.kubevirtBridge?.keepIp !== false,
-                        },
-                      },
-                    })
-                  }
-                />
-                {form.providers?.kubevirtBridge?.enabled ? (
-                  <>
-                    <LabeledField
-                      label="Bridge name"
-                      fieldId="kubevirtBridgeName"
-                      help={getFieldHelp('clusterJoin.kubevirtBridgeName')}
-                    >
-                      <TextInput
-                        id="kubevirtBridgeName"
-                        value={form.providers?.kubevirtBridge?.bridgeName || 'n0p0_mgmt_nw'}
-                        onChange={(_e, v) =>
-                          setForm({
-                            ...form,
-                            providers: {
-                              ...form.providers,
-                              kubevirtBridge: {
-                                ...form.providers?.kubevirtBridge,
-                                enabled: true,
-                                bridgeName: v || 'n0p0_mgmt_nw',
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </LabeledField>
-                    <LabeledField
-                      label="Slave NIC (optional)"
-                      fieldId="kubevirtBridgeSlaveNic"
-                      help={getFieldHelp('clusterJoin.kubevirtBridgeSlaveNic')}
-                    >
-                      <TextInput
-                        id="kubevirtBridgeSlaveNic"
-                        placeholder="auto (iface of node mgmt IP)"
-                        value={form.providers?.kubevirtBridge?.slaveNic || ''}
-                        onChange={(_e, v) =>
-                          setForm({
-                            ...form,
-                            providers: {
-                              ...form.providers,
-                              kubevirtBridge: {
-                                ...form.providers?.kubevirtBridge,
-                                enabled: true,
-                                slaveNic: v || undefined,
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </LabeledField>
-                    <LabeledField
-                      label="Move management IP onto the bridge"
-                      fieldId="kubevirtBridgeKeepIp"
-                      help={getFieldHelp('clusterJoin.kubevirtBridgeKeepIp')}
-                    >
-                      <Checkbox
-                        id="kubevirtBridgeKeepIp"
-                        label="Keep mgmt IP reachable after enslaving the NIC"
-                        isChecked={form.providers?.kubevirtBridge?.keepIp !== false}
-                        onChange={(_e, checked) =>
-                          setForm({
-                            ...form,
-                            providers: {
-                              ...form.providers,
-                              kubevirtBridge: {
-                                ...form.providers?.kubevirtBridge,
-                                enabled: true,
-                                keepIp: checked,
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </LabeledField>
-                    <p style={{ fontSize: '0.8rem', margin: 0, opacity: 0.85 }}>
-                      Runs early in <code>bootstrap.sh</code> on all nodes. Discovers the NIC
-                      that holds each node&apos;s management IP; fails if that IP is already on a
-                      bridge. Multus NAD is applied when the KubeVirt provider installs.
-                    </p>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </LabeledField>
           <LabeledField label="Min root disk (GiB)" fieldId="minRootDiskGi" help={getFieldHelp('clusterJoin.minRootDiskGi')}>
             <TextInput
               id="minRootDiskGi"

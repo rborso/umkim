@@ -539,44 +539,138 @@ func ansibleJob(ns, jobName, siteName, image string, cmd []string, sshSecret, in
 	}
 }
 
-func ptrBool(b bool) *bool       { return &b }
-func ptrInt32(i int32) *int32    { return &i }
+func ptrBool(b bool) *bool    { return &b }
+func ptrInt32(i int32) *int32 { return &i }
 
-const InstanceBackupInventoryCM = "fleet-instance-backup-inventory"
+const helmAppJobScript = `set -euo pipefail
+KC=/tmp/spoke.kubeconfig
+kubectl -n fleet-system get secret "fleet-kubeconfig-${FLEET_APP_CLUSTER}" -o jsonpath='{.data.kubeconfig}' | base64 -d > "$KC"
+test -s "$KC"
+if [ "${FLEET_APP_ACTION}" = "uninstall" ]; then
+  helm uninstall "${FLEET_APP_RELEASE}" --namespace "${FLEET_APP_NAMESPACE}" \
+    --kubeconfig "$KC" --kube-insecure-skip-tls-verify --wait=false || true
+  echo uninstalled
+  exit 0
+fi
+if [ -n "${FLEET_APP_REGISTRY:-}" ]; then
+  python3 - <<'PY'
+import yaml
+p = yaml.safe_load(open("/secrets/hub/ansible_vars.yml"))["harbor_admin_password"]
+open("/tmp/harbor.pass", "w").write(str(p))
+PY
+  helm registry login "${FLEET_APP_REGISTRY}" -u "${FLEET_APP_REGISTRY_USER:-admin}" --password-stdin --insecure < /tmp/harbor.pass
+  rm -f /tmp/harbor.pass
+fi
+VER=()
+if [ -n "${FLEET_APP_VERSION:-}" ]; then
+  VER=(--version "${FLEET_APP_VERSION}")
+fi
+VAL=()
+if [ -s /values/values.yaml ]; then
+  VAL=(-f /values/values.yaml)
+fi
+POST=()
+if [ -s /imagemap/images.json ]; then
+  cat > /tmp/fleet-image-rewrite.sh <<'EOS'
+#!/bin/bash
+python3 - <<'PY'
+import json, sys
+m = json.load(open("/imagemap/images.json"))
+data = sys.stdin.read()
+for src, dst in sorted(m.items(), key=lambda kv: -len(kv[0])):
+    if src and dst:
+        data = data.replace(src, dst)
+sys.stdout.write(data)
+PY
+EOS
+  chmod +x /tmp/fleet-image-rewrite.sh
+  POST=(--post-renderer /tmp/fleet-image-rewrite.sh)
+fi
+helm upgrade --install "${FLEET_APP_RELEASE}" "${FLEET_APP_CHART}" "${VER[@]}" \
+  --namespace "${FLEET_APP_NAMESPACE}" --create-namespace \
+  --kubeconfig "$KC" --kube-insecure-skip-tls-verify --insecure-skip-tls-verify \
+  "${VAL[@]}" "${POST[@]}"
+echo installed
+`
 
-// InstanceBackupJob runs Velero backup + DCM export on the hub.
-func InstanceBackupJob(ns, jobName, runnerImage, inventoryCM string, extraArgs []string) *batchv1.Job {
-	args := []string{
-		"ansible-playbook", "/ansible/instance-backup.yml",
-		"-e", "@/ansible/inventory/group_vars/all/common.yml",
-		"-e", "@/secrets/hub/ansible_vars.yml",
-		"-i", "/inventory/inventory.ini",
-	}
-	args = append(args, extraArgs...)
-	return hubKubeJob(ns, jobName, "fleet-instance-backup", runnerImage, inventoryCM, args, 1800)
+type HelmAppJobOpts struct {
+	Namespace         string
+	JobName           string
+	Cluster           string
+	Chart             string
+	Version           string
+	Release           string
+	TargetNamespace   string
+	Action            string
+	RunnerImage       string
+	ValuesConfigMap   string
+	ImageMapConfigMap string
+	RegistryHost      string
+	HubSecretsName    string
 }
 
-// InstanceRestoreJob runs Velero restore on a spoke via hub kubeconfig.
-func InstanceRestoreJob(ns, jobName, runnerImage, inventoryCM string, extraArgs []string) *batchv1.Job {
-	args := []string{
-		"ansible-playbook", "/ansible/instance-restore.yml",
-		"-e", "@/ansible/inventory/group_vars/all/common.yml",
-		"-e", "@/secrets/hub/ansible_vars.yml",
-		"-i", "/inventory/inventory.ini",
+func HelmAppJob(opts HelmAppJobOpts) *batchv1.Job {
+	action := opts.Action
+	if action == "" {
+		action = "install"
 	}
-	args = append(args, extraArgs...)
-	return hubKubeJob(ns, jobName, "fleet-instance-restore", runnerImage, inventoryCM, args, 1800)
-}
-
-func hubKubeJob(ns, jobName, app, runnerImage, inventoryCM string, cmd []string, timeoutSec int64) *batchv1.Job {
 	backoff := int32(1)
-	deadline := timeoutSec
-	ttl := int32(300)
+	deadline := int64(900)
+	ttl := int32(86400)
+	env := []corev1.EnvVar{
+		{Name: "KUBECONFIG", Value: "/etc/kube/config"},
+		{Name: "FLEET_APP_ACTION", Value: action},
+		{Name: "FLEET_APP_CLUSTER", Value: opts.Cluster},
+		{Name: "FLEET_APP_CHART", Value: opts.Chart},
+		{Name: "FLEET_APP_VERSION", Value: opts.Version},
+		{Name: "FLEET_APP_RELEASE", Value: opts.Release},
+		{Name: "FLEET_APP_NAMESPACE", Value: opts.TargetNamespace},
+		{Name: "FLEET_APP_REGISTRY", Value: opts.RegistryHost},
+		{Name: "FLEET_APP_REGISTRY_USER", Value: "admin"},
+	}
+	mounts := []corev1.VolumeMount{
+		{Name: "kube", MountPath: "/etc/kube", ReadOnly: true},
+	}
+	volumes := []corev1.Volume{
+		{Name: "kube", VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: "fleet-site-controller-kubeconfig"},
+		}},
+	}
+	if opts.HubSecretsName != "" {
+		mounts = append(mounts, corev1.VolumeMount{Name: "hub-secrets", MountPath: "/secrets/hub", ReadOnly: true})
+		volumes = append(volumes, corev1.Volume{
+			Name: "hub-secrets",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{SecretName: opts.HubSecretsName},
+			},
+		})
+	}
+	if opts.ValuesConfigMap != "" && action != "uninstall" {
+		mounts = append(mounts, corev1.VolumeMount{Name: "values", MountPath: "/values", ReadOnly: true})
+		volumes = append(volumes, corev1.Volume{
+			Name: "values",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: opts.ValuesConfigMap}},
+			},
+		})
+	}
+	if opts.ImageMapConfigMap != "" && action != "uninstall" {
+		mounts = append(mounts, corev1.VolumeMount{Name: "imagemap", MountPath: "/imagemap", ReadOnly: true})
+		volumes = append(volumes, corev1.Volume{
+			Name: "imagemap",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: opts.ImageMapConfigMap}},
+			},
+		})
+	}
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: ns,
-			Labels:    map[string]string{"app": app},
+			Name:      opts.JobName,
+			Namespace: opts.Namespace,
+			Labels: map[string]string{
+				"app":           "fleet-app-helm",
+				"fleet-cluster": opts.Cluster,
+			},
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit:            &backoff,
@@ -584,38 +678,251 @@ func hubKubeJob(ns, jobName, app, runnerImage, inventoryCM string, cmd []string,
 			TTLSecondsAfterFinished: &ttl,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": app},
+					Labels: map[string]string{"app": "fleet-app-helm", "fleet-cluster": opts.Cluster},
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyNever,
 					HostNetwork:        true,
 					ServiceAccountName: "fleet-site-controller",
 					Containers: []corev1.Container{{
-						Name:            "ansible",
-						Image:           runnerImage,
+						Name:            "helm",
+						Image:           opts.RunnerImage,
 						ImagePullPolicy: corev1.PullAlways,
-						Command:         cmd,
-						VolumeMounts: []corev1.VolumeMount{
-							{Name: "inventory", MountPath: "/inventory"},
-							{Name: "kube", MountPath: "/etc/kube"},
-							{Name: "hub-secrets", MountPath: "/secrets/hub", ReadOnly: true},
-						},
-						Env: []corev1.EnvVar{
-							{Name: "KUBECONFIG", Value: "/etc/kube/config"},
-							{Name: "ANSIBLE_HOST_KEY_CHECKING", Value: "False"},
-						},
+						Command:         []string{"/bin/bash", "-c", helmAppJobScript},
+						Env:             env,
+						VolumeMounts:    mounts,
 					}},
-					Volumes: []corev1.Volume{
-						{Name: "inventory", VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: inventoryCM}},
-						}},
-						{Name: "kube", VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{SecretName: "fleet-site-controller-kubeconfig"},
-						}},
-						{Name: "hub-secrets", VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{SecretName: HubAnsibleSecretsName},
-						}},
-					},
+					Volumes: volumes,
+				},
+			},
+		},
+	}
+}
+
+type ChartPublishJobOpts struct {
+	Namespace      string
+	JobName        string
+	ChartName      string
+	Version        string
+	Source         string
+	Origin         string
+	InboxFile      string
+	InboxHostPath  string
+	ImagePolicy    string
+	ValuesYAML     string
+	DestOCI        string
+	MirrorHost     string
+	RunnerImage    string
+	HubSecretsName string
+	ResultCM       string
+}
+
+const chartPublishJobScript = `set -euo pipefail
+python3 - <<'PY'
+import yaml
+p = yaml.safe_load(open("/secrets/hub/ansible_vars.yml"))["harbor_admin_password"]
+open("/tmp/harbor.pass", "w").write(str(p))
+PY
+DEST="${FLEET_CHART_DEST}"
+DEST_HOST="${DEST#oci://}"
+DEST_HOST="${DEST_HOST%%/*}"
+helm registry login "${DEST_HOST}" -u admin --password-stdin --insecure < /tmp/harbor.pass
+WORKDIR=/tmp/chart-work
+mkdir -p "$WORKDIR"
+cd "$WORKDIR"
+SOURCE="${FLEET_CHART_SOURCE}"
+ORIGIN="${FLEET_CHART_ORIGIN:-}"
+VERSION="${FLEET_CHART_VERSION:-}"
+TGZ=""
+if [ "$SOURCE" = "upload" ]; then
+  TGZ="/inbox/${FLEET_CHART_INBOX_FILE}"
+  test -s "$TGZ"
+elif [ "$SOURCE" = "oci" ]; then
+  PULL=(helm pull "$ORIGIN" --destination . --insecure-skip-tls-verify)
+  if [ -n "$VERSION" ]; then PULL+=(--version "$VERSION"); fi
+  "${PULL[@]}"
+  TGZ=$(ls -1 *.tgz | head -1)
+elif [ "$SOURCE" = "http" ]; then
+  curl -fsSL -o chart.tgz "$ORIGIN"
+  TGZ=chart.tgz
+elif [ "$SOURCE" = "harbor" ]; then
+  echo "harbor import; no push"
+else
+  echo "unknown source $SOURCE" >&2
+  exit 1
+fi
+if [ -n "$TGZ" ]; then
+  META=$(helm show chart "$TGZ")
+  NAME=$(printf '%s\n' "$META" | awk '/^name:/{print $2; exit}')
+  VER=$(printf '%s\n' "$META" | awk '/^version:/{print $2; exit}')
+  [ -n "${FLEET_CHART_NAME:-}" ] && NAME="${FLEET_CHART_NAME}"
+  [ -n "$VERSION" ] && VER="$VERSION"
+  PUSH_OUT=$(helm push "$TGZ" "$DEST" --insecure-skip-tls-verify 2>&1)
+  printf '%s\n' "$PUSH_OUT"
+  DIGEST=$(printf '%s\n' "$PUSH_OUT" | awk '/^Digest:/{print $2; exit}')
+else
+  NAME="${FLEET_CHART_NAME}"
+  VER="${VERSION}"
+  DIGEST=""
+fi
+CHART="${DEST%/}/${NAME}"
+COPIED_JSON='[]'
+IMAGE_VALUES=""
+POLICY="${FLEET_CHART_IMAGE_POLICY:-external}"
+if [ "$POLICY" = "copy" ] && [ -n "$TGZ" ]; then
+  mkdir -p /tmp/chart-src
+  tar -xzf "$TGZ" -C /tmp/chart-src
+  CHARTDIR=$(find /tmp/chart-src -mindepth 1 -maxdepth 1 -type d | head -1)
+  VALF=/tmp/pub-values.yaml
+  if [ -n "${FLEET_CHART_VALUES:-}" ]; then
+    printf '%s\n' "${FLEET_CHART_VALUES}" > "$VALF"
+  else
+    echo '{}' > "$VALF"
+  fi
+  helm template preview "$CHARTDIR" -f "$VALF" > /tmp/rendered.yaml
+  python3 - <<'PY'
+import json, os, re, subprocess, sys
+rendered = open("/tmp/rendered.yaml").read()
+imgs = []
+for m in re.finditer(r"image:\s+(\S+)", rendered):
+    imgs.append(m.group(1).strip().strip("\"'"))
+    imgs.append(m.group(1).strip())
+uniq = []
+seen = set()
+for i in imgs:
+    if i and i not in seen:
+        seen.add(i)
+        uniq.append(i)
+
+def normalize(ref):
+    if ref.startswith("sha256:"):
+        return ""
+    host = ref.split("/")[0]
+    if "/" not in ref or ("." not in host and ":" not in host and host != "localhost"):
+        if "/" not in ref:
+            ref = "docker.io/library/" + ref
+        else:
+            ref = "docker.io/" + ref
+    return ref
+
+mirror = os.environ.get("FLEET_CHART_MIRROR", "10.10.0.1:30443/mirror")
+pw = open("/tmp/harbor.pass").read().strip()
+copied = []
+for raw in uniq:
+    src = normalize(raw)
+    if not src:
+        continue
+    dest = mirror.rstrip("/") + "/" + src
+    cmd = [
+        "skopeo", "copy", "--src-tls-verify=false", "--dest-tls-verify=false",
+        "--dest-creds", "admin:" + pw,
+        "docker://" + src, "docker://" + dest,
+    ]
+    print("copy", src, "->", dest, flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.stderr.write(r.stdout + r.stderr)
+        sys.stderr.write("failed to copy image %s\n" % src)
+        sys.exit(1)
+    copied.append({"from": src, "to": dest})
+open("/tmp/copied.json", "w").write(json.dumps(copied))
+lines = ["fleet:", "  copiedImages:"]
+for c in copied:
+    lines.append("    - from: %s" % json.dumps(c["from"]))
+    lines.append("      to: %s" % json.dumps(c["to"]))
+open("/tmp/image-values.yaml", "w").write("\n".join(lines) + "\n")
+print("copied", len(copied), "images", flush=True)
+PY
+  COPIED_JSON=$(cat /tmp/copied.json)
+  IMAGE_VALUES=$(cat /tmp/image-values.yaml)
+elif [ "$POLICY" = "copy" ]; then
+  echo "imagePolicy copy requires a packaged chart" >&2
+  exit 1
+fi
+printf '%s\n' "$COPIED_JSON" > /tmp/copied.json
+printf '%s\n' "$IMAGE_VALUES" > /tmp/image-values.yaml
+kubectl -n "${FLEET_CHART_NAMESPACE}" create configmap "${FLEET_CHART_RESULT_CM}" \
+  --from-literal=name="${NAME}" \
+  --from-literal=version="${VER}" \
+  --from-literal=digest="${DIGEST}" \
+  --from-literal=chart="${CHART}" \
+  --from-file=imagesCopied.json=/tmp/copied.json \
+  --from-file=imageValues.yaml=/tmp/image-values.yaml \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo published "${CHART}" "${VER}"
+`
+
+func ChartPublishJob(opts ChartPublishJobOpts) *batchv1.Job {
+	backoff := int32(1)
+	deadline := int64(1800)
+	ttl := int32(86400)
+	inboxPath := opts.InboxHostPath
+	if inboxPath == "" {
+		inboxPath = "/var/lib/umkim/chart-inbox"
+	}
+	env := []corev1.EnvVar{
+		{Name: "KUBECONFIG", Value: "/etc/kube/config"},
+		{Name: "FLEET_CHART_NAME", Value: opts.ChartName},
+		{Name: "FLEET_CHART_VERSION", Value: opts.Version},
+		{Name: "FLEET_CHART_SOURCE", Value: opts.Source},
+		{Name: "FLEET_CHART_ORIGIN", Value: opts.Origin},
+		{Name: "FLEET_CHART_INBOX_FILE", Value: opts.InboxFile},
+		{Name: "FLEET_CHART_IMAGE_POLICY", Value: opts.ImagePolicy},
+		{Name: "FLEET_CHART_VALUES", Value: opts.ValuesYAML},
+		{Name: "FLEET_CHART_DEST", Value: opts.DestOCI},
+		{Name: "FLEET_CHART_MIRROR", Value: opts.MirrorHost},
+		{Name: "FLEET_CHART_NAMESPACE", Value: opts.Namespace},
+		{Name: "FLEET_CHART_RESULT_CM", Value: opts.ResultCM},
+	}
+	mounts := []corev1.VolumeMount{
+		{Name: "kube", MountPath: "/etc/kube", ReadOnly: true},
+		{Name: "hub-secrets", MountPath: "/secrets/hub", ReadOnly: true},
+	}
+	volumes := []corev1.Volume{
+		{Name: "kube", VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: "fleet-site-controller-kubeconfig"},
+		}},
+		{Name: "hub-secrets", VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: opts.HubSecretsName},
+		}},
+	}
+	if opts.Source == "upload" && opts.InboxFile != "" {
+		dirOrCreate := corev1.HostPathDirectoryOrCreate
+		mounts = append(mounts, corev1.VolumeMount{Name: "inbox", MountPath: "/inbox"})
+		volumes = append(volumes, corev1.Volume{
+			Name: "inbox",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: inboxPath, Type: &dirOrCreate},
+			},
+		})
+	}
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opts.JobName,
+			Namespace: opts.Namespace,
+			Labels:    map[string]string{"app": "fleet-chart-publish", "fleet-chart": opts.ChartName},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit:            &backoff,
+			ActiveDeadlineSeconds:   &deadline,
+			TTLSecondsAfterFinished: &ttl,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "fleet-chart-publish", "fleet-chart": opts.ChartName},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy:      corev1.RestartPolicyNever,
+					HostNetwork:        true,
+					ServiceAccountName: "fleet-site-controller",
+					Containers: []corev1.Container{{
+						Name:            "publish",
+						Image:           opts.RunnerImage,
+						ImagePullPolicy: corev1.PullAlways,
+						Command:         []string{"/bin/bash", "-c", chartPublishJobScript},
+						Env:             env,
+						VolumeMounts:    mounts,
+					}},
+					Volumes: volumes,
 				},
 			},
 		},

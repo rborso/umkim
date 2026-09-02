@@ -12,16 +12,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: process.env.DCM_API_PROXY || 'http://198.51.100.10:30908',
-        changeOrigin: true,
-      },
       '/fleet/api': {
-        target: process.env.DCM_API_PROXY || 'http://198.51.100.10:30908',
+        target: process.env.FLEET_API_PROXY || process.env.DCM_API_PROXY || 'http://127.0.0.1:30912',
         changeOrigin: true,
       },
       '/fleet/auth': {
-        target: process.env.DCM_API_PROXY || 'http://198.51.100.10:30908',
+        target: process.env.FLEET_API_PROXY || process.env.DCM_API_PROXY || 'http://127.0.0.1:30912',
         changeOrigin: true,
       },
     },

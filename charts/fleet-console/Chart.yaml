@@ -1,6 +1,6 @@
 apiVersion: v2
 name: fleet-console
-description: DCM fleet console SPA, fleet-console-auth RBAC gate, optional lldap
+description: Fleet console SPA, fleet-console-auth RBAC gate, optional lldap
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

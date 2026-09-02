@@ -66,7 +66,6 @@ PY
   export FLEET_SITE_COOKIE_JAR="${FLEET_SITE_COOKIE_JAR:-${FLEET_AUTH_COOKIE_JAR:-${FV_AUTH_ADMIN_JAR:-}}}"
   export FLEET_NFS_SERVER="${FLEET_NFS_SERVER:-203.0.113.40}"
   export NFS_SERVER="${NFS_SERVER:-${FLEET_NFS_SERVER}}"
-  export DCM_API="${DCM_API:-http://${FLEET_HUB_IP:-127.0.0.1}:30908/api/v1alpha1}"
 
   local vault="${FV_ROOT}/inventory/group_vars/all/vault.yml"
   local pass_file="${ANSIBLE_VAULT_PASSWORD_FILE:-${HOME}/.umkim-vault-pass}"

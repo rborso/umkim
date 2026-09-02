@@ -157,9 +157,7 @@ func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, nam
 		return
 	}
 	if sub == "providers" || strings.HasPrefix(sub, "providers/") {
-		rest := strings.TrimPrefix(sub, "providers")
-		rest = strings.TrimPrefix(rest, "/")
-		s.handleClusterProviders(w, r, name, rest)
+		http.Error(w, "service providers are not used; install Helm with FleetApp", http.StatusGone)
 		return
 	}
 	if sub != "" {

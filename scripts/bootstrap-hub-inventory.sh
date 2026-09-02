@@ -31,7 +31,6 @@ copy_file host_vars/umkim-hub.yml
 copy_file group_vars/all/site.yml
 copy_file group_vars/all/profile.yml
 copy_file group_vars/all/common.yml
-copy_file group_vars/all/fleet_git_pins.yml
 copy_file group_vars/all/fleet_site.yml
 copy_file group_vars/all/wg_operator_clients.yml
 copy_file group_vars/all/fleet_edge_domains.yml

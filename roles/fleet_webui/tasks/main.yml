@@ -2,7 +2,7 @@
 - name: Fleet WebUI | Deprecated entrypoint notice
   ansible.builtin.debug:
     msg: >-
-      Prefer fleet-console-auth-crd.yml + fleet-console-auth.yml (+ fleet-webui-lab.yml for OCM Lab/Swagger).
+      Prefer fleet-console-auth-crd.yml + fleet-console-auth.yml (+ fleet-webui-lab.yml for OCM Lab).
       This role main.yml remains for direct role invocation only.
   tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]
 
@@ -19,15 +19,10 @@
   when: ocm_console_enabled | bool
   tags: [fleet_webui, ocm_webui]
 
-- name: Fleet WebUI | Deploy DCM fleet dashboard (Helm)
+- name: Fleet WebUI | Deploy fleet console (Helm)
   ansible.builtin.import_tasks: dcm_fleet.yml
   when: dcm_fleet_dashboard_enabled | bool
   tags: [fleet_webui, dcm_webui, dcm_fleet]
-
-- name: Fleet WebUI | Deploy DCM Swagger UI
-  ansible.builtin.import_tasks: dcm.yml
-  when: dcm_ui_enabled | bool
-  tags: [fleet_webui, dcm_webui]
 
 - name: Fleet WebUI | Access URLs
   ansible.builtin.debug:
@@ -37,12 +32,7 @@
       {{
         ([] if not (ocm_lab_enabled | default(false) | bool) else
           ['OCM Lab Dashboard: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ ocm_lab_nodeport ~ '/'])
-        + (['DCM Fleet Dashboard: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ dcm_fleet_dashboard_nodeport ~ '/fleet/login']
+        + (['Fleet console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ dcm_fleet_dashboard_nodeport ~ '/fleet/login']
            if dcm_fleet_dashboard_enabled | default(true) | bool else [])
-        + ([] if not (dcm_ui_enabled | default(false) | bool) else
-          ['DCM Swagger UI: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ dcm_ui_nodeport ~ '/'])
-        + (['DCM Fleet via gateway: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ phase5_gateway_nodeport ~ '/fleet/']
-           if dcm_fleet_gateway_path | default(false) | bool else [])
-        + ['DCM API: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ phase5_gateway_nodeport ~ '/api/v1alpha1/providers']
       }}
   tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet, fleet_webui_verify]

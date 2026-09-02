@@ -1,21 +1,25 @@
 # Fleet API flows
 
-These playbooks automate selected FleetSite and FleetClusterJoin controller API
-workflows. They are orchestration helpers, not a replacement for the supported
-installation path, inventory validation, or access controls.
+These playbooks automate selected FleetSite, FleetClusterJoin, and FleetApp
+controller API workflows. They are orchestration helpers, not a replacement
+for the supported installation path.
 
 ## Available flows
 
 - [site-create.yml](site-create.yml) creates site records.
 - [cluster-create.yml](cluster-create.yml) drives cluster creation and
   provisioning steps.
-- [cluster-delete.yml](cluster-delete.yml) drives cluster removal.
-- The remaining playbooks cover optional preparation and catalog-instance
-  workflows.
+- [cluster-delete.yml](cluster-delete.yml) drives cluster removal. Default:
+  **detach** from hub (preserves K3s and workloads). Opt-in full K3s reset:
+  `fleet_flow_cleanup_kubernetes=true`.
+- [app-install.yml](app-install.yml) installs an OCI Helm chart onto a
+  **selected Ready cluster** (`fleet_flow_cluster_name` is required).
+- [whoami-helm-deploy.yml](whoami-helm-deploy.yml) installs the Harbor whoami
+  chart via FleetApp.
+- The remaining playbooks cover optional GPU preparation and other charts
+  (Gitea, llama.cpp). Each chart flow requires the target cluster name.
 
-The playbook source is authoritative for required variables, API calls, and
-side effects. Review it and use `ansible-playbook --list-tasks` before running a
-flow.
+There is no placement engine. Do not omit `fleet_flow_cluster_name`.
 
 ## Use safely
 
@@ -25,11 +29,11 @@ flow.
   definitions.
 - Confirm authorization and resource ownership before create, provision,
   delete, or cleanup operations.
-- A documentation-only change does not alter controller behavior or external
-  infrastructure.
 
 ## References
 
-- [Fleet site component](../../docs/components/fleet-site.md)
+- [Fleet apps](../../docs/components/fleet-apps.md)
+- [Fleet site](../../docs/components/fleet-site.md)
 - [Installation guide](../../docs/install.md)
 - [Design guide](../../docs/design.md)
+- [Site exposure examples](../../examples/site-profiles/)

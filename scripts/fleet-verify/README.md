@@ -24,3 +24,6 @@ report. The registry and runner are the current execution contract.
 Some layers and handlers can mutate a target. Review the selected registry
 entries and runner arguments before execution; this README does not guarantee
 that a check is safe for every environment.
+
+Prefer [docs/fleet-verify.md](../../docs/fleet-verify.md) and
+`scripts/verify-fleet-app.sh` for Helm-app verification.

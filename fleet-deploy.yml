@@ -4,10 +4,10 @@
 #
 # Usage:
 #   ansible-playbook fleet-deploy.yml
-#   ansible-playbook playbooks/preflight.yml -e fleet_profile=production --vault-password-file …
-#   ansible-playbook fleet-deploy.yml -e fleet_profile=production --vault-password-file …
+#   ansible-playbook playbooks/preflight.yml --vault-password-file …
+#   ansible-playbook fleet-deploy.yml --vault-password-file …
 
-- name: UMKIM v1 preflight (production)
+- name: UMKIM hub preflight
   ansible.builtin.import_playbook: playbooks/preflight.yml
 
 - name: OCM hub (K3s + Calico + clusteradm)
@@ -21,9 +21,6 @@
 
 - name: Phase 4 platform (OLM, cert-manager, KubeVirt hub)
   ansible.builtin.import_playbook: fleet-platform.yml
-
-- name: Phase 5 DCM control plane + spoke workers
-  ansible.builtin.import_playbook: fleet-dcm.yml
 
 - name: Fleet console CRDs (Helm)
   ansible.builtin.import_playbook: fleet-console-auth-crd.yml

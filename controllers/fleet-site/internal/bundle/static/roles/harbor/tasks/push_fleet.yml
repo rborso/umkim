@@ -1,10 +1,5 @@
 ---
 # Build fleet-owned images on the hub and push to Harbor hosted project (not quay-proxy).
-- name: Harbor | Verify sibling git pins on controller
-  ansible.builtin.import_tasks: verify_git_pins.yml
-  when: fleet_enforce_git_pins | default(false) | bool
-  tags: [harbor, harbor_push_fleet, harbor_verify_git_pins]
-
 - name: Harbor | Ensure fleet hosted project exists
   ansible.builtin.include_tasks: configure_hosted.yml
   tags: [harbor, harbor_push_fleet]
@@ -14,7 +9,6 @@
     name:
       - podman
       - git
-      - containernetworking-plugins
     state: present
   tags: [harbor, harbor_push_fleet]
 

@@ -68,10 +68,10 @@ func (s *Server) handleGetHubInfrastructure(ctx context.Context, w http.Response
 		ExposureMode:     fs.Spec.EffectiveExposureMode(),
 		HubZone:          fs.Spec.EffectiveEdgeDomain(),
 		Services: []hubService{
-			{Name: "DCM control plane", Description: "Gateway, catalog, policy, placement"},
 			{Name: "Harbor", Description: "Fleet image registry"},
-			{Name: "Fleet Console", Description: "Sites, clusters, catalog UI"},
+			{Name: "Fleet Console", Description: "Sites and clusters"},
 			{Name: "OCM hub", Description: "clusteradm / ManifestWorks"},
+			{Name: "Hub ingress", Description: "Traefik hostNetwork on :80/:443"},
 		},
 	}
 	if fia, err := ingressauth.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg); err == nil {

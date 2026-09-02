@@ -2,9 +2,7 @@
 # Render ManifestWork YAML for a single OCM cluster name (controller / GitOps input).
 #
 # Usage:
-#   ansible-playbook render-manifestworks.yml -e ocm_target_cluster=lab-int01 \
-#     -e render_dcm_k8s_sp_nodeport=30190 \
-#     -e render_dcm_k8s_sp_endpoint_host=10.10.0.10
+#   ansible-playbook render-manifestworks.yml -e ocm_target_cluster=lab-int01
 
 - name: Render fleet ManifestWorks locally
   hosts: localhost
@@ -13,10 +11,6 @@
   vars:
     ocm_target_cluster: "{{ ocm_target_cluster | mandatory }}"
     render_output_dir: "{{ playbook_dir }}/files/manifestworks/rendered"
-    render_dcm_k8s_sp_nodeport: "{{ render_dcm_k8s_sp_nodeport | default(30190) }}"
-    render_dcm_k8s_sp_name: "{{ render_dcm_k8s_sp_name | default('k8s-' ~ ocm_target_cluster) }}"
-    render_dcm_k8s_sp_endpoint_host: "{{ render_dcm_k8s_sp_endpoint_host | mandatory }}"
-    render_dcm_k8s_sp_image: "{{ render_dcm_k8s_sp_image | default(phase5_k8s_container_sp_image) }}"
   tasks:
     - name: Render | Ensure output directory
       ansible.builtin.file:
@@ -24,28 +18,17 @@
         state: directory
         mode: "0755"
 
-    - name: Render | Phase4 platform bootstrap
+    - name: Render | OLM platform bootstrap
       ansible.builtin.template:
         src: "{{ playbook_dir }}/roles/olm/templates/manifestwork-bootstrap.yaml.j2"
-        dest: "{{ render_output_dir }}/phase4-{{ ocm_target_cluster }}.yaml"
+        dest: "{{ render_output_dir }}/olm-{{ ocm_target_cluster }}.yaml"
       vars:
         ocm_target_cluster: "{{ ocm_target_cluster }}"
 
-    - name: Render | Phase5 k8s-container-sp
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/roles/dcm/templates/manifestwork-k8s-sp.yaml.j2"
-        dest: "{{ render_output_dir }}/phase5-{{ ocm_target_cluster }}.yaml"
-      vars:
-        ocm_target_cluster: "{{ ocm_target_cluster }}"
-        dcm_k8s_sp_nodeport: "{{ render_dcm_k8s_sp_nodeport }}"
-        dcm_k8s_sp_name: "{{ render_dcm_k8s_sp_name }}"
-        dcm_k8s_sp_endpoint_host: "{{ render_dcm_k8s_sp_endpoint_host }}"
-        dcm_k8s_sp_image: "{{ render_dcm_k8s_sp_image }}"
-
-    - name: Render | Phase6 spoke ingress
+    - name: Render | Spoke ingress
       ansible.builtin.template:
         src: "{{ playbook_dir }}/roles/spoke_ingress/templates/manifestwork-ingress.yaml.j2"
-        dest: "{{ render_output_dir }}/phase6-{{ ocm_target_cluster }}.yaml"
+        dest: "{{ render_output_dir }}/spoke-ingress-{{ ocm_target_cluster }}.yaml"
       vars:
         ocm_target_cluster: "{{ ocm_target_cluster }}"
         spoke_ingress_http_nodeport: "{{ phase6_http_nodeport | default(30080) }}"

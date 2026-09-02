@@ -3,7 +3,7 @@ import { DOCS } from './docsUrls';
 
 export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   'clusterJoin.siteId': {
-    description: 'Fleet site the cluster belongs to. Sets fleet.site label used by placement policies.',
+    description: 'Sets fleet.site label on the cluster.',
     example: 'homelab',
   },
   'clusterJoin.clusterName': {
@@ -62,15 +62,16 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     examples: ['/dev/vdb', '/dev/sdb'],
   },
   'clusterJoin.providers': {
-    description: 'DCM service providers auto-installed after the cluster reaches Ready (k8s, helm, kubevirt).',
-    example: 'k8s, helm',
+    description:
+      'Optional KubeVirt platform add-on after the cluster is Ready. Helm charts install with FleetApp, not service providers.',
+    example: 'kubevirt',
   },
   'clusterJoin.minRootDiskGi': {
     description: 'Minimum root disk size (GiB) required on nodes for cluster validation. Default is 40.',
     example: '40',
   },
   'clusterJoin.region': {
-    description: 'Region label (fleet.topology/region) stored on the cluster for placement and display.',
+    description: 'Region label (fleet.topology/region) stored on the cluster for display.',
     example: 'homelab',
   },
   'clusterJoin.clusterLabels': {
@@ -122,18 +123,18 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'clusterJoin.exposureMode': {
     description:
-      'Override site edge exposure, or inherit. Working pairs: none/hub_gateway→acme_hub, port_forward→acme_cluster, reverse_proxy→external. Site catalog routing needs port_forward or reverse_proxy.',
+      'Override site edge exposure, or inherit. Working pairs: none/hub_gateway→acme_hub, port_forward→acme_cluster, reverse_proxy→external.',
     example: 'inherit',
     examples: ['inherit', 'none', 'port_forward', 'reverse_proxy', 'hub_gateway'],
     learnMoreUrl: DOCS.createClusterEdge,
   },
   'clusterDetail.siteId': {
-    description: 'fleet.site label on the ManagedCluster (site membership for placement).',
+    description: 'fleet.site label on the ManagedCluster (site membership).',
     example: 'homelab',
   },
   'clusterDetail.org': {
     description:
-      'dc-admin only. Assigns fleet.org on the ManagedCluster for dedicated org placement. Empty clears the label.',
+      'dc-admin only. Assigns fleet.org on the ManagedCluster for dedicated org ownership. Empty clears the label.',
     example: 'acme',
   },
   'clusterDetail.pool': {
@@ -158,12 +159,12 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     learnMoreUrl: DOCS.fleetEdge,
   },
   'clusterDetail.region': {
-    description: 'Cluster region label (fleet.topology/region) for policies and display.',
+    description: 'Cluster region label (fleet.topology/region) for display.',
     example: 'homelab',
   },
   'clusterDetail.clusterLabels': {
     description:
-      'OCM ManagedCluster fleet.* labels used by placement policies. Capability labels (fleet.capability/*) are discovered automatically and read-only here.',
+      'OCM ManagedCluster fleet.* labels. Capability labels (fleet.capability/*) are discovered automatically and read-only here.',
     example: 'fleet.site=homelab',
     examples: ['fleet.custom/zone=lab-a', 'fleet.topology/region=homelab'],
   },

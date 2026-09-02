@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify site exposure mode, endpoints, domains, and cluster bindings.
 set -euo pipefail
-API="${FLEET_API:-http://127.0.0.1:30908/fleet/api/v1alpha1}"
+API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
 SITE="${VERIFY_SITE:-homelab}"
 CLUSTER="${VERIFY_CLUSTER:-virt01}"
 NS="${FLEET_EDGE_NS:-fleet-system}"

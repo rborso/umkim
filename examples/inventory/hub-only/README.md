@@ -1,7 +1,8 @@
 # Hub-only inventory template
 
-Use this template for the supported greenfield management installation. It
-contains non-operational placeholders and must be completed locally before use.
+Use this template for the supported greenfield management installation on
+Rocky Linux 10. It contains non-operational placeholders and must be completed
+locally before use.
 
 ## Start
 
@@ -33,10 +34,13 @@ contract. Do not infer values from this README or other examples.
   intended to become a documented configuration contract.
 - This template does not create external infrastructure or attach workload
   clusters; use the installation and component documentation for those paths.
+  After a cluster is Ready, install Helm charts with FleetApp (you must select
+  the cluster).
 
 ## References
 
 - [Installation guide](../../../docs/install.md)
 - [Design guide](../../../docs/design.md)
+- [FleetApp Helm installs](../../../docs/components/fleet-apps.md)
 - [Secrets guide](../../../docs/secrets.md)
 - [Fleet site component](../../../docs/components/fleet-site.md)

@@ -34,7 +34,8 @@ fi
 hub_kubectl -n "$NS" get fleetllm fleet-llm >/dev/null
 
 ok_health=0
-MASTER_KEY="$(hub_kubectl -n dcm get secret fleet-llm-master-key -o jsonpath='{.data.master_key}' 2>/dev/null | base64 -d || true)"
+LLM_NS="${FLEET_LLM_NAMESPACE:-fleet-llm}"
+MASTER_KEY="$(hub_kubectl -n "$LLM_NS" get secret fleet-llm-master-key -o jsonpath='{.data.master_key}' 2>/dev/null | base64 -d || true)"
 for _ in $(seq 1 12); do
   if [[ -n "${MASTER_KEY}" ]] && curl -sf --max-time 5 -H "Authorization: Bearer ${MASTER_KEY}" "${LITELLM_URL}/health" >/dev/null; then
     ok_health=1
@@ -52,12 +53,5 @@ if [[ "${ok_health}" != "1" ]]; then
   exit 1
 fi
 echo "LiteLLM health OK at ${LITELLM_URL}"
-
-ITEM=$(curl -sf "${DCM_API:-http://${FLEET_HUB_IP:-127.0.0.1}:30908/api/v1alpha1}/catalog-items/llama-cpp-helm" 2>/dev/null || true)
-if [[ -n "$ITEM" ]]; then
-  echo "$ITEM" | jq -r '.display_name // .metadata.name // "llama-cpp-helm ok"'
-else
-  echo "WARN: llama-cpp-helm catalog item not found (run dcm_seed_llama_cpp_helm)"
-fi
 
 echo "=== verify-fleet-llm OK (phase=${PHASE:-unknown}) ==="

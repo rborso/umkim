@@ -75,7 +75,7 @@ func TestInventoryYAMLLines(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("want 3 lines, got %d", len(lines))
 	}
-	if lines[0] != "dcm_gateway_acme_solver_enabled: false" {
+	if lines[0] != "fleet_edge_acme_solver_enabled: false" {
 		t.Fatalf("unexpected: %s", lines[0])
 	}
 }

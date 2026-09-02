@@ -125,21 +125,6 @@
       tags: [phase6, phase6_push, spoke_ingress, fleet_site_provision]
 
     - ansible.builtin.import_role:
-        name: fleet_site
-        tasks_from: push_site_dcm_workers.yml
-      tags: [ocm, ocm_register, phase4, phase5, fleet_site_provision, fleet_site_operator]
-
-    - ansible.builtin.import_role:
-        name: fleet_site
-        tasks_from: seed_operator_policy.yml
-      tags: [fleet_site, fleet_site_operator, fleet_site_provision]
-
-    - ansible.builtin.import_role:
-        name: fleet_site
-        tasks_from: auto_install_kubevirt_operator.yml
-      tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision]
-
-    - ansible.builtin.import_role:
         name: ocm
         tasks_from: verify_umkim_registration.yml
       tags: [ocm, ocm_register, fleet_site_provision]

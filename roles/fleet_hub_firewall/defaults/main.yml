@@ -25,15 +25,13 @@ fleet_hub_firewall_public_ingress_enabled: "{{ fleet_edge_acme_enabled | default
 # Legacy iptables REDIRECT (superseded by gateway Service externalIPs when gateway HA).
 fleet_hub_firewall_public_ingress_dnat: false
 fleet_hub_firewall_block_public_http: "{{ not fleet_hub_firewall_public_ingress_enabled | bool }}"
-fleet_hub_firewall_gateway_http_nodeport: "{{ phase5_gateway_nodeport | default(30908) }}"
-fleet_hub_firewall_gateway_https_nodeport: "{{ phase5_gateway_https_nodeport | default(30909) }}"
+fleet_hub_firewall_gateway_http_nodeport: 80
+fleet_hub_firewall_gateway_https_nodeport: 443
 
 fleet_hub_firewall_public_tcp_allow: >-
   {{
     ['22']
     + ([80, 443] if fleet_hub_firewall_public_ingress_enabled | bool else [])
-    + ([fleet_hub_firewall_gateway_http_nodeport | int, fleet_hub_firewall_gateway_https_nodeport | int]
-       if fleet_hub_firewall_public_ingress_enabled | bool else [])
   }}
 
 fleet_hub_firewall_public_udp_allow:

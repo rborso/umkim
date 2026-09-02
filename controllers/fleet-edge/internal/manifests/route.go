@@ -20,6 +20,7 @@ import (
 type SpokeIngressOptions struct {
 	AuthEnabled      bool
 	SpokeACME        bool
+	CertResolver     string
 	RedirectHTTPS    bool
 	UseHubEntrypoint bool
 }
@@ -54,7 +55,7 @@ func RenderManifestWork(route fleetv1alpha1.FleetAppRoute, hosts []string, clust
 		httpsAnnotations := ingressAnnotations(ingressAnnotationOpts{
 			entrypoint:   "websecure",
 			tls:          true,
-			certResolver: "letsencrypt",
+			certResolver: spokeCertResolver(opts),
 			middlewares:  httpsMids,
 		})
 		tlsBlock := ingressTLSBlock(hosts)
@@ -62,7 +63,7 @@ func RenderManifestWork(route fleetv1alpha1.FleetAppRoute, hosts []string, clust
 			"fleet-route-"+sanitize(route.Spec.InstanceID)+"-tls",
 			svcNS, httpsAnnotations, tlsBlock, httpsRules,
 		))
-		// Hub Traefik proxies catalog hub/dual hostnames to spoke :30081 (web-hub).
+		// Hub Traefik proxies catalog hub hostnames to spoke :30081 (web-hub).
 		// ACME TLS ingress alone leaves that entrypoint empty → hub path HTTP 404.
 		if opts.UseHubEntrypoint {
 			hubHosts := HubHostsForRoute(route)
@@ -212,13 +213,6 @@ func HostsForRoute(route fleetv1alpha1.FleetAppRoute) []string {
 		if route.Spec.SiteHost != "" {
 			hosts = append(hosts, route.Spec.SiteHost)
 		}
-	case fleetv1alpha1.RouteModeDual:
-		if route.Spec.HubHost != "" {
-			hosts = append(hosts, route.Spec.HubHost)
-		}
-		if route.Spec.SiteHost != "" {
-			hosts = append(hosts, route.Spec.SiteHost)
-		}
 	}
 	return hosts
 }
@@ -230,7 +224,7 @@ func HubHostsForRoute(route fleetv1alpha1.FleetAppRoute) []string {
 		mode = route.Spec.Mode
 	}
 	switch mode {
-	case fleetv1alpha1.RouteModeHub, fleetv1alpha1.RouteModeDual:
+	case fleetv1alpha1.RouteModeHub:
 		if route.Spec.HubHost != "" {
 			return []string{route.Spec.HubHost}
 		}
@@ -239,7 +233,7 @@ func HubHostsForRoute(route fleetv1alpha1.FleetAppRoute) []string {
 }
 
 // SpokeHostsForRoute returns hostnames published on the spoke via ManifestWork Ingress.
-// Hub (and dual) modes proxy through spoke Traefik, so the hub hostname must exist on the spoke.
+// Hub mode proxies through spoke Traefik, so the hub hostname must exist on the spoke.
 func SpokeHostsForRoute(route fleetv1alpha1.FleetAppRoute) []string {
 	mode := route.Spec.EffectiveMode
 	if mode == "" {
@@ -252,13 +246,6 @@ func SpokeHostsForRoute(route fleetv1alpha1.FleetAppRoute) []string {
 			hosts = append(hosts, route.Spec.HubHost)
 		}
 	case fleetv1alpha1.RouteModeSite:
-		if route.Spec.SiteHost != "" {
-			hosts = append(hosts, route.Spec.SiteHost)
-		}
-	case fleetv1alpha1.RouteModeDual:
-		if route.Spec.HubHost != "" {
-			hosts = append(hosts, route.Spec.HubHost)
-		}
 		if route.Spec.SiteHost != "" {
 			hosts = append(hosts, route.Spec.SiteHost)
 		}
@@ -279,4 +266,11 @@ func ValidateRouteHosts(route fleetv1alpha1.FleetAppRoute) error {
 		return fmt.Errorf("service name required for spoke ingress")
 	}
 	return nil
+}
+
+func spokeCertResolver(opts SpokeIngressOptions) string {
+	if opts.CertResolver != "" {
+		return opts.CertResolver
+	}
+	return "letsencrypt"
 }

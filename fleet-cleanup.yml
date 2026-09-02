@@ -1,5 +1,5 @@
 ---
-# Tear down fleet workloads on the hub (ManifestWorks, DCM, platform stacks).
+# Tear down fleet workloads on the hub (ManifestWorks, platform stacks).
 # Keeps K3s, Calico, WireGuard, OCM hub/spoke registration, and Harbor (fleet_cleanup_delete_harbor: false).
 #
 # Usage:

@@ -1,4 +1,5 @@
 {% set phase6_spoke_acme = fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% set phase6_spoke_acme_http_challenge = phase6_spoke_acme_http_challenge | default(false) | bool %}
 {% set phase6_traefik_file_provider = fleet_ingress_auth_enabled | default(false) | bool %}
 apiVersion: work.open-cluster-management.io/v1
 kind: ManifestWork
@@ -75,7 +76,7 @@ spec:
           name: traefik
           namespace: {{ phase6_spoke_ingress_namespace }}
           annotations:
-            fleet.umkim.com/acme-reconcile: "2"
+            fleet.umkim.com/acme-reconcile: "4"
         spec:
           replicas: 1
           selector:
@@ -86,7 +87,7 @@ spec:
               labels:
                 app: traefik
               annotations:
-                fleet.umkim.com/acme-reconcile: "2"
+                fleet.umkim.com/acme-reconcile: "4"
             spec:
               serviceAccountName: traefik
               containers:
@@ -102,7 +103,7 @@ spec:
                     - --ping=true
                     - --ping.entrypoint=web
                     - --log.level=INFO
-{% if phase6_spoke_acme %}
+{% if phase6_spoke_acme and not phase6_spoke_acme_http_challenge %}
                     - --entrypoints.web.http.redirections.entryPoint.to=:443
                     - --entrypoints.web.http.redirections.entryPoint.scheme=https
                     - --entrypoints.web.http.redirections.entryPoint.permanent=true
@@ -117,7 +118,19 @@ spec:
 {% if fleet_edge_acme_staging | default(false) | bool %}
                     - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
 {% endif %}
+{% if phase6_spoke_acme_http_challenge %}
+                    - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+                    - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+{% else %}
                     - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+{% endif %}
+{% if fleet_edge_acme_preflight_enabled | default(true) | bool %}
+                    - --certificatesresolvers.letsencrypt-staging.acme.email={{ fleet_edge_acme_email }}
+                    - --certificatesresolvers.letsencrypt-staging.acme.storage=/data/acme-staging.json
+                    - --certificatesresolvers.letsencrypt-staging.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+                    - --certificatesresolvers.letsencrypt-staging.acme.httpchallenge=true
+                    - --certificatesresolvers.letsencrypt-staging.acme.httpchallenge.entrypoint=web
+{% endif %}
 {% endif %}
                   ports:
                     - name: web

@@ -537,3 +537,130 @@ func (in *FleetLLMList) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
+
+func (in *FleetApp) DeepCopyInto(out *FleetApp) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	in.Status.DeepCopyInto(&out.Status)
+}
+
+func (in *FleetApp) DeepCopy() *FleetApp {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetApp)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetApp) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *FleetAppStatus) DeepCopyInto(out *FleetAppStatus) {
+	*out = *in
+	if in.Conditions != nil {
+		out.Conditions = make([]metav1.Condition, len(in.Conditions))
+		copy(out.Conditions, in.Conditions)
+	}
+}
+
+func (in *FleetAppList) DeepCopyInto(out *FleetAppList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		out.Items = make([]FleetApp, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	}
+}
+
+func (in *FleetAppList) DeepCopy() *FleetAppList {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetAppList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetAppList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *FleetChart) DeepCopyInto(out *FleetChart) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	in.Status.DeepCopyInto(&out.Status)
+}
+
+func (in *FleetChart) DeepCopy() *FleetChart {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetChart)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetChart) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *FleetChartStatus) DeepCopyInto(out *FleetChartStatus) {
+	*out = *in
+	if in.Versions != nil {
+		out.Versions = append([]string(nil), in.Versions...)
+	}
+	if in.ImagesCopied != nil {
+		out.ImagesCopied = make([]FleetChartCopiedImage, len(in.ImagesCopied))
+		copy(out.ImagesCopied, in.ImagesCopied)
+	}
+	if in.Conditions != nil {
+		out.Conditions = make([]metav1.Condition, len(in.Conditions))
+		copy(out.Conditions, in.Conditions)
+	}
+}
+
+func (in *FleetChartList) DeepCopyInto(out *FleetChartList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		out.Items = make([]FleetChart, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	}
+}
+
+func (in *FleetChartList) DeepCopy() *FleetChartList {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetChartList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetChartList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}

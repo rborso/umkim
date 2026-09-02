@@ -1,6 +1,6 @@
 # Fleet cluster storage
 
-> Status: v0.1.0 is an experimental proof of concept. Validate storage,
+> Status: v0.2 is an experimental proof of concept. Validate storage,
 > backup, and recovery behavior for every workload before production use.
 
 `FleetClusterJoin` accepts storage intent during cluster creation. After a

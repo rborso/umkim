@@ -4,57 +4,35 @@ This is the greenfield path: install one hub, then create workload clusters
 through FleetClusterJoin. It does not create Ansible-managed spokes.
 
 > [!WARNING]
-> This v0.1.0 path is experimental and can make destructive changes. Review
+> This v0.2 path is experimental and can make destructive changes. Review
 > [../SECURITY.md](../SECURITY.md) and [../RELEASE_NOTES.md](../RELEASE_NOTES.md)
 > before continuing.
 
 ## Prerequisites
 
-- Rocky Linux 9 hub host, non-root operator account, passwordless `sudo`
+- Rocky Linux 10 hub host, non-root operator account, passwordless `sudo`
 - Roughly 4+ vCPU, 8+ GiB RAM, and 100+ GiB disk
 - Public IPv4 with WAN TCP 22/80/443 and UDP 51820 (WireGuard)
 - DNS and firewall control for intended public application endpoints
 - Private management connectivity for cluster enrollment
+- Workload nodes for join are Rocky Linux 10 as well
 
-### Controller packages and repository layout
+### Controller packages
 
-Harbor fleet image builds expect sibling checkouts beside `~/umkim`. Install
-packages, clone UMKIM and the required siblings, then pin them to the release:
+Install packages, clone UMKIM, then install Ansible collections:
 
 ```bash
 sudo dnf install -y ansible-core git python3-pip python3-libselinux \
   httpd-tools podman containernetworking-plugins
 pip install netaddr
 
-# HTTPS (or use matching git@github.com:rborso/... SSH URLs for every clone)
 git clone https://github.com/rborso/umkim.git ~/umkim
 cd ~/umkim
 ansible-galaxy collection install -r requirements.yml
-
-cd ~
-git clone https://github.com/rborso/control-plane.git
-git clone https://github.com/rborso/fleet-olm-subscription-sp.git
-git clone https://github.com/rborso/fleet-helm-release-sp.git
-git clone https://github.com/rborso/k8s-container-service-provider.git
-git clone https://github.com/rborso/kubevirt-service-provider.git
 ```
 
-Use one transport (HTTPS or SSH) for every clone. Harbor clone defaults use
-HTTPS.
-
-Align siblings to the release pins and verify before building images:
-
-```bash
-cd ~/umkim
-./scripts/fleet-checkout-pins.sh
-./scripts/fleet-verify-pins.sh --strict
-```
-
-Pin sources of truth are documented in [../VERSIONS.md](../VERSIONS.md).
-
-**Optional:** [`umkim-catalog`](https://github.com/rborso/umkim-catalog) holds
-application charts. It is not required for hub install; clone it later only if
-you need the catalog add-on (see [Optional catalog items](#optional-catalog-items)).
+Harbor fleet image builds use this checkout. Sibling service-provider
+repos are not required for hub install or cluster join.
 
 ## 1. Create inventory
 
@@ -72,7 +50,8 @@ continuing:
 |------|-------------|
 | `inventory/hosts.yml` | Hub inventory host key, public IPv4 (`ansible_host`), SSH user |
 | `inventory/host_vars/umkim-hub.yml` | `fleet_hub_public_ipv4` (same WAN IPv4 as in `hosts.yml`) |
-| `inventory/group_vars/all/site.yml` | DNS zone, ACME email, WireGuard hostname, LDAP/`domain`, management site ids |
+| `inventory/group_vars/all/site.yml` | DNS zone, ACME email, WireGuard hostname, LDAP/`domain`, management site ids, per-site `exposure_mode` |
+| `inventory/group_vars/all/fleet_sites.yml` | Per-site exposure profiles — see [examples/site-profiles/](../examples/site-profiles/) |
 
 Then run:
 
@@ -105,13 +84,14 @@ env -u ANSIBLE_VAULT_PASSWORD_FILE ansible-vault encrypt \
   --encrypt-vault-id default
 ```
 
-Optional keys (per-cluster LLDAP passwords, Gitea catalog admin) stay in the
-example for later use; leave them unset or commented until needed.
+Optional keys (per-cluster LLDAP passwords, Gitea chart admin when installing
+Gitea via FleetApp) stay in the example for later use; leave them unset or
+commented until needed.
 
 ### Generate passwords
 
 The helper fills hub-required secrets with random values and encrypts the file.
-It omits optional per-cluster LLDAP and Gitea catalog keys (add those later from
+It omits optional per-cluster LLDAP and Gitea chart keys (add those later from
 [`vault.example.yml`](vault.example.yml) if you need them):
 
 ```bash
@@ -125,7 +105,7 @@ Use `--force` only when intentionally overwriting an existing `vault.yml`.
 
 ```bash
 export ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass
-FLEET_PROFILE=production ./scripts/preflight-v1.sh
+./scripts/preflight-v1.sh
 ```
 
 ## 3. Install and verify the hub
@@ -133,16 +113,16 @@ FLEET_PROFILE=production ./scripts/preflight-v1.sh
 ```bash
 export INV="-i inventory/hosts.yml -i inventory/hosts-from-hub.yml"
 export ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass
-FLEET_PROFILE=production ./scripts/install-hub.sh
-./scripts/verify-fleet.sh --layer 1 --suite hub
+./scripts/install-hub.sh
+./scripts/verify-hub-install.sh
 ```
 
 The wrapper runs host preparation, WireGuard, OCM, Harbor, platform services,
-console, DCM, firewall, FleetSite, and fleet-edge. Image builds can take a
+console, hub ingress, firewall, FleetSite, and fleet-edge. Image builds can take a
 long time. To resume a known failed phase, use a targeted tag, for example:
 
 ```bash
-ansible-playbook $INV hub-install.yml -l hub --tags dcm_hub
+ansible-playbook $INV hub-install.yml -l hub --tags harbor_push_fleet
 ```
 
 ## 4. Create a WireGuard client
@@ -172,41 +152,69 @@ Treat the config as a secret. Details and peer lifecycle are in
 After the hub is ready and your WireGuard client can reach the overlay:
 
 1. Sign in to the console through the private management path.
-2. Create a registry site other than the management site.
+2. Create a registry site other than the management site. Choose an exposure
+   mode (`hub_gateway`, `port_forward`, `reverse_proxy`, or `none`) that
+   matches how that location reaches the WAN. See
+   [examples/site-profiles/](../examples/site-profiles/).
 3. Create a FleetClusterJoin cluster for that site.
 4. Download its bootstrap bundle through the authenticated console and treat
    the archive as a secret.
-5. Run `sudo ./bootstrap.sh` on the first control node, wait for
-   **Validated**, then select **Provision**.
-6. When the cluster is **Ready**, install the k8s provider; install Helm or
-   KubeVirt only when needed.
-7. Deploy a seeded catalog item or an approved OCI chart.
+5. Copy the bundle to a Rocky Linux 10 control node, run `sudo ./bootstrap.sh`,
+   wait for **Validated**, then select **Provision**.
+6. When the cluster is **Ready**, it joins the management overlay and receives
+   platform ManifestWorks (OLM, cert-manager, spoke Traefik). The spoke remains
+   an independent K3s cluster. Helm installs use FleetApp onto that Ready
+   cluster; do not enable leftover provider playbooks.
+
+To remove a cluster from the hub without wiping workloads, delete it with the
+default **detach** mode. Full K3s reset is opt-in (`cleanupKubernetes=true`).
+See [playbooks/flows/cluster-delete.yml](../playbooks/flows/cluster-delete.yml).
+
+## 6. Install a Helm chart on a selected cluster
+
+There is no placement engine. Pick the Ready cluster, then install:
+
+1. Console **Apps** → **Install chart** (library picker), or
+2. Authenticated `POST /fleet/api/v1alpha1/apps` with `clusterName` and `chart`
+   (controller path `/api/v1alpha1/apps`), or
+3. `ansible-playbook $INV playbooks/flows/app-install.yml` with
+   `fleet_flow_cluster_name` and `fleet_flow_chart`.
+
+Publish additional charts with **Apps → Add chart** or
+`./scripts/fleet-chart.sh publish`. Harbor already publishes `whoami` at
+`oci://<hub-overlay>:30443/charts/whoami`. The library lists it after import.
+`route.mode` defaults to `none`. Match routing to site exposure:
+
+- `hub` — site uses `hub_gateway`; DNS for `hubHost` must be ready.
+- `site` — site uses `port_forward` or `reverse_proxy`; `siteHost` and site
+  ingress must be configured.
+- `none` — chart or workload owns ingress (or app is internal).
+
+Hub-routed apps require a healthy hub. `site` and `none` apps can remain
+reachable when the hub is down if site ingress is healthy. Details:
+[components/fleet-apps.md](components/fleet-apps.md).
 
 For the model and lifecycle, see [design.md](design.md) and
 [components/fleet-site.md](components/fleet-site.md).
 
-## Optional catalog items
+## 7. Teardown and reinstall from zero
 
-Clone the catalog beside UMKIM when you need the packaged application charts:
-
-```bash
-cd ~
-git clone https://github.com/rborso/umkim-catalog.git
-# Or: git clone git@github.com:rborso/umkim-catalog.git
-```
-
-Configure that repository per its public README (`shared/config.env`). Set
-`HARBOR_HOST` to the hub WireGuard address (for example `10.10.0.1`), not
-`127.0.0.1` — Helm uses plain HTTP for loopback and Harbor rejects it. Then from
-the UMKIM checkout push charts and seed DCM items:
+Hub teardown is destructive on the **hub host** only. It uninstalls hub K3s,
+Harbor, controllers, Traefik, the nftables `fleet_hub` table, and WireGuard
+so `./scripts/install-hub.sh` can run on a clean host. Detached workload
+clusters keep running independently. Inventory and encrypted vault under
+`inventory/` are kept.
 
 ```bash
-cd ~/umkim
-./scripts/seed-umkim-catalog.sh
+export INV="-i inventory/hosts.yml -i inventory/hosts-from-hub.yml"
+export ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass
+./scripts/teardown-hub.sh --confirm
+# Optional: hub-only wipe if no workload clusters exist
+# ./scripts/teardown-hub.sh --confirm --skip-cluster-delete
+test ! -f /etc/rancher/k3s/k3s.yaml && echo OK
+./scripts/install-hub.sh
+./scripts/verify-hub-install.sh
 ```
-
-Deploy an item only after a non-management FleetClusterJoin is **Ready** and
-its providers are installed.
 
 ## Safe troubleshooting
 
@@ -214,5 +222,6 @@ its providers are installed.
 - Inspect controller and workload status before retrying a phase.
 - Use targeted playbook tags rather than a full redeploy.
 - Treat teardown as destructive; do not use it as normal troubleshooting.
+  To reinstall from zero, use `./scripts/teardown-hub.sh --confirm`.
 
 For non-destructive verification, see [fleet-verify.md](fleet-verify.md).

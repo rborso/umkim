@@ -13,8 +13,9 @@ the fleet gateway.
 4. Validate inventory before running the relevant edge playbook.
 
 The snippet records desired configuration; it does not create external DNS,
-firewall, certificate, or routing resources. Refer to the component guide for
-the current controller contract.
+firewall, certificate, or routing resources. Use `FleetApp` `route.mode: hub`
+for apps published through the hub gateway. Hub-routed URLs require a healthy
+hub.
 
 ## References
 

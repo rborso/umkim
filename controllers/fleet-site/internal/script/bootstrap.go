@@ -52,7 +52,7 @@ require_root() {
   log "Run as root or with passwordless sudo: sudo $0"; exit 1
 }
 
-assert_rocky9() {
+assert_rocky() {
   [[ -f /etc/os-release ]] || { log "ERROR: /etc/os-release missing"; exit 1; }
   # shellcheck source=/dev/null
   source /etc/os-release
@@ -124,7 +124,7 @@ post_enrollment() {
 
 main() {
   require_root
-  assert_rocky9
+  assert_rocky
   install_packages
   write_wg_config
   start_wg
@@ -159,7 +159,7 @@ require_root() {
   log "Run as root or with passwordless sudo: sudo $0"; exit 1
 }
 
-assert_rocky9() {
+assert_rocky() {
   [[ -f /etc/os-release ]] || { log "ERROR: /etc/os-release missing"; exit 1; }
   # shellcheck source=/dev/null
   source /etc/os-release
@@ -381,7 +381,7 @@ run_ansible() {
 
 main() {
   require_root
-  assert_rocky9
+  assert_rocky
   install_packages
   install_bundle_ssh_key_local
   install_ansible

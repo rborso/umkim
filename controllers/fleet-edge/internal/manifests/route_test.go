@@ -59,36 +59,6 @@ func TestRenderManifestWorkHubNoAuth(t *testing.T) {
 	}
 }
 
-func TestHostsForRouteDual(t *testing.T) {
-	route := fleetv1alpha1.FleetAppRoute{
-		Spec: fleetv1alpha1.FleetAppRouteSpec{
-			Mode:          fleetv1alpha1.RouteModeDual,
-			EffectiveMode: fleetv1alpha1.RouteModeDual,
-			HubHost:       "app.mgmt.umkim.com",
-			SiteHost:      "app.virt02.mgmt.umkim.com",
-		},
-	}
-	hosts := HostsForRoute(route)
-	if len(hosts) != 2 {
-		t.Fatalf("expected 2 hosts, got %v", hosts)
-	}
-}
-
-func TestSpokeHostsForRouteDual(t *testing.T) {
-	route := fleetv1alpha1.FleetAppRoute{
-		Spec: fleetv1alpha1.FleetAppRouteSpec{
-			Mode:          fleetv1alpha1.RouteModeDual,
-			EffectiveMode: fleetv1alpha1.RouteModeDual,
-			HubHost:       "app.mgmt.umkim.com",
-			SiteHost:      "app.virt02.mgmt.umkim.com",
-		},
-	}
-	hosts := SpokeHostsForRoute(route)
-	if len(hosts) != 2 || hosts[0] != "app.mgmt.umkim.com" || hosts[1] != "app.virt02.mgmt.umkim.com" {
-		t.Fatalf("dual spoke hosts: %v", hosts)
-	}
-}
-
 func TestRenderManifestWorkSiteAuth(t *testing.T) {
 	route := fleetv1alpha1.FleetAppRoute{
 		Spec: fleetv1alpha1.FleetAppRouteSpec{
@@ -172,6 +142,30 @@ func TestRenderManifestWorkSiteACMENoAuth(t *testing.T) {
 	}
 }
 
+func TestRenderManifestWorkSiteACMEStaging(t *testing.T) {
+	route := fleetv1alpha1.FleetAppRoute{
+		Spec: fleetv1alpha1.FleetAppRouteSpec{
+			InstanceID:    "inst-site",
+			Cluster:       "lab-single-0",
+			Mode:          fleetv1alpha1.RouteModeSite,
+			EffectiveMode: fleetv1alpha1.RouteModeSite,
+			SiteHost:      "whoami.homelab.example.com",
+			Service:       fleetv1alpha1.ServiceRef{Name: "app", Port: 80},
+		},
+	}
+	yaml, err := RenderManifestWork(route, []string{"whoami.homelab.example.com"}, "lab-single-0", route.Spec.Service, SpokeIngressOptions{
+		SpokeACME:     true,
+		CertResolver:  "letsencrypt-staging",
+		RedirectHTTPS: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(yaml, "letsencrypt-staging") {
+		t.Fatalf("staging ACME ingress should use letsencrypt-staging resolver: %s", yaml)
+	}
+}
+
 func TestRenderManifestWorkSiteACMEWithAuth(t *testing.T) {
 	route := fleetv1alpha1.FleetAppRoute{
 		Spec: fleetv1alpha1.FleetAppRouteSpec{
@@ -206,78 +200,18 @@ func TestRenderManifestWorkSiteACMEWithAuth(t *testing.T) {
 	}
 }
 
-func TestRenderManifestWorkDualACMEIncludesHubEntrypoint(t *testing.T) {
-	route := fleetv1alpha1.FleetAppRoute{
-		Spec: fleetv1alpha1.FleetAppRouteSpec{
-			InstanceID:    "inst-dual",
-			Cluster:       "virt02",
-			Mode:          fleetv1alpha1.RouteModeDual,
-			EffectiveMode: fleetv1alpha1.RouteModeDual,
-			HubHost:       "app.mgmt.umkim.com",
-			SiteHost:      "app.virt02.mgmt.umkim.com",
-			Service:       fleetv1alpha1.ServiceRef{Name: "app", Port: 80},
-		},
-	}
-	yaml, err := RenderManifestWork(route, []string{"app.mgmt.umkim.com", "app.virt02.mgmt.umkim.com"}, "virt02", route.Spec.Service, SpokeIngressOptions{
-		SpokeACME:        true,
-		UseHubEntrypoint: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Count(yaml, "kind: Ingress") != 2 {
-		t.Fatalf("dual ACME should render TLS + web-hub Ingresses: %s", yaml)
-	}
-	if !strings.Contains(yaml, "name: fleet-route-inst-dual-tls") {
-		t.Fatalf("expected TLS ingress: %s", yaml)
-	}
-	if !strings.Contains(yaml, "name: fleet-route-inst-dual-hub") {
-		t.Fatalf("expected web-hub ingress: %s", yaml)
-	}
-	if !strings.Contains(yaml, traefikEntrypointsAnnotation+`: "web-hub"`) {
-		t.Fatalf("hub ingress should use web-hub entrypoint: %s", yaml)
-	}
-	if !strings.Contains(yaml, "app.mgmt.umkim.com") {
-		t.Fatalf("web-hub ingress must include hub host: %s", yaml)
-	}
-}
-
 func TestHubHostsForRoute(t *testing.T) {
-	dual := fleetv1alpha1.FleetAppRoute{Spec: fleetv1alpha1.FleetAppRouteSpec{
-		Mode: fleetv1alpha1.RouteModeDual, HubHost: "h.example", SiteHost: "s.example",
+	hub := fleetv1alpha1.FleetAppRoute{Spec: fleetv1alpha1.FleetAppRouteSpec{
+		Mode: fleetv1alpha1.RouteModeHub, HubHost: "h.example",
 	}}
-	if got := HubHostsForRoute(dual); len(got) != 1 || got[0] != "h.example" {
-		t.Fatalf("dual hub hosts: %v", got)
+	if got := HubHostsForRoute(hub); len(got) != 1 || got[0] != "h.example" {
+		t.Fatalf("hub hosts: %v", got)
 	}
 	site := fleetv1alpha1.FleetAppRoute{Spec: fleetv1alpha1.FleetAppRouteSpec{
 		Mode: fleetv1alpha1.RouteModeSite, SiteHost: "s.example",
 	}}
 	if got := HubHostsForRoute(site); len(got) != 0 {
 		t.Fatalf("site hub hosts should be empty: %v", got)
-	}
-}
-
-func TestRenderManifestWorkDualNoAuth(t *testing.T) {
-	route := fleetv1alpha1.FleetAppRoute{
-		Spec: fleetv1alpha1.FleetAppRouteSpec{
-			InstanceID:    "inst-1",
-			Cluster:       "virt02",
-			Mode:          fleetv1alpha1.RouteModeDual,
-			EffectiveMode: fleetv1alpha1.RouteModeDual,
-			HubHost:       "app.mgmt.umkim.com",
-			SiteHost:      "app.virt02.mgmt.umkim.com",
-			Service:       fleetv1alpha1.ServiceRef{Name: "app", Port: 80},
-		},
-	}
-	yaml, err := RenderManifestWork(route, []string{"app.virt02.mgmt.umkim.com"}, "virt02", route.Spec.Service, SpokeIngressOptions{AuthEnabled: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(yaml, "app.mgmt.umkim.com") {
-		t.Fatalf("dual spoke ingress must not include hub host: %s", yaml)
-	}
-	if strings.Contains(yaml, siteAuthMiddleware) {
-		t.Fatalf("dual spoke ingress must not attach authelia: %s", yaml)
 	}
 }
 

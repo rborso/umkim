@@ -21,6 +21,7 @@ be destructive or environment-dependent.
 3. Use `./scripts/verify-fleet.sh --help` to select the verification layer,
    profile, and suite. The registry at
    `scripts/fleet-verify/check-registry.yaml` is the current check contract.
+   For a Helm smoke test, use `scripts/verify-fleet-app.sh`.
 4. Run a dry run before mutating verification, and obtain explicit approval for
    cleanup, teardown, or rebuild actions.
 
@@ -32,4 +33,5 @@ and topology from the authorized inventory and runtime configuration.
 - [Installation guide](../../../docs/install.md)
 - [Design guide](../../../docs/design.md)
 - [Verification guide](../../../docs/fleet-verify.md)
+- [FleetApp Helm installs](../../../docs/components/fleet-apps.md)
 - [Agent routing](../../../AGENTS.md)

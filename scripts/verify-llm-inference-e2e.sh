@@ -13,7 +13,7 @@
 #   FLEET_LLM_CLUSTER=example-gpu        optional spoke cluster for real inference
 #   FLEET_LLM_RELEASE=llama-cpp
 #   FLEET_LLM_MODEL=Qwen2.5-0.5B-Instruct
-#   SKIP_LLM_DEPLOY=1                    skip catalog deploy; use healthy backend or mock
+#   SKIP_LLM_DEPLOY=1                    skip spoke llama-cpp deploy; use healthy backend or mock
 #   LLM_E2E_USE_MOCK_FALLBACK=1          hub mock when spoke deploy unavailable (default without GPU)
 #   LLM_E2E_REQUIRE_INFERENCE_DEPLOY=1   fail instead of mock fallback
 #   REBUILD_AUTH=1                       rebuild + rollout fleet-console-auth before test
@@ -29,13 +29,12 @@ source "${ROOT}/scripts/fleet-verify/lib/hub-kubectl.sh"
 
 CONSOLE="${FLEET_CONSOLE_URL:-http://${FLEET_HUB_IP:-127.0.0.1}:30912}"
 LLM_PROXY="${CONSOLE}/llm"
-DCM_API="${DCM_API:-http://${FLEET_HUB_IP:-127.0.0.1}:30908/api/v1alpha1}"
 FLEET_API="${FLEET_API:-http://${FLEET_HUB_IP:-127.0.0.1}:18080/api/v1alpha1}"
 LITELLM_URL="${FLEET_LITELLM_URL:-http://${FLEET_HUB_IP:-127.0.0.1}:30918}"
 CLUSTER="${FLEET_LLM_CLUSTER:-${FLEET_GPU_CLUSTER:-}}"
 RELEASE="${FLEET_LLM_RELEASE:-llama-cpp}"
 NS="${FLEET_CONSOLE_NS:-fleet-console}"
-DCM_NS="${FLEET_LLM_DCM_NS:-dcm}"
+LLM_NS="${FLEET_LLM_NAMESPACE:-fleet-llm}"
 KEY_NAME="${FLEET_LLM_APIKEY_NAME:-llm-e2e-test}"
 MODEL="${FLEET_LLM_MODEL:-Qwen2.5-0.5B-Instruct}"
 PUBLIC_HOST="${FLEET_LLM_PUBLIC_HOST:-}"
@@ -63,7 +62,7 @@ litellm_master_key() {
     printf '%s' "${LITELLM_MASTER_KEY}"
     return 0
   fi
-  hub_k -n "$DCM_NS" get secret fleet-llm-master-key \
+  hub_k -n "$LLM_NS" get secret fleet-llm-master-key \
     -o jsonpath='{.data.master_key}' 2>/dev/null | base64 -d
 }
 
@@ -148,7 +147,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: litellm-config
-  namespace: ${DCM_NS}
+  namespace: ${LLM_NS}
 data:
   config.yaml: |
     model_list:
@@ -164,10 +163,10 @@ EOF
   hub_k apply -f - < "${tmp}"
   rm -f "${tmp}"
   # hostNetwork LiteLLM cannot do a normal rolling update on a single-node hub.
-  hub_k -n "$DCM_NS" scale deployment/litellm --replicas=1
-  hub_k -n "$DCM_NS" delete pod -l app=fleet-llm --force --grace-period=0 || true
+  hub_k -n "$LLM_NS" scale deployment/litellm --replicas=1
+  hub_k -n "$LLM_NS" delete pod -l app=fleet-llm --force --grace-period=0 || true
   for _ in $(seq 1 60); do
-    if hub_k -n "$DCM_NS" get pod -l app=fleet-llm -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null | grep -q true; then
+    if hub_k -n "$LLM_NS" get pod -l app=fleet-llm -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null | grep -q true; then
       break
     fi
     sleep 5
@@ -183,7 +182,7 @@ EOF
 
 deploy_mock_backend() {
   log "deploy hub mock OpenAI backend on 127.0.0.1:${MOCK_PORT}"
-  hub_k -n "$DCM_NS" apply -f - <<EOF
+  hub_k -n "$LLM_NS" apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -241,7 +240,7 @@ spec:
                       })
               HTTPServer(("0.0.0.0", ${MOCK_PORT}), H).serve_forever()
 EOF
-  hub_k -n "$DCM_NS" rollout status deployment/llm-e2e-mock --timeout=120s
+  hub_k -n "$LLM_NS" rollout status deployment/llm-e2e-mock --timeout=120s
   apply_litellm_backend "http://127.0.0.1:${MOCK_PORT}/v1"
 }
 

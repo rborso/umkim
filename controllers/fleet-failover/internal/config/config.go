@@ -18,7 +18,7 @@ func FromEnv() Config {
 		RouteNamespace:          env("FLEET_ROUTE_NAMESPACE", "fleet-system"),
 		DegradedCMNamespace:     env("FLEET_FAILOVER_CM_NS", "fleet-system"),
 		DegradedCMName:          env("FLEET_FAILOVER_CM_NAME", "fleet-failover-degraded-clusters"),
-		PlacementManagerURL:     env("PLACEMENT_MANAGER_URL", "http://placement-manager.dcm.svc.cluster.local:8080/api/v1alpha1"),
+		PlacementManagerURL:     env("PLACEMENT_MANAGER_URL", ""),
 		FailoverCooldownSeconds: envInt("FAILOVER_COOLDOWN_SECONDS", 300),
 	}
 }

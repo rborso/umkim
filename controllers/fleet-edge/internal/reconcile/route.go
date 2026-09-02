@@ -52,6 +52,14 @@ func (routeRebuildPredicate) Update(e event.UpdateEvent) bool {
 	if oldRoute.Status.ActiveCluster != newRoute.Status.ActiveCluster {
 		return true
 	}
+	if oldRoute.Status.TLSPhase != newRoute.Status.TLSPhase {
+		return true
+	}
+	oldStaging := annotationValue(oldRoute.Annotations, annotationSpokeACMEStagingOK)
+	newStaging := annotationValue(newRoute.Annotations, annotationSpokeACMEStagingOK)
+	if oldStaging != newStaging {
+		return true
+	}
 	oldGen := annotationValue(oldRoute.Annotations, annotationFailoverGeneration)
 	newGen := annotationValue(newRoute.Annotations, annotationFailoverGeneration)
 	return oldGen != newGen
@@ -122,7 +130,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			latest.Spec.EffectiveMode = effective
 			patchSpec = true
 		}
-		if latest.Spec.SiteHost == "" && (effective == fleetv1alpha1.RouteModeSite || effective == fleetv1alpha1.RouteModeDual) {
+		if latest.Spec.SiteHost == "" && effective == fleetv1alpha1.RouteModeSite {
 			siteHost := defaultSiteHost(latest.Spec.HubHost, latest.Spec.Cluster, r.Config.FleetEdgeDomain)
 			if latest.Spec.SiteHost != siteHost {
 				latest.Spec.SiteHost = siteHost
@@ -196,17 +204,19 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				AuthEnabled:   r.Config.AutheliaEnabled,
 				SpokeACME:     false,
 				RedirectHTTPS: regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled),
-				// Hub Traefik always upstreams hub/dual catalog hosts to spoke :30081 (web-hub).
+				// Hub Traefik always upstreams hub catalog hosts to spoke :30081 (web-hub).
 				UseHubEntrypoint: regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled) &&
-					(routeMode == fleetv1alpha1.RouteModeHub || routeMode == fleetv1alpha1.RouteModeDual),
+					routeMode == fleetv1alpha1.RouteModeHub,
 			}
-			if enabled, gateMsg := r.spokeACMEEnabledForRoute(ctx, &route, clusterName, regCluster); enabled {
+			spokeState := r.resolveSpokeACMEState(ctx, &route, clusterName, regCluster)
+			if spokeState.ApplyACME {
 				targetOpts.SpokeACME = true
-				// Queued behind another site hostname: keep existing ManifestWork (do not
-				// rewrite TLS ingresses onto web-hub-only).
-				if gateMsg == "queued" {
+				targetOpts.CertResolver = spokeState.CertResolver
+				if spokeState.SkipApply {
 					continue
 				}
+			} else if spokeState.Blocked {
+				continue
 			}
 			yaml, err := manifests.RenderManifestWork(route, spokeHosts, clusterName, target.Service, targetOpts)
 			if err != nil {
@@ -233,7 +243,7 @@ func effectiveMode(mode, cluster string, reg clusters.Registry) (string, string)
 	if !ok {
 		return fleetv1alpha1.RouteModeHub, "cluster not in fleet-edge registry; using hub only"
 	}
-	if !c.AllowsDirectSiteIngress() && (mode == fleetv1alpha1.RouteModeSite || mode == fleetv1alpha1.RouteModeDual) {
+	if !c.AllowsDirectSiteIngress() && mode == fleetv1alpha1.RouteModeSite {
 		return fleetv1alpha1.RouteModeHub, "cluster has no direct site ingress; downgraded to hub"
 	}
 	if mode == "" {
@@ -272,7 +282,7 @@ func (r *RouteReconciler) issuingHubHosts(routes []fleetv1alpha1.FleetAppRoute) 
 		if mode == "" {
 			mode = route.Spec.Mode
 		}
-		if mode != fleetv1alpha1.RouteModeHub && mode != fleetv1alpha1.RouteModeDual {
+		if mode != fleetv1alpha1.RouteModeHub {
 			continue
 		}
 		switch route.Status.TLSPhase {
@@ -329,7 +339,7 @@ func (r *RouteReconciler) pendingTLSMiddlewares(routes []fleetv1alpha1.FleetAppR
 		if mode == "" {
 			mode = route.Spec.Mode
 		}
-		if mode != fleetv1alpha1.RouteModeHub && mode != fleetv1alpha1.RouteModeDual {
+		if mode != fleetv1alpha1.RouteModeHub {
 			continue
 		}
 		add(route.Spec.HubHost, route.Spec.RequireAuth)

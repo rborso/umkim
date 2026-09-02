@@ -13,68 +13,21 @@ harbor_proxy_project_ghcr: ghcr-proxy
 # Hosted project for fleet-built images (accepts push; survives fleet-cleanup when Harbor is kept).
 harbor_fleet_project: fleet
 harbor_charts_project: charts
+harbor_mirror_project: mirror
 harbor_charts_oci_prefix: "oci://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_charts_project }}"
-harbor_umkim_catalog_root: "{{ harbor_umkim_root | dirname }}/umkim-catalog"
 harbor_charts_to_push:
-  # Demo charts (seeded via roles/dcm/tasks/seed_*_catalog.yml)
   - name: whoami
     version: 0.1.0
   - name: pet-clinic-helm
     version: 0.1.1
   - name: llama-cpp-helm
     version: 0.1.2
-  # App charts from umkim-catalog (seed via umkim-catalog/shared/scripts/seed-catalog.sh)
-  - name: gitea-local
-    version: 0.1.0
-    optional: true
-    dependency_build: true
-    chart_dir: "{{ harbor_umkim_catalog_root }}/items/gitea/chart"
-  - name: paperless-local
-    version: 0.1.0
-    optional: true
-    dependency_build: true
-    chart_dir: "{{ harbor_umkim_catalog_root }}/items/paperless/chart"
-  - name: uptime-kuma-local
-    version: 0.1.0
-    optional: true
-    dependency_build: true
-    chart_dir: "{{ harbor_umkim_catalog_root }}/items/uptime-kuma/chart"
-  - name: nextcloud-local
-    version: 0.1.0
-    optional: true
-    dependency_build: true
-    chart_dir: "{{ harbor_umkim_catalog_root }}/items/nextcloud/chart"
-  - name: vaultwarden-local
-    version: 0.1.0
-    optional: true
-    dependency_build: true
-    chart_dir: "{{ harbor_umkim_catalog_root }}/items/vaultwarden/chart"
-  - name: immich-local
-    version: 0.1.0
-    optional: true
-    dependency_build: true
-    chart_dir: "{{ harbor_umkim_catalog_root }}/items/immich/chart"
-harbor_chart_repositories:
-  - name: gitea-charts
-    url: https://dl.gitea.com/charts/
-  - name: gabe565
-    url: https://charts.gabe565.com
-  - name: uptime-kuma
-    url: https://helm.irsigler.cloud
-  - name: nextcloud
-    url: https://nextcloud.github.io/helm/
-  - name: guerzon
-    url: https://guerzon.github.io/vaultwarden
-  - name: immich
-    url: https://immich-app.github.io/immich-charts
+harbor_chart_repositories: []
 harbor_fleet_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}"
 harbor_fleet_image_prefix: "{{ harbor_fleet_registry }}/{{ harbor_fleet_project }}"
 harbor_fleet_src_parent_dir: /opt/fleet-src
 # Sync from Ansible controller (avoids GitHub egress from hub).
-# Layout: ~/umkim + sibling repos under same parent; ~/upstream/* (dcm-project).
 harbor_umkim_root: "{{ playbook_dir | regex_replace('/playbooks/?$', '') }}"
-harbor_fleet_rborso_root: "{{ harbor_umkim_root | dirname }}"
-harbor_fleet_upstream_root: "{{ harbor_umkim_root | dirname }}/upstream"
 harbor_fleet_use_local_src: true
 harbor_fleet_push_force: false
 harbor_fleet_local_staging_dir: "{{ harbor_umkim_root }}/.cache/harbor-push"
@@ -83,22 +36,8 @@ harbor_fleet_failover_controller_local_src: "{{ harbor_umkim_root }}/controllers
 harbor_fleet_console_auth_local_src: "{{ harbor_umkim_root }}/controllers/fleet-console-auth"
 harbor_fleet_site_controller_local_src: "{{ harbor_umkim_root }}/controllers"
 harbor_fleet_ansible_runner_local_src: "{{ harbor_umkim_root }}/images/fleet-ansible-runner"
+# Historical image/dir name used by the live hub console.
 harbor_fleet_dcm_console_local_src: "{{ harbor_umkim_root }}/ui/dcm-fleet-console"
-harbor_fleet_olm_sp_local_src: "{{ harbor_fleet_rborso_root }}/fleet-olm-subscription-sp"
-harbor_fleet_olm_sp_git_repo: https://github.com/rborso/fleet-olm-subscription-sp.git
-harbor_fleet_olm_sp_git_version: "{{ harbor_fleet_olm_sp_git_ref | default('v0.1.0') }}"
-harbor_fleet_control_plane_git_repo: https://github.com/rborso/control-plane.git
-harbor_fleet_control_plane_git_version: "{{ harbor_fleet_control_plane_git_ref | default('v0.1.0') }}"
-harbor_fleet_control_plane_local_src: "{{ harbor_fleet_rborso_root }}/control-plane"
-harbor_fleet_helm_sp_local_src: "{{ harbor_fleet_rborso_root }}/fleet-helm-release-sp"
-harbor_fleet_helm_sp_git_repo: https://github.com/rborso/fleet-helm-release-sp.git
-harbor_fleet_helm_sp_git_version: "{{ harbor_fleet_helm_sp_git_ref | default('v0.1.0') }}"
-harbor_fleet_k8s_sp_git_repo: https://github.com/rborso/k8s-container-service-provider.git
-harbor_fleet_k8s_sp_git_version: "{{ harbor_fleet_k8s_sp_git_ref | default('v0.1.0') }}"
-harbor_fleet_k8s_sp_local_src: "{{ harbor_fleet_rborso_root }}/k8s-container-service-provider"
-harbor_fleet_kubevirt_sp_git_repo: https://github.com/rborso/kubevirt-service-provider.git
-harbor_fleet_kubevirt_sp_git_version: "{{ harbor_fleet_kubevirt_sp_git_ref | default('v0.1.0') }}"
-harbor_fleet_kubevirt_sp_local_src: "{{ harbor_fleet_rborso_root }}/kubevirt-service-provider"
 # Images built from UMKIM repo root — stage UMKIM LICENSE/NOTICE (sibling repos carry their own).
 harbor_fleet_umkim_legal_images:
   - fleet-site-controller
@@ -109,65 +48,34 @@ harbor_fleet_umkim_legal_images:
   - fleet-ansible-runner
 harbor_fleet_push_images:
   - repository: fleet-site-controller
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
     local_src: "{{ harbor_umkim_root }}/controllers"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/controllers"
     containerfile: fleet-site/Containerfile
   - repository: fleet-ansible-runner
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
     local_src: "{{ harbor_umkim_root }}/images/fleet-ansible-runner"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-ansible-runner"
     containerfile: Dockerfile
   - repository: fleet-edge-controller
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
     local_src: "{{ harbor_fleet_edge_controller_local_src }}"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-edge"
     containerfile: Containerfile
   - repository: fleet-failover-controller
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
     local_src: "{{ harbor_umkim_root }}/controllers"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/controllers"
     containerfile: fleet-failover/Containerfile
   - repository: dcm-fleet-console
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
     local_src: "{{ harbor_fleet_dcm_console_local_src }}"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/dcm-fleet-console"
     containerfile: Containerfile
   - repository: fleet-console-auth
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
     local_src: "{{ harbor_fleet_console_auth_local_src }}"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-console-auth"
-    containerfile: Containerfile
-  - repository: fleet-olm-subscription-sp
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
-    local_src: "{{ harbor_fleet_olm_sp_local_src }}"
-    clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-olm-subscription-sp"
-    containerfile: Containerfile
-  - repository: control-plane
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
-    git_repo: "{{ harbor_fleet_control_plane_git_repo }}"
-    git_version: "{{ harbor_fleet_control_plane_git_version }}"
-    local_src: "{{ harbor_fleet_control_plane_local_src }}"
-    clone_dir: "{{ harbor_fleet_src_parent_dir }}/control-plane"
-    containerfile: Containerfile
-  - repository: fleet-helm-release-sp
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
-    local_src: "{{ harbor_fleet_helm_sp_local_src }}"
-    clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-helm-release-sp"
-    containerfile: Containerfile
-  - repository: k8s-container-service-provider
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
-    git_repo: "{{ harbor_fleet_k8s_sp_git_repo }}"
-    git_version: "{{ harbor_fleet_k8s_sp_git_version }}"
-    local_src: "{{ harbor_fleet_k8s_sp_local_src }}"
-    clone_dir: "{{ harbor_fleet_src_parent_dir }}/k8s-container-service-provider"
-    containerfile: Containerfile
-  - repository: kubevirt-service-provider
-    tag: "{{ harbor_fleet_image_tag | default('0.1.0') }}"
-    git_repo: "{{ harbor_fleet_kubevirt_sp_git_repo }}"
-    git_version: "{{ harbor_fleet_kubevirt_sp_git_version }}"
-    local_src: "{{ harbor_fleet_kubevirt_sp_local_src }}"
-    clone_dir: "{{ harbor_fleet_src_parent_dir }}/kubevirt-service-provider"
     containerfile: Containerfile
 harbor_registry_pvc_size: 80Gi
 harbor_seed_local_images: true

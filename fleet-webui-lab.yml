@@ -1,5 +1,5 @@
 ---
-# Optional maintainer-lab console extras: OCM Lab dashboard, DCM Swagger, gateway /fleet/ routes.
+# Optional maintainer-lab console extras: OCM Lab dashboard, gateway /fleet/ routes.
 # Core console (auth + dashboard) is fleet-console-auth.yml — same as greenfield hub-install.
 #
 # Usage:

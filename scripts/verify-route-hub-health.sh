@@ -9,22 +9,22 @@ source "${ROOT}/scripts/fleet-verify/lib/hub-kubectl.sh"
 NS="${FLEET_ROUTE_NAMESPACE:-fleet-system}"
 MAX_WAIT_SEC="${ROUTE_HEALTH_MAX_WAIT_SEC:-180}"
 INTERVAL_SEC="${ROUTE_HEALTH_POLL_SEC:-15}"
-TRAEFIK_CM_NS="${FLEET_ROUTES_CM_NS:-dcm}"
-TRAEFIK_CM_NAME="${FLEET_ROUTES_CM_NAME:-dcm-traefik-fleet-routes}"
+TRAEFIK_CM_NS="${FLEET_ROUTES_CM_NS:-fleet-ingress}"
+TRAEFIK_CM_NAME="${FLEET_ROUTES_CM_NAME:-fleet-traefik-fleet-routes}"
 TRAEFIK_CM_KEY="${FLEET_ROUTES_CM_KEY:-fleet-routes.yml}"
-DCM_NS="${DCM_NAMESPACE:-dcm}"
+HUB_INGRESS_NS="${HUB_INGRESS_NS:-fleet-ingress}"
 GATEWAY_DEPLOY="${GATEWAY_DEPLOYMENT:-gateway}"
 
 echo "=== verify-route-hub-health ==="
 
-GW_JSON=$(hub_kubectl -n "$DCM_NS" get deploy "$GATEWAY_DEPLOY" -o json 2>/dev/null || echo '{}')
+GW_JSON=$(hub_kubectl -n "$HUB_INGRESS_NS" get deploy "$GATEWAY_DEPLOY" -o json 2>/dev/null || echo '{}')
 if [[ "$GW_JSON" != "{}" ]]; then
   echo "$GW_JSON" | jq -r '"gateway replicas=" + (.spec.replicas|tostring) + " ready=" + ((.status.readyReplicas//0)|tostring) + " strategy=" + (.spec.strategy.type//"?")'
 fi
 
 ROUTE=$(hub_kubectl -n "$NS" get fleetapproutes -o json 2>/dev/null | jq -r '
   .items[]
-  | select(.spec.mode == "hub" or .spec.mode == "dual" or .spec.effectiveMode == "hub" or .spec.effectiveMode == "dual")
+  | select(.spec.mode == "hub" or .spec.effectiveMode == "hub")
   | select(.status.phase == "Applied" or .status.phase == "Degraded")
   | .metadata.name
 ' | head -1)

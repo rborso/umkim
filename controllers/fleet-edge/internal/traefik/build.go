@@ -166,7 +166,7 @@ func Build(routes []fleetv1alpha1.FleetAppRoute, reg clusters.Registry, acme boo
 		}
 		cfg.HTTP.Services[svcName] = service{LoadBalancer: &lb}
 
-		if mode == fleetv1alpha1.RouteModeHub || mode == fleetv1alpha1.RouteModeDual {
+		if mode == fleetv1alpha1.RouteModeHub {
 			httpMids := hubRouterMiddlewares(mode, false, route.Spec.RequireAuth, opts, acme)
 			cfg.HTTP.Routers["fleet-app-"+appID+"-http"] = router{
 				Rule:        hostRuleHTTP(route.Spec.HubHost, acme),
@@ -219,7 +219,7 @@ func Build(routes []fleetv1alpha1.FleetAppRoute, reg clusters.Registry, acme boo
 	return out, nil
 }
 
-func dualUpstreamHealthCheck(route fleetv1alpha1.FleetAppRoute) *healthCheck {
+func failoverUpstreamHealthCheck(route fleetv1alpha1.FleetAppRoute) *healthCheck {
 	followRedirects := false
 	return &healthCheck{
 		Path:            route.EffectiveHealthPath(),
@@ -249,7 +249,7 @@ func upstreamServers(route fleetv1alpha1.FleetAppRoute, reg clusters.Registry, g
 	// Hub catalog hostnames always proxy to spoke Traefik hub HTTP (:30081), even when the
 	// spoke cluster uses acme_cluster site TLS. effectiveMode tracks routing policy, not upstream scheme.
 	upstreamMode := effectiveRouteMode(route)
-	if route.Spec.Mode == fleetv1alpha1.RouteModeHub || route.Spec.Mode == fleetv1alpha1.RouteModeDual {
+	if route.Spec.Mode == fleetv1alpha1.RouteModeHub {
 		upstreamMode = fleetv1alpha1.RouteModeHub
 	}
 
@@ -280,7 +280,7 @@ func upstreamServers(route fleetv1alpha1.FleetAppRoute, reg clusters.Registry, g
 	}
 	var hc *healthCheck
 	if len(servers) > 1 {
-		hc = dualUpstreamHealthCheck(route)
+		hc = failoverUpstreamHealthCheck(route)
 	}
 	return servers, hc, needsInsecure
 }

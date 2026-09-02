@@ -1,9 +1,10 @@
 ---
-fleet_failover_controller_enabled: true
+# Optional fleet-failover controller. Disabled in v0.2 (no placement engine).
+fleet_failover_controller_enabled: false
 fleet_failover_controller_namespace: fleet-system
 fleet_failover_route_namespace: fleet-system
 fleet_failover_controller_tag: "{{ harbor_fleet_image_tag }}"
 fleet_failover_controller_image: "{{ harbor_fleet_image_prefix }}/fleet-failover-controller:{{ fleet_failover_controller_tag }}"
 fleet_failover_controller_replicas: 1
-placement_manager_api_url: "http://placement-manager.{{ phase5_dcm_namespace }}.svc.cluster.local:8080/api/v1alpha1"
+placement_manager_api_url: ""
 fleet_failover_cooldown_seconds: 300

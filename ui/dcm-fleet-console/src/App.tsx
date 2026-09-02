@@ -2,11 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/AppLayout';
+import { AppsPage } from './pages/AppsPage';
 import { OverviewPage } from './pages/OverviewPage';
-import { ProvidersPage } from './pages/ProvidersPage';
-import { CatalogPage } from './pages/CatalogPage';
-import { InstancesPage } from './pages/InstancesPage';
-import { PoliciesPage } from './pages/PoliciesPage';
 import { SitesPage } from './pages/SitesPage';
 import { SiteDetailPage } from './pages/SiteDetailPage';
 import { ClustersPage } from './pages/ClustersPage';
@@ -37,18 +34,13 @@ export function App() {
             }
           >
             <Route index element={<OverviewPage />} />
-            <Route path="providers" element={<ProvidersPage />} />
-            <Route path="catalog" element={<CatalogPage />} />
-            <Route path="instances" element={<InstancesPage />} />
-            <Route path="operators" element={<Navigate to="/instances" replace />} />
-            <Route path="domains" element={<Navigate to="/sites" replace />} />
-            <Route path="policies" element={<PoliciesPage />} />
             <Route path="sites" element={<SitesPage />} />
             <Route path="sites/:name" element={<SiteDetailPage />} />
             <Route path="infrastructure" element={<InfrastructurePage />} />
             <Route path="clusters/umkim-hub" element={<Navigate to="/infrastructure" replace />} />
             <Route path="clusters" element={<ClustersPage />} />
             <Route path="clusters/:name" element={<ClusterDetailPage />} />
+            <Route path="apps" element={<AppsPage />} />
             <Route path="admin/users" element={<UsersPage />} />
             <Route path="admin/groups" element={<GroupsPage />} />
             <Route path="admin/role-bindings" element={<RoleBindingsPage />} />

@@ -1,6 +1,6 @@
 # Security
 
-UMKIM v0.1.0 is an experimental small-fleet reference stack. It is not
+UMKIM v0.2 is an experimental small-fleet reference stack. It is not
 security-certified or production-supported. Operators are responsible for
 reviewing every image, playbook, network rule, and secret before deployment.
 
@@ -21,10 +21,10 @@ path needs an explicit exposure review and must not be assumed WAN-blocked.
 
 ## Required operator controls
 
-- Use an encrypted Ansible Vault in the production profile; see
+- Use an encrypted Ansible Vault for hub install; see
   [docs/secrets.md](docs/secrets.md).
 - Use unique credentials and remove every `REPLACE_ME` value before deployment.
-- Restrict SSH access and enable host-key checking for non-lab deployments.
+- Restrict SSH access and enable host-key checking.
 - Keep the management plane behind WireGuard or an equivalent private network.
 - Enable TLS and authenticated access before exposing an application.
 - Test backup and restore independently; they are not a production
@@ -34,7 +34,7 @@ path needs an explicit exposure review and must not be assumed WAN-blocked.
 
 - `inventory/group_vars/all/vault.yml` and its password file
 - WireGuard private keys
-- Harbor, database, session, and application credentials
+- Harbor, session, directory, and application credentials
 - live inventory values, public addresses, and personal DNS names
 
 Commit only public templates such as [docs/vault.example.yml](docs/vault.example.yml).

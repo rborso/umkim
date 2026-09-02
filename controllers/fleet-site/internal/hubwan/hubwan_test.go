@@ -15,7 +15,7 @@ func TestInvalid(t *testing.T) {
 
 func TestInventoryYAMLLines(t *testing.T) {
 	lines := InventoryYAMLLines("203.0.113.5")
-	if len(lines) != 4 {
+	if len(lines) != 3 {
 		t.Fatalf("want 4 lines, got %d", len(lines))
 	}
 	if lines[0] != `fleet_hub_public_ipv4: "203.0.113.5"` {

@@ -9,6 +9,9 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-edge/internal/clusters"
 	"github.com/rborso/umkim/controllers/fleet-edge/internal/dns"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // spokeACMEQueue serializes TLS ingress pushes per cluster (one site hostname at a time).
@@ -82,15 +85,30 @@ func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName
 	if r.spokeACME == nil || !regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled) {
 		return
 	}
-	probeHost := strings.TrimSpace(regCluster.EdgeWANIP)
-	if probeHost == "" {
-		probeHost = effectiveGatewayProbeHost(r.Config)
-	}
+	probeHost := ""
 	for i := 0; i < 8; i++ {
 		host := r.spokeACME.activeHost(clusterName)
 		if host == "" {
 			return
 		}
+		if probeHost == "" {
+			probeHost = spokeProbeHost(ctx, host, regCluster)
+		}
+		route := r.routeForSiteHost(ctx, host, clusterName)
+		if route == nil {
+			return
+		}
+
+		if r.Config.SpokeACMEPreflightEnabled && !spokeStagingOK(route) {
+			ok, err := probeACMECert(probeHost, host, true)
+			if err != nil || !ok {
+				return
+			}
+			_ = r.annotateSpokeStagingOK(ctx, route)
+			_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseIssuing, "staging preflight succeeded; requesting production certificate")
+			return
+		}
+
 		ok, err := probeACMECert(probeHost, host, false)
 		if err != nil || !ok {
 			return
@@ -98,6 +116,52 @@ func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName
 		r.spokeACME.release(clusterName, host)
 		_ = r.markSiteHostTLSReady(ctx, clusterName, host)
 	}
+}
+
+func spokeStagingOK(route *fleetv1alpha1.FleetAppRoute) bool {
+	if route == nil || route.Annotations == nil {
+		return false
+	}
+	return route.Annotations[annotationSpokeACMEStagingOK] == "true"
+}
+
+func (r *RouteReconciler) routeForSiteHost(ctx context.Context, siteHost, clusterName string) *fleetv1alpha1.FleetAppRoute {
+	siteHost = normalizeHostname(siteHost)
+	var list fleetv1alpha1.FleetAppRouteList
+	if err := r.List(ctx, &list); err != nil {
+		return nil
+	}
+	for i := range list.Items {
+		route := &list.Items[i]
+		if normalizeHostname(route.Spec.SiteHost) != siteHost {
+			continue
+		}
+		if routeTargetsCluster(route, clusterName) {
+			return route
+		}
+	}
+	return nil
+}
+
+func (r *RouteReconciler) annotateSpokeStagingOK(ctx context.Context, route *fleetv1alpha1.FleetAppRoute) error {
+	if route == nil {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var latest fleetv1alpha1.FleetAppRoute
+		if err := r.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: route.Namespace}, &latest); err != nil {
+			return err
+		}
+		if latest.Annotations != nil && latest.Annotations[annotationSpokeACMEStagingOK] == "true" {
+			return nil
+		}
+		base := latest.DeepCopy()
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[annotationSpokeACMEStagingOK] = "true"
+		return r.Patch(ctx, &latest, client.MergeFrom(base))
+	})
 }
 
 func (r *RouteReconciler) markSiteHostTLSReady(ctx context.Context, clusterName, siteHost string) error {
@@ -136,7 +200,7 @@ func routeTargetsCluster(route *fleetv1alpha1.FleetAppRoute, clusterName string)
 }
 
 func (r *RouteReconciler) validateSiteDNS(ctx context.Context, hostname string, cluster clusters.Cluster) (bool, string) {
-	expected := cluster.EdgeWANIP
+	expected := strings.TrimSpace(cluster.EdgeWANIP)
 	ok, ips, err := dns.ValidateHost(ctx, hostname, expected)
 	if err != nil {
 		return false, err.Error()
@@ -146,43 +210,6 @@ func (r *RouteReconciler) validateSiteDNS(ctx context.Context, hostname string, 
 			return false, fmt.Sprintf("hostname %s did not resolve", hostname)
 		}
 		return false, fmt.Sprintf("DNS %v does not match expected %s", ips, expected)
-	}
-	return true, ""
-}
-
-func (r *RouteReconciler) spokeACMEEnabledForRoute(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, clusterName string, regCluster clusters.Cluster) (bool, string) {
-	if !regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled) {
-		return false, ""
-	}
-	mode := route.Spec.EffectiveMode
-	if mode == "" {
-		mode = route.Spec.Mode
-	}
-	if mode != fleetv1alpha1.RouteModeSite && mode != fleetv1alpha1.RouteModeDual {
-		return false, ""
-	}
-	siteHost := route.Spec.SiteHost
-	if siteHost == "" {
-		return false, ""
-	}
-	if route.Status.TLSPhase == fleetv1alpha1.TLSPhaseFailedDNS {
-		return false, route.Status.TLSMessage
-	}
-	if r.Config.ACMEDNSCheckEnabled {
-		ok, msg := r.validateSiteDNS(ctx, siteHost, regCluster)
-		if !ok {
-			_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseFailedDNS, msg)
-			return false, msg
-		}
-	}
-	if r.spokeACME == nil {
-		r.spokeACME = newSpokeACMEQueue()
-	}
-	if !r.spokeACME.allow(clusterName, siteHost) {
-		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseQueued, "waiting for spoke ACME queue")
-		// Still "enabled" for rendering: do not downgrade an existing TLS ManifestWork to
-		// plain web-hub while waiting — caller skips ApplyYAML until allow() succeeds.
-		return true, "queued"
 	}
 	return true, ""
 }

@@ -57,6 +57,7 @@ type clusterCreateBody struct {
 	Edge           fleetv1alpha1.FleetClusterJoinEdgeSpec `json:"edge,omitempty"`
 	Topology       string                                 `json:"topology,omitempty"`
 	NetworkMode    string                                 `json:"networkMode,omitempty"`
+	RockyVersion   string                                 `json:"rockyVersion,omitempty"`
 	HubLanApi      string                                 `json:"hubLanApi,omitempty"`
 	ControlPlaneVip string                                `json:"controlPlaneVip,omitempty"`
 	Nodes          []fleetv1alpha1.FleetClusterJoinNodeSpec `json:"nodes,omitempty"`
@@ -355,6 +356,7 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 			Edge:                req.Edge,
 			Topology:            topology,
 			NetworkMode:         networkMode,
+			RockyVersion:        s.Cfg.RockyMajor(req.RockyVersion),
 			HubLanApi:           req.HubLanApi,
 			ControlPlaneVip:     strings.TrimSpace(req.ControlPlaneVip),
 			Nodes:               req.Nodes,

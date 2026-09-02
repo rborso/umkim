@@ -1,0 +1,133 @@
+# FleetApp — Helm chart install onto an operator-selected Ready cluster.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetapps.fleet.umkim.com
+spec:
+  group: fleet.umkim.com
+  names:
+    kind: FleetApp
+    listKind: FleetAppList
+    plural: fleetapps
+    singular: fleetapp
+    shortNames:
+      - fapp
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: Cluster
+          type: string
+          jsonPath: .spec.clusterName
+        - name: Chart
+          type: string
+          jsonPath: .spec.chart
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - clusterName
+                - chart
+              properties:
+                clusterName:
+                  type: string
+                  description: Ready FleetClusterJoin / ManagedCluster name. Required; no auto-placement.
+                chart:
+                  type: string
+                  description: OCI chart URL or short name under the Harbor charts prefix.
+                version:
+                  type: string
+                releaseName:
+                  type: string
+                namespace:
+                  type: string
+                valuesYaml:
+                  type: string
+                route:
+                  type: object
+                  properties:
+                    mode:
+                      type: string
+                      enum:
+                        - none
+                        - hub
+                        - site
+                    hubHost:
+                      type: string
+                    siteHost:
+                      type: string
+                    requireAuth:
+                      type: boolean
+                    serviceName:
+                      type: string
+                    servicePort:
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
+                    serviceNamespace:
+                      type: string
+                    healthPath:
+                      type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Installing
+                    - Ready
+                    - Failed
+                    - Deleting
+                message:
+                  type: string
+                lastJobName:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                specHash:
+                  type: string
+                releaseName:
+                  type: string
+                namespace:
+                  type: string
+                clusterName:
+                  type: string
+                chart:
+                  type: string
+                routeName:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-map-type: atomic
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string

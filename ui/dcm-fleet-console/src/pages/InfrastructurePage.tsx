@@ -301,7 +301,7 @@ export function InfrastructurePage() {
               Let&apos;s Encrypt (TLS)
             </Title>
             <p style={{ marginTop: '0.5rem', maxWidth: '52rem' }}>
-              Hub-routed apps use certificates from Let&apos;s Encrypt on the DCM Traefik gateway
+              Hub-routed apps use certificates from Let&apos;s Encrypt on hub Traefik
               ({hub?.hub_zone ? `*.${hub.hub_zone}` : 'app zone'}). Requires public DNS and WAN
               :80/:443 to this host.
             </p>

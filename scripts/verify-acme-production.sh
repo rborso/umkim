@@ -29,8 +29,10 @@ if [[ -n "$phase" ]]; then
   ok "FleetAppRoute tlsPhase=Ready"
 fi
 
-static="$($KUBECTL -n dcm get cm dcm-traefik-static -o jsonpath='{.data.traefik\.yml}' 2>/dev/null || true)"
-[[ -n "$static" ]] || fail "dcm-traefik-static missing"
+INGRESS_NS="${HUB_INGRESS_NS:-fleet-ingress}"
+STATIC_CM="${HUB_INGRESS_STATIC_CM:-fleet-traefik-static}"
+static="$($KUBECTL -n "$INGRESS_NS" get cm "$STATIC_CM" -o jsonpath='{.data.traefik\.yml}' 2>/dev/null || true)"
+[[ -n "$static" ]] || fail "${STATIC_CM} missing in ${INGRESS_NS}"
 echo "$static" | grep -q 'letsencrypt-preflight' \
   && ok "traefik static has preflight resolver" \
   || fail "missing letsencrypt-preflight resolver"

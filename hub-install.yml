@@ -1,17 +1,16 @@
 ---
-# Greenfield hub install: K3s, OCM, Harbor, DCM, console, fleet-site, fleet-edge.
-# No Ansible-managed spokes. Workload clusters join later via console (FleetClusterJoin).
+# Greenfield hub install (v0.2 spine): K3s, OCM, Harbor, console, fleet-site, fleet-edge.
+# No DCM. No Ansible-managed spokes. Workload clusters join later via console (FleetClusterJoin).
 #
 # Prerequisites: inventory from examples/inventory/hub-only (see scripts/bootstrap-hub-inventory.sh)
 #
 # Usage:
 #   ./scripts/install-hub.sh
 #   ansible-playbook hub-install.yml -l hub
-#   ansible-playbook hub-install.yml -l hub --tags dcm_hub,dcm_seed_catalog   # resume
+#   ansible-playbook hub-install.yml -l hub --tags harbor_push_fleet   # resume
 #
 # Environment:
-#   FLEET_PROFILE=production|lab  (default: production via install-hub.sh)
-#   ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass  (required for production)
+#   ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass  (required)
 #   INV="-i inventory/hosts.yml -i inventory/hosts-from-hub.yml"
 
 - name: Hub install | Preflight
@@ -46,9 +45,9 @@
   ansible.builtin.import_playbook: fleet-console-auth.yml
   tags: [hub_install, fleet_console_auth, fleet_console_helm]
 
-- name: Hub install | DCM control plane
-  ansible.builtin.import_playbook: fleet-dcm.yml
-  tags: [hub_install, dcm, dcm_hub, dcm_seed_catalog]
+- name: Hub install | Hub ingress (Traefik hostNetwork)
+  ansible.builtin.import_playbook: hub-ingress.yml
+  tags: [hub_install, hub_ingress]
 
 - name: Hub install | Hub firewall
   ansible.builtin.import_playbook: hub-firewall.yml
@@ -61,11 +60,6 @@
 - name: Hub install | Fleet site controller
   ansible.builtin.import_playbook: fleet-site-controller.yml
   tags: [hub_install, fleet_site, fleet_site_controller]
-
-# Hub LiteLLM proxy when inventory fleet_llm_enabled is true (seeded by fleet-site-controller).
-- name: Hub install | Fleet LLM (LiteLLM)
-  ansible.builtin.import_playbook: fleet-llm.yml
-  tags: [hub_install, fleet_llm, fleet_llm_hub]
 
 - name: Hub install | Fleet edge CRD
   ansible.builtin.import_playbook: fleet-edge-crd.yml

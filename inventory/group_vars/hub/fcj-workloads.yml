@@ -7,7 +7,5 @@
 # is for hub-only fleets without console-managed spokes.
 
 fleet_gateway_wireguard_upstream: true
-fleet_edge_acme_legacy_gateway_scale: true
+fleet_edge_acme_legacy_gateway_scale: false
 fleet_edge_acme_preflight_enabled: false
-dcm_gateway_acme_solver_enabled: false
-dcm_gateway_replicas: 1

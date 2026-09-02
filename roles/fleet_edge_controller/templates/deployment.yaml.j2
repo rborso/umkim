@@ -38,31 +38,37 @@ spec:
             - name: FLEET_EDGE_ACME_PREFLIGHT_ENABLED
               value: "{{ fleet_edge_acme_preflight_enabled | default(true) | bool | ternary('true', 'false') }}"
             - name: FLEET_GATEWAY_PROBE_HOST
-              value: "{{ fleet_gateway_probe_host | default(fleet_hub_public_ipv4 | default(dcm_gateway_external_ip | default(''))) }}"
+              value: "{{ fleet_gateway_probe_host | default(fleet_hub_public_ipv4 | default('')) }}"
             - name: FLEET_ACME_QUEUE_RETRY_INTERVAL_SEC
               value: "{{ fleet_edge_acme_queue_retry_interval_sec | default(60) | string }}"
             - name: FLEET_ACME_SOLVER_ENABLED
-              value: "{{ dcm_gateway_acme_solver_enabled | default(fleet_edge_acme_enabled | default(false)) | bool | ternary('true', 'false') }}"
+              value: "false"
             - name: FLEET_ACME_LEGACY_GATEWAY_SCALE
-              value: "{{ fleet_edge_acme_legacy_gateway_scale | default(false) | bool | ternary('true', 'false') }}"
+              value: "false"
+            - name: FLEET_GATEWAY_DEPLOYMENT_NS
+              value: "{{ fleet_edge_gateway_deployment_ns }}"
+            - name: FLEET_GATEWAY_DEPLOYMENT_NAME
+              value: "{{ fleet_edge_gateway_deployment_name }}"
             - name: FLEET_ACME_SOLVER_DEPLOYMENT
               value: "gateway-acme"
             - name: FLEET_ACME_SOLVER_SERVICE
               value: "gateway-acme"
             - name: FLEET_ACME_SOLVER_ROUTES_CM
-              value: "dcm-traefik-acme-routes"
+              value: "{{ fleet_edge_acme_solver_routes_cm | default('fleet-traefik-acme-routes') }}"
             - name: FLEET_ACME_DEBOUNCE_SEC
               value: "{{ fleet_edge_acme_debounce_sec | default(30) | string }}"
             - name: FLEET_ACME_DNS_CHECK_ENABLED
               value: "{{ fleet_edge_acme_dns_check_enabled | default(true) | bool | ternary('true', 'false') }}"
+            - name: FLEET_SPOKE_ACME_PREFLIGHT_ENABLED
+              value: "{{ fleet_spoke_acme_preflight_enabled | default(true) | bool | ternary('true', 'false') }}"
             - name: FLEET_GATEWAY_WAN_IP
-              value: "{{ fleet_hub_public_ipv4 | default(dcm_gateway_external_ip | default('')) }}"
+              value: "{{ fleet_hub_public_ipv4 | default('') }}"
             - name: FLEET_ROUTE_NAMESPACE
               value: "{{ fleet_edge_controller_namespace }}"
             - name: HUB_GATEWAY_URL
-              value: "{{ fleet_edge_hub_gateway_url | default('http://127.0.0.1:30908') }}"
+              value: "{{ fleet_edge_hub_gateway_url | default('http://127.0.0.1:80') }}"
             - name: HUB_GATEWAY_HTTP_URL
-              value: "{{ fleet_edge_hub_gateway_http_url | default('http://127.0.0.1:30908') }}"
+              value: "{{ fleet_edge_hub_gateway_http_url | default('http://127.0.0.1:80') }}"
             - name: ROUTE_HEALTH_INTERVAL_SEC
               value: "{{ fleet_edge_route_health_interval_sec | default(60) | string }}"
             - name: ROUTE_HEALTH_FAILURE_THRESHOLD

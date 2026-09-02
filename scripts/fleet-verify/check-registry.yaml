@@ -33,17 +33,6 @@
   timeout_s: 180
   blocking: true
 
-- id: fleet.pins
-  layer: [1]
-  suite: [hub, core]
-  module: S1
-  mode: readonly
-  requires: [hub]
-  profiles: [hub-only, homelab]
-  script: scripts/fleet-verify-pins.sh
-  timeout_s: 120
-  blocking: false  # sibling-repo SHA hygiene; not live hub runtime
-
 - id: docs.tiers
   layer: [1]
   suite: [hub, core]
@@ -66,73 +55,29 @@
   timeout_s: 180
   blocking: true
 
-- id: dcm.hub-install
+- id: hub.install
   layer: [1]
   suite: [hub, core]
   module: S3
   mode: readonly
-  requires: [hub, dcm_api, kubectl]
+  requires: [hub, kubectl]
   profiles: [hub-only, homelab]
   script: scripts/verify-hub-install.sh
   timeout_s: 300
   blocking: true
 
-- id: dcm.placement-preview
+- id: hub.charts
   layer: [1]
-  suite: [core, hub]
+  suite: [hub, apps]
   module: S3
   mode: readonly
-  requires: [hub, dcm_api]
+  requires: [hub, fleet_api]
   profiles: [hub-only, homelab]
-  script: scripts/verify-placement-preview.sh
-  timeout_s: 120
+  script: scripts/verify-fleet-chart.sh
+  timeout_s: 60
   blocking: true
 
-- id: dcm.placement-preview-verbose
-  layer: [1]
-  suite: [core, hub]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  script: scripts/verify-placement-preview-verbose.sh
-  timeout_s: 180
-  blocking: true
-
-- id: dcm.placement-phase2
-  layer: [1]
-  suite: [core, hub]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  script: scripts/verify-placement-phase2.sh
-  timeout_s: 180
-  blocking: true
-
-- id: dcm.policy-manager-fork
-  layer: [1]
-  suite: [core, hub]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  script: scripts/validate-policy-manager-phase2-fork.sh
-  timeout_s: 180
-  blocking: true
-
-- id: dcm.llama-cpp-helm
-  layer: [1]
-  suite: [llm, hub]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api, kubectl]
-  profiles: [hub-only, homelab]
-  script: scripts/verify-llama-cpp-helm.sh
-  timeout_s: 300
-  blocking: true
-
-- id: dcm.fleet-llm
+- id: llm.fleet
   layer: [1]
   suite: [llm, hub]
   module: S3
@@ -145,7 +90,7 @@
   env:
     FLEET_LLM_EXPECT_ENABLED: "true"
 
-- id: dcm.gpu-discovery
+- id: llm.gpu-discovery
   layer: [1]
   suite: [llm, core]
   module: S3
@@ -155,17 +100,6 @@
   script: scripts/verify-gpu-discovery.sh
   timeout_s: 120
   blocking: false
-
-- id: edge.dual-route
-  layer: [1]
-  suite: [edge, core]
-  module: S5
-  mode: readonly
-  requires: [hub, kubectl, dcm_api]
-  profiles: [homelab]
-  script: scripts/test-fleet-edge-dual-route.sh
-  timeout_s: 180
-  blocking: true
 
 - id: edge.ingress-auth
   layer: [1]
@@ -183,7 +117,7 @@
   suite: [edge, hub]
   module: S5
   mode: readonly
-  requires: [hub, dcm_api, kubectl]
+  requires: [hub, kubectl]
   profiles: [homelab]
   script: scripts/verify-route-hub-health.sh
   timeout_s: 180
@@ -244,28 +178,6 @@
   timeout_s: 300
   blocking: true
 
-- id: edge.failover-relocate
-  layer: [1]
-  suite: [edge, regression]
-  module: S5
-  mode: readonly
-  requires: [hub, dcm_api, kubectl]
-  profiles: [homelab]
-  script: scripts/verify-failover-relocate.sh
-  timeout_s: 600
-  blocking: true
-
-- id: edge.hub-multisite-failover
-  layer: [1]
-  suite: [edge, regression]
-  module: S5
-  mode: readonly
-  requires: [hub, dcm_api, kubectl]
-  profiles: [homelab]
-  script: scripts/verify-hub-multisite-failover.sh
-  timeout_s: 600
-  blocking: true
-
 - id: ops.fleet-backup
   layer: [1]
   suite: [backup, hub]
@@ -275,17 +187,6 @@
   profiles: [hub-only, homelab]
   script: scripts/verify-fleet-backup.sh
   timeout_s: 300
-  blocking: true
-
-- id: ops.instance-placement-targets
-  layer: [1]
-  suite: [core, hub]
-  module: S8
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  script: scripts/verify-instance-placement-targets.sh
-  timeout_s: 180
   blocking: true
 
 - id: ops.site-cluster-model
@@ -397,83 +298,6 @@
   handler: checks/fleet-backup-infra.sh
   timeout_s: 60
   blocking: false
-
-- id: dcm.providers.list
-  layer: [1]
-  suite: [hub, core]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-providers-list.sh
-  timeout_s: 60
-  blocking: true
-
-- id: dcm.catalog.list
-  layer: [1]
-  suite: [hub, core, catalog]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-catalog-list.sh
-  timeout_s: 60
-  blocking: true
-
-- id: dcm.policies.list
-  layer: [1]
-  suite: [hub, core]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-policies-list.sh
-  timeout_s: 60
-  blocking: true
-
-- id: dcm.instances.list
-  layer: [1]
-  suite: [hub, core, catalog]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-instances-list.sh
-  timeout_s: 60
-  blocking: true
-
-- id: dcm.service-types
-  layer: [1]
-  suite: [hub, core]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-service-types.sh
-  timeout_s: 60
-  blocking: true
-
-- id: dcm.health
-  layer: [1]
-  suite: [hub, core]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-health.sh
-  timeout_s: 120
-  blocking: true
-
-- id: dcm.placement.preview
-  layer: [1]
-  suite: [core, hub]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/dcm-placement-preview.sh
-  timeout_s: 120
-  blocking: true
 
 - id: auth.gate
   layer: [1]
@@ -588,20 +412,6 @@
   timeout_s: 600
   blocking: true
 
-- id: ansible.dcm
-  layer: [1]
-  suite: [hub, core]
-  module: S3
-  mode: readonly
-  requires: [hub, dcm_api]
-  profiles: [hub-only, homelab]
-  handler: checks/ansible-verify.sh
-  env:
-    FV_ANSIBLE_PLAYBOOK: fleet-dcm.yml
-    FV_ANSIBLE_TAGS: dcm_verify
-  timeout_s: 600
-  blocking: true
-
 - id: ansible.platform
   layer: [1]
   suite: [hub, core]
@@ -667,24 +477,12 @@
   blocking: true
   parity: true
 
-- id: parity.policy.crud
-  layer: [2]
-  suite: [core, catalog]
-  module: S7
-  mode: mutating
-  requires: [hub, dcm_api, console]
-  profiles: [homelab]
-  handler: parity/run-parity.sh
-  timeout_s: 600
-  blocking: true
-  parity: true
-
 - id: parity.deploy.submit
   layer: [2]
-  suite: [core, catalog]
+  suite: [core, apps]
   module: S7
   mode: mutating
-  requires: [hub, dcm_api, console]
+  requires: [hub, console]
   profiles: [homelab]
   handler: parity/run-parity.sh
   timeout_s: 900
@@ -724,17 +522,6 @@
   timeout_s: 1800
   blocking: true
 
-- id: tenancy.multi-tenancy-e2e
-  layer: [2]
-  suite: [tenancy, regression]
-  module: S7
-  mode: mutating
-  requires: [hub, console, dcm_api]
-  profiles: [homelab]
-  script: scripts/verify-multi-tenancy-e2e.sh
-  timeout_s: 900
-  blocking: true
-
 - id: edge.external-access
   layer: [2]
   suite: [edge, regression]
@@ -755,28 +542,6 @@
   profiles: [homelab]
   script: scripts/verify-cluster-ingress-auth-enable.sh
   timeout_s: 900
-  blocking: true
-
-- id: backup.instance-backup-api
-  layer: [2]
-  suite: [backup]
-  module: S8
-  mode: mutating
-  requires: [hub, fleet_api, dcm_api]
-  profiles: [homelab]
-  handler: checks/backup-instance-api.sh
-  timeout_s: 1200
-  blocking: true
-
-- id: backup.instance-backup-restore-e2e
-  layer: [2]
-  suite: [backup, regression]
-  module: S8
-  mode: mutating
-  requires: [hub, fleet_api, dcm_api, nfs]
-  profiles: [homelab]
-  script: scripts/verify-instance-backup-restore-e2e.sh
-  timeout_s: 3600
   blocking: true
 
 - id: storage.cluster-configure
@@ -821,50 +586,6 @@
     LLM_E2E_USE_MOCK_FALLBACK: "1"
     SKIP_LLM_DEPLOY: "1"
 
-- id: catalog.helm
-  layer: [2]
-  suite: [catalog, core]
-  module: S3
-  mode: mutating
-  requires: [hub, dcm_api, jumphost]
-  profiles: [homelab]
-  script: scripts/verify-helm-catalog.sh
-  timeout_s: 1200
-  blocking: true
-
-- id: catalog.stateless-web
-  layer: [2]
-  suite: [catalog]
-  module: S3
-  mode: mutating
-  requires: [hub, dcm_api, jumphost]
-  profiles: [homelab]
-  script: scripts/verify-stateless-web-catalog.sh
-  timeout_s: 1200
-  blocking: true
-
-- id: catalog.olm-operator-whoami
-  layer: [2]
-  suite: [catalog]
-  module: S3
-  mode: mutating
-  requires: [hub, dcm_api, kubectl]
-  profiles: [homelab]
-  script: scripts/verify-olm-operator-whoami.sh
-  timeout_s: 1800
-  blocking: true
-
-- id: regression.homelab-matrix
-  layer: [2]
-  suite: [regression]
-  module: S8
-  mode: mutating
-  requires: [hub, fleet_api, dcm_api, jumphost]
-  profiles: [homelab]
-  script: scripts/lab/verify-homelab-matrix.sh
-  timeout_s: 7200
-  blocking: true
-
 - id: fleet.sites.patch
   layer: [2]
   suite: [core]
@@ -907,26 +628,4 @@
   profiles: [homelab]
   handler: checks/fleet-infra-patch.sh
   timeout_s: 600
-  blocking: true
-
-- id: fleet.secrets.catalog
-  layer: [2]
-  suite: [catalog, core]
-  module: S6
-  mode: mutating
-  requires: [hub, fleet_api, dcm_api]
-  profiles: [homelab]
-  handler: checks/fleet-secrets-catalog.sh
-  timeout_s: 600
-  blocking: true
-
-- id: catalog.whoami-deploy
-  layer: [2]
-  suite: [catalog, core]
-  module: S3
-  mode: mutating
-  requires: [hub, dcm_api, jumphost]
-  profiles: [homelab]
-  handler: checks/whoami-deploy.sh
-  timeout_s: 900
   blocking: true

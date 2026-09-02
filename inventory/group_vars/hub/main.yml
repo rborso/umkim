@@ -6,9 +6,10 @@
 #   inventory/group_vars/all/site.yml   — domain, LDAP base DN, fleet_hub_inventory_hostname
 #   inventory/group_vars/all/fleet_sites.yml
 #
-# Secrets: inventory/group_vars/all/vault.yml (production); wired below via *_vault keys.
+# Secrets: inventory/group_vars/all/vault.yml (encrypted); wired below via *_vault keys.
 
 fleet_role: hub
+fleet_node: true
 fleet_lab_webui_extras: false
 harbor_enable_quay_mirror: false
 ocm_clusteradm_path: /usr/local/bin/clusteradm
@@ -17,26 +18,13 @@ k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 phase4_bootstrap_namespace: fleet-bootstrap
 phase4_manifestwork_name: phase4-platform-bootstrap
 phase4_bootstrap_image: docker.io/bitnami/kubectl@sha256:9e369df7ab3386b736d162348f167bcc02cb4ba3f5203e9151be854437d6e0af
-phase5_dcm_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_quay }}"
-phase5_control_plane_version: "{{ harbor_fleet_image_tag | default(umkim_version | default('0.1.0')) }}"
-phase5_control_plane_image: "{{ harbor_fleet_image_prefix }}/control-plane:{{ phase5_control_plane_version }}"
-fleet_dcm_monolith_reset_db: false
 fleet_cleanup_delete_harbor: false
 k3s_role: server
 ocm_hub: true
 
-# Whoami smoke-test catalog items (container demo-webapp + helm whoami-helm); seeded by phase5_hub.
-fleet_dcm_demo_catalog_seed: true
-fleet_dcm_helm_catalog_seed: true
-# Demo placement policies (fleet-*-rwo single cluster; fleet-*-rwo-repl2 two clusters + standby failover).
-# Demo placement policies (demo-* single / ha-standby / least-util); see roles/dcm/defaults/main.yml.
-fleet_dcm_demo_catalog_replicas: 1
-fleet_dcm_operator_catalog_seed: false
-fleet_dcm_phase2_placement: true
+# Whoami smoke-test chart (Harbor charts/whoami); install with FleetApp onto a selected Ready cluster.
 # Optional hub LiteLLM proxy — enable only when GPU clusters exist (not in install-hub.sh).
 # fleet_llm_enabled: false
-fleet_dcm_demo_policy_spread_ha: false
-fleet_phase3_decisions_locked: true
 wireguard_address: 10.10.0.1/24
 wireguard_role: server
 
@@ -51,12 +39,9 @@ k3s_bind_address: "{{ wireguard_address | ansible.utils.ipaddr('address') }}"
 k3s_advertise_address: "{{ wireguard_address | ansible.utils.ipaddr('address') }}"
 calico_ip_autodetection_method: interface=wg0
 
-# Fleet edge + Let's Encrypt on hub gateway (:80/:443).
+# Fleet edge + Let's Encrypt on hub gateway (hostNetwork :80/:443).
 fleet_edge_acme_enabled: true
-# Default: HA pod-network (hub-only, no console workload clusters). For §6 FCJ clusters, copy
-# examples/inventory/hub-only/group_vars/hub/fcj-workloads.yml → inventory/group_vars/hub/
-dcm_gateway_replicas: 3
-fleet_edge_hub_gateway_url: "{{ 'https://10.10.0.1:30909' if (fleet_ingress_auth_enabled | default(false) | bool) else 'http://10.10.0.1:30908' }}"
+fleet_edge_hub_gateway_url: "{{ 'https://127.0.0.1' if (fleet_ingress_auth_enabled | default(false) | bool) else 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
 
 # Fleet ingress auth (Authelia). Set true to enable on hub at install (requires vault LLDAP password).
 # Reconcile: fleet-site-controller Job (seed_infrastructure.yml) or POST /ingress-auth/reconcile.
@@ -75,7 +60,7 @@ fleet_ingress_auth_lldap_external_url: >-
   {{ ('ldap://lldap.' + (fleet_webui_namespace | default('fleet-console')) + '.svc.cluster.local:' + (fleet_auth_lldap_ldap_port | default(3890) | string))
      if (fleet_auth_lldap_enabled | default(fleet_auth_lldap_enabled_profile | default(false)) | bool) else '' }}
 
-# Fleet console auth — lldap LDAP in production (fleet_profile=production).
+# Console auth — LLDAP (default hub install). Break-glass localadmin stays in vault.
 # fleet_auth_ldap_base_dn: set in group_vars/all/site.yml (applies to hub via all/ group).
 fleet_auth_lldap_enabled: "{{ fleet_auth_lldap_enabled_profile | default(false) }}"
 fleet_auth_lldap_image: ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
@@ -94,9 +79,8 @@ ocm_create_namespace: true
 ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
 ocm_join_command_path: /etc/ocm/hub-join-command.sh
 
-# Production secrets (vault.yml) — required when FLEET_PROFILE=production
-dcm_postgres_password: "{{ dcm_postgres_password_vault | default('FleetDCM-ChangeMe') }}"
+# Vault secrets (inventory/group_vars/all/vault.yml, encrypted)
 harbor_admin_password: "{{ harbor_admin_password_vault | default('FleetHarbor-ChangeMe') }}"
 fleet_console_auth_session_secret: "{{ fleet_console_auth_session_secret_vault | default('change-me-fleet-console-auth') }}"
-# WG console NodePorts (30908/30912) are plain HTTP; Secure cookies break login in the browser.
+# Overlay HTTP console NodePort (30912); Secure cookies break login in the browser.
 fleet_console_auth_session_secure: false

@@ -1,5 +1,8 @@
 # WireGuard clients for operators
 
+> Status: v0.2 is an experimental proof of concept. Overlay access is
+> privileged; treat client configs as secrets.
+
 WireGuard operator clients provide split-tunnel access to the fleet management
 overlay. They are for trusted operator devices, not a general remote-access
 service.

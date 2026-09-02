@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate inventory/group_vars/all/vault.yml from docs/vault.example.yml with random secrets.
-# Omits optional per-cluster LLDAP and Gitea catalog keys (add later from vault.example.yml).
+# Omits optional per-cluster LLDAP and Gitea keys (add later from vault.example.yml).
 #
 # Usage:
 #   ./scripts/generate-vault-secrets.sh
@@ -101,7 +101,6 @@ set_yaml fleet_ingress_auth_session_secret_vault "$(rand_alnum 48)"
 set_yaml fleet_ingress_auth_storage_key_vault "$(rand_exact32)"
 set_yaml fleet_ingress_auth_reset_jwt_secret_vault "$(rand_hex 32)"
 set_yaml fleet_ingress_auth_lldap_jwt_secret_vault "$(rand_hex 32)"
-set_yaml dcm_postgres_password_vault "$(rand_alnum 24)"
 set_yaml harbor_admin_password_vault "$(rand_alnum 24)"
 set_yaml fleet_velero_minio_access_key_vault "$(rand_alnum 20)"
 set_yaml fleet_velero_minio_secret_key_vault "$(rand_alnum 40)"

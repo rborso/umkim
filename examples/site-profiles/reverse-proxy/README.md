@@ -13,8 +13,8 @@ operated outside the fleet and manages the external TLS boundary.
 4. Validate the resulting inventory and ingress behavior before deployment.
 
 [`nginx-vhost.example`](nginx-vhost.example) is a commented reference only.
-Neither it nor this profile creates proxy configuration, certificates, DNS
-records, or network access.
+Use `FleetApp` `route.mode: site` for apps published through spoke ingress.
+Site-routed apps can remain reachable when the hub is down if ingress is healthy.
 
 ## References
 

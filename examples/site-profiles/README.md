@@ -1,15 +1,22 @@
 # Site profiles
 
-These are configuration examples for `FleetSite.spec.edge.exposureMode`. They
-illustrate inventory inputs only; they do not configure DNS, routers,
-certificates, or controller behavior.
+These are configuration examples for `FleetSite.spec.edge.exposureMode`
+(inventory: `exposure_mode`). They illustrate inventory inputs only; they do
+not configure DNS, routers, certificates, or controller behavior.
 
-Choose the profile that matches the access path you operate:
+A multi-site fleet can use a **different profile per site**. Outbound-only
+reachability via the hub is one supported pattern (`hub_gateway`), not the
+only topology.
 
-- [Hub gateway](hub-gateway/) for centrally routed traffic.
-- [Port forward](port-forward/) for direct router forwarding.
-- [Reverse proxy](reverse-proxy/) for an externally managed proxy.
-- [Internal](internal/) for private-only access.
+| Profile | `exposure_mode` / `exposureMode` |
+|---------|----------------------------------|
+| [Hub gateway](hub-gateway/) | `hub_gateway` |
+| [Port forward](port-forward/) | `port_forward` |
+| [Reverse proxy](reverse-proxy/) | `reverse_proxy` |
+| [Internal](internal/) | `none` |
+
+Inventory snippets use `exposure_mode` (Ansible → API). The CRD field is
+`exposureMode`. Values are the same.
 
 ## Use an example safely
 

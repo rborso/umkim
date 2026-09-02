@@ -62,9 +62,6 @@ fv_profile_check_requires() {
     req="${req// /}"
     case "${req}" in
       hub) ;;
-      dcm_api)
-        curl -sf --connect-timeout 3 "${DCM_API:-http://${FLEET_HUB_IP:-127.0.0.1}:30908/api/v1alpha1}/catalog-items" >/dev/null 2>&1 || return 1
-        ;;
       fleet_api)
         curl -sf --connect-timeout 3 "${FLEET_API:-http://${FLEET_HUB_IP:-127.0.0.1}:18080/api/v1alpha1}/clusters" >/dev/null 2>&1 || return 1
         ;;

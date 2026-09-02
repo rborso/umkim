@@ -3,8 +3,8 @@
 #   cp docs/vault.example.yml inventory/group_vars/all/vault.yml
 #   ansible-vault encrypt inventory/group_vars/all/vault.yml
 #
-# Run playbooks:
-#   ansible-playbook fleet-deploy.yml --vault-password-file ~/.umkim-vault-pass
+# Run hub install:
+#   ./scripts/install-hub.sh
 #
 # Never commit decrypted vault.yml with real secrets to a public repo.
 
@@ -32,8 +32,7 @@ fleet_ingress_auth_lldap_jwt_secret_vault: "REPLACE_ME"  # spokes only; hub uses
 # beta_lab02_lldap_password_vault: "REPLACE_ME_another_password"   # preferred
 # lab_ext02_lldap_password_vault: "REPLACE_ME_another_password"    # legacy alias for beta-lab02
 
-# DCM / Harbor
-dcm_postgres_password_vault: "REPLACE_ME_dcm_postgres"
+# Harbor
 harbor_admin_password_vault: "REPLACE_ME_harbor_admin"
 
 # Velero backup (hub MinIO + encrypted repo password)
@@ -41,5 +40,5 @@ fleet_velero_minio_access_key_vault: "REPLACE_ME_velero_access_key"
 fleet_velero_minio_secret_key_vault: "REPLACE_ME_velero_secret_key"
 fleet_velero_repo_password_vault: "REPLACE_ME_velero_repo_password"
 
-# Gitea catalog default admin (gitea-helm catalog item)
+# Gitea chart default admin (optional; used when installing Gitea via FleetApp)
 fleet_gitea_admin_password_vault: "REPLACE_ME_gitea_admin_password"

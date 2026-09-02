@@ -1,6 +1,6 @@
 # Fleet verification
 
-> Status: v0.1.0 is an experimental proof of concept. Verification improves
+> Status: v0.2 is an experimental proof of concept. Verification improves
 > confidence but does not certify production readiness.
 
 `scripts/verify-fleet.sh` runs the repository’s layered checks from the
@@ -27,8 +27,13 @@ repository root.
 ./scripts/verify-fleet.sh --layer 3 --suite regression
 ```
 
-The currently supported suite names are `hub`, `core`, `edge`, `backup`,
-`tenancy`, `llm`, `nested`, `catalog`, `regression`, and `all`.
+The currently registered suite names include `hub`, `core`, `edge`, `backup`,
+`tenancy`, `llm`, `nested`, `apps`, `regression`, and `all`.
+
+For a Helm app smoke test on a Ready cluster, use
+`scripts/verify-fleet-app.sh` (set `FLEET_APP_CLUSTER`) or the console **Apps**
+page. `scripts/verify-fleet-chart.sh` checks that the hub library lists seeded
+charts. See [components/fleet-apps.md](components/fleet-apps.md).
 
 ## Cluster reinstall presets
 

@@ -1,9 +1,11 @@
 ---
-# fleet_profile: lab | production (auth/secrets/LDAP only; images always use umkim_version)
-# Hub-only greenfield installs use production (matches install-hub.sh default).
-fleet_profile: production
+# Default hub install (the only supported path).
+# Encrypted vault, LLDAP console login, overlay HTTP cookies.
+# Not HA / not a "production" profile — one Rocky 10 management node.
 
-fleet_secrets_strict: "{{ fleet_profile == 'production' }}"
+fleet_profile: default
+
+fleet_secrets_strict: true
 
 fleet_secret_placeholder_patterns:
   - change-me
@@ -19,6 +21,8 @@ fleet_secret_placeholder_patterns:
   - fleet-authelia-storage-change-me
   - fleet-authelia-reset-jwt-change-me
 
-# Profile-gated settings (lab defaults remain in hub.yml / role defaults)
-fleet_auth_lldap_enabled_profile: "{{ fleet_profile == 'production' }}"
-fleet_console_auth_session_secure_profile: "{{ fleet_profile == 'production' }}"
+# Console uses LLDAP. Break-glass localadmin remains in vault.
+fleet_auth_lldap_enabled_profile: true
+# Console is HTTP on the WireGuard overlay (NodePort 30912). Secure cookies
+# would drop the session. Set true only if the console is served over HTTPS.
+fleet_console_auth_session_secure_profile: false

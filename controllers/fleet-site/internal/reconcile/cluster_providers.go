@@ -18,90 +18,17 @@ func providerAnnotation(kind, action string) string {
 	return fmt.Sprintf("fleet.umkim.com/provider-%s-%s", kind, action)
 }
 
+func (r *ClusterJoinReconciler) reconcileClusterProviders(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {
+	// v0.2: no DCM k8s/helm/kubevirt service providers. Ready is the deployable state.
+	return ctrl.Result{}, nil
+}
+
 func allProviderKinds() []string {
 	return []string{
 		fleetv1alpha1.ProviderKindKubevirt,
 		fleetv1alpha1.ProviderKindK8s,
 		fleetv1alpha1.ProviderKindHelm,
 	}
-}
-
-func (r *ClusterJoinReconciler) reconcileClusterProviders(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {
-	if fcj.Status.Providers == nil {
-		fcj.Status.Providers = map[string]fleetv1alpha1.ClusterProviderStatus{}
-	}
-	ensureProviderStatusDefaults(fcj, clusterName)
-	if providers, changed := r.recoverOrphanedProviderJobs(ctx, fcj.Namespace, fcj.Status.Providers); changed {
-		fcj.Status.Providers = providers
-		_ = r.Status().Update(ctx, fcj)
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	for _, kind := range allProviderKinds() {
-		for _, action := range []string{"install", "delete"} {
-			ann := providerAnnotation(kind, action)
-			if fcj.Annotations == nil {
-				continue
-			}
-			if _, ok := fcj.Annotations[ann]; !ok {
-				continue
-			}
-			if busy, busyKind := r.providerJobBusy(fcj); busy && busyKind != kind {
-				fcj.Status.Message = fmt.Sprintf("Provider %s job already running", busyKind)
-				_ = r.Status().Update(ctx, fcj)
-				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-			}
-			delete(fcj.Annotations, ann)
-			_ = r.Update(ctx, fcj)
-			if res, err := r.startClusterProviderJob(ctx, fcj, clusterName, kind, action); err != nil {
-				st := fcj.Status.Providers[kind]
-				st.Phase = fleetv1alpha1.ProviderPhaseFailed
-				st.Message = err.Error()
-				fcj.Status.Providers[kind] = st
-				_ = r.Status().Update(ctx, fcj)
-				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
-			} else if res.Requeue || res.RequeueAfter > 0 {
-				return res, nil
-			}
-			return ctrl.Result{Requeue: true}, nil
-		}
-	}
-
-	for _, kind := range allProviderKinds() {
-		st := fcj.Status.Providers[kind]
-		if st.JobName == "" {
-			continue
-		}
-		if st.Phase != fleetv1alpha1.ProviderPhaseInstalling && st.Phase != fleetv1alpha1.ProviderPhaseDeleting {
-			continue
-		}
-		done, ok, msg := r.jobDone(ctx, fcj.Namespace, st.JobName)
-		if !done {
-			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
-		}
-		if ok {
-			if st.Phase == fleetv1alpha1.ProviderPhaseDeleting {
-				st.Phase = fleetv1alpha1.ProviderPhaseNotInstalled
-				st.Message = "Provider removed"
-			} else {
-				st.Phase = fleetv1alpha1.ProviderPhaseReady
-				st.Message = "Provider ready"
-			}
-		} else {
-			st.Phase = fleetv1alpha1.ProviderPhaseFailed
-			st.Message = msg
-		}
-		st.JobName = ""
-		fcj.Status.Providers[kind] = st
-		_ = r.Status().Update(ctx, fcj)
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	if res, err := r.reconcileAutoProviderInstall(ctx, fcj, clusterName); err != nil || !res.IsZero() {
-		return res, err
-	}
-
-	return ctrl.Result{}, nil
 }
 
 func (r *ClusterJoinReconciler) reconcileAutoProviderInstall(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {

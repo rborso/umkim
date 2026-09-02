@@ -14,7 +14,3 @@
 - name: Fleet site overlay | Re-apply hub WG peer and route
   ansible.builtin.import_tasks: hub_wg_peer.yml
   run_once: true
-
-- name: Fleet site overlay | Refresh DCM provider health probes
-  ansible.builtin.import_tasks: refresh_dcm_provider_health.yml
-  run_once: true

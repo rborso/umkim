@@ -27,4 +27,22 @@ fleet_sites:
       expected_wan_ip: "{{ hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].fleet_hub_public_ipv4 | default(hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].ansible_host | default('')) }}"
     wireguard_pool: null
 
+  homelab:
+    display_name: Homelab
+    region: homelab
+    edge_domain: "{{ fleet_homelab_edge_domain }}"
+    edge_wildcard: "*.{{ fleet_homelab_edge_domain }}"
+    exposure_mode: port_forward
+    external_endpoints:
+      - id: virt03-wan
+        address: "134.255.112.204"
+        role: primary
+        description: "WAN forwards TCP 80→30080 and 443→30443 on virt03"
+    domains:
+      - id: homelab-zone
+        zone: "{{ fleet_homelab_edge_domain }}"
+        wildcard: "*.{{ fleet_homelab_edge_domain }}"
+        tls_policy: acme_cluster
+    dns_target_note: "A/AAAA *.{{ fleet_homelab_edge_domain }} → virt03 (port-forward 80→30080, 443→30443)"
+
 fleet_site_cluster_hosts: []

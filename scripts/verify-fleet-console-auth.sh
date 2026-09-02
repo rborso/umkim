@@ -4,7 +4,6 @@ set -euo pipefail
 
 BASE="${FLEET_CONSOLE_URL:-http://127.0.0.1:30912}"
 AUTH="${BASE}/fleet/auth/v1alpha1"
-API="${BASE}/api/v1alpha1"
 FLEET_API="${BASE}/fleet/api/v1alpha1"
 USER="${FLEET_AUTH_USER:-localadmin}"
 PASS="${FLEET_AUTH_PASSWORD:-fleet-admin-change-me}"
@@ -16,8 +15,8 @@ TEST_ORG="${FLEET_TEST_ORG:-acme}"
 
 rm -f "$COOKIE_JAR" "$CUSTOMER_JAR"
 
-echo "== unauthenticated catalog should fail =="
-code=$(curl -s -o /dev/null -w '%{http_code}' "${API}/catalog-items" || true)
+echo "== unauthenticated fleet API should fail =="
+code=$(curl -s -o /dev/null -w '%{http_code}' "${FLEET_API}/clusters" || true)
 if [[ "$code" != "401" && "$code" != "403" ]]; then
   echo "expected 401/403, got $code" >&2
   exit 1
@@ -38,17 +37,10 @@ if ! echo "$me" | grep -q '"roles"'; then
   exit 1
 fi
 
-echo "== authenticated catalog list =="
-code=$(curl -s -b "$COOKIE_JAR" -o /dev/null -w '%{http_code}' "${API}/catalog-items")
+echo "== authenticated cluster list =="
+code=$(curl -s -b "$COOKIE_JAR" -o /dev/null -w '%{http_code}' "${FLEET_API}/clusters")
 if [[ "$code" != "200" ]]; then
   echo "expected 200, got $code" >&2
-  exit 1
-fi
-
-echo "== catalog-access requires dc-admin =="
-code=$(curl -s -b "$COOKIE_JAR" -o /dev/null -w '%{http_code}' "${AUTH}/catalog-access")
-if [[ "$code" != "200" ]]; then
-  echo "expected 200 for dc-admin catalog-access, got $code" >&2
   exit 1
 fi
 
@@ -72,8 +64,8 @@ fi
 
 if [[ -n "${FLEET_SA_TOKEN:-}" ]]; then
   echo "== service account token =="
-  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${FLEET_SA_TOKEN}" "${API}/health/catalog")
-  echo "health/catalog HTTP $code"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${FLEET_SA_TOKEN}" "${AUTH}/me")
+  echo "auth/me HTTP $code"
 fi
 
 if [[ -n "$CUSTOMER_USER" && -n "$CUSTOMER_PASS" && "${FLEET_VERIFY_MUTATING:-1}" != "0" ]]; then
@@ -82,23 +74,6 @@ if [[ -n "$CUSTOMER_USER" && -n "$CUSTOMER_PASS" && "${FLEET_VERIFY_MUTATING:-1}
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"${CUSTOMER_USER}\",\"password\":\"${CUSTOMER_PASS}\"}" | head -c 200
   echo
-
-  echo "== customer policies list empty =="
-  body=$(curl -s -b "$CUSTOMER_JAR" "${API}/policies")
-  if echo "$body" | grep -q '"results":\[\]'; then
-    echo "policies list filtered"
-  else
-    echo "expected empty policies results for customer" >&2
-    exit 1
-  fi
-
-  echo "== customer cannot POST catalog-items =="
-  code=$(curl -s -b "$CUSTOMER_JAR" -o /dev/null -w '%{http_code}' -X POST "${API}/catalog-items?id=test-deny" \
-    -H 'Content-Type: application/json' -d '{}')
-  if [[ "$code" != "403" ]]; then
-    echo "expected 403 for customer catalog create, got $code" >&2
-    exit 1
-  fi
 
   echo "== customer cluster list scoped =="
   code=$(curl -s -b "$CUSTOMER_JAR" -o /dev/null -w '%{http_code}' "${FLEET_API}/clusters")

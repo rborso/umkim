@@ -11,8 +11,9 @@
 
 - name: Fleet edge | Apply hub Traefik routes (includes fragment render)
   ansible.builtin.import_role:
-    name: dcm
-    tasks_from: traefik_config.yml
+    name: hub_ingress
+    tasks_from: update_routes.yml
+  when: fleet_edge_enable | default(false) | bool
   tags: [fleet_edge, fleet_edge_traefik]
 
 - name: Fleet edge | Build manual DNS checklist

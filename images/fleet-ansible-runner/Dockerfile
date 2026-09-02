@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git=1:2.39.5-0+deb12u3 \
     curl=7.88.1-10+deb12u15 \
     iputils-ping=3:20221126-1+deb12u1 \
+    skopeo \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl \
     && echo "${KUBECTL_SHA256}  /tmp/kubectl" | sha256sum -c - \
@@ -39,12 +40,8 @@ COPY ansible.cfg /ansible/ansible.cfg
 COPY site-validate.yml site-provision.yml cluster-validate.yml cluster-provision.yml \
   cluster-provision-local.yml cluster-provision-hub.yml cluster-discover-capabilities.yml cluster-delete-hub.yml \
   cluster-configure-storage.yml cluster-validate-storage.yml \
-  cluster-provider-k8s-install.yml cluster-provider-k8s-delete.yml \
-  cluster-provider-helm-install.yml cluster-provider-helm-delete.yml \
-  cluster-provider-kubevirt-install.yml cluster-provider-kubevirt-delete.yml \
   cluster-overlay-recover.yml \
-  ingress-auth-reconcile.yml acme-reconcile.yml llm-reconcile.yml wireguard-install.yml \
-  instance-backup.yml instance-restore.yml /ansible/
+  ingress-auth-reconcile.yml acme-reconcile.yml llm-reconcile.yml wireguard-install.yml /ansible/
 COPY cleanup_node_local.sh /ansible/cleanup_node_local.sh
 COPY roles /ansible/roles/
 COPY charts /ansible/charts/

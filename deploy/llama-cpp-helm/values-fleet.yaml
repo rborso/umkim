@@ -1,4 +1,4 @@
-# Default llama-cpp-helm values for DCM catalog seed and lab deploy flows.
+# Default llama-cpp-helm values for FleetApp lab deploys.
 replicaCount: 1
 
 # Hugging Face GGUF repo (llama-server -hf); quant suffix added by chart.

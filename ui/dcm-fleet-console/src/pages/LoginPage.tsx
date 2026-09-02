@@ -94,8 +94,8 @@ export function LoginPage() {
   return (
     <PFLoginPage
       brandImgSrc=""
-      brandImgAlt="DCM Fleet"
-      textContent="DCM Fleet Console"
+      brandImgAlt="UMKIM"
+      textContent="UMKIM fleet console"
       loginTitle="Log in to your account"
     >
       {loginForm}

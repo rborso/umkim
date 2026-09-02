@@ -7,11 +7,10 @@ FV_REPORT_DIR="${FV_REPORT_DIR:?}"
 RESIDUAL_JSON="${FV_REPORT_DIR}/residual.json"
 
 fleet_api="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
-dcm_api="${DCM_API:-http://127.0.0.1:30908/api/v1alpha1}"
 
 sites=()
 clusters=()
-instances=()
+apps=()
 
 if curl -sf "${fleet_api}/sites" >/dev/null 2>&1; then
   while IFS= read -r s; do
@@ -39,14 +38,14 @@ for c in d.get('clusters',[]):
 " 2>/dev/null || true)
 fi
 
-if curl -sf "${dcm_api}/catalog-item-instances" >/dev/null 2>&1; then
+if curl -sf "${fleet_api}/apps" >/dev/null 2>&1; then
   while IFS= read -r i; do
-    [[ -n "$i" ]] && instances+=("$i")
-  done < <(curl -sf "${dcm_api}/catalog-item-instances" | python3 -c "
+    [[ -n "$i" ]] && apps+=("$i")
+  done < <(curl -sf "${fleet_api}/apps" | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
-for r in d.get('results',[]):
-  n=r.get('display_name') or ''
+for r in d.get('apps', d.get('items', [])):
+  n=r.get('name') or r.get('metadata',{}).get('name') or ''
   if 'verify-synth' in n or n.startswith('E2E '):
     print(n)
 " 2>/dev/null || true)
@@ -57,14 +56,14 @@ import json, sys
 print(json.dumps({
   'sites': sys.argv[1].split('\t') if sys.argv[1] else [],
   'clusters': sys.argv[2].split('\t') if sys.argv[2] else [],
-  'instances': sys.argv[3].split('\t') if sys.argv[3] else [],
+  'apps': sys.argv[3].split('\t') if sys.argv[3] else [],
 }, indent=2))" \
   "$(printf '%s\t' "${sites[@]:-}")" \
   "$(printf '%s\t' "${clusters[@]:-}")" \
-  "$(printf '%s\t' "${instances[@]:-}")" \
+  "$(printf '%s\t' "${apps[@]:-}")" \
   > "${RESIDUAL_JSON}"
 
-if [[ ${#sites[@]} -gt 0 || ${#clusters[@]} -gt 0 || ${#instances[@]} -gt 0 ]]; then
+if [[ ${#sites[@]} -gt 0 || ${#clusters[@]} -gt 0 || ${#apps[@]} -gt 0 ]]; then
   echo "WARN: residual verify resources — see ${RESIDUAL_JSON}"
   exit 1
 fi

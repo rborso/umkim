@@ -5,19 +5,22 @@ operator runbook, use [install.md](install.md). Inventory values belong in
 `inventory/` or [examples/inventory/hub-only/](../examples/inventory/hub-only/).
 
 > [!WARNING]
-> UMKIM v0.1.0 is an experimental reference stack. It is not a supported or
+> UMKIM v0.2 is an experimental reference stack. It is not a supported or
 > production-certified platform.
 
-## Model
+## Product model
 
-UMKIM operates a multi-cluster fleet from one hub.
+UMKIM is a **hub-centric management plane for independent K3s clusters across
+sites**. Outbound-only reachability via the hub WireGuard overlay is one
+supported pattern, not the only topology. Sites may use hub gateway,
+port-forward, reverse proxy, or private-only exposure.
 
 | Layer | Responsibility |
 | --- | --- |
-| Hub | K3s, OCM, DCM, Harbor, console, and optional edge services |
-| Site | A `FleetSite` logical location with placement and exposure metadata |
+| Hub | K3s, OCM, Harbor, console, WireGuard, and optional edge services |
+| Site | A `FleetSite` logical location with `exposure_mode` and edge metadata |
 | Cluster | An independent K3s data plane represented by `FleetClusterJoin` and OCM `ManagedCluster` |
-| Provider | A service provider that materializes a placed workload |
+| App | A `FleetApp` Helm release on a cluster the operator selects |
 
 The hub is infrastructure, not a workload `ManagedCluster`. Each workload
 cluster runs its own K3s server and is managed by OCM after it joins.
@@ -25,63 +28,91 @@ cluster runs its own K3s server and is managed by OCM after it joins.
 ## Network and control planes
 
 The management LAN carries cluster-local Kubernetes traffic. A WireGuard
-overlay provides hub-to-cluster management reachability. Do not expose
-management APIs, registry endpoints, or Kubernetes NodePorts to the public
-network by default; see [../SECURITY.md](../SECURITY.md).
+overlay provides hub-to-cluster **management** reachability. Workload
+execution does not depend on the hub; the overlay is for enrollment, OCM,
+Helm install jobs, and optional hub-gateway forwarding.
+
+Do not expose management APIs, registry endpoints, or Kubernetes NodePorts to
+the public network by default; see [../SECURITY.md](../SECURITY.md).
 
 OCM registers workload clusters and delivers platform manifests through
-`ManifestWork`. DCM evaluates catalog and placement intent, then invokes a
-provider on an eligible cluster.
+`ManifestWork`. Application charts are installed with `FleetApp` onto a
+named Ready cluster. There is no placement engine and no DCM catalog.
+
+## Site exposure
+
+Each `FleetSite` (or cluster override) selects how that location reaches the
+WAN. Inventory examples live under [../examples/site-profiles/](../examples/site-profiles/).
+
+| `exposure_mode` | Meaning |
+| --- | --- |
+| `hub_gateway` | Public HTTP/S on the hub; hub forwards to spokes over WireGuard |
+| `port_forward` | WAN port-forwards (e.g. router) to spoke Traefik NodePorts |
+| `reverse_proxy` | External reverse proxy terminates TLS and reaches cluster ingress |
+| `none` | No fleet-managed WAN exposure at the site |
+
+Inventory uses `exposure_mode`; the CRD field is `exposureMode`. Values are
+the same.
 
 ## Cluster lifecycle
 
-1. An operator creates a registry `FleetSite`.
+1. An operator creates a registry `FleetSite` with the intended exposure mode.
 2. The operator creates a `FleetClusterJoin` for a non-management site.
 3. The controller issues a bootstrap bundle containing enrollment material.
 4. The operator runs the bundle on the cluster control node.
 5. After local K3s validation, the hub provisions OCM registration and platform
    manifests.
-6. The cluster becomes Ready and can receive optional provider installation.
+6. The cluster becomes Ready and can receive Helm charts via `FleetApp`.
+   Optional KubeVirt remains a spoke platform add-on, not a deploy path for
+   charts.
 
 The public lifecycle phases are `Pending`, `ScriptIssued`, `Enrolled`,
-`Validated`, `Provisioning`, and `Ready`. Cluster deletion defaults to detach:
-it removes hub-managed resources while preserving the cluster unless an
-operator explicitly requests Kubernetes cleanup.
+`Validated`, `Provisioning`, and `Ready`. Cluster deletion defaults to **detach**:
+it removes hub-managed resources while preserving the cluster and workloads
+unless an operator explicitly requests Kubernetes cleanup
+(`cleanupKubernetes=true` on delete).
 
-## Providers and workloads
+## Hub independence
 
-FleetClusterJoin supports post-Ready installation of these workload providers:
+- Spokes are independent K3s control planes; the hub does not run their
+  workloads.
+- **Hub down:** console and hub-routed (`route.mode: hub`) URLs stop; pods and
+  Helm releases on spokes keep running. Apps with `route.mode: site` or
+  `none` can remain reachable when site ingress is configured and healthy.
+- **Detach:** default cluster delete keeps K3s and user workloads on the spoke.
 
-- **k8s:** deploys container workloads.
-- **Helm:** installs allowed OCI charts.
-- **KubeVirt:** provisions VM workloads where the cluster is prepared for it.
+## Helm apps
 
-OLM and cert-manager are platform prerequisites. The OLM Subscription provider
-is deployed separately and is not a FleetClusterJoin provider choice.
+After a cluster is Ready, install an OCI chart with `FleetApp`:
 
-DCM uses labels, policy, and capacity signals to choose a cluster. Placement
-count is the number of selected clusters; workload replicas are pods per
-selected cluster. The hub itself is not a placement target.
+- `spec.clusterName` is required. The hub is not a valid target.
+- `spec.chart` is an `oci://` URL or a short name under Harbor `charts`.
+- `spec.route.mode` is `none`, `hub`, or `site`.
+- Charts may be published to the hub library (`FleetChart`) before install.
+
+Match `route.mode` to site exposure: `hub` with `hub_gateway`; `site` with
+`port_forward` or `reverse_proxy`; `none` for chart-owned or internal ingress.
+
+See [components/fleet-apps.md](components/fleet-apps.md).
 
 ## Edge routing
 
-`FleetAppRoute` represents an application route. The edge controller reconciles
-hub Traefik configuration and, when required, spoke ingress manifests.
+`FleetAppRoute` represents an application route created for a `FleetApp` when
+the route mode is not `none`. The edge controller reconciles hub Traefik
+configuration and, when required, spoke ingress manifests.
 
-| Routing mode | Intended use |
-| --- | --- |
-| `hub` | Hub gateway forwards to a selected workload cluster |
-| `site` | A site exposes its own ingress path |
-| `none` | No fleet-managed public route |
+| Routing mode | Intended use | Hub required for public URL? |
+| --- | --- | --- |
+| `hub` | Hub gateway forwards to the selected workload cluster | Yes |
+| `site` | Site ingress (port-forward, reverse proxy, etc.) exposes the app | No |
+| `none` | No fleet-managed public route | No |
 
 Exposure and TLS settings must be compatible with the selected network path.
-See [components/fleet-edge.md](components/fleet-edge.md) for the supported
-model. Active–backup behavior is experimental; active–active routing is not a
-v0.1.0 feature.
+See [components/fleet-edge.md](components/fleet-edge.md).
 
 ## Optional services
 
-- **Harbor** hosts fleet-built images and may proxy approved upstream sources.
+- **Harbor** hosts fleet-built images and OCI charts.
 - **Ingress authentication** protects selected public application routes; it is
   separate from console login.
 - **Backup/restore** is experimental and must be tested for every application.
@@ -94,7 +125,8 @@ v0.1.0 feature.
 | --- | --- |
 | Hub install | [install.md](install.md) |
 | FleetSite and FleetClusterJoin | [components/fleet-site.md](components/fleet-site.md) |
-| Placement and catalog | [components/dcm.md](components/dcm.md) |
+| Helm apps | [components/fleet-apps.md](components/fleet-apps.md) |
 | Edge routes | [components/fleet-edge.md](components/fleet-edge.md) |
+| Site exposure examples | [../examples/site-profiles/](../examples/site-profiles/) |
 | Versions | [../VERSIONS.md](../VERSIONS.md) |
 | Security | [../SECURITY.md](../SECURITY.md) |

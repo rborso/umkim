@@ -6,16 +6,12 @@ import (
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/dcm"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/workload"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const llmWorkloadProfile = "llm"
 
 type edgeClusterEntry struct {
 	UpstreamHost string `yaml:"upstream_host"`
@@ -25,11 +21,10 @@ type edgeClustersFile struct {
 	Clusters map[string]edgeClusterEntry `yaml:"clusters"`
 }
 
-// SyncBackendsFromDCM discovers llama-cpp-helm instances and resolves OpenAI-compatible API bases.
-func SyncBackendsFromDCM(ctx context.Context, k8s client.Client, edgeNS, edgeCM, dcmURL string, existing []fleetv1alpha1.FleetLLMBackend) ([]fleetv1alpha1.FleetLLMBackend, error) {
-	dcmClient := dcm.NewClient(dcmURL)
-	instances, err := dcmClient.ListCatalogItemInstances(ctx)
-	if err != nil {
+// SyncBackendsFromFleetApps discovers llama-cpp Helm releases and resolves OpenAI-compatible API bases.
+func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, edgeCM string, existing []fleetv1alpha1.FleetLLMBackend) ([]fleetv1alpha1.FleetLLMBackend, error) {
+	var apps fleetv1alpha1.FleetAppList
+	if err := k8s.List(ctx, &apps); err != nil {
 		return existing, err
 	}
 	edge, err := loadEdgeUpstream(ctx, k8s, edgeNS, edgeCM)
@@ -44,41 +39,29 @@ func SyncBackendsFromDCM(ctx context.Context, k8s client.Client, edgeNS, edgeCM,
 		}
 	}
 
-	for _, inst := range instances {
-		if inst.Spec.LabelSelector["fleet.workload/profile"] != llmWorkloadProfile {
+	for _, app := range apps.Items {
+		if !isLlamaChart(app.Spec.Chart) {
 			continue
 		}
-		catalogID := inst.Spec.CatalogItemID
-		if catalogID == "" {
-			catalogID = inst.Spec.CatalogItemName
-		}
-		if catalogID != "llama-cpp-helm" {
+		if app.Status.Phase != fleetv1alpha1.AppPhaseReady && app.Status.Phase != "" {
 			continue
 		}
-		targets, err := dcmClient.GetPlacementTargets(ctx, inst.InstanceID())
-		if err != nil {
+		cluster := strings.TrimSpace(app.Spec.ClusterName)
+		upstream := edge[cluster]
+		if upstream == "" {
 			continue
 		}
-		model := dcm.UserValueHelmField(inst.Spec.UserValues, "model")
+		vals := parseValues(app.Spec.ValuesYAML)
+		model := stringVal(vals, "model")
 		if model == "" {
-			model = dcm.UserValueHelmField(inst.Spec.UserValues, "hfRepo")
-			if model == "" {
-				model = catalogID + "-" + inst.InstanceID()
-			}
+			model = stringVal(vals, "hfRepo")
 		}
-		port := dcm.UserValueHelmInt(inst.Spec.UserValues, 8080, "service", "port")
-		for _, t := range targets.Targets {
-			if !t.Healthy && t.Status != "" && t.Status != "active" {
-				continue
-			}
-			cluster := workload.ProviderToCluster(t.Provider)
-			upstream := edge[cluster]
-			if upstream == "" {
-				continue
-			}
-			apiBase := fmt.Sprintf("http://%s:%d/v1", upstream, port)
-			byModel[model] = fleetv1alpha1.FleetLLMBackend{Model: model, APIBase: apiBase}
+		if model == "" {
+			model = app.Name
 		}
+		port := intVal(vals, 8080, "service", "port")
+		apiBase := fmt.Sprintf("http://%s:%d/v1", upstream, port)
+		byModel[model] = fleetv1alpha1.FleetLLMBackend{Model: model, APIBase: apiBase}
 	}
 
 	out := make([]fleetv1alpha1.FleetLLMBackend, 0, len(byModel))
@@ -86,6 +69,53 @@ func SyncBackendsFromDCM(ctx context.Context, k8s client.Client, edgeNS, edgeCM,
 		out = append(out, b)
 	}
 	return out, nil
+}
+
+func isLlamaChart(chart string) bool {
+	c := strings.ToLower(strings.TrimSpace(chart))
+	return strings.Contains(c, "llama-cpp")
+}
+
+func parseValues(raw string) map[string]any {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return map[string]any{}
+	}
+	var out map[string]any
+	if err := yaml.Unmarshal([]byte(raw), &out); err != nil || out == nil {
+		return map[string]any{}
+	}
+	return out
+}
+
+func stringVal(m map[string]any, key string) string {
+	v, ok := m[key]
+	if !ok {
+		return ""
+	}
+	s, _ := v.(string)
+	return strings.TrimSpace(s)
+}
+
+func intVal(m map[string]any, def int, keys ...string) int {
+	cur := any(m)
+	for _, k := range keys {
+		mm, ok := cur.(map[string]any)
+		if !ok {
+			return def
+		}
+		cur = mm[k]
+	}
+	switch n := cur.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	default:
+		return def
+	}
 }
 
 func loadEdgeUpstream(ctx context.Context, c client.Client, ns, cmName string) (map[string]string, error) {

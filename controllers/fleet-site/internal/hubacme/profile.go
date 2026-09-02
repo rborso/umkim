@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const gatewayNS = "dcm"
+const gatewayNS = "fleet-ingress"
 
 // Profile is the hub Traefik ACME issuance mode (solver vs hostNetwork legacy).
 type Profile struct {
@@ -32,7 +32,7 @@ func Detect(ctx context.Context, c client.Client) Profile {
 	hostNet := gw.Spec.Template.Spec.HostNetwork
 	solverExists := resourceExists(ctx, c, "Deployment", "gateway-acme")
 
-	// Mirror roles/dcm/templates/hub-stack.yaml.j2 gateway_ha / gateway_host_network.
+	// Mirror hub Traefik HA: replicas>1 and not hostNetwork, plus gateway-acme.
 	ha := replicas > 1 && !hostNet
 	useSolver := ha && solverExists
 	if useSolver {
@@ -78,7 +78,7 @@ func yamlQuote(s string) string {
 // InventoryYAMLLines emits Ansible vars for fleet-edge-controller ACME profile.
 func InventoryYAMLLines(p Profile) []string {
 	return []string{
-		"dcm_gateway_acme_solver_enabled: " + boolYAML(p.SolverEnabled),
+		"fleet_edge_acme_solver_enabled: " + boolYAML(p.SolverEnabled),
 		"fleet_edge_acme_legacy_gateway_scale: " + boolYAML(p.LegacyScale),
 		"fleet_edge_acme_preflight_enabled: " + boolYAML(p.Preflight),
 	}

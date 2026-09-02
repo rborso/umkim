@@ -17,7 +17,6 @@ func TestParseRequireAuth(t *testing.T) {
 		{"hub true", map[string]string{"routing.require_auth": "true"}, fleetv1alpha1.RouteModeHub, true},
 		{"hub false", map[string]string{"routing.require_auth": "false"}, fleetv1alpha1.RouteModeHub, false},
 		{"site true", map[string]string{"routing.require_auth": "1"}, fleetv1alpha1.RouteModeSite, true},
-		{"dual forced off", map[string]string{"routing.require_auth": "true"}, fleetv1alpha1.RouteModeDual, false},
 		{"none forced off", map[string]string{"routing.require_auth": "true"}, fleetv1alpha1.RouteModeNone, false},
 	}
 	for _, tc := range tests {

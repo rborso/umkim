@@ -14,7 +14,7 @@
 #   ./scripts/teardown-hub.sh --confirm --skip-cluster-delete   # hub-only wipe
 #
 # Environment (same as install-hub.sh):
-#   INV, FLEET_PROFILE, ANSIBLE_VAULT_PASSWORD_FILE
+#   INV, ANSIBLE_VAULT_PASSWORD_FILE
 #   FLEET_API              fleet-site API (default http://127.0.0.1:18080/api/v1alpha1)
 #   TEARDOWN_CLUSTER_TIMEOUT_SEC  per-cluster delete wait (default 3600)
 #
@@ -31,12 +31,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 export INV="${INV:--i inventory/hosts.yml -i inventory/hosts-from-hub.yml}"
-FLEET_PROFILE="${FLEET_PROFILE:-production}"
-export FLEET_PROFILE
 
 API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
 CLUSTER_TIMEOUT="${TEARDOWN_CLUSTER_TIMEOUT_SEC:-3600}"
 POLL_INTERVAL="${TEARDOWN_POLL_INTERVAL_SEC:-20}"
+# Direct fleet-site API requires identity headers (FLEET_SITE_REQUIRE_IDENTITY=true).
+API_ID_HEADERS=(
+  -H "X-Fleet-Subject-Kind: User"
+  -H "X-Fleet-Subject-Name: fleet-teardown"
+  -H "X-Fleet-DC-Admin: true"
+)
 
 CONFIRM=0
 DRY_RUN=0
@@ -70,15 +74,14 @@ if [[ "${CONFIRM}" -ne 1 ]]; then
   exit 1
 fi
 
-PROFILE_ARGS=(-e "fleet_profile=${FLEET_PROFILE}")
 VAULT_ARGS=()
 if [[ -z "${ANSIBLE_VAULT_PASSWORD_FILE:-}" && -f "${HOME}/.umkim-vault-pass" ]]; then
   export ANSIBLE_VAULT_PASSWORD_FILE="${HOME}/.umkim-vault-pass"
 fi
 if [[ -n "${ANSIBLE_VAULT_PASSWORD_FILE:-}" && -f "${ANSIBLE_VAULT_PASSWORD_FILE}" ]]; then
   VAULT_ARGS=(--vault-password-file "$ANSIBLE_VAULT_PASSWORD_FILE")
-elif [[ "$FLEET_PROFILE" == "production" ]]; then
-  echo "ERROR: FLEET_PROFILE=production requires vault (see docs/install.md §3)." >&2
+else
+  echo "ERROR: hub teardown requires encrypted vault.yml and ANSIBLE_VAULT_PASSWORD_FILE (see docs/install.md)." >&2
   exit 1
 fi
 
@@ -98,13 +101,13 @@ api_delete_cluster() {
     return 0
   fi
   local code
-  code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${url}" || true)
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${API_ID_HEADERS[@]}" "${url}" || true)
   case "${code}" in
     202|204|404) log "DELETE cluster ${name} → HTTP ${code}" ;;
     409)
       log "Cluster ${name} busy (409); waiting before retry..."
       sleep 30
-      code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${url}" || true)
+      code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${API_ID_HEADERS[@]}" "${url}" || true)
       log "DELETE cluster ${name} (retry) → HTTP ${code}"
       ;;
     *)
@@ -178,7 +181,7 @@ api_delete_nested() {
     return 0
   fi
   local code
-  code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${url}" || true)
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "${API_ID_HEADERS[@]}" "${url}" || true)
   log "DELETE nested cluster ${name} → HTTP ${code}"
 }
 
@@ -194,7 +197,7 @@ kubectl_fallback_cluster_cleanup() {
 }
 
 echo "=== UMKIM hub teardown ==="
-echo "INV=${INV} FLEET_PROFILE=${FLEET_PROFILE} API=${API}"
+echo "INV=${INV} API=${API}"
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "DRY RUN — no destructive changes"
 fi
@@ -202,9 +205,9 @@ echo ""
 echo "This will:"
 echo "  1. Delete ALL fleet clusters with cleanupKubernetes=true (uninstall K3s on nodes)"
 echo "  2. Delete nested clusters (if any)"
-echo "  3. Remove fleet edge, DCM, Harbor, OCM, and hub K3s"
+echo "  3. Remove fleet edge, Harbor, OCM, hub ingress, and hub K3s"
 if [[ "${KEEP_WIREGUARD}" -eq 0 ]]; then
-  echo "  4. Stop hub WireGuard (wg0)"
+  echo "  4. Stop hub WireGuard (wg0) and drop nft table fleet_hub"
 fi
 echo ""
 sleep 3
@@ -264,14 +267,14 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
   log "[dry-run] ansible-playbook ${INV} playbooks/teardown-hub.yml -l hub ${ANSIBLE_EXTRA[*]}"
 else
   ansible-playbook ${INV} playbooks/teardown-hub.yml -l hub \
-    "${PROFILE_ARGS[@]}" "${VAULT_ARGS[@]}" \
+    "${VAULT_ARGS[@]}" \
     "${ANSIBLE_EXTRA[@]}"
 fi
 
 echo ""
 log "Hub teardown finished."
 echo ""
-echo "Next steps for a fresh install:"
+echo "Next steps for a fresh install from zero:"
 echo "  1. Verify K3s is gone:  test ! -f /etc/rancher/k3s/k3s.yaml && echo OK"
 echo "  2. Re-run hub install:   ./scripts/install-hub.sh"
 echo "  3. Verify:               ./scripts/verify-hub-install.sh"

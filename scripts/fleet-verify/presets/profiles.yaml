@@ -6,4 +6,4 @@ hub-only:
 homelab:
   description: Maintainer homelab with FCJ workload clusters
   l1_suites: [hub, core, edge]
-  l2_suites: [core, tenancy, edge, backup, catalog, regression]
+  l2_suites: [core, tenancy, edge, backup, regression]

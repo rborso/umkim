@@ -3,11 +3,9 @@ package reconcile
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/dcm"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/teardown"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/wg"
@@ -73,10 +71,6 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 	// Run hub/spoke delete while overlay WG is still up so klusterlet can finish ManifestWork cleanup.
 	needsDeleteJob := r.clusterNeedsDeleteJob(ctx, fcj, clusterName)
 	if needsDeleteJob && fcj.Status.DeleteJobName == "" {
-		if err := r.abandonCatalogInstancesForCluster(ctx, clusterName); err != nil {
-			log := ctrl.LoggerFrom(ctx)
-			log.Error(err, "best-effort abandon of catalog instances failed; continuing cluster delete", "cluster", clusterName)
-		}
 		if err := r.startClusterDelete(ctx, fcj, clusterName); err != nil {
 			return r.failClusterDelete(ctx, fcj, err)
 		}
@@ -244,47 +238,4 @@ func (r *ClusterJoinReconciler) failClusterDelete(ctx context.Context, fcj *flee
 	fcj.Status.Message = "Delete failed: " + err.Error()
 	_ = r.Status().Update(ctx, fcj)
 	return ctrl.Result{}, err
-}
-
-// abandonCatalogInstancesForCluster removes DCM catalog records for workloads
-// placed on or routed to cluster before providers are deregistered.
-func (r *ClusterJoinReconciler) abandonCatalogInstancesForCluster(ctx context.Context, clusterName string) error {
-	if strings.TrimSpace(r.Cfg.DCMCatalogAPIURL) == "" {
-		return nil
-	}
-	log := ctrl.LoggerFrom(ctx).WithValues("cluster", clusterName)
-	client := dcm.NewClient(r.Cfg.DCMCatalogAPIURL)
-	instances, err := client.ListCatalogItemInstances(ctx)
-	if err != nil {
-		return fmt.Errorf("list catalog-item-instances: %w", err)
-	}
-	var firstErr error
-	for _, inst := range instances {
-		id := inst.InstanceID()
-		if id == "" {
-			continue
-		}
-		match := dcm.InstanceTargetsCluster(inst, clusterName)
-		if !match {
-			if targets, terr := client.GetPlacementTargets(ctx, id); terr == nil {
-				for _, t := range targets.Targets {
-					if dcm.ProviderNameTargetsCluster(t.Provider, clusterName) {
-						match = true
-						break
-					}
-				}
-			}
-		}
-		if !match {
-			continue
-		}
-		log.Info("Abandoning catalog instance before cluster delete", "instance", id, "display_name", inst.DisplayName)
-		if err := client.DeleteCatalogItemInstance(ctx, id, "abandon"); err != nil {
-			log.Error(err, "abandon catalog instance failed", "instance", id)
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-	return firstErr
 }

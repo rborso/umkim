@@ -12,6 +12,8 @@ by the Harbor role rather than this README.
 - `roles/harbor/tasks/push_fleet_image.yml` implements staging, build, and push
   behavior for `harbor_push_fleet`.
 - Use authorized inventory values for registry access and source references.
+- v0.2 fleet images are built from this checkout. Sibling DCM
+  service-provider clones are not required.
 
 Build contexts can include generated or staged files. This documentation does
 not guarantee that a local context is complete or suitable for a remote

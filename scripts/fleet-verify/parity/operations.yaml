@@ -9,17 +9,9 @@ operations:
       spec: e2e/parity/site-create.spec.ts
     compare_fields: [name, phase]
 
-  policy.crud:
-    api:
-      script: ui/dcm-fleet-console/scripts/verify-policy-api.sh
-    console:
-      spec: e2e/parity/policy-crud.spec.ts
-    compare_fields: [display_name, id]
-
   deploy.submit:
-    catalog_item: whoami-helm
     api:
-      handler: checks/whoami-deploy.sh
+      script: scripts/verify-fleet-app.sh
     console:
       spec: e2e/parity/deploy-submit.spec.ts
-    compare_fields: [display_name, phase]
+    compare_fields: [name, phase]

@@ -13,7 +13,6 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/audit"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/bootstrap"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/authorizer"
-	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/catalogacl"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/httpapi"
 	"github.com/rborso/umkim/controllers/fleet-console-auth/internal/identity"
@@ -71,7 +70,6 @@ func main() {
 	rbacEngine := &rbac.Engine{Client: k8sClient, Namespace: cfg.Namespace}
 	checker := &authorizer.Checker{RBAC: rbacEngine, Client: k8sClient}
 	auditRec := &audit.Recorder{Client: k8sClient, Namespace: cfg.Namespace}
-	catalog := &catalogacl.Manager{Client: k8sClient, Namespace: cfg.Namespace, RBAC: rbacEngine}
 	tokenMgr := &tokens.Manager{Client: k8sClient, Namespace: cfg.Namespace}
 
 	ctx := context.Background()
@@ -93,7 +91,6 @@ func main() {
 		RBAC:       rbacEngine,
 		Checker:    checker,
 		Audit:      auditRec,
-		CatalogACL: catalog,
 		Tokens:     tokenMgr,
 	}
 

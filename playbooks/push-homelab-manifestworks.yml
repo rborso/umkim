@@ -1,5 +1,5 @@
 ---
-- name: Push UMKIM platform + DCM workers to homelab spokes
+- name: Push UMKIM platform ManifestWorks to homelab spokes
   hosts: hub
   become: true
   gather_facts: false
@@ -10,7 +10,3 @@
     - ansible.builtin.import_role:
         name: ocm
         tasks_from: push_umkim_manifestworks.yml
-
-    - ansible.builtin.import_role:
-        name: fleet_helm_sp
-        tasks_from: push_spokes.yml

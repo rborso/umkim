@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post hub-install: sites, clusters, providers, demo-webapp, ACME verification.
+# Post hub-install: sites, clusters, FleetApp whoami, ACME verification.
 # Run on the hub after ./scripts/install-hub.sh and ./scripts/verify-hub-install.sh succeed.
 set -euo pipefail
 
@@ -9,9 +9,8 @@ cd "$ROOT"
 export INV="${INV:--i inventory/hosts.yml -i inventory/hosts-from-hub.yml}"
 export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-${HOME}/.umkim-vault-pass}"
 API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
-DCM="${DCM_API:-http://127.0.0.1:30908/api/v1alpha1}"
 DOMAIN="${FLEET_EDGE_DOMAIN:-apps.example.com}"
-DEMO_HOST="demo-webapp.${DOMAIN}"
+DEMO_HOST="whoami.${DOMAIN}"
 CLUSTER="${FLEET_DEMO_CLUSTER:-beta-lab02}"
 SITE_ACME="acme-site"
 SITE_BETA="beta-site"
@@ -32,16 +31,6 @@ VAULT_ARGS=()
 log() { echo "[postinstall] $*"; }
 fail() { echo "[postinstall] FAIL: $*" >&2; exit 1; }
 
-post_provider_install() {
-  local cluster="$1" kind="$2"
-  local code
-  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${API}/clusters/${cluster}/providers/${kind}/install" || true)
-  case "${code}" in
-    200|202|409) log "POST ${kind} install on ${cluster} → HTTP ${code}" ;;
-    *) fail "POST ${kind} install on ${cluster} → HTTP ${code}" ;;
-  esac
-}
-
 wait_cluster_ready() {
   local name="$1" retries="${2:-120}" delay="${3:-20}"
   local i phase
@@ -55,45 +44,6 @@ wait_cluster_ready() {
     sleep "${delay}"
   done
   fail "timeout waiting for cluster ${name} Ready (last phase=${phase})"
-}
-
-wait_provider() {
-  local cluster="$1" kind="$2" retries="${3:-90}" delay="${4:-10}"
-  local i phase
-  for ((i = 0; i < retries; i++)); do
-    phase=$(curl -sf "${API}/clusters/${cluster}/providers" | python3 -c "
-import json,sys
-for p in json.load(sys.stdin).get('providers',[]):
-  if p.get('kind')=='${kind}':
-    print(p.get('phase','')); sys.exit(0)
-print('')
-" 2>/dev/null || echo "")
-    if [[ "${phase}" == "Ready" ]]; then
-      log "provider ${kind} on ${cluster} Ready"
-      return 0
-    fi
-    sleep "${delay}"
-  done
-  fail "timeout waiting for ${kind} provider on ${cluster} (last=${phase})"
-}
-
-wait_spm_provider() {
-  local name="$1" retries="${2:-60}" delay="${3:-5}"
-  local i
-  for ((i = 0; i < retries; i++)); do
-    if curl -sf "${DCM}/providers" | python3 -c "
-import json,sys
-for p in json.load(sys.stdin).get('providers',[]):
-  if p.get('name')=='${name}' and p.get('health_status')=='ready':
-    sys.exit(0)
-sys.exit(1)
-" 2>/dev/null; then
-      log "SPM provider ${name} ready"
-      return 0
-    fi
-    sleep "${delay}"
-  done
-  fail "timeout waiting for SPM provider ${name}"
 }
 
 log "Bootstrap FleetAcme CR (fresh install)"
@@ -119,15 +69,7 @@ provision_cluster_if_needed() {
   local phase
   phase=$(curl -sf "${API}/clusters/${name}" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('provisioning_phase',''))" 2>/dev/null || echo "")
   if [[ "${phase}" == "Ready" ]]; then
-    log "Cluster ${name} already Ready — waiting for k8s provider only"
-    post_provider_install "${name}" k8s
-    wait_provider "${name}" k8s
-    wait_spm_provider "k8s-${name}"
-    if grep -q 'fleet_flow_install_helm: true' "${example}" 2>/dev/null; then
-      post_provider_install "${name}" helm
-      wait_provider "${name}" helm
-      wait_spm_provider "helm-${name}"
-    fi
+    log "Cluster ${name} already Ready"
     return 0
   fi
   provision_cluster "${example}" "$@"
@@ -141,14 +83,6 @@ provision_cluster() {
   log "Provision cluster ${name}"
   ansible-playbook ${INV} playbooks/flows/cluster-create.yml -e @"${example}" "$@" "${VAULT_ARGS[@]}"
   wait_cluster_ready "${name}"
-  post_provider_install "${name}" k8s
-  wait_provider "${name}" k8s
-  wait_spm_provider "k8s-${name}"
-  if grep -q 'fleet_flow_install_helm: true' "${example}" 2>/dev/null; then
-    post_provider_install "${name}" helm
-    wait_provider "${name}" helm
-    wait_spm_provider "helm-${name}"
-  fi
 }
 
 provision_cluster_if_needed playbooks/flows/examples/acme-lab01.yml
@@ -221,23 +155,10 @@ for _ in $(seq 1 60); do
 done
 [[ "${storage_phase:-}" == "Applied" ]] || fail "NFS storage not Applied (last=${storage_phase:-none})"
 
-log "Deploy demo-webapp (hub routing) on ${CLUSTER}"
-INST="demo-webapp"
-RESP=$(curl -sf -X POST "${DCM}/catalog-item-instances" -H 'Content-Type: application/json' -d "{
-  \"api_version\": \"v1alpha1\",
-  \"display_name\": \"${INST}\",
-  \"spec\": {
-    \"label_selector\": {\"fleet.workload/profile\": \"demo\", \"fleet.placement/scope\": \"single\"},
-    \"catalog_item_id\": \"demo-webapp\",
-    \"user_values\": [
-      {\"path\": \"metadata.name\", \"value\": \"${INST}\"},
-      {\"path\": \"routing.mode\", \"value\": \"hub\"},
-      {\"path\": \"routing.cluster\", \"value\": \"${CLUSTER}\"}
-    ]
-  }
-}")
-INST_ID=$(echo "${RESP}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('id') or d.get('uid') or '')")
-[[ -n "${INST_ID}" ]] || fail "demo-webapp instance create failed: ${RESP}"
+log "Install whoami FleetApp (hub routing) on ${CLUSTER}"
+FLEET_SITE_API="${API}" FLEET_APP_CLUSTER="${CLUSTER}" FLEET_APP_CHART=whoami \
+  FLEET_APP_NAME=whoami FLEET_APP_RELEASE=whoami FLEET_APP_ROUTE_MODE=hub \
+  ./scripts/verify-fleet-app.sh
 
 log "Wait for FleetAppRoute TLS (up to 15m)"
 for _ in $(seq 1 45); do
@@ -253,11 +174,10 @@ issuer=$(echo | openssl s_client -connect "${DEMO_HOST}:443" -servername "${DEMO
   | openssl x509 -noout -issuer 2>/dev/null || true)
 echo "${issuer}" | grep -qi "Let's Encrypt" || fail "expected Let's Encrypt cert on ${DEMO_HOST}, got: ${issuer:-none}"
 
-log "Verify demo-webapp page content (whoami)"
+log "Verify whoami page content"
 body=$(curl -sf "https://${DEMO_HOST}/")
-echo "${body}" | grep -qi 'Hostname' || fail "unexpected demo-webapp body (expected whoami Hostname)"
+echo "${body}" | grep -qi 'Hostname' || fail "unexpected whoami body (expected Hostname)"
 echo "${body}" | head -5
 
 log "=== rebuild-homelab-postinstall OK ==="
-log "demo-webapp: https://${DEMO_HOST}/"
-log "instance id: ${INST_ID}"
+log "whoami: https://${DEMO_HOST}/"

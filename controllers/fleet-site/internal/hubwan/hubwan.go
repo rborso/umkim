@@ -20,16 +20,16 @@ func Invalid(ip string) bool {
 
 // Resolve returns the hub WAN IPv4 for console Ansible Jobs (ACME, ingress auth).
 func Resolve(ctx context.Context, c client.Client, cfg config.Config) string {
+	if ip := strings.TrimSpace(cfg.HubPublicIPv4); !Invalid(ip) {
+		return ip
+	}
 	var svc corev1.Service
-	if err := c.Get(ctx, types.NamespacedName{Namespace: "dcm", Name: "gateway"}, &svc); err == nil {
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "fleet-ingress", Name: "gateway"}, &svc); err == nil {
 		if len(svc.Spec.ExternalIPs) > 0 {
 			if ip := strings.TrimSpace(svc.Spec.ExternalIPs[0]); !Invalid(ip) {
 				return ip
 			}
 		}
-	}
-	if ip := strings.TrimSpace(cfg.HubPublicIPv4); !Invalid(ip) {
-		return ip
 	}
 	var dep appsv1.Deployment
 	if err := c.Get(ctx, types.NamespacedName{Namespace: fleetEdgeControllerNS, Name: "fleet-edge-controller"}, &dep); err == nil {
@@ -62,7 +62,6 @@ func InventoryYAMLLines(wan string) []string {
 	}
 	return []string{
 		"fleet_hub_public_ipv4: \"" + yamlQuote(wan) + "\"",
-		"dcm_gateway_external_ip: \"" + yamlQuote(wan) + "\"",
 		"fleet_hub_firewall_public_ipv4: \"" + yamlQuote(wan) + "\"",
 		"fleet_gateway_probe_host: \"" + yamlQuote(wan) + "\"",
 	}

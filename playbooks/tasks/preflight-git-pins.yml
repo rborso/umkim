@@ -1,9 +1,4 @@
 ---
-- name: Preflight | Verify sibling git pins
-  ansible.builtin.command:
-    cmd: "{{ playbook_dir | dirname }}/scripts/fleet-verify-pins.sh --strict"
-  delegate_to: localhost
-  become: false
-  environment:
-    PINS_FILE: "{{ playbook_dir | dirname }}/inventory/group_vars/all/fleet_git_pins.yml"
-  changed_when: false
+- name: Preflight | Sibling git pins are not used in v0.2
+  ansible.builtin.debug:
+    msg: v0.2 builds hub images from this checkout; sibling service-provider pins are ignored.

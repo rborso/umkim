@@ -1,7 +1,7 @@
 ---
 - name: Fleet failover controller | Skip when disabled
   ansible.builtin.meta: end_host
-  when: not (fleet_failover_controller_enabled | default(true) | bool)
+  when: not (fleet_failover_controller_enabled | default(false) | bool)
 
 - name: Fleet failover controller | Ensure namespace
   ansible.builtin.shell: |

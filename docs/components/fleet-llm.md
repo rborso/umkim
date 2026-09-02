@@ -1,10 +1,11 @@
 # Fleet LLM
 
-> Status: v0.1.0 is an experimental proof of concept. The LLM, GPU placement,
+> Status: v0.2 is an experimental proof of concept. The LLM, GPU,
 > proxy, and billing-related paths are not production guarantees.
 
-Fleet LLM is an optional hub LiteLLM proxy with GPU inference workloads
-deployed as the `llama-cpp-helm` catalog item.
+Fleet LLM is an optional hub LiteLLM proxy. GPU inference is the
+`llama-cpp-helm` chart installed with FleetApp onto a selected Ready
+cluster; see [fleet-apps.md](fleet-apps.md).
 
 ## Components
 

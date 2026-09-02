@@ -14,7 +14,7 @@ fi
 PINS="${REPO_ROOT}/inventory/group_vars/all/fleet_git_pins.yml"
 if [[ -f "$PINS" ]]; then
   echo ""
-  echo "=== sibling git pins (fleet_git_pins.yml) ==="
+  echo "=== leftover sibling git pins (unused in v0.2) ==="
   grep -E '^harbor_fleet_.*_git_ref:' "$PINS" || true
 fi
 
@@ -27,7 +27,7 @@ if command -v ansible-inventory >/dev/null 2>&1; then
     | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
-for k in ('umkim_version','fleet_profile','harbor_fleet_image_tag','ocm_bundle_version','k3s_channel','fleet_lab_webui_extras'):
+for k in ('umkim_version','fleet_profile','harbor_fleet_image_tag','ocm_bundle_version','k3s_channel'):
     if k in d: print(f'{k}: {d[k]}')
 " 2>/dev/null || echo "(ansible-inventory unavailable or vault locked)"
 fi

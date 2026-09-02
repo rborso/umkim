@@ -5,7 +5,7 @@
 #     -e fleet_site_wg_public_key=... -e fleet_site_wg_address=10.10.0.15/32 \
 #     -i inventory/from-controller.ini
 
-- name: Fleet cluster overlay | Hub peer + DCM health nudge
+- name: Fleet cluster overlay | Hub peer
   hosts: hub
   become: true
   gather_facts: false
@@ -13,7 +13,6 @@
     fleet_site_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
     fleet_site_ocm_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
     fleet_site_ocm_cluster: "{{ fleet_cluster_name | default(fleet_site_name) }}"
-    fleet_site_container_api_url: "{{ fleet_site_dcm_api_url | default('http://127.0.0.1:30908/api/v1alpha1') }}"
   tasks:
     - ansible.builtin.import_role:
         name: fleet_site

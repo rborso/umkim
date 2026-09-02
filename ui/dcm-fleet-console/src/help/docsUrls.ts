@@ -22,7 +22,7 @@ export const DOCS = {
   multiTenancy: `${DOCS_BASE}/components/multi-tenancy/`,
   fleetLlm: `${DOCS_BASE}/components/fleet-llm/`,
   fleetSite: `${DOCS_BASE}/components/fleet-site/`,
-  dcm: `${DOCS_BASE}/components/dcm/`,
+  fleetApps: `${DOCS_BASE}/components/fleet-apps/`,
   consoleAuth: `${DOCS_BASE}/components/console-auth/`,
 } as const;
 

@@ -1,8 +1,0 @@
-# gitea-helm on acme-lab01 (org acme dedicated). Alias name kept for older runbooks.
-#
-#   ansible-playbook $INV playbooks/flows/gitea-deploy.yml -e @playbooks/flows/examples/gitea-lab-int01.yml
-# Prefer: -e @playbooks/flows/examples/gitea-acme-lab01.yml
-
-fleet_flow_cluster: acme-lab01
-fleet_flow_release_name: gitea-br-test
-fleet_flow_namespace: gitea

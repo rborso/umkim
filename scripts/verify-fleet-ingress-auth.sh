@@ -16,7 +16,7 @@ source "${ROOT}/scripts/fleet-verify/lib/hub-kubectl.sh"
 AUTH_NS="${FLEET_INGRESS_AUTH_NS:-fleet-ingress-auth}"
 LLDAP_NS="${FLEET_LLDAP_NS:-fleet-console}"
 FIA_NS="${FLEET_INGRESS_AUTH_CR_NS:-fleet-console}"
-HUB_GATEWAY="${HUB_GATEWAY:-http://127.0.0.1:30908}"
+HUB_GATEWAY="${HUB_GATEWAY:-http://127.0.0.1:80}"
 EDGE_DOMAIN="${FLEET_EDGE_DOMAIN:-apps.example.com}"
 SPOKE_CLUSTER="${FLEET_INGRESS_AUTH_CLUSTER:-lab-ha01}"
 AUTH_PASS="${FLEET_INGRESS_AUTH_PASSWORD:-${LLDAP_PASSWORD:-}}"
@@ -80,10 +80,10 @@ fi
 
 if [[ "${VERIFY_ROUTES:-0}" == "1" ]]; then
   echo "== Route policy smoke"
-  dual_code="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: whoami.${EDGE_DOMAIN}" "${HUB_GATEWAY}/" || true)"
-  echo "whoami.${EDGE_DOMAIN} HTTP ${dual_code}"
-  if [[ "$dual_code" != "200" && "$dual_code" != "301" && "$dual_code" != "302" && "$dual_code" != "401" ]]; then
-    echo "WARN: unexpected HTTP ${dual_code} for whoami route smoke"
+  hub_code="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: whoami.${EDGE_DOMAIN}" "${HUB_GATEWAY}/" || true)"
+  echo "whoami.${EDGE_DOMAIN} HTTP ${hub_code}"
+  if [[ "$hub_code" != "200" && "$hub_code" != "301" && "$hub_code" != "302" && "$hub_code" != "401" ]]; then
+    echo "WARN: unexpected HTTP ${hub_code} for whoami route smoke"
   fi
 fi
 

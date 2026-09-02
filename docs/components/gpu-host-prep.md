@@ -1,6 +1,6 @@
 # GPU host preparation
 
-> Status: v0.1.0 is an experimental proof of concept. GPU driver, runtime, and
+> Status: v0.2 is an experimental proof of concept. GPU driver, runtime, and
 > workload compatibility must be validated on the target hardware.
 
 Fleet bootstrap does not install GPU drivers. Prepare every GPU node before

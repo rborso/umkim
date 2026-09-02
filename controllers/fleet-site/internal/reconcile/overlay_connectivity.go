@@ -83,7 +83,7 @@ func (r *ClusterJoinReconciler) reconcileOverlayConnectivity(ctx context.Context
 			fails := overlayFailCount(fcj.Annotations[annOverlayFailCount]) + 1
 			fcj.Annotations[annOverlayFailCount] = strconv.Itoa(fails)
 			fcj.Annotations[annOverlayReachable] = "false"
-			fcj.Status.Message = fmt.Sprintf("Hub overlay unreachable (%s); DCM providers show unavailable until tunnel recovers", msg)
+			fcj.Status.Message = fmt.Sprintf("Hub overlay unreachable (%s); tunnel recovery in progress", msg)
 			if fails >= overlayRecoverFailCount {
 				if err := r.startOverlayRecover(ctx, fcj, clusterName); err != nil {
 					return ctrl.Result{}, err
@@ -192,8 +192,6 @@ func (r *ClusterJoinReconciler) startOverlayRecover(ctx context.Context, fcj *fl
 	}
 	jobName := fmt.Sprintf("fleet-overlay-recover-%s-%d", clusterName, time.Now().Unix())
 	extra := []string{
-		"-e", "fleet_site_sp_endpoint=" + clusterSpEndpoint(fcj, nodeWG),
-		"-e", "fleet_site_dcm_api_url=" + r.Cfg.DCMCatalogAPIURL,
 		"-e", "fleet_site_wg_public_key=" + fcj.Status.WireguardPublicKey,
 		"-e", "fleet_site_wg_address=" + fcj.Status.WireguardAddress,
 	}

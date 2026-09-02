@@ -87,7 +87,7 @@ fi
 
 source "${FRAMEWORK}/lib/hub-endpoint.sh"
 fv_hub_endpoint_export_urls
-export FLEET_HUB_IP HUB_HOST HUB_SSH FLEET_CONSOLE_URL FLEET_API DCM_API
+export FLEET_HUB_IP HUB_HOST HUB_SSH FLEET_CONSOLE_URL FLEET_API
 
 FV_KUBECTL_BIN="${TMPDIR:-/tmp}/fleet-verify-kubectl-bin-${$}"
 mkdir -p "${FV_KUBECTL_BIN}"
@@ -101,7 +101,6 @@ source "${FRAMEWORK}/lib/auth.sh"
 fv_auth_load_password
 export FLEET_AUTH_USER="${FLEET_AUTH_USER:-localadmin}"
 export FLEET_AUTH_PASSWORD
-export DCM_API_URL="${DCM_API_URL:-${FLEET_CONSOLE_URL}/api/v1alpha1}"
 export FLEET_API_URL="${FLEET_API_URL:-${FLEET_CONSOLE_URL}/fleet/api/v1alpha1}"
 
 source "${FRAMEWORK}/lib/report.sh"

@@ -5,7 +5,6 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 const (
 	RouteModeHub  = "hub"
 	RouteModeSite = "site"
-	RouteModeDual = "dual"
 	RouteModeNone = "none"
 
 	PhasePending  = "Pending"
@@ -26,6 +25,8 @@ const (
 	ConditionCertificateReady  = "CertificateReady"
 
 	TLSPhasePendingDNS      = "PendingDNS"
+	TLSPhasePendingPreflight = "PendingPreflight"
+	TLSPhasePendingStaging  = "PendingStaging"
 	TLSPhaseQueued          = "Queued"
 	TLSPhaseIssuing         = "Issuing"
 	TLSPhaseReady           = "Ready"
@@ -57,7 +58,7 @@ type FleetAppRouteSpec struct {
 	ClusterTargets []ClusterTarget `json:"clusterTargets,omitempty"`
 	Mode           string          `json:"mode"`
 	EffectiveMode  string          `json:"effectiveMode,omitempty"`
-	HubHost        string          `json:"hubHost"`
+	HubHost        string          `json:"hubHost,omitempty"`
 	SiteHost       string          `json:"siteHost,omitempty"`
 	HealthPath     string          `json:"healthPath,omitempty"`
 	FailoverMode   string          `json:"failoverMode,omitempty"`

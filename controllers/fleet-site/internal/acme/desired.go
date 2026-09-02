@@ -99,7 +99,7 @@ func EnsureCR(ctx context.Context, c client.Client, ns string, cfg config.Config
 
 func LegacyHubACMEEnabled(ctx context.Context, c client.Client) (bool, error) {
 	var cm corev1.ConfigMap
-	err := c.Get(ctx, types.NamespacedName{Namespace: "dcm", Name: "dcm-traefik-static"}, &cm)
+	err := c.Get(ctx, types.NamespacedName{Namespace: "fleet-ingress", Name: "fleet-traefik-static"}, &cm)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, nil
@@ -185,13 +185,13 @@ type HubRunnerVars struct {
 func hubGatewayRunnerVars(ctx context.Context, c client.Client, cfg config.Config) HubRunnerVars {
 	out := HubRunnerVars{GatewayReplicas: 1}
 	var svc corev1.Service
-	if err := c.Get(ctx, types.NamespacedName{Namespace: "dcm", Name: "gateway"}, &svc); err == nil {
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "fleet-ingress", Name: "gateway"}, &svc); err == nil {
 		if len(svc.Spec.ExternalIPs) > 0 {
 			out.GatewayExternalIP = svc.Spec.ExternalIPs[0]
 		}
 	}
 	var dep appsv1.Deployment
-	if err := c.Get(ctx, types.NamespacedName{Namespace: "dcm", Name: "gateway"}, &dep); err == nil {
+	if err := c.Get(ctx, types.NamespacedName{Namespace: "fleet-ingress", Name: "gateway"}, &dep); err == nil {
 		if dep.Spec.Replicas != nil && *dep.Spec.Replicas > 0 {
 			out.GatewayReplicas = int(*dep.Spec.Replicas)
 		}
@@ -207,9 +207,9 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fa *fleetv1alph
 	if email == "" {
 		email = cfg.FleetEdgeACMEEmail
 	}
-	gatewayURL := "http://10.10.0.1:30908"
+	gatewayURL := "http://127.0.0.1:80"
 	if desired.HubEnabled {
-		gatewayURL = "https://10.10.0.1:30909"
+		gatewayURL = "https://127.0.0.1"
 	}
 	lines := []string{
 		"fleet_acme_hub_enabled: " + boolYAML(desired.HubEnabled),
@@ -229,7 +229,7 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fa *fleetv1alph
 		"ocm_kubeconfig: /etc/kube/config",
 		"k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"fleet_edge_controller_playbook_dir: /ansible",
-		"dcm_gateway_replicas: " + fmt.Sprintf("%d", hub.GatewayReplicas),
+		"hub_ingress_namespace: fleet-ingress",
 		"fleet_acme_gateway_replicas: " + fmt.Sprintf("%d", hub.GatewayReplicas),
 	}
 	lines = append(lines, hubwan.InventoryYAMLLines(hub.GatewayExternalIP)...)

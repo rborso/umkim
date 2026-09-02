@@ -138,6 +138,7 @@
           scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${PROXY[@]}" "$BUNDLE" "${TARGET}:/tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz"
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${PROXY[@]}" "$TARGET" bash -s <<'REMOTE'
           set -euo pipefail
+          sudo dnf install -y tar gzip
           rm -rf "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
           mkdir -p "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
           tar -xzf "/tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz" -C "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
@@ -171,6 +172,7 @@
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
           {{ fleet_flow_ssh_user | default(_flow_remote_user_default) }}@{{ fleet_flow_bootstrap_host }}
           'set -euo pipefail;
+          sudo dnf install -y tar gzip;
           rm -rf /tmp/bootstrap-{{ fleet_flow_cluster_name }};
           mkdir -p /tmp/bootstrap-{{ fleet_flow_cluster_name }};
           tar -xzf /tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz -C /tmp/bootstrap-{{ fleet_flow_cluster_name }};

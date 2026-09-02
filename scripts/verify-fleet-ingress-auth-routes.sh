@@ -5,8 +5,8 @@ set -euo pipefail
 KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
 export KUBECONFIG
 NS="${FLEET_ROUTE_NAMESPACE:-fleet-system}"
-HUB_GATEWAY="${HUB_GATEWAY:-http://127.0.0.1:30908}"
-HUB_GATEWAY_HTTPS="${HUB_GATEWAY_HTTPS:-https://127.0.0.1:30909}"
+HUB_GATEWAY="${HUB_GATEWAY:-http://127.0.0.1:80}"
+HUB_GATEWAY_HTTPS="${HUB_GATEWAY_HTTPS:-https://127.0.0.1}"
 VIRT01_TRAEFIK="${VIRT01_TRAEFIK:-http://10.10.0.11:30080}"
 VIRT01_TRAEFIK_HTTPS="${VIRT01_TRAEFIK_HTTPS:-https://10.10.0.11:30443}"
 DEMO_NS="${FLEET_AUTH_TEST_NS:-fleet-ingress}"
@@ -16,8 +16,9 @@ kubectl -n fleet-ingress-auth rollout status deployment/authelia --timeout=60s
 kubectl -n fleet-ingress-auth rollout status deployment/lldap --timeout=60s
 
 echo "== Fleet-edge authelia middleware present"
-kubectl -n dcm get cm dcm-traefik-fleet-routes -o yaml | grep -q fleet-edge-authelia || \
-  kubectl -n dcm get cm dcm-traefik-dynamic -o yaml | grep -q fleet-edge-authelia
+INGRESS_NS="${HUB_INGRESS_NS:-fleet-ingress}"
+kubectl -n "$INGRESS_NS" get cm fleet-traefik-fleet-routes -o yaml | grep -q fleet-edge-authelia || \
+  kubectl -n "$INGRESS_NS" get cm fleet-traefik-dynamic -o yaml | grep -q fleet-edge-authelia
 
 cleanup() { kubectl -n "$NS" delete fleetapproute --all --ignore-not-found; }
 trap cleanup EXIT
@@ -66,12 +67,6 @@ apply_route auth-test-hub hub whoami-hub-auth-test.mgmt.umkim.com
 code=$(curl -sk -o /dev/null -w '%{http_code}' -H 'Host: whoami-hub-auth-test.mgmt.umkim.com' "${HUB_GATEWAY_HTTPS}/" || true)
 echo "hub-only HTTP ${code}"
 [[ "$code" == "401" || "$code" == "302" || "$code" == "303" ]] || { echo "FAIL hub-only got ${code}"; exit 1; }
-
-echo "== dual route"
-apply_route auth-test-dual dual whoami-dual-auth-test.mgmt.umkim.com whoami-dual-auth-test.virt01.mgmt.umkim.com
-code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: whoami-dual-auth-test.mgmt.umkim.com' "${HUB_GATEWAY}/" || true)
-echo "dual HTTP ${code}"
-[[ "$code" == "200" ]] || echo "WARN dual got ${code}"
 
 echo "== site-only route"
 apply_route auth-test-site site whoami-site-auth-test.mgmt.umkim.com whoami-site-auth-test.virt01.mgmt.umkim.com

@@ -11,8 +11,9 @@ ingress. Access and name resolution remain private deployment concerns.
    resolution are managed by the deployment owner.
 4. Validate inventory before applying a scoped playbook.
 
-This profile expresses a no-public-exposure intent. It does not create private
-network connectivity, access policies, or internal DNS records.
+This profile expresses a no-public-exposure intent. Use `FleetApp`
+`route.mode: none` for workloads that manage their own ingress or run
+internally.
 
 ## References
 

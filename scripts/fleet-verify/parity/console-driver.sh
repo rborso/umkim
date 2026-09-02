@@ -12,14 +12,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${SCRIPT_DIR}/lib/playwright.sh"
 
 export FLEET_CONSOLE_URL="${CONSOLE}"
-export DCM_API_URL="${CONSOLE}/api/v1alpha1"
 export FLEET_API_URL="${CONSOLE}/fleet/api/v1alpha1"
 export FV_RUN_ID="${FV_RUN_ID:-$(date +%Y%m%d%H%M%S)}"
 
 spec=""
 case "${OP}" in
   parity.site.create|site.create) spec="e2e/parity/site-create.spec.ts" ;;
-  parity.policy.crud|policy.crud) spec="e2e/parity/policy-crud.spec.ts" ;;
   parity.deploy.submit|deploy.submit) spec="e2e/parity/deploy-submit.spec.ts" ;;
   *) echo "unknown console parity op: ${OP}" >&2; exit 1 ;;
 esac

@@ -18,7 +18,6 @@ VAULT_ARGS=()
 [[ -f "${HOME}/.umkim-vault-pass" ]] && VAULT_ARGS=(--vault-password-file "${HOME}/.umkim-vault-pass")
 
 API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
-DCM="${DCM_API:-http://127.0.0.1:30908/api/v1alpha1}"
 
 log() { echo "[cluster-reinstall] $*"; }
 fail() { echo "[cluster-reinstall] FAIL: $*" >&2; exit 1; }

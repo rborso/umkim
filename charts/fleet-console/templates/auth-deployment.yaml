@@ -49,8 +49,6 @@ spec:
               value: {{ .Values.auth.bootstrapLdapGroup | quote }}
             - name: FLEET_AUTH_BOOTSTRAP_LDAP_GROUP_CN
               value: {{ .Values.auth.bootstrapLdapGroupCN | quote }}
-            - name: FLEET_AUTH_DCM_UPSTREAM
-              value: {{ .Values.auth.dcmUpstream | quote }}
             - name: FLEET_AUTH_FLEET_UPSTREAM
               value: {{ .Values.auth.fleetUpstream | quote }}
             - name: FLEET_AUTH_LLM_UPSTREAM

@@ -51,7 +51,7 @@ func TestRenderBundleModeKubevirtBridgeHooks(t *testing.T) {
 		HubWireguardIP:        "10.10.0.1",
 		EnrollmentBaseURL:     "http://10.10.0.1:30912/fleet/api/v1alpha1",
 		WGPublicKey:           "wgpub",
-		RockyMajor:            "9",
+		RockyMajor:            "10",
 		BundleMode:            true,
 		WireguardEndpointHost: "wg.example.com",
 		WireguardEndpointPort: "51820",

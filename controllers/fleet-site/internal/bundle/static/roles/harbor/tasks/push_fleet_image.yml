@@ -27,11 +27,6 @@
          | default(harbor_fleet_edge_controller_local_src if fleet_image.repository == 'fleet-edge-controller' else '')
          | default(harbor_fleet_failover_controller_local_src if fleet_image.repository == 'fleet-failover-controller' else '')
          | default(harbor_fleet_dcm_console_local_src if fleet_image.repository == 'dcm-fleet-console' else '')
-         | default(harbor_fleet_olm_sp_local_src if fleet_image.repository == 'fleet-olm-subscription-sp' else '')
-         | default(harbor_fleet_control_plane_local_src if fleet_image.repository == 'control-plane' else '')
-         | default(harbor_fleet_helm_sp_local_src if fleet_image.repository == 'fleet-helm-release-sp' else '')
-         | default(harbor_fleet_k8s_sp_local_src if fleet_image.repository == 'k8s-container-service-provider' else '')
-         | default(harbor_fleet_kubevirt_sp_local_src if fleet_image.repository == 'kubevirt-service-provider' else '')
          | default(harbor_fleet_site_controller_local_src if fleet_image.repository == 'fleet-site-controller' else '')
          | default(harbor_fleet_console_auth_local_src if fleet_image.repository == 'fleet-console-auth' else '')
          | default(harbor_fleet_ansible_runner_local_src if fleet_image.repository == 'fleet-ansible-runner' else '') }}
@@ -185,8 +180,6 @@
       --build-arg CACHEBUST={{ lookup('pipe', 'date +%s') }}
       {% if fleet_image.repository == 'dcm-fleet-console' %}
       --build-arg VITE_BUILD_ID={{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) }}
-      {% elif fleet_image.repository == 'control-plane' %}
-      --build-arg UMKIM_BUILD_ID={{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) }}
       {% endif %}
       -t localhost/{{ fleet_image.repository }}:{{ fleet_image.tag }}
       -f {{ fleet_image.containerfile | default('Containerfile') }}

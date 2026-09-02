@@ -1,5 +1,6 @@
 ---
-# Deploy fleet-edge-controller + route-sync + failover controller on hub (catalog dual-route).
+# Deploy fleet-edge-controller on hub.
+# Failover controller is skipped unless fleet_failover_controller_enabled is true.
 #
 #   ansible-playbook fleet-edge-crd.yml -l hub
 #   ansible-playbook fleet-edge-controller.yml -l hub
@@ -18,7 +19,3 @@
       tags: [fleet_edge_controller]
     - role: fleet_failover_controller
       tags: [fleet_failover_controller]
-    - role: fleet_edge_controller
-      tasks_from: verify_e2e.yml
-      tags: [fleet_edge_e2e]
-      when: fleet_edge_e2e_verify | default(false) | bool

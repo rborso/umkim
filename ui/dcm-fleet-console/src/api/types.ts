@@ -1,249 +1,4 @@
-export interface Provider {
-  id?: string;
-  name?: string;
-  display_name?: string;
-  displayName?: string;
-  service_type?: string;
-  serviceType?: string;
-  health_status?: string;
-  endpoint?: string;
-  operations?: string[];
-  schema_version?: string;
-  schemaVersion?: string;
-  metadata?: Record<string, string>;
-  region?: string;
-  zone?: string;
-  create_time?: string;
-  update_time?: string;
-}
-
-export interface ProviderRegistration {
-  name: string;
-  displayName?: string;
-  serviceType: string;
-  schemaVersion: string;
-  operations: string[];
-  endpoint: string;
-  region?: string;
-  zone?: string;
-  metadata?: Record<string, string>;
-}
-
-export type CatalogFieldUiTier = 'required' | 'common' | 'advanced' | 'hidden';
-
-export type CatalogFieldUiWidget =
-  | 'text'
-  | 'select'
-  | 'password'
-  | 'boolean'
-  | 'number'
-  | 'cpu-quantity'
-  | 'domain'
-  | 'site-domain'
-  | 'hostname'
-  | 'dns-label'
-  | 'yaml';
-
-export interface CatalogResourceSpec {
-  name: string;
-  service_type: string;
-  fields?: CatalogFieldDef[];
-  requires_resources?: string[];
-}
-
-export interface CatalogFieldDef {
-  path: string;
-  display_name?: string;
-  description?: string;
-  example?: string;
-  examples?: string[];
-  editable?: boolean;
-  default?: unknown;
-  required?: boolean;
-  ui_tier?: CatalogFieldUiTier;
-  ui_widget?: CatalogFieldUiWidget;
-  validation_schema?: {
-    type?: string;
-    enum?: unknown[];
-    minimum?: number;
-    maximum?: number;
-    minLength?: number;
-    maxLength?: number;
-    pattern?: string;
-    format?: string;
-    /** Catalog-manager persists UI hints under validation_schema (top-level ui_* is stripped). */
-    'x-ui-tier'?: CatalogFieldUiTier;
-    'x-ui-widget'?: CatalogFieldUiWidget;
-    'x-required'?: boolean;
-    'x-ui-depends-on'?: {
-      path: string;
-      equals?: unknown;
-      notEquals?: unknown;
-      in?: unknown[];
-    };
-    'x-value-preset'?: Record<string, Record<string, unknown>>;
-    'x-sensitive'?: boolean;
-    'x-secret-bind'?: {
-      secretName: string;
-      secretKey: string;
-      secretDataFrom?: Record<string, string>;
-      valuesSet?: Record<string, string>;
-      valuesClear?: string[];
-    };
-    [key: string]: unknown;
-  };
-  /** Control-plane conditional allowed-values constraint (server validation). */
-  depends_on?: {
-    path: string;
-    allowed_values: Record<string, unknown[]>;
-  };
-}
-
-export interface CatalogItem {
-  id?: string;
-  uid?: string;
-  name?: string;
-  display_name?: string;
-  service_type?: string;
-  serviceType?: string;
-  status?: string;
-  state?: string;
-  description?: string;
-  spec?: Record<string, unknown> & {
-    service_type?: string;
-    fields?: CatalogFieldDef[];
-    resources?: CatalogResourceSpec[];
-    workload?: CatalogWorkloadSpec;
-  };
-  schema_version?: string;
-  api_version?: string;
-  path?: string;
-  create_time?: string;
-  update_time?: string;
-}
-
-export interface PlacementTargetStatus {
-  provider?: string;
-  sprm_id?: string;
-  role?: string;
-  status?: string;
-  status_message?: string;
-  healthy?: boolean;
-}
-
-export interface PlacementTargetsResponse {
-  resource_id?: string;
-  approval_status?: string;
-  targets?: PlacementTargetStatus[];
-  healthy_count?: number;
-  target_count?: number;
-}
-
-export interface InstanceHubRouteResponse {
-  instance_id?: string;
-  effective_mode?: string;
-  hub_route_applicable?: boolean;
-  hub_host?: string;
-  active_cluster?: string;
-  standby_cluster?: string;
-  hub_route_healthy?: boolean;
-  failover_phase?: string;
-  failover_mode?: string;
-  last_failover_at?: string;
-  consecutive_failures?: number;
-}
-
-export interface BackupInfrastructureStatus {
-  hub_minio_ready?: boolean;
-  bucket?: string;
-  clusters?: Array<{
-    name: string;
-    ready: boolean;
-    velero_ready: boolean;
-    message?: string;
-  }>;
-}
-
-export interface InstanceWorkloadResponse {
-  instance_id: string;
-  display_name?: string;
-  service_type?: string;
-  cluster: string;
-  release: string;
-  namespace?: string;
-  hub_host?: string;
-  active_cluster?: string;
-  deployed?: boolean;
-}
-
-export interface CatalogInstanceSecretsRequest {
-  cluster: string;
-  namespace: string;
-  secretName: string;
-  data: Record<string, string>;
-}
-
-export interface InstanceBackupResponse {
-  name: string;
-  instance_id: string;
-  cluster: string;
-  release: string;
-  namespace?: string;
-  phase: string;
-  message?: string;
-  velero_backup_name?: string;
-  artifact_secret?: string;
-  started_at?: string;
-  completed_at?: string;
-}
-
-export interface InstanceRestoreResponse {
-  name: string;
-  backup_ref: string;
-  target_cluster: string;
-  source_cluster?: string;
-  phase: string;
-  message?: string;
-  velero_restore_name?: string;
-  new_instance_id?: string;
-  started_at?: string;
-  completed_at?: string;
-}
-
-export interface CatalogItemInstance {
-  id?: string;
-  uid?: string;
-  display_name?: string;
-  resource_id?: string;
-  spec?: {
-    catalog_item_id?: string;
-    user_values?: Array<{ path: string; value: unknown }>;
-  };
-  create_time?: string;
-  update_time?: string;
-  path?: string;
-}
-
-export interface CatalogItemCreate {
-  /** Optional stable id for POST /catalog-items?id=… (import flow). */
-  id?: string;
-  name?: string;
-  display_name?: string;
-  serviceType?: string;
-  service_type?: string;
-  schemaVersion?: string;
-  description?: string;
-  spec?: Record<string, unknown> & {
-    service_type?: string;
-    fields?: CatalogFieldDef[];
-    resources?: CatalogResourceSpec[];
-    workload?: CatalogWorkloadSpec;
-  };
-  api_version?: string;
-}
-
-/** Console offers hub | site | none. `dual` remains valid on the API / FleetAppRoute for advanced use. */
-export type RoutingMode = 'hub' | 'site' | 'dual' | 'none';
+export type RoutingMode = 'hub' | 'site' | 'none';
 
 export type FleetSitePhase =
   | 'Draft'
@@ -432,6 +187,86 @@ export type FleetClusterPhase =
   | 'Ready'
   | 'Failed'
   | 'Deleting';
+
+export type FleetAppPhase = 'Pending' | 'Installing' | 'Ready' | 'Failed' | 'Deleting' | '';
+
+export type FleetAppRouteMode = 'none' | 'hub' | 'site';
+
+export interface FleetAppRoute {
+  mode?: FleetAppRouteMode;
+  hubHost?: string;
+  siteHost?: string;
+  requireAuth?: boolean;
+  serviceName?: string;
+  servicePort?: number;
+  serviceNamespace?: string;
+  healthPath?: string;
+}
+
+export interface FleetApp {
+  name: string;
+  clusterName: string;
+  chart: string;
+  version?: string;
+  releaseName: string;
+  namespace: string;
+  valuesYaml?: string;
+  route?: FleetAppRoute;
+  phase?: FleetAppPhase;
+  message?: string;
+  routeName?: string;
+}
+
+export interface FleetAppCreate {
+  name?: string;
+  clusterName: string;
+  chart: string;
+  version?: string;
+  releaseName?: string;
+  namespace?: string;
+  values?: Record<string, unknown>;
+  valuesYaml?: string;
+  route?: FleetAppRoute;
+}
+
+export interface FleetAppDefaults {
+  chartPrefix: string;
+  hubEdgeDomain?: string;
+}
+
+export type FleetChartPhase = 'Pending' | 'Fetching' | 'Publishing' | 'Ready' | 'Failed' | '';
+
+export type FleetChartSource = 'oci' | 'http' | 'upload' | 'harbor' | '';
+
+export type FleetChartImagePolicy = 'external' | 'proxy' | 'copy' | '';
+
+export interface FleetChartCopiedImage {
+  from: string;
+  to: string;
+}
+
+export interface FleetChart {
+  name: string;
+  source: FleetChartSource | string;
+  origin?: string;
+  version?: string;
+  imagePolicy?: FleetChartImagePolicy | string;
+  chart?: string;
+  digest?: string;
+  versions?: string[];
+  phase?: FleetChartPhase;
+  message?: string;
+  imagesCopied?: FleetChartCopiedImage[];
+}
+
+export interface FleetChartCreate {
+  name?: string;
+  origin?: string;
+  version?: string;
+  imagePolicy?: FleetChartImagePolicy | string;
+  source?: FleetChartSource | string;
+  valuesYaml?: string;
+}
 
 export interface FleetCluster {
   name: string;
@@ -697,11 +532,9 @@ export interface FleetClusterCreate {
     tlsPolicy?: FleetTlsPolicy;
     ingressEndpointId?: string;
   };
+  /** Optional KubeVirt platform add-on (not a chart install path). */
   providers?: {
-    k8s?: boolean;
-    helm?: boolean;
     kubevirt?: boolean;
-    /** Day-0 host Linux bridge for Multus L2 KubeVirt VMs */
     kubevirtBridge?: {
       enabled?: boolean;
       bridgeName?: string;
@@ -711,195 +544,3 @@ export interface FleetClusterCreate {
   };
 }
 
-export type ClusterProviderKind = 'k8s' | 'helm' | 'kubevirt';
-
-export type ClusterProviderPhase =
-  | 'NotInstalled'
-  | 'Installing'
-  | 'Ready'
-  | 'Deleting'
-  | 'Failed';
-
-export interface ClusterProviderRow {
-  kind: ClusterProviderKind;
-  displayName: string;
-  providerName: string;
-  nodePort?: number;
-  phase: ClusterProviderPhase;
-  message?: string;
-}
-
-export interface UserValue {
-  path: string;
-  value: unknown;
-}
-
-export interface CatalogItemInstanceCreate {
-  api_version?: string;
-  display_name: string;
-  spec: {
-    catalog_item_id: string;
-    user_values: UserValue[];
-    label_selector?: Record<string, string>;
-    placement_override?: { cluster_count?: number };
-  };
-}
-
-export type PolicyType = 'GLOBAL' | 'USER';
-
-export interface ClusterRequirements {
-  matchLabels?: Record<string, string>;
-  matchExpressions?: unknown[];
-}
-
-export type PlacementStrategy = 'single' | 'spread' | 'all_matching' | 'least_utilized';
-
-export interface PlacementSpec {
-  cluster_count?: number;
-  strategy?: PlacementStrategy;
-  site_diversity?: boolean;
-}
-
-export type FailoverMode = 'manual' | 'relocatable' | 'standby';
-
-export interface FailoverSpec {
-  mode?: FailoverMode;
-  hub_health_path?: string;
-  failure_threshold?: number;
-  success_threshold?: number;
-  cooldown_seconds?: number;
-  auto_revert?: boolean;
-}
-
-export interface Policy {
-  id?: string;
-  display_name?: string;
-  description?: string;
-  policy_type?: PolicyType;
-  enabled?: boolean;
-  priority?: number;
-  rego_code?: string;
-  label_selector?: Record<string, string>;
-  cluster_requirements?: ClusterRequirements;
-  placement?: PlacementSpec;
-  failover?: FailoverSpec;
-  create_time?: string;
-  update_time?: string;
-  path?: string;
-}
-
-export interface PolicyCreate {
-  display_name: string;
-  policy_type: PolicyType;
-  rego_code: string;
-  description?: string;
-  enabled?: boolean;
-  priority?: number;
-  label_selector?: Record<string, string>;
-  cluster_requirements?: ClusterRequirements;
-  placement?: PlacementSpec;
-  failover?: FailoverSpec;
-}
-
-export interface CatalogWorkloadSpec {
-  replicas?: number;
-}
-
-export type PolicyPatch = Partial<PolicyCreate>;
-
-export interface ServiceType {
-  id?: string;
-  name?: string;
-  service_type?: string;
-  description?: string;
-}
-
-export interface HealthStatus {
-  status?: string;
-  message?: string;
-  [key: string]: unknown;
-}
-
-export interface PlacementPreviewCluster {
-  name?: string;
-  provider?: string;
-  provider_registered?: boolean;
-  provider_healthy?: boolean;
-  matches_cluster_requirements?: boolean;
-  fleet_site_phase?: string | null;
-  cpu_utilization?: number | null;
-  memory_utilization?: number | null;
-  metrics_ok?: boolean;
-  workload_fit?: string;
-  fits_node?: boolean | null;
-  fits_cluster?: boolean | null;
-  limits_over_capacity?: boolean;
-}
-
-export interface PlacementPreviewClusterDiagnostic {
-  name?: string;
-  eligible?: boolean;
-  provider?: string;
-  matches_cluster_requirements?: boolean;
-  provider_registered?: boolean;
-  provider_healthy?: boolean;
-  excluded?: boolean;
-  reasons?: string[];
-  cpu_utilization?: number | null;
-  memory_utilization?: number | null;
-  metrics_ok?: boolean;
-  workload_fit?: string;
-  fits_node?: boolean | null;
-  fits_cluster?: boolean | null;
-  limits_over_capacity?: boolean;
-}
-
-export interface PlacementPreviewPolicyTraceEntry {
-  id?: string;
-  display_name?: string;
-  policy_type?: string;
-  priority?: number;
-  enabled?: boolean;
-  instance_label_match?: boolean;
-  evaluated?: boolean;
-  rego_defined?: boolean;
-  rego_rejected?: boolean;
-  rejection_reason?: string;
-  sets_cluster_requirements?: boolean;
-  selected_provider?: string;
-  won?: boolean;
-  outcome?: string;
-  detail?: string;
-}
-
-export interface PlacementPreviewResponse {
-  deployable?: boolean;
-  service_type?: string;
-  winning_policy?: { id?: string; display_name?: string };
-  eligible_clusters?: PlacementPreviewCluster[];
-  eligible_count?: number;
-  effective_placement_count?: number;
-  warnings?: string[];
-  blocking_reasons?: string[];
-  cluster_diagnostics?: PlacementPreviewClusterDiagnostic[];
-  policy_trace?: PlacementPreviewPolicyTraceEntry[];
-}
-
-export type PlacementPreviewMode = 'deploy' | 'policy';
-
-export interface PlacementPreviewUserValue {
-  path: string;
-  value: unknown;
-}
-
-export interface PlacementPreviewRequest {
-  mode: PlacementPreviewMode;
-  verbose?: boolean;
-  catalog_item_id?: string;
-  service_type?: string;
-  label_selector?: Record<string, string>;
-  user_values?: PlacementPreviewUserValue[];
-  placement_override?: { cluster_count?: number };
-  policy?: PolicyCreate & { id?: string };
-  probe_label_selector?: Record<string, string>;
-}

@@ -14,7 +14,7 @@
   tags: [ocm, ocm_verify]
 
 - name: OCM | Join spoke cluster to hub
-  ansible.builtin.import_tasks: join_spoke.yml
+  ansible.builtin.include_tasks: join_spoke.yml
   when:
     - not (ocm_hub | default(false) | bool)
     - ocm_enabled | default(true) | bool

@@ -108,16 +108,12 @@
       Public {{ fleet_hub_firewall_public_interface }}: SSH, UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }},
       HTTP/S :80/:443 REDIRECT → NodePorts {{ fleet_hub_firewall_gateway_http_nodeport }}/{{ fleet_hub_firewall_gateway_https_nodeport }} (gateway HA).
       Management NodePorts still blocked on WAN IP; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
-      {% elif fleet_hub_firewall_public_ingress_enabled | bool and (dcm_gateway_replicas | default(1) | int) > 1 %}
-      Public {{ fleet_hub_firewall_public_interface }}: SSH, UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }},
-      HTTP/S :80/:443 via gateway Service externalIPs (gateway HA; NodePorts blocked on WAN).
-      Management NodePorts still blocked on WAN IP; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
       {% elif fleet_hub_firewall_public_ingress_enabled | bool %}
       Public {{ fleet_hub_firewall_public_interface }}: SSH, UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }},
       HTTP/S :80/:443 on gateway Traefik hostNetwork (single replica).
       Management NodePorts still blocked on WAN IP; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
       {% else %}
       Public interface {{ fleet_hub_firewall_public_interface }}: SSH + UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }} only.
-      DCM/Fleet/Harbor NodePorts blocked on WAN; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
+      Fleet/Harbor NodePorts blocked on WAN; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
       {% endif %}
   tags: [fleet_hub_firewall, hub_firewall]

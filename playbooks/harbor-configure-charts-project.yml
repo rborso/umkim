@@ -1,0 +1,10 @@
+---
+# Ensure Harbor charts + mirror hosted projects exist (idempotent).
+- name: Harbor charts and mirror projects
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: configure_charts_project.yml

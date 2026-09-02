@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const acmeSolverRoutesChecksumKey = "checksum/dcm-traefik-acme-routes"
+const acmeSolverRoutesChecksumKey = "checksum/fleet-traefik-acme-routes"
 
 type wanHandoffState struct {
 	gatewayExternalIPs []string

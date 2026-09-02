@@ -22,11 +22,15 @@ fi
 phase="$(kubectl -n "$NS" get fleetapproute "$ROUTE_NAME" -o jsonpath='{.status.tlsPhase}')"
 [[ "$phase" == "FailedDNS" ]] || fail "expected tlsPhase=FailedDNS got ${phase:-empty}"
 
-solver_ready=$(kubectl -n dcm get deploy gateway-acme -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+INGRESS_NS="${HUB_INGRESS_NS:-fleet-ingress}"
+solver_ready=$(kubectl -n "$INGRESS_NS" get deploy gateway-acme -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
 [[ "${solver_ready:-0}" == "0" ]] || fail "gateway-acme should not be running for FailedDNS host (ready=$solver_ready)"
 
-gw_ext="$(kubectl -n dcm get svc gateway -o jsonpath='{.spec.externalIPs}' 2>/dev/null || true)"
-[[ -n "$gw_ext" && "$gw_ext" != "[]" ]] || fail "gateway Service lost externalIPs"
+HOST_NET=$(kubectl -n "$INGRESS_NS" get deploy gateway -o jsonpath='{.spec.template.spec.hostNetwork}' 2>/dev/null || true)
+if [[ "$HOST_NET" != "true" ]]; then
+  gw_ext="$(kubectl -n "$INGRESS_NS" get svc gateway -o jsonpath='{.spec.externalIPs}' 2>/dev/null || true)"
+  [[ -n "$gw_ext" && "$gw_ext" != "[]" ]] || fail "gateway Service lost externalIPs"
+fi
 
 ok "FailedDNS without solver disruption"
 echo "=== verify-acme-dns-guard OK ==="

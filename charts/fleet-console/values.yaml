@@ -17,10 +17,9 @@ auth:
   # Must match lldap group cn (memberOf); lldap uses the group name verbatim.
   bootstrapLdapGroupCN: fleet-admins
   htpasswdLine: ""
-  dcmUpstream: http://gateway.dcm.svc.cluster.local:80
   fleetUpstream: http://fleet-site-controller.fleet-console.svc.cluster.local:18080
-  llmUpstream: http://litellm.dcm.svc.cluster.local:4000
-  llmMasterKeySecretNamespace: dcm
+  llmUpstream: http://litellm.fleet-llm.svc.cluster.local:4000
+  llmMasterKeySecretNamespace: fleet-llm
   llmMasterKeySecretName: fleet-llm-master-key
   llmMasterKeySecretKey: master_key
   ldap:

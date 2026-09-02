@@ -1,0 +1,13 @@
+---
+# Hub ingress: Traefik hostNetwork :80/:443 + ACME (v0.2 spine, no DCM).
+#
+# Usage:
+#   ansible-playbook hub-ingress.yml -l hub
+
+- name: Hub ingress on management hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: hub_ingress
+      tags: [hub_ingress]

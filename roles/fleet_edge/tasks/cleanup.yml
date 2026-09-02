@@ -24,10 +24,22 @@
     fleet_edge_services_fragment: ""
   tags: [fleet_edge, fleet_edge_cleanup]
 
+- name: Fleet edge | Check hub ingress namespace
+  ansible.builtin.command:
+    cmd: kubectl get namespace {{ hub_ingress_namespace | default('fleet-ingress') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_cleanup_ingress_ns
+  changed_when: false
+  failed_when: false
+  tags: [fleet_edge, fleet_edge_cleanup]
+
 - name: Fleet edge | Apply hub Traefik without re-rendering fleet routes
   ansible.builtin.import_role:
-    name: dcm
-    tasks_from: traefik_config.yml
+    name: hub_ingress
+    tasks_from: update_routes.yml
   vars:
     fleet_edge_skip_render: true
+  when: fleet_edge_cleanup_ingress_ns.rc == 0
   tags: [fleet_edge, fleet_edge_cleanup]

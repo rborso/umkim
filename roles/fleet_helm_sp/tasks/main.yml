@@ -1,4 +1,0 @@
----
-- name: Fleet Helm SP | Push to spokes
-  ansible.builtin.import_tasks: push_spokes.yml
-  tags: [fleet_helm_sp, phase5_helm_sp, phase5_push]

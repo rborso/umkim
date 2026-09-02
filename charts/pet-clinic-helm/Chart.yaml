@@ -1,6 +1,6 @@
 apiVersion: v2
 name: pet-clinic-helm
-description: Three-tier Pet Clinic demo (Postgres + Spring app + nginx web) for DCM Helm catalog
+description: Three-tier Pet Clinic demo (Postgres + Spring app + nginx web) for FleetApp Helm installs
 type: application
 version: 0.1.1
 appVersion: "6.1.2"

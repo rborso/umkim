@@ -22,11 +22,5 @@ fleet_site_wireguard_endpoint_port: "{{ wireguard_endpoint_port }}"
 fleet_site_wireguard_persistent_keepalive: "{{ wireguard_persistent_keepalive }}"
 fleet_site_bootstrap_ssh_user: linux
 ocm_join_extra_args: []
-fleet_site_dcm_k8s_sp_nodeport: 30190
-fleet_site_dcm_helm_sp_nodeport: 30194
-fleet_site_deploy_olm_sp: true
-fleet_site_dcm_olm_sp_nodeport: 30191
-fleet_site_dcm_k8s_sp_name: "k8s-{{ fleet_site_name | default(fleet_site_ocm_name) }}"
-fleet_site_dcm_olm_sp_name: "olm-{{ fleet_site_name | default(fleet_site_ocm_name) }}"
 fleet_site_enable_kubevirt: false
 fleet_site_auto_install_kubevirt_operator: false

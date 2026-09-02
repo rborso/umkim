@@ -22,7 +22,7 @@ func MapRequest(r *http.Request, backend string) MappedRequest {
 	case "fleet":
 		return mapFleet(path, method)
 	default:
-		return mapDCM(path, method)
+		return MappedRequest{Resource: "unknown", Verb: methodToVerb(method)}
 	}
 }
 
@@ -60,52 +60,16 @@ func mapFleet(path, method string) MappedRequest {
 		return MappedRequest{Resource: "clusters", Verb: "update"}
 	case "edge":
 		return MappedRequest{Resource: "edge", Verb: listVerb(method)}
-	case "instance-routes":
-		return MappedRequest{Resource: "instances", Verb: verb}
-	default:
-		return MappedRequest{Resource: parts[0], Verb: verb}
-	}
-}
-
-func mapDCM(path, method string) MappedRequest {
-	path = strings.TrimPrefix(path, "/proxy/dcm/")
-	path = strings.TrimPrefix(path, "/api/v1alpha1/")
-	path = strings.TrimPrefix(path, "api/v1alpha1/")
-	path = strings.TrimPrefix(path, "v1alpha1/")
-	path = strings.Trim(path, "/")
-	parts := strings.Split(path, "/")
-	verb := methodToVerb(method)
-
-	if len(parts) == 0 {
-		return MappedRequest{Resource: "health", Verb: verb}
-	}
-	switch parts[0] {
-	case "health":
-		return MappedRequest{Resource: "health", Verb: "get"}
-	case "providers":
+	case "apps":
 		if len(parts) == 1 {
-			return MappedRequest{Resource: "providers", Verb: listVerb(method)}
+			return MappedRequest{Resource: "apps", Verb: listVerb(method)}
 		}
-		return MappedRequest{Resource: "providers", Verb: verb}
-	case "catalog-items":
-		access := ""
-		if method != http.MethodGet && method != http.MethodHead {
-			access = "readWrite"
-		}
+		return MappedRequest{Resource: "apps", Verb: verb}
+	case "charts":
 		if len(parts) == 1 {
-			return MappedRequest{Resource: "catalog-items", Verb: listVerb(method), AccessLevel: access}
+			return MappedRequest{Resource: "charts", Verb: listVerb(method)}
 		}
-		return MappedRequest{Resource: "catalog-items", Verb: verb, ScopeKind: "CatalogItem", ScopeName: parts[1], AccessLevel: access}
-	case "catalog-item-instances":
-		if len(parts) == 1 {
-			return MappedRequest{Resource: "catalog-item-instances", Verb: listVerb(method)}
-		}
-		return MappedRequest{Resource: "catalog-item-instances", Verb: verb, ScopeKind: "CatalogItemInstance", ScopeName: parts[1]}
-	case "policies":
-		if len(parts) == 1 {
-			return MappedRequest{Resource: "policies", Verb: listVerb(method)}
-		}
-		return MappedRequest{Resource: "policies", Verb: verb, ScopeKind: "Policy", ScopeName: parts[1]}
+		return MappedRequest{Resource: "charts", Verb: verb}
 	default:
 		return MappedRequest{Resource: parts[0], Verb: verb}
 	}

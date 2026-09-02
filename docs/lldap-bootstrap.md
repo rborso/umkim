@@ -1,6 +1,6 @@
 # LLDAP bootstrap
 
-> Status: v0.1.0 is an experimental proof of concept. Directory administration
+> Status: v0.2 is an experimental proof of concept. Directory administration
 > and access recovery require an organization-approved security process.
 
 UMKIM can run LLDAP in two independent roles:

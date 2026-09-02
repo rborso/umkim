@@ -285,10 +285,7 @@ func (r *ClusterJoinReconciler) issueClusterScript(ctx context.Context, fcj *fle
 	priv := bootstrapNode.PrivateKey
 	pub := bootstrapNode.PublicKey
 
-	rocky := fcj.Spec.RockyVersion
-	if rocky == "" {
-		rocky = "9"
-	}
+	rocky := r.Cfg.RockyMajor(fcj.Spec.RockyVersion)
 	bundleMode := r.clusterJoinBundleMode(fcj)
 	enrollBase := r.Cfg.EnrollmentBaseURL
 
@@ -299,7 +296,7 @@ func (r *ClusterJoinReconciler) issueClusterScript(ctx context.Context, fcj *fle
 		HubWireguardIP:        r.Cfg.HubWireguardIP,
 		EnrollmentBaseURL:     enrollBase,
 		WGPublicKey:           pub,
-		RockyMajor:            strings.Split(rocky, ".")[0],
+		RockyMajor:            rocky,
 		BundleMode:            bundleMode,
 		WireguardEndpointHost: r.Cfg.WireguardEndpointHost,
 		WireguardEndpointPort: r.Cfg.WireguardEndpointPort,
@@ -704,8 +701,6 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	if enableKubevirt {
 		kubevirtEnable = "true"
 	}
-	phase5URL := "http://10.10.0.1:30908/api/v1alpha1"
-	phase5Nats := "nats://10.10.0.1:30222"
 	sshKeyFile := "ssh/id_rsa"
 	if hubRunner {
 		sshKeyFile = "/root/.ssh/id_rsa"
@@ -758,6 +753,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		var b strings.Builder
 		writeNodeGroups(&b)
 		b.WriteString("\n[fleet_cluster_nodes:vars]\n")
+		b.WriteString("fleet_node=true\n")
 		b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
 		b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
 		b.WriteString(fmt.Sprintf("fleet_cluster_kvm=%s\n", kubevirtEnable))
@@ -824,9 +820,6 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString("wireguard_address=10.10.0.1/24\n")
 		b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
-		b.WriteString("phase5_gateway_nodeport=30908\n")
-		b.WriteString(fmt.Sprintf("phase5_registration_url=%s\n", phase5URL))
-		b.WriteString(fmt.Sprintf("phase5_nats_url=%s\n", phase5Nats))
 		if hubRunner {
 			b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
 			b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
@@ -850,6 +843,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	var b strings.Builder
 	writeNodeGroups(&b)
 	b.WriteString("\n[fleet_cluster_nodes:vars]\n")
+	b.WriteString("fleet_node=true\n")
 	b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
 	b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
 	b.WriteString("k3s_cluster_mode=false\n")
@@ -903,9 +897,6 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	b.WriteString("wireguard_address=10.10.0.1/24\n")
 	b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
-	b.WriteString("phase5_gateway_nodeport=30908\n")
-	b.WriteString(fmt.Sprintf("phase5_registration_url=%s\n", phase5URL))
-	b.WriteString(fmt.Sprintf("phase5_nats_url=%s\n", phase5Nats))
 	if hubRunner {
 		b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
 		b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))

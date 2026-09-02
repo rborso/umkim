@@ -19,7 +19,9 @@ fleet_cleanup_legacy_manifestworks:
 fleet_cleanup_hub_namespaces:
   - dcm
   - fleet-console
+  - fleet-ingress
   - fleet-ingress-auth
+  - fleet-system
   - fleet-bootstrap
   - harbor
   - open-cluster-management

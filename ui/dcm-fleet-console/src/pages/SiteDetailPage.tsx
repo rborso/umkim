@@ -53,7 +53,6 @@ import { ExposureTlsPairWarning } from '../components/ExposureTlsPairWarning';
 import { LabeledField } from '../components/forms/LabeledField';
 import { getExposureTlsPairIssue, recommendedTlsForExposure } from '../edge/exposureTlsPairs';
 import { getFieldHelp } from '../help/fieldHelp';
-import { SiteOperatorsPanel } from '../components/sites/SiteOperatorsPanel';
 
 export function SiteDetailPage() {
   const { name } = useParams<{ name: string }>();
@@ -411,9 +410,6 @@ export function SiteDetailPage() {
                       </Button>
                     )}
                   </div>
-                )}
-                {!isRegistry && !isManagement && (
-                  <SiteOperatorsPanel siteName={name} sitePhase={phase} />
                 )}
               </Tab>
               <Tab eventKey={1} title={<TabTitleText>Edge and DNS</TabTitleText>}>

@@ -25,7 +25,6 @@ type Config struct {
 	OIDCClientID           string
 	OIDCClientSecret       string
 	OIDCRedirectURL        string
-	DCMUpstream            string
 	FleetUpstream          string
 	LLMUpstream            string
 	LLMMasterKey           string
@@ -79,11 +78,10 @@ func FromEnv() Config {
 		OIDCClientID:         os.Getenv("FLEET_AUTH_OIDC_CLIENT_ID"),
 		OIDCClientSecret:     os.Getenv("FLEET_AUTH_OIDC_CLIENT_SECRET"),
 		OIDCRedirectURL:      os.Getenv("FLEET_AUTH_OIDC_REDIRECT_URL"),
-		DCMUpstream:          envOr("FLEET_AUTH_DCM_UPSTREAM", "http://gateway.dcm.svc.cluster.local:9080"),
 		FleetUpstream:        envOr("FLEET_AUTH_FLEET_UPSTREAM", "http://fleet-site-controller.fleet-console.svc.cluster.local:18080"),
-		LLMUpstream:          envOr("FLEET_AUTH_LLM_UPSTREAM", "http://litellm.dcm.svc.cluster.local:4000"),
+		LLMUpstream:          envOr("FLEET_AUTH_LLM_UPSTREAM", "http://litellm.fleet-llm.svc.cluster.local:4000"),
 		LLMMasterKey:         os.Getenv("FLEET_AUTH_LLM_MASTER_KEY"),
-		LLMMasterKeySecretNS: envOr("FLEET_AUTH_LLM_MASTER_KEY_SECRET_NS", "dcm"),
+		LLMMasterKeySecretNS: envOr("FLEET_AUTH_LLM_MASTER_KEY_SECRET_NS", "fleet-llm"),
 		LLMMasterKeySecret:   envOr("FLEET_AUTH_LLM_MASTER_KEY_SECRET", "fleet-llm-master-key"),
 		LLMMasterKeySecretKey: envOr("FLEET_AUTH_LLM_MASTER_KEY_SECRET_KEY", "master_key"),
 		AuditRetention:       retention,

@@ -115,7 +115,6 @@ WireGuard client ready.
   On your PC:  sudo wg-quick up ./wg-umkim.conf
   Test:        ping -c1 10.10.0.1
   Console:     http://10.10.0.1:30912/fleet/   (dashboard NodePort)
-               http://10.10.0.1:30908/fleet/   (DCM gateway HTTP)
 
 Copy to your laptop (run on the laptop):
   scp linux@${HUB_PUBLIC_IP}:$CONF .

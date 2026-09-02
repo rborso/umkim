@@ -6,30 +6,11 @@ import type {
   FleetClusterCreate,
   FleetClusterPatch,
   CapabilityDiscovery,
-  ClusterProviderKind,
-  ClusterProviderRow,
   FleetNode,
   FleetNodePatch,
   HubInfrastructure,
-  CatalogItem,
-  CatalogItemCreate,
-  CatalogItemInstance,
-  CatalogItemInstanceCreate,
-  HealthStatus,
-  Policy,
-  PolicyCreate,
-  PolicyPatch,
-  PlacementPreviewRequest,
-  PlacementPreviewResponse,
-  InstanceHubRouteResponse,
-  PlacementTargetsResponse,
-  Provider,
-  ProviderRegistration,
-  ServiceType,
-  UserValue,
 } from './types';
 
-const API_BASE = '/api/v1alpha1';
 const FLEET_SITE_API_BASE = '/fleet/api/v1alpha1';
 
 export class ApiError extends Error {
@@ -58,609 +39,6 @@ function onUnauthorized(status: number) {
   if (status === 401 && !window.location.pathname.endsWith('/login')) {
     window.location.href = '/fleet/login';
   }
-}
-
-async function request<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
-  const r = await fetch(API_BASE + path, {
-    credentials: 'include',
-    headers: { Accept: 'application/json', ...init?.headers },
-    ...init,
-  });
-  const text = await r.text();
-  if (!r.ok) {
-    onUnauthorized(r.status);
-    throw new ApiError(
-      path + ' → HTTP ' + r.status + (text ? ': ' + text.slice(0, 200) : ''),
-      r.status,
-      text,
-    );
-  }
-  if (!text) return {} as T;
-  const ct = r.headers.get('content-type') || '';
-  if (ct.includes('application/json')) {
-    return JSON.parse(text) as T;
-  }
-  return { _raw: text } as T;
-}
-
-const healthListFallback: Record<
-  'providers' | 'catalog' | 'policies' | 'placement',
-  string
-> = {
-  providers: '/providers',
-  catalog: '/catalog-items',
-  policies: '/policies',
-  placement: '/catalog-item-instances',
-};
-
-export async function getHealth(
-  component: 'providers' | 'catalog' | 'policies' | 'placement',
-): Promise<HealthStatus> {
-  try {
-    return await request<HealthStatus>('/health/' + component);
-  } catch (e) {
-    // control-plane monolith may not expose per-component /health/* routes yet
-    if (!(e instanceof ApiError && e.status === 404)) {
-      throw e;
-    }
-    await request<unknown>(healthListFallback[component]);
-    return { status: 'reachable', component };
-  }
-}
-
-export async function listProviders(): Promise<Provider[]> {
-  const data = await request<unknown>('/providers');
-  return listKey<Provider>(data, ['providers', 'items']);
-}
-
-export async function getProvider(id: string): Promise<Provider> {
-  return request<Provider>('/providers/' + encodeURIComponent(id));
-}
-
-export async function createProvider(body: ProviderRegistration): Promise<Provider> {
-  return request<Provider>('/providers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateProvider(
-  id: string,
-  body: ProviderRegistration,
-): Promise<Provider> {
-  return request<Provider>('/providers/' + encodeURIComponent(id), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-function normalizeCatalogItem(item: CatalogItem): CatalogItem {
-  return {
-    ...item,
-    id: item.id || item.uid,
-    name: item.name || item.display_name,
-    service_type: item.service_type || item.serviceType,
-  };
-}
-
-function normalizeCatalogInstance(item: CatalogItemInstance): CatalogItemInstance {
-  return {
-    ...item,
-    id: item.id || item.uid,
-  };
-}
-
-export function catalogItemDisplayName(c: CatalogItem): string {
-  return c.display_name || c.name || '—';
-}
-
-export function catalogItemId(c: CatalogItem): string {
-  return c.id || c.uid || '—';
-}
-
-export async function getCatalogItem(id: string): Promise<CatalogItem> {
-  const item = await request<CatalogItem>(
-    '/catalog-items/' + encodeURIComponent(id),
-  );
-  return normalizeCatalogItem(item);
-}
-
-export async function deleteCatalogItem(id: string): Promise<void> {
-  await request<void>('/catalog-items/' + encodeURIComponent(id), {
-    method: 'DELETE',
-  });
-}
-
-export async function getInstancePlacementTargets(
-  instanceId: string,
-): Promise<PlacementTargetsResponse> {
-  return request<PlacementTargetsResponse>(
-    '/catalog-item-instances/' + encodeURIComponent(instanceId) + '/placement-targets',
-  );
-}
-
-export async function getInstanceHubRoute(
-  instanceId: string,
-): Promise<InstanceHubRouteResponse | null> {
-  try {
-    return await fleetSiteRequest<InstanceHubRouteResponse>(
-      '/instance-routes/' + encodeURIComponent(instanceId),
-    );
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
-    throw e;
-  }
-}
-
-export async function getBackupInfrastructure(): Promise<import('./types').BackupInfrastructureStatus> {
-  return fleetSiteRequest<import('./types').BackupInfrastructureStatus>('/backup-infrastructure');
-}
-
-export async function getInstanceWorkload(
-  instanceId: string,
-): Promise<import('./types').InstanceWorkloadResponse> {
-  return fleetSiteRequest<import('./types').InstanceWorkloadResponse>(
-    '/instance-workloads/' + encodeURIComponent(instanceId),
-  );
-}
-
-export async function putCatalogInstanceSecrets(
-  body: import('./types').CatalogInstanceSecretsRequest,
-): Promise<void> {
-  await fleetSiteRequest('/catalog-instance-secrets', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteCatalogInstanceSecrets(
-  body: import('./types').CatalogInstanceSecretsRequest,
-): Promise<void> {
-  await fleetSiteRequest('/catalog-instance-secrets', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function listInstanceBackups(params?: {
-  instance_id?: string;
-  cluster?: string;
-  phase?: string;
-}): Promise<import('./types').InstanceBackupResponse[]> {
-  const q = new URLSearchParams();
-  if (params?.instance_id) q.set('instance_id', params.instance_id);
-  if (params?.cluster) q.set('cluster', params.cluster);
-  if (params?.phase) q.set('phase', params.phase);
-  const suffix = q.toString() ? '?' + q.toString() : '';
-  const data = await fleetSiteRequest<{ backups?: import('./types').InstanceBackupResponse[] }>(
-    '/instance-backups' + suffix,
-  );
-  return data.backups ?? [];
-}
-
-export async function getInstanceBackup(
-  name: string,
-): Promise<import('./types').InstanceBackupResponse> {
-  return fleetSiteRequest<import('./types').InstanceBackupResponse>(
-    '/instance-backups/' + encodeURIComponent(name),
-  );
-}
-
-export async function createInstanceBackup(body: {
-  instance_id: string;
-  cluster?: string;
-  release?: string;
-  namespace?: string;
-  wait?: boolean;
-}): Promise<{ name: string; phase: string }> {
-  return fleetSiteRequest<{ name: string; phase: string }>('/instance-backups', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function listInstanceRestores(params?: {
-  instance_id?: string;
-  backup_name?: string;
-}): Promise<import('./types').InstanceRestoreResponse[]> {
-  const q = new URLSearchParams();
-  if (params?.instance_id) q.set('instance_id', params.instance_id);
-  if (params?.backup_name) q.set('backup_name', params.backup_name);
-  const suffix = q.toString() ? '?' + q.toString() : '';
-  const data = await fleetSiteRequest<{ restores?: import('./types').InstanceRestoreResponse[] }>(
-    '/instance-restores' + suffix,
-  );
-  return data.restores ?? [];
-}
-
-export async function getInstanceRestore(
-  name: string,
-): Promise<import('./types').InstanceRestoreResponse> {
-  return fleetSiteRequest<import('./types').InstanceRestoreResponse>(
-    '/instance-restores/' + encodeURIComponent(name),
-  );
-}
-
-export async function createInstanceRestore(body: {
-  backup_name: string;
-  target_cluster: string;
-  source_cluster?: string;
-  rebind?: {
-    enabled: boolean;
-    mode?: 'supersede' | 'clone';
-    display_name_suffix?: string;
-    user_value_patches?: Array<{ path: string; value: string }>;
-  };
-  storage_class_hints?: Record<string, string>;
-}): Promise<{ name: string; phase: string }> {
-  return fleetSiteRequest<{ name: string; phase: string }>('/instance-restores', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function getCatalogItemInstance(
-  id: string,
-): Promise<CatalogItemInstance> {
-  const item = await request<CatalogItemInstance>(
-    '/catalog-item-instances/' + encodeURIComponent(id),
-  );
-  return normalizeCatalogInstance(item);
-}
-
-export async function deleteCatalogItemInstance(
-  id: string,
-  opts?: { deletionMode?: 'strict' | 'deferred' | 'abandon' },
-): Promise<void> {
-  const mode = opts?.deletionMode ?? 'strict';
-  const q = mode === 'strict' ? '' : `?deletion_mode=${encodeURIComponent(mode)}`;
-  await request<void>('/catalog-item-instances/' + encodeURIComponent(id) + q, {
-    method: 'DELETE',
-  });
-}
-
-export type HelmHistoryEntry = {
-  revision?: number;
-  status?: string;
-  chart?: string;
-  app_version?: string;
-  description?: string;
-};
-
-export async function getHelmInstanceHistory(
-  instanceId: string,
-): Promise<{ releases: HelmHistoryEntry[] }> {
-  return request<{ releases: HelmHistoryEntry[] }>(
-    '/catalog-item-instances/' + encodeURIComponent(instanceId) + '/helm/history',
-  );
-}
-
-export async function rollbackHelmInstance(
-  instanceId: string,
-  revision: number,
-): Promise<unknown> {
-  return request<unknown>(
-    '/catalog-item-instances/' + encodeURIComponent(instanceId) + '/helm/rollback',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ revision }),
-    },
-  );
-}
-
-export async function upgradeCatalogItemInstance(
-  instanceId: string,
-  userValues: UserValue[],
-): Promise<CatalogItemInstance> {
-  return request<CatalogItemInstance>(
-    '/catalog-item-instances/' + encodeURIComponent(instanceId),
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spec: { user_values: userValues } }),
-    },
-  );
-}
-
-export async function listCatalogItems(): Promise<CatalogItem[]> {
-  const data = await request<unknown>('/catalog-items');
-  return listKey<CatalogItem>(data, [
-    'results',
-    'catalog_items',
-    'catalog-items',
-    'items',
-  ]).map(normalizeCatalogItem);
-}
-
-export async function listCatalogItemInstances(): Promise<CatalogItemInstance[]> {
-  const data = await request<unknown>('/catalog-item-instances');
-  return listKey<CatalogItemInstance>(data, [
-    'results',
-    'catalog_item_instances',
-    'catalog-item-instances',
-    'instances',
-    'items',
-  ]).map(normalizeCatalogInstance);
-}
-
-function toCatalogItemBody(
-  body: CatalogItemCreate,
-): Record<string, unknown> {
-  const serviceType =
-    body.service_type || body.serviceType || body.spec?.service_type || 'container';
-  const displayName =
-    body.display_name || body.name || '';
-  const specIn = { ...(body.spec || {}) };
-  let spec: Record<string, unknown>;
-  if (Array.isArray(specIn.resources) && specIn.resources.length > 0) {
-    spec = specIn;
-  } else {
-    const { service_type: _st, fields, ...rest } = specIn;
-    spec = {
-      ...rest,
-      resources: [
-        {
-          name: 'app',
-          service_type: serviceType,
-          fields: fields || [],
-        },
-      ],
-    };
-  }
-  return {
-    api_version: body.api_version || 'v1alpha1',
-    display_name: displayName,
-    description: body.description,
-    spec,
-  };
-}
-
-export async function createCatalogItem(body: CatalogItemCreate): Promise<CatalogItem> {
-  const id = (body.id || body.name || '').trim();
-  const path = id
-    ? `/catalog-items?id=${encodeURIComponent(id)}`
-    : '/catalog-items';
-  return request<CatalogItem>(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toCatalogItemBody(body)),
-  });
-}
-
-export async function createCatalogItemInstance(
-  body: CatalogItemInstanceCreate,
-): Promise<CatalogItemInstance> {
-  return request<CatalogItemInstance>('/catalog-item-instances', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_version: body.api_version || 'v1alpha1',
-      display_name: body.display_name,
-      spec: body.spec,
-    }),
-  });
-}
-
-export async function updateCatalogItem(
-  id: string,
-  body: Partial<CatalogItemCreate>,
-): Promise<CatalogItem> {
-  return request<CatalogItem>('/catalog-items/' + encodeURIComponent(id), {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/merge-patch+json',
-    },
-    body: JSON.stringify(toCatalogItemBody(body as CatalogItemCreate)),
-  });
-}
-
-export function catalogItemServiceType(c: CatalogItem): string {
-  const spec = c.spec as Record<string, unknown> | undefined;
-  const resources = spec?.resources;
-  if (Array.isArray(resources) && resources.length > 0) {
-    const st = (resources[0] as { service_type?: string }).service_type;
-    if (st) return st;
-  }
-  return (
-    c.service_type ||
-    c.serviceType ||
-    (spec?.service_type as string) ||
-    '—'
-  );
-}
-
-export function isOperatorCatalogItem(c: CatalogItem): boolean {
-  return catalogItemServiceType(c) === 'operator';
-}
-
-export async function listOperatorCatalogItems(): Promise<CatalogItem[]> {
-  const items = await listCatalogItems();
-  return items.filter(isOperatorCatalogItem);
-}
-
-export function isOperatorInstance(
-  inst: CatalogItemInstance,
-  operatorCatalogIds: Set<string>,
-): boolean {
-  const cid = inst.spec?.catalog_item_id || '';
-  return operatorCatalogIds.has(cid);
-}
-
-export async function listOperatorInstances(): Promise<{
-  instances: CatalogItemInstance[];
-  catalogItems: CatalogItem[];
-}> {
-  const [instances, catalogItems] = await Promise.all([
-    listCatalogItemInstances(),
-    listCatalogItems(),
-  ]);
-  const operatorIds = new Set(
-    catalogItems.filter(isOperatorCatalogItem).map((c) => catalogItemId(c)).filter((id) => id !== '—'),
-  );
-  return {
-    instances: instances.filter((i) => isOperatorInstance(i, operatorIds)),
-    catalogItems: catalogItems.filter(isOperatorCatalogItem),
-  };
-}
-
-/** Clusters with an olm-* DCM provider registered on the hub. */
-export function listOlmProviderClusters(providers: Provider[]): string[] {
-  const clusters: string[] = [];
-  for (const p of providers) {
-    const name = p.name || '';
-    if (name.startsWith('olm-')) {
-      clusters.push(name.slice(4));
-    } else if (
-      p.service_type === 'operator' ||
-      p.serviceType === 'operator'
-    ) {
-      const n = p.name || p.display_name || '';
-      if (n) clusters.push(n);
-    }
-  }
-  return [...new Set(clusters)].sort();
-}
-
-export function instanceMatchesCluster(
-  replication: PlacementTargetsResponse | undefined,
-  cluster: string,
-): boolean {
-  if (!cluster || !replication?.targets?.length) return false;
-  return replication.targets.some(
-    (t) => t.provider === `olm-${cluster}` || t.provider?.endsWith(cluster),
-  );
-}
-
-export async function listPolicies(): Promise<Policy[]> {
-  const data = await request<unknown>('/policies');
-  return listKey<Policy>(data, ['policies', 'items']);
-}
-
-/** Policy Manager expects snake_case request bodies (unlike SPM/catalog). */
-function toPolicyBody(body: PolicyCreate | PolicyPatch): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  if (body.display_name !== undefined) out.display_name = body.display_name;
-  if (body.policy_type !== undefined) out.policy_type = body.policy_type;
-  if (body.rego_code !== undefined) out.rego_code = body.rego_code;
-  if (body.description !== undefined) out.description = body.description;
-  if (body.enabled !== undefined) out.enabled = body.enabled;
-  if (body.priority !== undefined) out.priority = body.priority;
-  if (body.label_selector !== undefined) out.label_selector = body.label_selector;
-  if (body.cluster_requirements !== undefined) {
-    out.cluster_requirements = body.cluster_requirements;
-  }
-  if (body.placement !== undefined) out.placement = body.placement;
-  if (body.failover !== undefined) out.failover = body.failover;
-  return out;
-}
-
-export async function previewPlacement(
-  body: PlacementPreviewRequest,
-): Promise<PlacementPreviewResponse> {
-  return request<PlacementPreviewResponse>('/placement-preview', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function getPolicy(id: string): Promise<Policy> {
-  return request<Policy>('/policies/' + encodeURIComponent(id));
-}
-
-export async function createPolicy(body: PolicyCreate, opts?: { id?: string }): Promise<Policy> {
-  const qs = opts?.id ? `?id=${encodeURIComponent(opts.id)}` : '';
-  return request<Policy>('/policies' + qs, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toPolicyBody(body)),
-  });
-}
-
-export async function updatePolicy(id: string, body: PolicyPatch): Promise<Policy> {
-  return request<Policy>('/policies/' + encodeURIComponent(id), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/merge-patch+json' },
-    body: JSON.stringify(toPolicyBody(body)),
-  });
-}
-
-export async function deletePolicy(id: string): Promise<void> {
-  await request<void>('/policies/' + encodeURIComponent(id), { method: 'DELETE' });
-}
-
-export function policyDisplayName(p: Policy): string {
-  return p.display_name || '—';
-}
-
-export async function listServiceTypes(): Promise<ServiceType[]> {
-  const data = await request<unknown>('/service-types');
-  return listKey<ServiceType>(data, [
-    'results',
-    'service_types',
-    'service-types',
-    'items',
-  ]).map((st) => ({
-    ...st,
-    name: st.service_type || st.name || st.id,
-  }));
-}
-
-export function providerDisplayName(p: Provider): string {
-  return p.display_name || p.displayName || p.name || '—';
-}
-
-export function providerHealth(p: Provider): string {
-  return p.health_status || (p as { status?: string }).status || '—';
-}
-
-/** Cluster suffix from fleet provider names (e.g. k8s-lab-ext02 → lab-ext02). */
-export function providerClusterFromName(name: string | undefined): string | undefined {
-  if (!name) return undefined;
-  const match = name.match(/^(?:k8s|helm|olm|kubevirt)-(.+)$/);
-  return match?.[1];
-}
-
-/** OCM cluster name for a registered service provider. */
-export function providerCluster(p: Provider, clusters: FleetCluster[] = []): string {
-  const zone = p.metadata?.zone || p.zone;
-  if (zone) return zone;
-  const fromName = providerClusterFromName(p.name);
-  if (fromName) return fromName;
-  void clusters;
-  return '—';
-}
-
-/** Fleet site label for a provider (metadata.site, or cluster fleet.site lookup). */
-export function providerSite(
-  p: Provider,
-  clusters: FleetCluster[] = [],
-  sites: FleetSite[] = [],
-): string {
-  const fromMeta = p.metadata?.site || p.metadata?.site_id;
-  if (fromMeta) return fleetSiteLabelForId(sites, fromMeta);
-
-  const clusterName = providerCluster(p, clusters);
-  if (clusterName !== '—') {
-    const cluster = clusters.find((c) => c.name === clusterName);
-    if (cluster?.site) return fleetSiteLabelForId(sites, cluster.site);
-  }
-  return '—';
-}
-
-/** @deprecated Use providerCluster — column header is "Cluster" but DCM field is zone. */
-export function providerZone(p: Provider, clusters: FleetCluster[] = []): string {
-  return providerCluster(p, clusters);
 }
 
 async function fleetSiteRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -805,6 +183,60 @@ export async function listFleetClusters(): Promise<FleetCluster[]> {
   return data.clusters ?? [];
 }
 
+export async function listFleetApps(): Promise<{
+  apps: import('./types').FleetApp[];
+  defaults: import('./types').FleetAppDefaults;
+}> {
+  const data = await fleetSiteRequest<{
+    apps?: import('./types').FleetApp[];
+    defaults?: import('./types').FleetAppDefaults;
+  }>('/apps');
+  return {
+    apps: data.apps ?? [],
+    defaults: data.defaults ?? { chartPrefix: '' },
+  };
+}
+
+export async function createFleetApp(
+  body: import('./types').FleetAppCreate,
+): Promise<import('./types').FleetApp> {
+  return fleetSiteRequest<import('./types').FleetApp>('/apps', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteFleetApp(name: string): Promise<void> {
+  await fleetSiteRequest('/apps/' + encodeURIComponent(name), { method: 'DELETE' });
+}
+
+export async function listFleetCharts(): Promise<import('./types').FleetChart[]> {
+  const data = await fleetSiteRequest<{ charts?: import('./types').FleetChart[] }>('/charts');
+  return data.charts ?? [];
+}
+
+export async function createFleetChart(
+  body: import('./types').FleetChartCreate,
+): Promise<import('./types').FleetChart> {
+  return fleetSiteRequest<import('./types').FleetChart>('/charts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function uploadFleetChart(form: FormData): Promise<import('./types').FleetChart> {
+  return fleetSiteRequest<import('./types').FleetChart>('/charts', {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export async function deleteFleetChart(name: string): Promise<void> {
+  await fleetSiteRequest('/charts/' + encodeURIComponent(name), { method: 'DELETE' });
+}
+
 export async function getFleetCluster(name: string): Promise<FleetCluster> {
   return fleetSiteRequest<FleetCluster>('/clusters/' + encodeURIComponent(name));
 }
@@ -925,11 +357,9 @@ export async function createFleetCluster(body: FleetClusterCreate): Promise<Flee
   const prov = body.providers;
   if (prov?.kubevirt || body.kvm) caps.kvm = true;
   if (body.topology === 'ha_3_node') caps.ha_topology = true;
-  const install = prov
+  const install = prov?.kubevirt
     ? {
-        k8s: !!prov.k8s,
-        helm: !!prov.helm,
-        kubevirt: !!prov.kubevirt,
+        kubevirt: true,
       }
     : undefined;
   const kubevirtBridge =
@@ -1054,33 +484,6 @@ export async function validateFleetClusterStorage(
     );
   }
   throw new ApiError('validate-storage → unexpected response', r.status, text);
-}
-
-export async function listClusterProviders(name: string): Promise<ClusterProviderRow[]> {
-  const data = await fleetSiteRequest<{ providers?: ClusterProviderRow[] }>(
-    '/clusters/' + encodeURIComponent(name) + '/providers',
-  );
-  return data.providers ?? [];
-}
-
-export async function installClusterProvider(
-  name: string,
-  kind: ClusterProviderKind,
-): Promise<void> {
-  await fleetSiteRequest(
-    '/clusters/' + encodeURIComponent(name) + '/providers/' + kind + '/install',
-    { method: 'POST' },
-  );
-}
-
-export async function deleteClusterProvider(
-  name: string,
-  kind: ClusterProviderKind,
-): Promise<void> {
-  await fleetSiteRequest(
-    '/clusters/' + encodeURIComponent(name) + '/providers/' + kind + '/delete',
-    { method: 'POST' },
-  );
 }
 
 export async function deleteFleetSite(name: string): Promise<void> {

@@ -52,6 +52,9 @@ type Syncer struct {
 }
 
 func (s *Syncer) RunOnce(ctx context.Context) error {
+	if strings.TrimSpace(s.Config.CatalogAPIURL) == "" {
+		return nil
+	}
 	logger := log.FromContext(ctx)
 	instances, err := s.fetchInstances(ctx)
 	if err != nil {

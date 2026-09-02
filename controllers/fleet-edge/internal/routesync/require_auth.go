@@ -24,7 +24,7 @@ func userValueAsString(v userValue) string {
 }
 
 func parseRequireAuth(uv map[string]string, mode string) bool {
-	if mode == fleetv1alpha1.RouteModeDual || mode == fleetv1alpha1.RouteModeNone {
+	if mode == fleetv1alpha1.RouteModeNone {
 		return false
 	}
 	raw := strings.TrimSpace(strings.ToLower(uv["routing.require_auth"]))

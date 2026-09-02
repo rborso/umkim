@@ -1,80 +1,32 @@
 openapi: 3.0.3
 info:
-  title: Fleet Site API — instance backup extensions
+  title: Fleet Site API
   version: v1alpha1
   description: |
-    Extensions to `/fleet/api/v1alpha1` for catalog instance backup and restore.
-    Full fleet-site routes are documented in docs/components/fleet-site.md.
+    Fleet-site HTTP API for sites, clusters, FleetApp Helm installs, and the chart library.
+    See docs/components/fleet-apps.md and docs/components/fleet-site.md.
 servers:
   - url: /fleet/api/v1alpha1
 paths:
-  /backup-infrastructure:
+  /apps:
     get:
-      summary: Velero and hub MinIO readiness
+      summary: List FleetApp Helm installs and chart prefix defaults
       responses:
         '200':
-          description: Infrastructure status per cluster
-  /instance-workloads/{instanceId}:
-    get:
-      summary: Resolve cluster, release, namespace for backup
-      parameters:
-        - name: instanceId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Resolved workload
-        '409':
-          description: Instance not deployed
-  /instance-backups:
-    get:
-      summary: List instance backups
-      parameters:
-        - name: instance_id
-          in: query
-          schema:
-            type: string
-        - name: cluster
-          in: query
-          schema:
-            type: string
-        - name: phase
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Backup list
+          description: apps plus defaults.chartPrefix
     post:
-      summary: Start async backup
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [instance_id]
-              properties:
-                instance_id:
-                  type: string
-                cluster:
-                  type: string
-                release:
-                  type: string
-                namespace:
-                  type: string
-                wait:
-                  type: boolean
+      summary: Install an OCI chart on a selected Ready cluster
+      description: clusterName is required. There is no placement engine.
       responses:
-        '202':
-          description: Backup accepted
+        '201':
+          description: FleetApp created
+        '400':
+          description: Missing clusterName or disallowed chart
         '409':
-          description: Infra not ready or concurrent operation
-  /instance-backups/{name}:
+          description: Cluster is not Ready, or name exists
+  /apps/{name}:
     get:
-      summary: Backup operation status
+      summary: Get a FleetApp
       parameters:
         - name: name
           in: path
@@ -83,80 +35,41 @@ paths:
             type: string
       responses:
         '200':
-          description: Backup status
+          description: FleetApp
+        '404':
+          description: Not found
     delete:
-      summary: Delete backup CR
+      summary: Uninstall the Helm release and delete the FleetApp
       parameters:
         - name: name
           in: path
           required: true
           schema:
             type: string
-      responses:
-        '204':
-          description: Deleted
-  /instance-restores:
-    get:
-      summary: List restore operations
-      parameters:
-        - name: instance_id
-          in: query
-          schema:
-            type: string
-        - name: backup_name
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Restore list
-    post:
-      summary: Start async restore
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [backup_name, target_cluster]
-              properties:
-                backup_name:
-                  type: string
-                target_cluster:
-                  type: string
-                source_cluster:
-                  type: string
-                rebind:
-                  type: object
-                  properties:
-                    enabled:
-                      type: boolean
-                    mode:
-                      type: string
-                      enum: [supersede, clone]
-                      description: Default supersede — delete backup source instance and reuse display name. Clone keeps the source and appends display_name_suffix.
-                    display_name_suffix:
-                      type: string
-                      description: Used only when mode is clone (default -restored).
-                    user_value_patches:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          path:
-                            type: string
-                          value:
-                            type: string
-                storage_class_hints:
-                  type: object
-                  additionalProperties:
-                    type: string
       responses:
         '202':
-          description: Restore accepted
-  /instance-restores/{name}:
+          description: Uninstall started
+  /charts:
     get:
-      summary: Restore operation status
+      summary: List hub library charts (FleetChart)
+      responses:
+        '200':
+          description: charts array
+    post:
+      summary: Publish a chart into Harbor and record a FleetChart
+      description: |
+        JSON body with origin (oci:// or http(s) .tgz) or multipart field chart (.tgz).
+        imagePolicy is external, proxy, or copy. cluster install is a separate POST /apps.
+      responses:
+        '201':
+          description: FleetChart created
+        '200':
+          description: Existing FleetChart updated for republish
+        '400':
+          description: Invalid origin, imagePolicy, or package
+  /charts/{name}:
+    get:
+      summary: Get a library chart
       parameters:
         - name: name
           in: path
@@ -165,4 +78,17 @@ paths:
             type: string
       responses:
         '200':
-          description: Restore status
+          description: FleetChart
+        '404':
+          description: Not found
+    delete:
+      summary: Remove the library record (Harbor artifact is kept)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Deleted

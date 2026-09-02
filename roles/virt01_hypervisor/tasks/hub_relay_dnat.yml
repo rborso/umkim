@@ -19,7 +19,7 @@
     set -euo pipefail
     LAN="{{ virt01_hub_relay_lan_ip }}"
     HUB="{{ fleet_hub_wireguard_ip }}"
-    ENROLL="{{ phase5_gateway_nodeport | default(30908) }}"
+    ENROLL="{{ dcm_fleet_dashboard_nodeport | default(30912) }}"
     API="{{ virt01_hub_relay_k3s_port | default(6443) }}"
     HARBOR="{{ harbor_nodeport_https | default(30443) }}"
     for pair in "${ENROLL}:${ENROLL}" "${API}:${API}" "${HARBOR}:${HARBOR}"; do

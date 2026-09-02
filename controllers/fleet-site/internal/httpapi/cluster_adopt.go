@@ -310,8 +310,6 @@ func buildAdoptedInventoryINI(cfg config.Config, clusterName, siteID, bootstrapH
 		sshUser = "linux"
 	}
 	sshArgs := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-	phase5URL := fmt.Sprintf("http://%s:30908/api/v1alpha1", cfg.HubWireguardIP)
-	phase5Nats := fmt.Sprintf("nats://%s:30222", cfg.HubWireguardIP)
 	region := "homelab"
 	return fmt.Sprintf(`[site_bootstrap]
 %s ansible_host=%s ansible_user=%s
@@ -348,8 +346,6 @@ site_bootstrap
 wireguard_address=10.10.0.1/24
 ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml
 k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-phase5_registration_url=%s
-phase5_nats_url=%s
 `,
 		clusterName, wgHost, sshUser,
 		sshArgs,
@@ -359,6 +355,5 @@ phase5_nats_url=%s
 		kubevirtEnable, kubevirtEnable,
 		region,
 		hubHost, cfg.HubWireguardIP, sshUser,
-		phase5URL, phase5Nats,
 	)
 }

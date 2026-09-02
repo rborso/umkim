@@ -7,7 +7,6 @@ source of truth.
 | Concern | Template location |
 |---------|-------------------|
 | Platform bootstrap | `roles/olm/templates/manifestwork-bootstrap.yaml.j2` |
-| Container provider | `roles/dcm/templates/manifestwork-k8s-sp.yaml.j2` |
 | Spoke ingress | `roles/spoke_ingress/templates/manifestwork-ingress.yaml.j2` |
 
 Change a template and its role inputs rather than adding a rendered artifact
@@ -16,6 +15,6 @@ changes.
 
 ## References
 
-- [DCM component](../../docs/components/dcm.md)
+- [FleetApp Helm installs](../../docs/components/fleet-apps.md)
 - [Fleet edge component](../../docs/components/fleet-edge.md)
 - [Design guide](../../docs/design.md)

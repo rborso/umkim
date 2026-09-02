@@ -51,7 +51,6 @@ fv_hub_endpoint_export_urls() {
   fv_hub_endpoint_init
   export FLEET_CONSOLE_URL="${FLEET_CONSOLE_URL:-http://${FLEET_HUB_IP}:30912}"
   export FLEET_API="${FLEET_API:-http://${FLEET_HUB_IP}:18080/api/v1alpha1}"
-  export DCM_API="${DCM_API:-http://${FLEET_HUB_IP}:30908/api/v1alpha1}"
   export HUB_HOST="${HUB_HOST:-${FLEET_HUB_IP}}"
   export HUB_SSH="${HUB_SSH:-linux@${FLEET_HUB_IP}}"
   export FLEET_EDGE_DOMAIN="${FLEET_EDGE_DOMAIN:-$(_fv_site_var fleet_edge_domain)}"

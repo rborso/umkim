@@ -3,77 +3,12 @@
   ansible.builtin.include_tasks: configure_charts_project.yml
   tags: [harbor, harbor_push_charts]
 
-- name: Harbor | Check optional catalog checkout on controller
-  ansible.builtin.stat:
-    path: "{{ harbor_umkim_catalog_root }}"
-  delegate_to: localhost
-  become: false
-  register: harbor_umkim_catalog_stat
-  tags: [harbor, harbor_push_charts]
-
-- name: Harbor | Select charts available on controller
+- name: Harbor | Charts to push
   ansible.builtin.set_fact:
-    harbor_charts_to_push_effective: >-
-      {{ harbor_charts_to_push_effective | default([]) + [item] }}
-  loop: "{{ harbor_charts_to_push }}"
-  when:
-    - not (item.optional | default(false) | bool)
-      or (harbor_umkim_catalog_stat.stat.isdir | default(false) | bool)
+    harbor_charts_to_push_effective: "{{ harbor_charts_to_push }}"
   tags: [harbor, harbor_push_charts]
 
-- name: Harbor | Report skipped optional catalog charts
-  ansible.builtin.debug:
-    msg: >-
-      Optional catalog checkout {{ harbor_umkim_catalog_root }} is absent;
-      skipping catalog charts and continuing with built-in charts.
-  when: not (harbor_umkim_catalog_stat.stat.isdir | default(false) | bool)
-  tags: [harbor, harbor_push_charts]
-
-- name: Harbor | Add upstream chart repositories on controller
-  ansible.builtin.command:
-    argv:
-      - helm
-      - repo
-      - add
-      - "{{ item.name }}"
-      - "{{ item.url }}"
-      - --force-update
-  delegate_to: localhost
-  become: false
-  loop: "{{ harbor_chart_repositories }}"
-  when: >-
-    harbor_charts_to_push_effective
-    | selectattr('dependency_build', 'defined')
-    | list
-    | length > 0
-  changed_when: true
-  tags: [harbor, harbor_push_charts]
-
-- name: Harbor | Update upstream chart repositories on controller
-  ansible.builtin.command:
-    cmd: helm repo update {{ item.name }}
-  delegate_to: localhost
-  become: false
-  loop: "{{ harbor_chart_repositories }}"
-  when: >-
-    harbor_charts_to_push_effective
-    | selectattr('dependency_build', 'defined')
-    | list
-    | length > 0
-  changed_when: false
-  tags: [harbor, harbor_push_charts]
-
-- name: Harbor | Build chart dependencies on controller
-  ansible.builtin.command:
-    cmd: helm dependency build {{ item.chart_dir | default(harbor_umkim_root ~ '/charts/' ~ item.name) }}
-  delegate_to: localhost
-  become: false
-  loop: "{{ harbor_charts_to_push_effective }}"
-  when: item.dependency_build | default(false) | bool
-  changed_when: true
-  tags: [harbor, harbor_push_charts]
-
-- name: Harbor | Package pilot charts on controller
+- name: Harbor | Package charts on controller
   ansible.builtin.command:
     cmd: helm package {{ item.chart_dir | default(harbor_umkim_root ~ '/charts/' ~ item.name) }} -d /tmp
   delegate_to: localhost

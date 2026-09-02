@@ -21,15 +21,15 @@ require_root() {
   fi
 }
 
-assert_rocky9() {
+assert_rocky() {
   if [[ ! -f /etc/os-release ]]; then
     log "ERROR: /etc/os-release missing"
     exit 1
   fi
   # shellcheck source=/dev/null
   source /etc/os-release
-  if [[ "${ID}" != "rocky" ]] || [[ "${VERSION_ID%%.*}" != "{{ fleet_site_rocky_major | default('9') }}" ]]; then
-    log "ERROR: Rocky Linux {{ fleet_site_rocky_major | default('9') }} required (found ${ID:-?} ${VERSION_ID:-?})"
+  if [[ "${ID}" != "rocky" ]] || [[ "${VERSION_ID%%.*}" != "{{ fleet_site_rocky_major | default('10') }}" ]]; then
+    log "ERROR: Rocky Linux {{ fleet_site_rocky_major | default('10') }} required (found ${ID:-?} ${VERSION_ID:-?})"
     exit 1
   fi
 }
@@ -167,7 +167,7 @@ post_enrollment() {
 
 main() {
   require_root
-  assert_rocky9
+  assert_rocky
   install_packages
   write_wg_config
   start_wg

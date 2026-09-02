@@ -13,15 +13,14 @@ dcm_fleet_console_image_name: dcm-fleet-console
 
 fleet_console_auth_session_secret: "{{ fleet_console_auth_session_secret_vault | default('change-me-fleet-console-auth') }}"
 fleet_console_auth_session_ttl: 8h
-# false for lab HTTP NodePorts (30908/30912 over WireGuard). Set true only when the
-# console is served exclusively over HTTPS (Secure cookies are dropped on http://).
-fleet_console_auth_session_secure: "{{ fleet_console_auth_session_secure_profile | default((fleet_profile | default('lab')) == 'production') }}"
+# false: console is HTTP on the WireGuard overlay (NodePort 30912). Set true only
+# when the console is served exclusively over HTTPS (Secure cookies are dropped on http://).
+fleet_console_auth_session_secure: false
 fleet_console_auth_bypass: false
 fleet_console_auth_htpasswd_admin_user: localadmin
 fleet_console_auth_htpasswd_admin_password: "{{ fleet_console_auth_admin_password_vault | default('fleet-admin-change-me') }}"
 fleet_console_auth_bootstrap_admin: true
 fleet_console_auth_bootstrap_install_token: "{{ fleet_console_auth_bootstrap_install_token_vault | default('') }}"
-fleet_console_auth_dcm_upstream: "http://gateway.{{ phase5_dcm_namespace | default('dcm') }}.svc.cluster.local:{{ dcm_gateway_cluster_port }}"
 fleet_console_auth_fleet_upstream: "http://fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080"
 
 fleet_auth_ldap_url: "ldap://lldap.{{ fleet_webui_namespace | default('fleet-console') }}.svc.cluster.local:{{ fleet_auth_lldap_ldap_port | default(3890) }}"

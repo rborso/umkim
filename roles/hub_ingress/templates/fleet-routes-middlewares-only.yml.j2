@@ -1,0 +1,4 @@
+# Middlewares shared by fleet-edge routes (no routers until FleetAppRoute CRs exist).
+http:
+  middlewares:
+{{ fleet_edge_middlewares_fragment | default('') | indent(4, true) }}

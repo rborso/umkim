@@ -17,8 +17,8 @@ func HubGatewayProbeURL(httpsURL, httpURL, tlsPhase string) string {
 	}
 	if strings.HasPrefix(httpsURL, "https://") {
 		hostPort := strings.TrimPrefix(httpsURL, "https://")
-		if strings.Contains(hostPort, ":30909") {
-			return "http://" + strings.Replace(hostPort, ":30909", ":30908", 1)
+		if strings.HasSuffix(hostPort, ":443") {
+			return "http://" + strings.TrimSuffix(hostPort, ":443") + ":80"
 		}
 		return "http://" + hostPort
 	}

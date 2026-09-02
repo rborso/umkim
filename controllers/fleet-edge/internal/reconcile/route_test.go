@@ -13,7 +13,7 @@ func TestEffectiveModeHubOnlyCluster(t *testing.T) {
 			"virt01-k3s": {DirectIngress: false, UpstreamHost: "10.0.0.1", TraefikHTTPPort: 30080},
 		},
 	}
-	mode, msg := effectiveMode(fleetv1alpha1.RouteModeDual, "virt01-k3s", reg)
+	mode, msg := effectiveMode(fleetv1alpha1.RouteModeSite, "virt01-k3s", reg)
 	if mode != fleetv1alpha1.RouteModeHub {
 		t.Fatalf("expected hub, got %q (%s)", mode, msg)
 	}
@@ -25,9 +25,9 @@ func TestEffectiveModeDirectIngress(t *testing.T) {
 			"virt02": {DirectIngress: true, UpstreamHost: "10.0.0.2", TraefikHTTPPort: 30080},
 		},
 	}
-	mode, _ := effectiveMode(fleetv1alpha1.RouteModeDual, "virt02", reg)
-	if mode != fleetv1alpha1.RouteModeDual {
-		t.Fatalf("expected dual, got %q", mode)
+	mode, _ := effectiveMode(fleetv1alpha1.RouteModeSite, "virt02", reg)
+	if mode != fleetv1alpha1.RouteModeSite {
+		t.Fatalf("expected site, got %q", mode)
 	}
 }
 

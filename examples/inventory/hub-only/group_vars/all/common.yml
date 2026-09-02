@@ -4,9 +4,9 @@
 
 domain: example.local
 
-umkim_version: "0.1.0"
+umkim_version: "0.2.0-dev"
 harbor_fleet_image_tag: "{{ umkim_version }}"
-# Sibling-repo SHAs: inventory/group_vars/all/fleet_git_pins.yml
+fleet_site_rocky_major: "10"
 
 fleet_hub_wireguard_ip: "10.10.0.1"
 
@@ -32,33 +32,13 @@ harbor_fleet_project: fleet
 harbor_fleet_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}"
 harbor_fleet_image_prefix: "{{ harbor_fleet_registry }}/{{ harbor_fleet_project }}"
 
-# Helm SP OCI allowlist (comma-separated). Harbor charts + public external registries.
+# Helm OCI allowlist (comma-separated). Harbor charts + public external registries.
 # Private charts: mirror into Harbor, then use Harbor prefix. Override with "*" for any oci://.
 helm_chart_oci_prefixes: >-
   {{ harbor_charts_oci_prefix | default('oci://' ~ harbor_host ~ ':' ~ harbor_nodeport_https ~ '/charts') }},oci://registry-1.docker.io,oci://docker.io,oci://quay.io,oci://ghcr.io
 
-# Upstream quay-proxy workers (k8s CSP) — not fleet/* umkim_version tag.
-phase5_upstream_image_tag: "{{ umkim_version }}"
-phase5_image_tag: "{{ phase5_upstream_image_tag }}"
-phase5_k8s_container_sp_version: "{{ phase5_upstream_image_tag }}"
-
-# Variable naming reference (legacy phase5_* names used in roles):
-#   phase5_gateway_nodeport (30908) — DCM API Traefik NodePort HTTP
-#   phase5_gateway_https_nodeport (30909) — DCM gateway HTTPS when fleet_edge_acme_enabled
-#   phase5_dcm_namespace (dcm)      — DCM Kubernetes namespace
-#   phase4_manifestwork_name        — OLM bootstrap ManifestWork on spokes
-#   phase5_manifestwork_name        — k8s CSP ManifestWork on spokes
-#   phase5_helm_sp_manifestwork_name / phase5_olm_sp_manifestwork_name — worker SP ManifestWorks
-
-phase5_gateway_nodeport: 30908
-phase5_gateway_https_nodeport: 30909
-# OCM ManifestWork names (console provider install/delete jobs embed common.yml only).
-phase5_manifestwork_name: phase5-k8s-container-sp
-phase5_helm_sp_manifestwork_name: phase5-helm-release-sp
-phase5_olm_sp_manifestwork_name: phase5-olm-subscription-sp
-phase5_traefik_acme_pvc_size: 1Mi
+# Overlay IP alias used by some roles.
 phase5_hub_wireguard_ip: "{{ fleet_hub_wireguard_ip }}"
-dcm_gateway_cluster_port: "{{ 80 if (fleet_edge_acme_enabled | default(false) | bool) else 9080 }}"
 
 # Hub + spoke Traefik ACME (hub.yml also sets these; runner Jobs only embed common.yml).
 fleet_edge_acme_enabled: true
@@ -88,6 +68,7 @@ host_prepare_sysctl:
 
 host_prepare_packages:
   - python3-libselinux
+  - kernel-modules-extra
   - iproute
   - NetworkManager
 
@@ -113,10 +94,6 @@ phase4_harbor_warm_images:
   - jetstack/cert-manager-controller:v1.15.3
   - jetstack/cert-manager-webhook:v1.15.3
   - jetstack/cert-manager-cainjector:v1.15.3
-
-# Phase 5 — DCM warm list (also in roles/dcm/defaults/main.yml; inventory can override).
-phase5_dcm_images:
-  - rborso/control-plane
 
 # Fleet controllers — image tags follow umkim_version (harbor_fleet_image_tag).
 fleet_edge_controller_enabled: true

@@ -20,9 +20,6 @@ import {
 import {
   ChartLineIcon,
   CubeIcon,
-  LayerGroupIcon,
-  ProcessAutomationIcon,
-  ShieldAltIcon,
   GlobeIcon,
   NetworkIcon,
   ServerIcon,
@@ -46,10 +43,7 @@ const navItems: NavItemDef[] = [
   { to: '/sites', label: 'Sites', icon: <GlobeIcon />, resource: 'sites', verb: 'list' },
   { to: '/infrastructure', label: 'Infrastructure', icon: <ServerIcon />, resource: 'infrastructure', verb: 'get' },
   { to: '/clusters', label: 'Clusters', icon: <NetworkIcon />, resource: 'clusters', verb: 'list' },
-  { to: '/providers', label: 'Providers', icon: <CubeIcon />, resource: 'providers', verb: 'list', hideForCustomer: true },
-  { to: '/catalog', label: 'Catalog', icon: <LayerGroupIcon />, resource: 'catalog-items', verb: 'list' },
-  { to: '/instances', label: 'Catalog instances', icon: <ProcessAutomationIcon />, resource: 'catalog-item-instances', verb: 'list' },
-  { to: '/policies', label: 'Policies', icon: <ShieldAltIcon />, resource: 'policies', verb: 'list', orgAdminOrDcAdmin: true },
+  { to: '/apps', label: 'Apps', icon: <CubeIcon />, resource: 'apps', verb: 'list' },
 ];
 
 export function AppLayout() {
@@ -58,7 +52,7 @@ export function AppLayout() {
   const header = (
     <Masthead>
       <MastheadMain>
-        <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>DCM Fleet Console</span>
+        <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>UMKIM</span>
       </MastheadMain>
       <MastheadContent>
         <Toolbar id="masthead-tools" isFullHeight isStatic>
@@ -85,7 +79,7 @@ export function AppLayout() {
   const sidebar = (
     <PageSidebar>
       <PageSidebarBody>
-        <Nav aria-label="DCM fleet">
+        <Nav aria-label="UMKIM fleet">
           <NavList>
             {navItems
               .filter((item) => {

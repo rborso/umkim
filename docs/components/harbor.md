@@ -1,12 +1,14 @@
 # Harbor registry
 
-> Status: v0.1.0 is an experimental proof of concept. Registry availability,
+> Status: v0.2 is an experimental proof of concept. Registry availability,
 > access control, transport security, and backup remain operator
 > responsibilities.
 
 Harbor is the hub registry for fleet-built images and chart artifacts. The
 `fleet` project holds images built by the repository’s Ansible workflows;
-proxy projects are used for selected upstream content.
+The `charts` project holds OCI Helm charts consumed by FleetApp; the `mirror`
+project holds images copied from a chart publish with `imagePolicy: copy`; proxy
+projects are used for selected upstream content.
 
 ## Build and publish
 
@@ -18,11 +20,14 @@ ansible-playbook harbor.yml -l hub --tags harbor_push_fleet
 ```
 
 Use the corresponding chart-push tag when publishing the repository’s charts.
-Fleet-built images use the release image tag configured by
+Operators can also publish into the hub library with
+[scripts/fleet-chart.sh](../../scripts/fleet-chart.sh) or the console Apps
+Library tab (`POST /api/v1alpha1/charts`). Fleet-built images use the release image tag configured by
 `umkim_version`/`harbor_fleet_image_tag`.
 
-Some images require locally pinned sibling source repositories. Follow
-[install.md](../install.md) and the version matrix before rebuilding them.
+v0.2 hub images are built from this checkout. Sibling service-provider
+clones are not required. See [install.md](../install.md) and
+[VERSIONS.md](../../VERSIONS.md).
 
 ## Security and recovery
 
@@ -33,4 +38,4 @@ Some images require locally pinned sibling source repositories. Follow
 - Back up Harbor data separately from the hub helper backup.
 
 See [secrets.md](../secrets.md), [backup-restore.md](../backup-restore.md),
-and [dcm.md](dcm.md) for related operational guidance.
+and [fleet-apps.md](fleet-apps.md) for related operational guidance.

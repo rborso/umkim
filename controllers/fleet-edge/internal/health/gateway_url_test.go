@@ -8,8 +8,8 @@ import (
 
 func TestHubGatewayProbeURL(t *testing.T) {
 	t.Parallel()
-	https := "https://10.10.0.1:30909"
-	http := "http://10.10.0.1:30908"
+	https := "https://10.10.0.1:443"
+	http := "http://10.10.0.1:80"
 	if got := HubGatewayProbeURL(https, http, fleetv1alpha1.TLSPhaseReady); got != https {
 		t.Fatalf("ready: got %q want %q", got, https)
 	}

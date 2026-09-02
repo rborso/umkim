@@ -5,7 +5,7 @@ test.describe('Authentication', () => {
   test('shows authenticated user in masthead', async ({ page }) => {
     const { user } = authCredentials();
     await page.goto('./');
-    await expect(page.getByText('DCM Fleet Console')).toBeVisible();
+    await expect(page.getByText('UMKIM fleet console')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
     await expect(page.getByText(user, { exact: false })).toBeVisible();
   });

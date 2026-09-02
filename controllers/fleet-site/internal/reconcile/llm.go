@@ -44,7 +44,7 @@ func (r *LLMReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	desired := fleetllm.ComputeDesired(ctx, r.Cfg, fl)
 
-	if backends, err := llm.SyncBackendsFromDCM(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName, r.Cfg.DCMCatalogAPIURL, fl.Spec.Backends); err == nil && len(backends) > 0 {
+	if backends, err := llm.SyncBackendsFromFleetApps(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName, fl.Spec.Backends); err == nil && len(backends) > 0 {
 		if !backendsEqual(fl.Spec.Backends, backends) {
 			fl.Spec.Backends = backends
 			if err := r.Update(ctx, fl); err != nil {
@@ -144,7 +144,7 @@ func (r *LLMReconciler) pollLLMJob(ctx context.Context, fl *fleetv1alpha1.FleetL
 
 func (r *LLMReconciler) llmHubOperational(ctx context.Context) bool {
 	var dep appsv1.Deployment
-	if err := r.Get(ctx, types.NamespacedName{Namespace: "dcm", Name: "litellm"}, &dep); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Namespace: "fleet-llm", Name: "litellm"}, &dep); err != nil {
 		return false
 	}
 	return dep.Status.ReadyReplicas >= 1

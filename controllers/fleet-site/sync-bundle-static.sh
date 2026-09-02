@@ -14,7 +14,7 @@ done
 cp -f "${BUNDLE_CFG}/ansible.cfg" "${DST}/ansible.cfg"
 cp -f "${BUNDLE_CFG}/requirements.yml" "${DST}/requirements.yml"
 
-for role in k3s calico harbor fleet_cluster_ssh fleet_cluster_wireguard fleet_cluster_storage fleet_cluster_longhorn fleet_site_validate kube_vip; do
+for role in k3s calico harbor fleet_cluster_ssh fleet_cluster_wireguard fleet_cluster_storage fleet_cluster_longhorn fleet_site_validate kube_vip host_prepare; do
   cp -a "${ROOT}/roles/${role}" "${DST}/roles/"
 done
 

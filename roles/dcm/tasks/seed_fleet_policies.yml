@@ -1,4 +1,0 @@
----
-# Legacy tag dcm_seed_policies — superseded policies are disabled via seed_placement_policies.
-- name: DCM policies | Disable legacy lab spoke routes
-  ansible.builtin.import_tasks: disable_legacy_lab_policies.yml

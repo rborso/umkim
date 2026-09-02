@@ -206,10 +206,6 @@ func (r *Reconciler) issueScript(ctx context.Context, fs *fleetv1alpha1.FleetSit
 	}
 
 	wgBlock := script.WGConfigBlock(priv, pub, addr, hubPub, r.Cfg.WireguardEndpointHost, r.Cfg.WireguardEndpointPort, r.Cfg.WireguardKeepalive, r.Cfg.WireguardSubnet)
-	rocky := fs.Spec.RockyVersion
-	if rocky == "" {
-		rocky = "9"
-	}
 	bootstrap, err := script.Render(script.Params{
 		SiteName:          siteName,
 		EnrollmentToken:   enrollToken,
@@ -217,7 +213,7 @@ func (r *Reconciler) issueScript(ctx context.Context, fs *fleetv1alpha1.FleetSit
 		EnrollmentBaseURL: r.Cfg.EnrollmentBaseURL,
 		WGConfigBlock:     wgBlock,
 		WGPublicKey:       pub,
-		RockyMajor:        strings.Split(rocky, ".")[0],
+		RockyMajor:        r.Cfg.RockyMajor(fs.Spec.RockyVersion),
 	})
 	if err != nil {
 		return err
@@ -459,13 +455,6 @@ ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/n
 %[1]s ansible_host=%s
 
 [%[1]s:vars]
-dcm_k8s_sp_nodeport=30190
-dcm_k8s_sp_name=k8s-%[1]s
-dcm_k8s_sp_endpoint_host=%s
-dcm_olm_sp_nodeport=30191
-dcm_olm_sp_name=olm-%[1]s
-dcm_olm_sp_endpoint_host=%s
-fleet_site_deploy_olm_sp=true
 fleet_site_enable_kubevirt=%s
 fleet_site_auto_install_kubevirt_operator=%s
 
@@ -479,8 +468,7 @@ site_bootstrap
 wireguard_address=10.10.0.1/24
 ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml
 k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-phase5_registration_url=http://10.10.0.1:30908/api/v1alpha1
-`, siteName, host, r.Cfg.SSHUser, siteName, siteName, addr, host, addr, siteName, host, siteName, host, kubevirtEnable, kubevirtOlmAuto, r.Cfg.HubHostInventoryName)
+`, siteName, host, r.Cfg.SSHUser, siteName, siteName, addr, host, addr, siteName, host, kubevirtEnable, kubevirtOlmAuto, r.Cfg.HubHostInventoryName)
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: inventoryCMName(siteName), Namespace: fs.Namespace},
@@ -573,5 +561,11 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := r.SetupLLMWithManager(mgr); err != nil {
 		return err
 	}
-	return r.SetupInstanceBackupWithManager(mgr)
+	if err := r.SetupAppWithManager(mgr); err != nil {
+		return err
+	}
+	if err := r.SetupChartWithManager(mgr); err != nil {
+		return err
+	}
+	return nil
 }

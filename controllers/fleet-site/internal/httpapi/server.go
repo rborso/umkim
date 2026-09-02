@@ -28,9 +28,9 @@ type Server struct {
 }
 
 type enrollRequest struct {
-	Hostname     string `json:"hostname"`
-	RockyVersion string `json:"rockyVersion"`
-	WgPublicKey  string `json:"wgPublicKey"`
+	Hostname      string `json:"hostname"`
+	RockyVersion  string `json:"rockyVersion"`
+	WgPublicKey   string `json:"wgPublicKey"`
 	ScriptVersion string `json:"scriptVersion"`
 }
 
@@ -57,7 +57,6 @@ func (s *Server) Handler() http.Handler {
 		}
 		s.handleClusterByName(w, r, name, sub)
 	})
-	mux.HandleFunc("/api/v1alpha1/instance-routes/", s.handleInstanceHubRoute)
 	mux.HandleFunc("/api/v1alpha1/edge/domains", s.handleEdgeDomains)
 	mux.HandleFunc("/api/v1alpha1/edge/hostnames/check", s.handleEdgeDomains)
 	mux.HandleFunc("/api/v1alpha1/edge/dns/validate", s.handleEdgeDomains)
@@ -79,29 +78,26 @@ func (s *Server) Handler() http.Handler {
 		sub = strings.Trim(sub, "/")
 		s.handleLLMSub(w, r, sub)
 	})
-	mux.HandleFunc("/api/v1alpha1/backup-infrastructure", s.handleBackupInfrastructure)
-	mux.HandleFunc("/api/v1alpha1/instance-workloads/", s.handleInstanceWorkloads)
-	mux.HandleFunc("/api/v1alpha1/instance-backups", s.handleInstanceBackups)
-	mux.HandleFunc("/api/v1alpha1/instance-backups/", func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/instance-backups/")
+	mux.HandleFunc("/api/v1alpha1/apps", s.handleApps)
+	mux.HandleFunc("/api/v1alpha1/apps/", func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/apps/")
 		name = strings.Trim(name, "/")
 		if name == "" {
-			s.handleInstanceBackups(w, r)
+			s.handleApps(w, r)
 			return
 		}
-		s.handleInstanceBackupByName(w, r, name)
+		s.handleAppByName(w, r, name)
 	})
-	mux.HandleFunc("/api/v1alpha1/instance-restores", s.handleInstanceRestores)
-	mux.HandleFunc("/api/v1alpha1/instance-restores/", func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/instance-restores/")
+	mux.HandleFunc("/api/v1alpha1/charts", s.handleCharts)
+	mux.HandleFunc("/api/v1alpha1/charts/", func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/charts/")
 		name = strings.Trim(name, "/")
 		if name == "" {
-			s.handleInstanceRestores(w, r)
+			s.handleCharts(w, r)
 			return
 		}
-		s.handleInstanceRestoreByName(w, r, name)
+		s.handleChartByName(w, r, name)
 	})
-	mux.HandleFunc("/api/v1alpha1/catalog-instance-secrets", s.handleCatalogInstanceSecrets)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
 }

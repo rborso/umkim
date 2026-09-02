@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create homelab-int/ext sites and clusters, bootstrap, provision, providers.
+# Create homelab-int/ext sites and clusters, bootstrap, provision.
 #
 # Maintainer lab automation (fixed node IPs, SSH jump). Greenfield operators follow
 # docs/install.md §5 in the console instead. Requires vault at ~/.umkim-vault-pass.
@@ -10,7 +10,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 API="${FLEET_API:-http://127.0.0.1:30912/fleet/api/v1alpha1}"
 AUTH="${FLEET_AUTH_API:-http://127.0.0.1:30912/fleet/auth/v1alpha1}"
-DCM="${DCM_API:-http://127.0.0.1:30908/api/v1alpha1}"
 COOKIE_JAR="${COOKIE_JAR:-/tmp/fleet-homelab-cookies.txt}"
 SSH_JUMP="${SSH_JUMP:-linux@wg.umkim.com:30200}"
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes)
@@ -77,28 +76,6 @@ sudo bash ./bootstrap.sh
 EOF
 }
 
-install_provider() {
-  local cluster="$1" prov="$2"
-  local code
-  code=$(curl -s -b "$COOKIE_JAR" -o /tmp/prov.json -w '%{http_code}' -X POST "${API}/clusters/${cluster}/providers/${prov}/install")
-  [[ "$code" == "202" || "$code" == "200" || "$code" == "409" ]] || { cat /tmp/prov.json >&2; return 1; }
-}
-
-wait_provider() {
-  local name="$1" max="${2:-600}"
-  for ((i = 0; i < max; i += 10)); do
-    curl -sf "${DCM}/providers" | python3 -c "
-import json,sys
-for p in json.load(sys.stdin).get('providers',[]):
-    if p['name']=='${name}' and (p.get('health') or p.get('health_status',''))=='ready':
-        sys.exit(0)
-sys.exit(1)
-" && return 0
-    sleep 10
-  done
-  return 1
-}
-
 create_site() {
   local name="$1" body="$2"
   local code
@@ -162,11 +139,6 @@ for cluster in homelab-int homelab-ext; do
       -H 'Content-Type: application/json' \
       -d '{"edge":{"direct_ingress":true,"traefik_http_port":30080}}' >/dev/null || true
   fi
-  for prov in k8s helm; do
-    log "Install ${prov} on ${cluster}"
-    install_provider "$cluster" "$prov"
-    wait_provider "${prov}-${cluster}" 900
-  done
 done
 
 log "Enable ACME on homelab-ext"
@@ -199,4 +171,3 @@ done
 
 log "Setup complete"
 api GET "/clusters" | python3 -c "import json,sys; [print(c['name'], c.get('provisioning_phase'), c.get('available')) for c in json.load(sys.stdin).get('clusters',[])]"
-curl -sf "${DCM}/providers" | python3 -c "import json,sys; [print(p['name'], p.get('health') or p.get('health_status')) for p in json.load(sys.stdin).get('providers',[])]"

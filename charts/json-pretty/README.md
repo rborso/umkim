@@ -9,10 +9,11 @@ deployment, service, and configuration are defined in this chart.
 helm template <release-name> .
 ```
 
-Review values and cluster policy before deployment. Chart publication, catalog
-registration, ingress, and external access are managed outside this chart.
+Review values and cluster policy before deployment. Chart publication,
+ingress, and external access are managed outside this chart (Harbor +
+FleetApp).
 
 ## References
 
-- [DCM component](../../docs/components/dcm.md)
+- [FleetApp Helm installs](../../docs/components/fleet-apps.md)
 - [Design guide](../../docs/design.md)

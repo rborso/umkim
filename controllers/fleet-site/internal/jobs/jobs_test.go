@@ -63,6 +63,94 @@ func TestOverlayConnectivityJobContainsProbe(t *testing.T) {
 	}
 }
 
+func TestChartPublishJob(t *testing.T) {
+	job := ChartPublishJob(ChartPublishJobOpts{
+		Namespace:      "fleet-console",
+		JobName:        "fc-p-whoami",
+		ChartName:      "whoami",
+		Version:        "0.1.0",
+		Source:         "upload",
+		InboxFile:      "whoami.tgz",
+		InboxHostPath:  "/var/lib/umkim/chart-inbox",
+		ImagePolicy:    "external",
+		DestOCI:        "oci://10.10.0.1:30443/charts",
+		MirrorHost:     "10.10.0.1:30443/mirror",
+		RunnerImage:    "img:tag",
+		HubSecretsName: HubAnsibleSecretsName,
+		ResultCM:       "fc-result-whoami",
+	})
+	pod := job.Spec.Template.Spec
+	if pod.HostNetwork != true {
+		t.Fatal("expected hostNetwork")
+	}
+	foundInbox, foundSecrets := false, false
+	for _, v := range pod.Volumes {
+		if v.Name == "inbox" && v.HostPath != nil {
+			foundInbox = true
+		}
+		if v.Name == "hub-secrets" {
+			foundSecrets = true
+		}
+	}
+	if !foundInbox || !foundSecrets {
+		t.Fatalf("inbox=%v secrets=%v", foundInbox, foundSecrets)
+	}
+	script := strings.Join(pod.Containers[0].Command, " ")
+	if !strings.Contains(script, "helm push") {
+		t.Fatal("expected helm push")
+	}
+	if !strings.Contains(script, "skopeo") {
+		t.Fatal("expected skopeo copy path")
+	}
+}
+
+func TestHelmAppJobInstallMounts(t *testing.T) {
+	job := HelmAppJob(HelmAppJobOpts{
+		Namespace:         "fleet-console",
+		JobName:           "fa-i-whoami",
+		Cluster:           "lab-single-0",
+		Chart:             "oci://10.10.0.1:30443/charts/whoami",
+		Version:           "0.1.0",
+		Release:           "whoami",
+		TargetNamespace:   "default",
+		Action:            "install",
+		RunnerImage:       "img:tag",
+		ValuesConfigMap:   "fa-vals-whoami",
+		ImageMapConfigMap: "fa-imap-whoami",
+		RegistryHost:      "10.10.0.1:30443",
+		HubSecretsName:    HubAnsibleSecretsName,
+	})
+	pod := job.Spec.Template.Spec
+	if pod.HostNetwork != true {
+		t.Fatal("expected hostNetwork")
+	}
+	if pod.Containers[0].Command[0] != "/bin/bash" {
+		t.Fatalf("expected bash override of ansible-playbook entrypoint, got %v", pod.Containers[0].Command)
+	}
+	foundValues, foundSecrets, foundMap := false, false, false
+	for _, v := range pod.Volumes {
+		if v.Name == "values" && v.ConfigMap != nil && v.ConfigMap.Name == "fa-vals-whoami" {
+			foundValues = true
+		}
+		if v.Name == "hub-secrets" && v.Secret != nil && v.Secret.SecretName == HubAnsibleSecretsName {
+			foundSecrets = true
+		}
+		if v.Name == "imagemap" && v.ConfigMap != nil && v.ConfigMap.Name == "fa-imap-whoami" {
+			foundMap = true
+		}
+	}
+	if !foundValues || !foundSecrets || !foundMap {
+		t.Fatalf("values=%v secrets=%v imagemap=%v", foundValues, foundSecrets, foundMap)
+	}
+	script := strings.Join(pod.Containers[0].Command, " ")
+	if !strings.Contains(script, "helm upgrade --install") {
+		t.Fatal("expected helm upgrade in script")
+	}
+	if !strings.Contains(script, "helm registry login") {
+		t.Fatal("expected registry login in script")
+	}
+}
+
 func TestValidateJobNoHubSecrets(t *testing.T) {
 	job := ValidateJob("fleet-console", "c", "c", "site1", "single", "img:tag", "ssh", "inv")
 	for _, v := range job.Spec.Template.Spec.Volumes {

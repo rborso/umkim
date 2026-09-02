@@ -241,9 +241,9 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 }
 
 func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alpha1.FleetIngressAuth, edgeClusters map[string]AnsibleEdgeCluster) string {
-	gatewayURL := "http://10.10.0.1:30908"
+	gatewayURL := "http://127.0.0.1:80"
 	if desired.ControllerAuth {
-		gatewayURL = "https://10.10.0.1:30909"
+		gatewayURL = "https://127.0.0.1"
 	}
 	forwardAuth := fmt.Sprintf("http://authelia.%s.svc.cluster.local:9091/api/authz/forward-auth", "fleet-ingress-auth")
 	lines := []string{

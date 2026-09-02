@@ -37,7 +37,7 @@ func (r *RouteHealthReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if mode == "" {
 		mode = route.Spec.Mode
 	}
-	if mode != fleetv1alpha1.RouteModeHub && mode != fleetv1alpha1.RouteModeDual {
+	if mode != fleetv1alpha1.RouteModeHub {
 		return ctrl.Result{RequeueAfter: time.Duration(r.Config.RouteHealthIntervalSec) * time.Second}, nil
 	}
 	if route.Status.Phase == "" || route.Status.Phase == fleetv1alpha1.PhasePending {

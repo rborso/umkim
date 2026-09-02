@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const gatewayFleetRoutesChecksumKey = "checksum/dcm-traefik-fleet-routes"
+const gatewayFleetRoutesChecksumKey = "checksum/fleet-traefik-fleet-routes"
 
 func (r *RouteReconciler) fleetRoutesYAMLFromCM(ctx context.Context, ns, name, key string) []byte {
 	reader := r.APIReader

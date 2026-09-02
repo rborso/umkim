@@ -1,26 +1,15 @@
 ---
-# Site-wide settings for a greenfield hub fleet.
-# Copy to inventory/group_vars/all/site.yml (or merge into common.yml).
-# Replace every CHANGE_ME / example.com value before deploy.
+# Site-wide settings for otthol.hu hub (local inventory — not committed).
+fleet_edge_domain: demo.otthol.hu
+fleet_homelab_edge_domain: homelab.otthol.hu
+fleet_edge_acme_email: "acme@otthol.hu"
 
-# Public DNS zone for fleet apps and hub ACME (hub_gateway profile).
-fleet_edge_domain: apps.example.com
-fleet_edge_acme_email: "fleet@example.com"
-
-# WireGuard endpoint hostname (UDP 51820) — usually a stable A/AAAA to the hub WAN IP.
 fleet_dns:
-  wireguard_hub: wg.example.com
+  wireguard_hub: wg.otthol.hu
 
-# Console / LDAP naming (lldap base DN — pick a private suffix, not a public zone).
-domain: example.local
-fleet_auth_ldap_base_dn: "dc=example,dc=local"
+domain: otthol.local
+fleet_auth_ldap_base_dn: "dc=otthol,dc=local"
 
-# Management site id in console (must match fleet_sites key below).
 fleet_management_site_id: management
 fleet_management_cluster_name: umkim-hub
-
-# Hub inventory hostname (must match hosts.yml hub host key).
 fleet_hub_inventory_hostname: umkim-hub
-
-# Workload site id for cluster-provision-hub.yml when -e fleet_site_id is omitted.
-# fleet_workload_site_id: site-a

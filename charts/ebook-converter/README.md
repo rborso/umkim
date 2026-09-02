@@ -11,10 +11,10 @@ helm template <release-name> .
 ```
 
 Review values, browser dependencies, and cluster policy before deployment.
-Chart publication, catalog registration, ingress, and external access are
-managed outside this chart.
+Chart publication, ingress, and external access are managed outside this
+chart (Harbor + FleetApp).
 
 ## References
 
-- [DCM component](../../docs/components/dcm.md)
+- [FleetApp Helm installs](../../docs/components/fleet-apps.md)
 - [Design guide](../../docs/design.md)

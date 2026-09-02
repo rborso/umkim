@@ -6,10 +6,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/fleet-verify/lib/hub-kubectl.sh
 source "${ROOT}/scripts/fleet-verify/lib/hub-kubectl.sh"
 
-NS="${DCM_NAMESPACE:-dcm}"
+NS="${HUB_INGRESS_NS:-fleet-ingress}"
 DEPLOY="${GATEWAY_DEPLOYMENT:-gateway}"
-PING_URL="${GATEWAY_PING_URL:-http://127.0.0.1:30908/ping}"
+PING_URL="${GATEWAY_PING_URL:-http://127.0.0.1:80/ping}"
 TEST_ROLLOUT="${TEST_GATEWAY_ROLLOUT:-0}"
+GW_POD_LABEL="${GATEWAY_POD_LABEL:-app=hub-gateway}"
 
 echo "=== verify-gateway-ha ==="
 
@@ -18,7 +19,7 @@ REPLICAS=$(echo "$DEPLOY_JSON" | jq -r '.spec.replicas')
 READY=$(echo "$DEPLOY_JSON" | jq -r '.status.readyReplicas // 0')
 STRATEGY=$(echo "$DEPLOY_JSON" | jq -r '.spec.strategy.type')
 MAX_UNAVAIL=$(echo "$DEPLOY_JSON" | jq -r '.spec.strategy.rollingUpdate.maxUnavailable // empty')
-EXPECTED_REPLICAS="${DCM_GATEWAY_REPLICAS:-$REPLICAS}"
+EXPECTED_REPLICAS="${GATEWAY_REPLICAS:-$REPLICAS}"
 
 echo "replicas=$REPLICAS ready=$READY strategy=$STRATEGY maxUnavailable=${MAX_UNAVAIL:-n/a}"
 
@@ -29,7 +30,7 @@ fi
 
 if [[ "$READY" -lt "$REPLICAS" ]]; then
   echo "ERROR: readyReplicas=$READY (expected >= $REPLICAS)"
-  hub_kubectl -n "$NS" get pods -l app=dcm-gateway -o wide
+  hub_kubectl -n "$NS" get pods -l "$GW_POD_LABEL" -o wide
   exit 1
 fi
 
@@ -37,7 +38,7 @@ if [[ "$REPLICAS" -gt 1 ]]; then
   HOST_NET=$(echo "$DEPLOY_JSON" | jq -r '.spec.template.spec.hostNetwork // false')
   if [[ "$HOST_NET" == "true" ]]; then
     echo "ERROR: hostNetwork=true with replicas=$REPLICAS — port conflict on single-node hub"
-    echo "       Patch hostNetwork=false or re-run fleet-dcm.yml --tags dcm_hub,dcm_traefik"
+    echo "       Patch hostNetwork=false or scale the fleet-ingress gateway"
     exit 1
   fi
   echo "OK: hostNetwork is not true (pod-network HA; omitted or false)"
@@ -52,10 +53,10 @@ else
   echo "OK: single-replica gateway (lab/single-node hub)"
 fi
 
-NOT_READY=$(hub_kubectl -n "$NS" get pods -l app=dcm-gateway --field-selector=status.phase!=Running -o name 2>/dev/null | wc -l)
+NOT_READY=$(hub_kubectl -n "$NS" get pods -l "$GW_POD_LABEL" --field-selector=status.phase!=Running -o name 2>/dev/null | wc -l)
 if [[ "$NOT_READY" -gt 0 ]]; then
   echo "ERROR: non-running gateway pods"
-  hub_kubectl -n "$NS" get pods -l app=dcm-gateway
+  hub_kubectl -n "$NS" get pods -l "$GW_POD_LABEL"
   exit 1
 fi
 
@@ -64,7 +65,7 @@ echo "OK: $READY gateway pod(s) ready"
 if [[ "$REPLICAS" -gt 1 ]]; then
   SOLVER_SPEC=$(hub_kubectl -n "$NS" get deploy gateway-acme -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "missing")
   if [[ "$SOLVER_SPEC" == "missing" ]]; then
-    echo "WARN: gateway-acme Deployment not found (install hub stack with dcm_gateway_acme_solver_enabled)"
+    echo "WARN: gateway-acme Deployment not found (HA ACME solver is not installed)"
   elif [[ "$SOLVER_SPEC" != "0" ]]; then
     echo "WARN: gateway-acme spec.replicas=$SOLVER_SPEC (expected 0 in steady state)"
   else

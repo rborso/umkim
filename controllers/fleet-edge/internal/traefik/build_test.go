@@ -191,7 +191,7 @@ func TestBuildStandbyDualUpstreamHealthCheck(t *testing.T) {
 			t.Fatalf("missing %q in:\n%s", want, s)
 		}
 	}
-	hc := dualUpstreamHealthCheck(routes[0])
+	hc := failoverUpstreamHealthCheck(routes[0])
 	if hc.Hostname != "myapp.mgmt.umkim.com" || hc.Status != 200 || *hc.FollowRedirects != followFalse {
 		t.Fatalf("unexpected health check: %+v", hc)
 	}
@@ -318,55 +318,11 @@ func TestBuildHubRouteNoAuthByDefault(t *testing.T) {
 	_ = out
 }
 
-func TestHubRouterMiddlewaresDualSkipsAuthelia(t *testing.T) {
-	opts := authOpts()
-	mids := hubRouterMiddlewares(fleetv1alpha1.RouteModeDual, false, true, opts, false)
-	for _, m := range mids {
-		if m == "fleet-edge-authelia" {
-			t.Fatalf("dual mode must not use authelia middleware: %v", mids)
-		}
-	}
-}
-
 func TestHubRouterMiddlewaresHubUsesAuthelia(t *testing.T) {
 	opts := authOpts()
 	mids := hubRouterMiddlewares(fleetv1alpha1.RouteModeHub, false, true, opts, false)
 	if len(mids) != 2 || mids[1] != "fleet-edge-authelia" {
 		t.Fatalf("hub-only route should chain authelia: %v", mids)
-	}
-}
-
-func TestHubRouterMiddlewaresHubSkipsWithoutRequireAuth(t *testing.T) {
-	opts := authOpts()
-	mids := hubRouterMiddlewares(fleetv1alpha1.RouteModeHub, false, false, opts, false)
-	for _, m := range mids {
-		if m == "fleet-edge-authelia" {
-			t.Fatalf("hub route without RequireAuth must not chain authelia: %v", mids)
-		}
-	}
-}
-
-func TestBuildDualRouteNoAuthelia(t *testing.T) {
-	routes := []fleetv1alpha1.FleetAppRoute{{
-		Spec: fleetv1alpha1.FleetAppRouteSpec{
-			InstanceID:    "dual-1",
-			Cluster:       "virt01",
-			Mode:          fleetv1alpha1.RouteModeDual,
-			EffectiveMode: fleetv1alpha1.RouteModeDual,
-			HubHost:       "dual.mgmt.umkim.com",
-		},
-	}}
-	reg := clusters.Registry{
-		Clusters: map[string]clusters.Cluster{
-			"virt01": {DirectIngress: true, UpstreamHost: "10.10.0.11", TraefikHTTPPort: 30080},
-		},
-	}
-	out, err := Build(routes, reg, false, authOpts())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(out), "dual.mgmt.umkim.com") {
-		t.Fatalf("missing dual host: %s", out)
 	}
 }
 

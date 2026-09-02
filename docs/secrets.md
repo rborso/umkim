@@ -1,9 +1,9 @@
 # Secrets
 
-> Status: v0.1.0 is an experimental proof of concept. Operators remain
+> Status: v0.2 is an experimental proof of concept. Operators remain
 > responsible for the confidentiality, rotation, and recovery of all secrets.
 
-Production deployments require an encrypted Ansible Vault. Start from
+Hub install requires an encrypted Ansible Vault. Start from
 [`vault.example.yml`](vault.example.yml), keep the resulting vault file outside
 version control, and protect the vault password with an approved secret
 manager.
@@ -14,7 +14,7 @@ Store control-plane credentials such as:
 
 - directory and console session secrets;
 - break-glass authentication credentials;
-- DCM database and Harbor credentials;
+- Harbor credentials;
 - ingress-auth material; and
 - backup repository credentials.
 
@@ -23,10 +23,9 @@ logs, shell history, or image build arguments.
 
 ## Runtime application secrets
 
-Catalog fields marked `x-sensitive` and `x-secret-bind` are designed to become
-spoke Kubernetes Secrets. Use the console or the supported catalog deployment
-tooling so the deployment request references the Secret instead of retaining
-plaintext in DCM catalog values.
+Helm values that contain passwords should be supplied through `FleetApp`
+`valuesYaml` only over the authenticated console or API. Prefer binding
+secrets on the spoke rather than leaving plaintext in the FleetApp object.
 
 Do not handcraft API requests containing application passwords unless they are
 sent by an approved secret-aware client over an authenticated channel. Never
@@ -42,6 +41,7 @@ copy a Kubernetes Secret value into a command, example, or ticket.
    backups.
 
 The repository ignores the live vault file; only the example schema should be
-tracked. See [install.md](install.md), [backup-restore.md](backup-restore.md),
-and [fleet-console-auth.md](fleet-console-auth.md) for related operational
-guidance.
+tracked. Spoke workload secrets remain on the cluster after hub detach; hub
+backup does not include spoke etcd or workload secrets. See [install.md](install.md),
+[backup-restore.md](backup-restore.md), and [fleet-console-auth.md](fleet-console-auth.md)
+for related operational guidance.

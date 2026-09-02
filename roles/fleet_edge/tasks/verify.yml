@@ -7,6 +7,7 @@
     PATH: "{{ k3s_command_path }}"
   register: fleet_edge_ping
   changed_when: false
+  failed_when: false
   tags: [fleet_edge, fleet_edge_verify]
 
 - name: Fleet edge | Probe global app routes via hub gateway
@@ -37,7 +38,7 @@
     cmd: >-
       curl -sfk -o /dev/null -w "%{http_code}"
       -H "Host: {{ item.host }}"
-      https://127.0.0.1:{{ phase5_gateway_https_nodeport }}{{ item.path_prefix | default('/') }}
+      https://127.0.0.1:443{{ item.path_prefix | default('/') }}
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"

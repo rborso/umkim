@@ -32,12 +32,12 @@
       - hardware
   when: ansible_connection != 'local'
 
-- name: Fleet site validate | Assert Rocky 9
+- name: Fleet site validate | Assert Rocky Linux
   ansible.builtin.assert:
     that:
       - ansible_facts['os_family'] == 'RedHat'
-      - ansible_facts['distribution_major_version'] == (fleet_site_rocky_major | default('9') | string)
-    fail_msg: "Rocky Linux {{ fleet_site_rocky_major | default('9') }} required"
+      - ansible_facts['distribution_major_version'] == (fleet_site_rocky_major | default('10') | string)
+    fail_msg: "Rocky Linux {{ fleet_site_rocky_major | default('10') }} required"
   when: ansible_connection != 'local'
 
 - name: Fleet site validate | Check root disk size

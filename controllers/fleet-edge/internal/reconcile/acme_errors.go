@@ -24,14 +24,18 @@ func classifyACMEError(err error) acmeErrorClass {
 	case strings.Contains(msg, "dns"),
 		strings.Contains(msg, "nxdomain"),
 		strings.Contains(msg, "no such host"),
-		strings.Contains(msg, "faileddns"),
-		strings.Contains(msg, "unauthorized"):
+		strings.Contains(msg, "faileddns"):
 		return acmeErrorDNS
 	case strings.Contains(msg, "429"),
 		strings.Contains(msg, "ratelimit"),
 		strings.Contains(msg, "rate limit"),
 		strings.Contains(msg, "too many"):
 		return acmeErrorRateLimit
+	case strings.Contains(msg, "unauthorized"),
+		strings.Contains(msg, "connection refused"),
+		strings.Contains(msg, "timeout"),
+		strings.Contains(msg, "acme-challenge"):
+		return acmeErrorTransient
 	default:
 		return acmeErrorTransient
 	}

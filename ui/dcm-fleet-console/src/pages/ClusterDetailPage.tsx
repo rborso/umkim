@@ -43,7 +43,6 @@ import type {
 } from '../api/types';
 import { ClusterCapabilitiesPanel } from '../components/clusters/ClusterCapabilitiesPanel';
 import { ClusterNodesPanel } from '../components/clusters/ClusterNodesPanel';
-import { ClusterProvidersPanel } from '../components/clusters/ClusterProvidersPanel';
 import { ClusterStoragePanel } from '../components/clusters/ClusterStoragePanel';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { ExposureTlsPairWarning } from '../components/ExposureTlsPairWarning';
@@ -435,8 +434,8 @@ export function ClusterDetailPage() {
               Download the bootstrap bundle, extract on the first control node with{' '}
               <code>tar -xzf bootstrap-{name}.tar.gz</code>, then run <code>sudo ./bootstrap.sh</code>.
               Validation and local K3s provision run inside the bundle. When phase is Validated, click
-              Provision for hub finalize (OCM join, cert-manager platform, edge). Install k8s/helm
-              providers from the Providers section after Ready.
+              Provision for hub finalize (OCM join, cert-manager platform, spoke ingress). The cluster
+              is usable for workloads when phase is Ready.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
               {(phase === 'ScriptIssued' ||
@@ -475,8 +474,7 @@ export function ClusterDetailPage() {
         )}
         {cluster && !pending && phase === 'Ready' && !cluster.available && (
           <p style={{ marginTop: '0.5rem', maxWidth: '42rem' }}>
-            Hub provision is complete. Waiting for OCM klusterlet registration; you can install DCM
-            providers below while node list catches up.
+            Hub provision is complete. Waiting for OCM klusterlet registration.
           </p>
         )}
         {cluster && !pending && (
@@ -488,11 +486,6 @@ export function ClusterDetailPage() {
               onUpdated={load}
             />
             <ClusterStoragePanel cluster={cluster} onUpdated={load} />
-            <ClusterProvidersPanel
-              clusterName={name}
-              clusterReady={phase === 'Ready' || !!cluster.available}
-              kvmCapability={!!cluster.capabilities?.kvm}
-            />
             <Title headingLevel="h2" size="lg">
               Labels and edge
             </Title>
@@ -883,7 +876,7 @@ export function ClusterDetailPage() {
         <ErrorAlert error={deleteError} />
         <p>
           Delete cluster <strong>{name}</strong>? Hub teardown unjoins OCM, removes ManifestWorks,
-          deregisters DCM providers, revokes hub WireGuard peers, and removes the fleet overlay
+          removes hub WireGuard peers and the fleet overlay
           (wg-umkim) on nodes. User workloads on K3s are kept unless you opt in below.
         </p>
         {consoleProvisioned && (
@@ -904,7 +897,7 @@ export function ClusterDetailPage() {
         {!consoleProvisioned && cluster?.available && (
           <p>
             <strong>Warning:</strong> this is a fleet inventory spoke; deleting it removes OCM
-            registration and DCM workers for the whole spoke.
+            registration for the whole spoke.
           </p>
         )}
       </Modal>

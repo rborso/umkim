@@ -70,7 +70,8 @@ done
 [[ "${enabled}" == "true" ]] || fail "hubEnabled=${enabled} (want true)"
 
 log "wait for LiteLLM NodePort ${LITELLM_URL}/health"
-MASTER_KEY="$(hub_kubectl -n dcm get secret fleet-llm-master-key -o jsonpath='{.data.master_key}' 2>/dev/null | base64 -d || true)"
+LLM_NS="${FLEET_LLM_NAMESPACE:-fleet-llm}"
+MASTER_KEY="$(hub_kubectl -n "$LLM_NS" get secret fleet-llm-master-key -o jsonpath='{.data.master_key}' 2>/dev/null | base64 -d || true)"
 for _ in $(seq 1 36); do
   if [[ -n "${MASTER_KEY}" ]] && curl -sf --max-time 5 -H "Authorization: Bearer ${MASTER_KEY}" "${LITELLM_URL}/health" >/dev/null 2>&1; then
     log "OK FleetLLM Ready; LiteLLM responding at ${LITELLM_URL}"

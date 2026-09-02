@@ -71,7 +71,7 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fl *fleetv1alph
 		"harbor_nodeport_https: \"30443\"",
 		"ocm_kubeconfig: /etc/kube/config",
 		"k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		"phase5_dcm_namespace: dcm",
+		"fleet_llm_namespace: \"fleet-llm\"",
 		"fleet_edge_acme_enabled: " + boolYAML(cfg.FleetEdgeACMEEnabled),
 		"fleet_console_namespace: \"" + yamlQuote(cfg.ConsoleNamespace) + "\"",
 	}

@@ -13,10 +13,8 @@ metadata:
   name: site-admin
 spec:
   rules:
-    - resources: ["sites", "clusters", "infrastructure", "ingress-auth", "acme", "edge", "instances", "catalog-items", "catalog-item-instances", "policies"]
+    - resources: ["sites", "clusters", "apps", "charts", "infrastructure", "ingress-auth", "acme", "edge"]
       verbs: ["get", "list", "create", "update", "delete", "patch"]
-    - resources: ["providers"]
-      verbs: ["get", "list"]
     - resources: ["health"]
       verbs: ["get"]
 ---
@@ -26,9 +24,13 @@ metadata:
   name: cluster-admin
 spec:
   rules:
-    - resources: ["clusters", "instances", "catalog-item-instances"]
+    - resources: ["apps"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["charts"]
+      verbs: ["get", "list"]
+    - resources: ["clusters"]
       verbs: ["get", "list", "update", "patch"]
-    - resources: ["sites", "catalog-items", "policies", "providers"]
+    - resources: ["sites"]
       verbs: ["get", "list"]
     - resources: ["health"]
       verbs: ["get"]
@@ -39,12 +41,10 @@ metadata:
   name: customer
 spec:
   rules:
-    - resources: ["catalog-items", "policies", "providers"]
-      verbs: ["get", "list"]
-    - resources: ["catalog-item-instances"]
+    - resources: ["apps"]
       verbs: ["get", "list", "create", "delete"]
-    - resources: ["placement-preview"]
-      verbs: ["create"]
+    - resources: ["charts"]
+      verbs: ["get", "list"]
     - resources: ["sites", "clusters"]
       verbs: ["get", "list", "create", "delete"]
     - resources: ["health"]
@@ -56,15 +56,11 @@ metadata:
   name: org-admin
 spec:
   rules:
-    - resources: ["catalog-items", "providers"]
-      verbs: ["get", "list"]
-    - resources: ["policies"]
-      verbs: ["get", "list", "create", "update", "patch", "delete"]
-    - resources: ["catalog-item-instances"]
+    - resources: ["apps"]
       verbs: ["get", "list", "create", "delete"]
-    - resources: ["placement-preview"]
-      verbs: ["create"]
-    - resources: ["sites", "clusters"]
+    - resources: ["charts"]
+      verbs: ["get", "list"]
+    - resources: ["sites", "clusters", "apps"]
       verbs: ["get", "list", "create", "update", "patch", "delete"]
     - resources: ["users", "role-bindings", "groups", "llm-api-keys"]
       verbs: ["get", "list", "create", "update", "patch", "delete"]

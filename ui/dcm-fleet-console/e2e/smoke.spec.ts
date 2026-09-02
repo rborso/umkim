@@ -1,15 +1,11 @@
 import { test, expect } from './fixtures';
-import { dcmApiUrl } from './helpers/env';
 
 const navRoutes = [
   { path: './', heading: 'Overview' },
   { path: './sites', heading: 'Sites' },
   { path: './infrastructure', heading: 'Infrastructure' },
   { path: './clusters', heading: 'Clusters' },
-  { path: './providers', heading: 'Service providers' },
-  { path: './catalog', heading: 'Catalog' },
-  { path: './instances', heading: 'Catalog instances' },
-  { path: './policies', heading: 'Policies' },
+  { path: './apps', heading: 'Apps' },
 ] as const;
 
 test.describe('Smoke navigation', () => {
@@ -23,17 +19,9 @@ test.describe('Smoke navigation', () => {
     });
   }
 
-  test('overview shows health cards', async ({ page }) => {
+  test('overview shows site and cluster health', async ({ page }) => {
     await page.goto('./');
-    await expect(page.getByText('Providers', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Catalog', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Policies', { exact: true }).first()).toBeVisible();
-  });
-
-  test('DCM health endpoints respond', async ({ apiRequest }) => {
-    for (const path of ['providers', 'catalog', 'policies', 'placement']) {
-      const res = await apiRequest.get(`${dcmApiUrl()}/health/${path}`);
-      expect(res.ok(), `health/${path} should return 200`).toBeTruthy();
-    }
+    await expect(page.getByText('Sites', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Clusters', { exact: true }).first()).toBeVisible();
   });
 });

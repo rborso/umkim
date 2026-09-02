@@ -48,7 +48,7 @@ func (r *RouteReconciler) discoverPending(ctx context.Context, prevRoutesYAML, r
 		if mode == "" {
 			mode = route.Spec.Mode
 		}
-		if mode != fleetv1alpha1.RouteModeHub && mode != fleetv1alpha1.RouteModeDual {
+		if mode != fleetv1alpha1.RouteModeHub {
 			continue
 		}
 		if route.Status.TLSPhase == fleetv1alpha1.TLSPhaseReady {
@@ -210,7 +210,7 @@ func (r *RouteReconciler) buildCertsReadyMap(ctx context.Context, routes []fleet
 		if mode == "" {
 			mode = route.Spec.Mode
 		}
-		if mode == fleetv1alpha1.RouteModeHub || mode == fleetv1alpha1.RouteModeDual {
+		if mode == fleetv1alpha1.RouteModeHub {
 			add(route.Spec.HubHost)
 		}
 	}

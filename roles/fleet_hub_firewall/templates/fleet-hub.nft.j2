@@ -1,11 +1,9 @@
 # Managed by Ansible (fleet_hub_firewall). Do not edit by hand.
-# Fleet Console / DCM API: http://{{ fleet_hub_firewall_overlay_ipv4 }}:{{ fleet_hub_firewall_gateway_http_nodeport }} over WireGuard.
+# Fleet console NodePort is overlay-only (30912). Public WAN is SSH + WireGuard, plus :80/:443 when ACME is on.
 {% if fleet_hub_firewall_public_ingress_enabled | bool and fleet_hub_firewall_public_ingress_dnat | bool %}
 # Public WAN :80/:443 → gateway NodePorts (iptables REDIRECT when gateway HA).
-{% elif fleet_hub_firewall_public_ingress_enabled | bool and (dcm_gateway_replicas | default(1) | int) > 1 %}
-# Public WAN :80/:443 → gateway Service externalIPs (kube-proxy; gateway HA).
 {% elif fleet_hub_firewall_public_ingress_enabled | bool %}
-# Public WAN :80/:443 → gateway Traefik hostNetwork (single replica).
+# Public WAN :80/:443 → hub Traefik (hostNetwork or Service externalIPs).
 {% else %}
 # Public HTTP/S blocked; management overlay only.
 {% endif %}

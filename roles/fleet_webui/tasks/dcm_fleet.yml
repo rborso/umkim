@@ -16,7 +16,7 @@
     - dcm_fleet_gateway_path | default(false) | bool
   tags: [fleet_webui, dcm_webui, dcm_fleet, fleet_console_gateway_routes]
 
-- name: Fleet WebUI | Probe DCM fleet dashboard NodePort
+- name: Fleet WebUI | Probe fleet console NodePort
   ansible.builtin.command:
     cmd: >-
       curl -sf -o /dev/null -w "%{http_code}"
@@ -27,9 +27,9 @@
   when: dcm_fleet_dashboard_enabled | bool
   tags: [fleet_webui, dcm_webui, dcm_fleet, fleet_webui_verify]
 
-- name: Fleet WebUI | Probe DCM fleet dashboard via gateway /fleet/
+- name: Fleet WebUI | Probe fleet console via gateway /fleet/
   ansible.builtin.command:
-    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:{{ phase5_gateway_nodeport }}/fleet/
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:80/fleet/
   register: fleet_webui_dcm_fleet_gw_http
   changed_when: false
   failed_when: fleet_webui_dcm_fleet_gw_http.stdout | trim not in ['200', '302']
