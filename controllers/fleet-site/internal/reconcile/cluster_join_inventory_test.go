@@ -117,6 +117,30 @@ func TestBuildClusterInventoryINI_haHubRunnerKeepsMgmtOnNodes(t *testing.T) {
 	}
 }
 
+func TestBuildClusterInventoryINI_haHubRunnerJumphostUsesMgmtLAN(t *testing.T) {
+	r := testClusterJoinReconciler()
+	fcj := &fleetv1alpha1.FleetClusterJoin{
+		Spec: fleetv1alpha1.FleetClusterJoinSpec{
+			ClusterName:     "lab-ha-0",
+			SiteId:          "homelab",
+			BootstrapHost:   "172.16.10.101",
+			Topology:        fleetv1alpha1.ClusterTopologyHA3Node,
+			ControlPlaneVip: "172.16.10.100",
+			Jumphost:        "linux@jump.example.com:30200",
+		},
+	}
+	nodes := []wg.NodeWG{
+		{Hostname: "virt02-vm01", Address: "172.16.10.140", WGAddress: "10.10.0.16/32", Role: fleetv1alpha1.NodeRoleWorker},
+	}
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, true, "")
+	if !strings.Contains(ini, "virt02-vm01 ansible_host=172.16.10.140") {
+		t.Fatal("jumphost hub runner should SSH via mgmt LAN ansible_host")
+	}
+	if !strings.Contains(ini, "ProxyCommand") || !strings.Contains(ini, "jump.example.com") {
+		t.Fatal("jumphost hub runner should set ProxyCommand in ansible_ssh_common_args")
+	}
+}
+
 func assertInventoryLANNetworking(t *testing.T, ini string) {
 	t.Helper()
 	for _, want := range []string{

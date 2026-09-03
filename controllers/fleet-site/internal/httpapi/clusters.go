@@ -10,7 +10,6 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/tenancy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,7 +18,6 @@ import (
 type clusterSummary struct {
 	Name              string            `json:"name"`
 	Site              string            `json:"site,omitempty"`
-	Pool              string            `json:"pool,omitempty"`
 	Available         bool              `json:"available"`
 	Management        bool              `json:"management,omitempty"`
 	ReadOnly          bool              `json:"read_only,omitempty"`
@@ -45,6 +43,7 @@ type clusterSummary struct {
 	IngressAuthStatus       *clusterIngressAuthStatusJSON `json:"ingressAuthStatus,omitempty"`
 	AcmeEnabled             bool                          `json:"acme_enabled,omitempty"`
 	AcmeStatus              *clusterAcmeStatusJSON        `json:"acmeStatus,omitempty"`
+	NodeOperation           *clusterNodeOperationJSON     `json:"nodeOperation,omitempty"`
 }
 
 type clusterAcmeStatusJSON struct {
@@ -69,12 +68,20 @@ type clusterStorageStatusJSON struct {
 	Message string `json:"message,omitempty"`
 }
 
+type clusterNodeOperationJSON struct {
+	Type    string `json:"type,omitempty"`
+	Node    string `json:"node,omitempty"`
+	Phase   string `json:"phase,omitempty"`
+	JobName string `json:"jobName,omitempty"`
+	Message string `json:"message,omitempty"`
+	Force     bool   `json:"force,omitempty"`
+	ID        string `json:"id,omitempty"`
+	ActorKind string `json:"actorKind,omitempty"`
+	ActorName string `json:"actorName,omitempty"`
+}
+
 type clusterPatchBody struct {
 	SiteID       string            `json:"siteId,omitempty"`
-	Pool         string            `json:"pool,omitempty"`
-	// Org assigns fleet.org (dc-admin only). Empty string clears the label.
-	Org          *string           `json:"org,omitempty"`
-	OrgId        *string           `json:"orgId,omitempty"`
 	Capabilities map[string]bool   `json:"capabilities,omitempty"`
 	Topology     map[string]string `json:"topology,omitempty"`
 	Edge         *clusterEdgePatch `json:"edge,omitempty"`
@@ -108,6 +115,19 @@ func (s *Server) handleClusters(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, name, sub string) {
+	if sub == "node-operations/validate" {
+		s.handleValidateNodeOperation(w, r, name)
+		return
+	}
+	if sub == "node-operations" || strings.HasPrefix(sub, "node-operations/") {
+		rest := strings.TrimPrefix(sub, "node-operations")
+		s.handleNodeOperations(w, r, name, rest)
+		return
+	}
+	if sub == "control-plane/replace" {
+		s.handleReplaceControlPlane(w, r, name)
+		return
+	}
 	if sub == "nodes" || strings.HasPrefix(sub, "nodes/") {
 		s.handleClusterNodes(w, r, name, sub)
 		return
@@ -196,16 +216,23 @@ func (s *Server) handleListClusters(ctx context.Context, w http.ResponseWriter) 
 		out = append(out, cs)
 		seen[mc.GetName()] = true
 	}
-	joins, _ := s.listPendingClusterJoins(ctx)
+	joins := pendingJoinsFromMap(fcjByCluster, seen)
 	for i := range joins {
-		n := joins[i].Spec.EffectiveClusterName(joins[i].Name)
-		if seen[n] {
-			continue
-		}
 		out = append(out, clusterSummaryFromJoin(&joins[i]))
-		seen[n] = true
+		seen[joins[i].Spec.EffectiveClusterName(joins[i].Name)] = true
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"clusters": out})
+}
+
+func pendingJoinsFromMap(fcjByCluster map[string]*fleetv1alpha1.FleetClusterJoin, seen map[string]bool) []fleetv1alpha1.FleetClusterJoin {
+	out := make([]fleetv1alpha1.FleetClusterJoin, 0)
+	for name, fcj := range fcjByCluster {
+		if seen[name] || fcj.Status.Phase == fleetv1alpha1.JoinPhaseReady {
+			continue
+		}
+		out = append(out, *fcj)
+	}
+	return out
 }
 
 func (s *Server) handleGetCluster(ctx context.Context, w http.ResponseWriter, name string) {
@@ -238,7 +265,7 @@ func (s *Server) handleGetCluster(ctx context.Context, w http.ResponseWriter, na
 }
 
 func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, r *http.Request, name string) {
-	actor, ok := s.requireMutatingActor(w, r)
+	_, ok := s.requireMutatingActor(w, r)
 	if !ok {
 		return
 	}
@@ -298,33 +325,6 @@ func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, 
 			return
 		}
 		labels[k] = v
-	}
-	if patch.Pool != "" {
-		if !actor.isPlatformAdmin() {
-			http.Error(w, "only platform admin may set pool", http.StatusForbidden)
-			return
-		}
-		if patch.Pool != tenancy.PoolShared && patch.Pool != tenancy.PoolDedicated {
-			http.Error(w, "pool must be shared or dedicated", http.StatusBadRequest)
-			return
-		}
-		labels[tenancy.LabelPool] = patch.Pool
-	}
-	orgVal := patch.Org
-	if orgVal == nil {
-		orgVal = patch.OrgId
-	}
-	if orgVal != nil {
-		if !actor.isPlatformAdmin() {
-			http.Error(w, "only platform admin may set org", http.StatusForbidden)
-			return
-		}
-		org := strings.TrimSpace(*orgVal)
-		if org == "" {
-			delete(labels, tenancy.LabelOrg)
-		} else {
-			labels[tenancy.LabelOrg] = org
-		}
 	}
 
 	mc.SetLabels(labels)
@@ -481,7 +481,6 @@ func clusterFromMC(mc *unstructured.Unstructured, edge edgeClustersFile, siteDef
 	cs := clusterSummary{
 		Name:                mc.GetName(),
 		Site:                labels["fleet.site"],
-		Pool:                labels[tenancy.LabelPool],
 		Available:           mcConditionAvailable(mc),
 		Capabilities:        registry.CapabilitiesFromLabels(labels),
 		Labels:              fleetLabelsFromMC(labels),
@@ -538,7 +537,7 @@ func boolLabel(v bool) string {
 }
 
 func allowedCustomLabel(k string) bool {
-	return strings.HasPrefix(k, "fleet.custom/") || strings.HasPrefix(k, "fleet.") && k != tenancy.LabelPool && k != tenancy.LabelOrg
+	return strings.HasPrefix(k, "fleet.custom/")
 }
 
 func fleetLabelsFromMC(labels map[string]string) map[string]string {

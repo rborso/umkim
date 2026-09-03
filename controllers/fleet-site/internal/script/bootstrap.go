@@ -169,11 +169,163 @@ assert_rocky() {
 
 install_packages() {
   if command -v dnf >/dev/null 2>&1; then
-    dnf install -y wireguard-tools curl iputils openssh-server openssh-clients python3-pip rsync
+    dnf install -y wireguard-tools curl iputils openssh-server openssh-clients python3-pip rsync kernel-modules-extra
   else
-    yum install -y wireguard-tools curl iputils openssh-server openssh-clients python3-pip rsync
+    yum install -y wireguard-tools curl iputils openssh-server openssh-clients python3-pip rsync kernel-modules-extra
   fi
   systemctl enable --now sshd 2>/dev/null || true
+}
+
+FLEET_STATE_DIR="/var/lib/fleet"
+FLEET_KMOD_READY="${FLEET_STATE_DIR}/kernel-modules-ready"
+FLEET_BOOTSTRAP_RESUME="${FLEET_STATE_DIR}/bootstrap-resume.sh"
+
+kernel_modules_ready() {
+  modprobe br_netfilter 2>/dev/null && modprobe overlay 2>/dev/null
+}
+
+persist_kernel_modules() {
+  mkdir -p /etc/modules-load.d
+  cat >/etc/modules-load.d/fleet-k8s.conf <<'KMODEOF'
+br_netfilter
+overlay
+KMODEOF
+}
+
+install_kernel_modules_on_host() {
+  local kver
+  kver="$(uname -r)"
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y "kernel-modules-extra-${kver}" 2>/dev/null || true
+    dnf install -y kernel-modules-extra 2>/dev/null || true
+  else
+    yum install -y "kernel-modules-extra-${kver}" 2>/dev/null || true
+    yum install -y kernel-modules-extra 2>/dev/null || true
+  fi
+  depmod -a 2>/dev/null || true
+  if kernel_modules_ready; then
+    persist_kernel_modules
+    return 0
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y kernel 2>/dev/null || true
+  else
+    yum install -y kernel 2>/dev/null || true
+  fi
+  return 1
+}
+
+schedule_bootstrap_resume_and_reboot() {
+  mkdir -p "${FLEET_STATE_DIR}"
+  cat >"${FLEET_BOOTSTRAP_RESUME}" <<RESUMEEOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec bash "${BUNDLE_DIR}/bootstrap.sh"
+RESUMEEOF
+  chmod 755 "${FLEET_BOOTSTRAP_RESUME}"
+  cat >/etc/systemd/system/fleet-bootstrap-resume.service <<'UNITEOF'
+[Unit]
+Description=Resume UMKIM fleet cluster bootstrap after kernel module reboot
+After=network-online.target sshd.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /var/lib/fleet/bootstrap-resume.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+  systemctl daemon-reload
+  systemctl enable fleet-bootstrap-resume.service
+  log "Rebooting to load kernel modules (br_netfilter); bootstrap will resume automatically"
+  reboot
+  exit 0
+}
+
+ensure_kernel_modules_local() {
+  mkdir -p "${FLEET_STATE_DIR}"
+  if [[ -f "${FLEET_KMOD_READY}" ]]; then
+    kernel_modules_ready || install_kernel_modules_on_host || true
+    return 0
+  fi
+  if install_kernel_modules_on_host; then
+    touch "${FLEET_KMOD_READY}"
+    log "Kernel modules ready on local host"
+    return 0
+  fi
+  schedule_bootstrap_resume_and_reboot
+}
+
+wait_for_ssh_host() {
+  local host="$1" i
+  local ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes)
+  for i in $(seq 1 120); do
+    if ssh "${ssh_opts[@]}" "linux@${host}" "true" 2>/dev/null; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+
+ensure_kernel_modules_peer() {
+  local host="$1"
+  local key_file="${BUNDLE_DIR}/ssh/id_rsa"
+  local ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o BatchMode=yes)
+  local remote_script
+  remote_script=$(cat <<'PEEREOF'
+set -euo pipefail
+kver="$(uname -r)"
+if modprobe br_netfilter 2>/dev/null && modprobe overlay 2>/dev/null; then
+  mkdir -p /etc/modules-load.d
+  printf '%s\n' br_netfilter overlay > /etc/modules-load.d/fleet-k8s.conf
+  exit 0
+fi
+dnf install -y "kernel-modules-extra-${kver}" 2>/dev/null || yum install -y "kernel-modules-extra-${kver}"
+dnf install -y kernel-modules-extra 2>/dev/null || yum install -y kernel-modules-extra
+depmod -a 2>/dev/null || true
+if modprobe br_netfilter 2>/dev/null && modprobe overlay 2>/dev/null; then
+  mkdir -p /etc/modules-load.d
+  printf '%s\n' br_netfilter overlay > /etc/modules-load.d/fleet-k8s.conf
+  exit 0
+fi
+dnf install -y kernel 2>/dev/null || yum install -y kernel
+if [[ ! -f /var/lib/fleet/peer-kmod-rebooted ]]; then
+  mkdir -p /var/lib/fleet
+  touch /var/lib/fleet/peer-kmod-rebooted
+  reboot
+fi
+exit 1
+PEEREOF
+)
+  if ssh -i "${key_file}" "${ssh_opts[@]}" "linux@${host}" "sudo bash -s" <<<"${remote_script}"; then
+    log "Kernel modules ready on peer ${host}"
+    return 0
+  fi
+  log "Waiting for peer ${host} after kernel module reboot..."
+  wait_for_ssh_host "${host}" || { log "ERROR: peer ${host} unreachable after reboot"; return 1; }
+  ssh -i "${key_file}" "${ssh_opts[@]}" "linux@${host}" "sudo bash -s" <<<"${remote_script}" || {
+    log "ERROR: kernel modules still unavailable on peer ${host} after reboot"
+    return 1
+  }
+  log "Kernel modules ready on peer ${host} after reboot"
+}
+
+ensure_kernel_modules_peers() {
+  local key_file="${BUNDLE_DIR}/ssh/id_rsa"
+  local host
+  [[ -f "${key_file}" ]] || return 0
+  chmod 600 "${key_file}"
+  while IFS= read -r host; do
+    [[ -n "${host}" ]] || continue
+    if is_local_mgmt_host "${host}"; then
+      continue
+    fi
+    log "Ensuring kernel modules on peer ${host}"
+    ensure_kernel_modules_peer "${host}" || exit 1
+  done < <(inventory_mgmt_ips)
 }
 
 bundle_ssh_pubkey() {
@@ -383,12 +535,14 @@ main() {
   require_root
   assert_rocky
   install_packages
+  ensure_kernel_modules_local
   install_bundle_ssh_key_local
   install_ansible
 {{ if .KubevirtBridgeEnabled }}
   run_kubevirt_host_bridge_local
 {{ end }}
   seed_bundle_ssh_to_peers
+  ensure_kernel_modules_peers
 {{ if .KubevirtBridgeEnabled }}
   run_kubevirt_host_bridge_peers
 {{ end }}

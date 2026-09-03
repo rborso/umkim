@@ -18,7 +18,7 @@ if [[ ! -s "${FV_AUTH_ADMIN_JAR}" ]]; then
 fi
 
 failed=0
-for path in users groups role-bindings service-accounts audit-events orgs; do
+for path in users groups role-bindings service-accounts audit-events llm-api-keys; do
   code="$(curl -s -b "${FV_AUTH_ADMIN_JAR}" -o /dev/null -w '%{http_code}' "${AUTH}/${path}" || true)"
   if [[ "${code}" == "200" ]]; then
     echo "OK auth GET /${path}"

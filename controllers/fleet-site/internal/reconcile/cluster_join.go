@@ -18,8 +18,8 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/script"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/storage"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/tenancy"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/teardown"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ssh"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/wg"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -90,6 +90,11 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return res, nil
 		}
 		if res, err := r.reconcileClusterProviders(ctx, &fcj, clusterName); err != nil {
+			return ctrl.Result{}, err
+		} else if res.Requeue || res.RequeueAfter > 0 {
+			return res, nil
+		}
+		if res, err := r.reconcileNodeOperation(ctx, &fcj, clusterName); err != nil {
 			return ctrl.Result{}, err
 		} else if res.Requeue || res.RequeueAfter > 0 {
 			return res, nil
@@ -684,6 +689,40 @@ func (r *ClusterJoinReconciler) siteDefaultExposure(ctx context.Context, siteID 
 	return fs.Spec.EffectiveDefaultExposureMode()
 }
 
+func (r *ClusterJoinReconciler) effectiveJumphost(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) string {
+	if j := strings.TrimSpace(fcj.Spec.Jumphost); j != "" {
+		return j
+	}
+	siteID := strings.TrimSpace(fcj.Spec.SiteId)
+	if siteID == "" {
+		return ""
+	}
+	var fs fleetv1alpha1.FleetSite
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: siteID}, &fs); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(fs.Spec.Jumphost)
+}
+
+func (r *ClusterJoinReconciler) inventorySSH(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, hubRunner bool) (sshArgs string, useMgmtLAN bool) {
+	base := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+	jh := r.effectiveJumphost(ctx, fcj)
+	if hubRunner && jh != "" {
+		return ssh.AnsibleSSHCommonArgs(base, jh, r.Cfg.SSHUser), true
+	}
+	return base, false
+}
+
+func nodeAnsibleHost(n wg.NodeWG, fallback string, hubRunner, useMgmtLAN bool) string {
+	if hubRunner && !useMgmtLAN {
+		return wg.HostIP(n.WGAddress)
+	}
+	if n.Address != "" {
+		return n.Address
+	}
+	return fallback
+}
+
 func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, nodeWG []wg.NodeWG, hubRunner bool, siteDefaultExposure string) string {
 	if len(nodeWG) == 0 {
 		return ""
@@ -705,7 +744,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	if hubRunner {
 		sshKeyFile = "/root/.ssh/id_rsa"
 	}
-	sshArgs := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+	sshArgs, useMgmtLAN := r.inventorySSH(ctx, fcj, hubRunner)
 	minDisk := fcj.Spec.MinRootDiskGi
 	if minDisk == 0 {
 		minDisk = 40
@@ -717,10 +756,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		if len(controls) > 0 {
 			b.WriteString("[fleet_cluster_control]\n")
 			for _, n := range controls {
-				sshHost := n.Address
-				if hubRunner {
-					sshHost = wg.HostIP(n.WGAddress)
-				}
+				sshHost := nodeAnsibleHost(n, fcj.Spec.BootstrapHost, hubRunner, useMgmtLAN)
 				b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s wireguard_address=%s fleet_node_mgmt_address=%s k3s_role=server%s\n",
 					n.Hostname, sshHost, r.Cfg.SSHUser, n.WGAddress, n.Address, nodeLabelsInventorySuffix(fcj, n.Hostname)))
 			}
@@ -728,10 +764,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		if len(workers) > 0 {
 			b.WriteString("\n[fleet_cluster_workers]\n")
 			for _, n := range workers {
-				sshHost := n.Address
-				if hubRunner {
-					sshHost = wg.HostIP(n.WGAddress)
-				}
+				sshHost := nodeAnsibleHost(n, fcj.Spec.BootstrapHost, hubRunner, useMgmtLAN)
 				b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s wireguard_address=%s fleet_node_mgmt_address=%s k3s_role=agent%s\n",
 					n.Hostname, sshHost, r.Cfg.SSHUser, n.WGAddress, n.Address, nodeLabelsInventorySuffix(fcj, n.Hostname)))
 			}
@@ -786,10 +819,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString(fmt.Sprintf("fleet_site_sp_endpoint=%s\n", bootstrapWG))
 		b.WriteString(fmt.Sprintf("fleet_site_enable_kubevirt=%s\n", kubevirtEnable))
 		b.WriteString("\n[site_bootstrap]\n")
-		sshHost := bootstrapMgmt
-		if hubRunner {
-			sshHost = bootstrapWG
-		}
+		sshHost := nodeAnsibleHost(bootstrap, bootstrapMgmt, hubRunner, useMgmtLAN)
 		b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", initHost, sshHost, r.Cfg.SSHUser))
 		b.WriteString("\n[site_bootstrap:vars]\n")
 		b.WriteString(fmt.Sprintf("wireguard_address=%s\n", bootstrap.WGAddress))
@@ -807,7 +837,11 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString("\n[ocm_spoke_join:children]\n")
 		b.WriteString("site_bootstrap\n")
 		b.WriteString(fmt.Sprintf("\n[%s]\n", clusterName))
-		b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", clusterName, bootstrapWG, r.Cfg.SSHUser))
+		clusterSSHHost := bootstrapWG
+		if useMgmtLAN {
+			clusterSSHHost = bootstrapMgmt
+		}
+		b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", clusterName, clusterSSHHost, r.Cfg.SSHUser))
 		b.WriteString(fmt.Sprintf("\n[%s:vars]\n", clusterName))
 		b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
@@ -833,12 +867,9 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 
 	n := bootstrap
 	wgIP := wg.HostIP(n.WGAddress)
-	sshHost := n.Address
+	sshHost := nodeAnsibleHost(n, fcj.Spec.BootstrapHost, hubRunner, useMgmtLAN)
 	if sshHost == "" {
 		sshHost = fcj.Spec.BootstrapHost
-	}
-	if hubRunner {
-		sshHost = wgIP
 	}
 	var b strings.Builder
 	writeNodeGroups(&b)
@@ -1178,23 +1209,8 @@ func (r *ClusterJoinReconciler) patchClusterLabels(ctx context.Context, fcj *fle
 			labels[k] = v
 		}
 	}
-	if siteOrg := fcjOrgID(fcj); siteOrg != "" {
-		labels[tenancy.LabelOrg] = siteOrg
-	}
-	if labels[tenancy.LabelPool] == "" {
-		labels[tenancy.LabelPool] = tenancy.PoolDedicated
-	}
 	mc.SetLabels(labels)
 	return r.Update(ctx, &mc)
-}
-
-func fcjOrgID(fcj *fleetv1alpha1.FleetClusterJoin) string {
-	if fcj.Spec.ClusterLabels != nil {
-		if o := fcj.Spec.ClusterLabels[tenancy.LabelOrg]; o != "" {
-			return o
-		}
-	}
-	return ""
 }
 
 func allowedClusterLabel(k string) bool {

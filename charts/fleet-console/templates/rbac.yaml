@@ -15,15 +15,11 @@ rules:
       - fleetrolebindings
       - fleetusers
       - fleetgroups
-      - fleetorgs
       - fleetserviceaccounts
       - fleetcatalogaccesses
       - fleetauditevents
       - fleetllmapikeys
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["console.umkim.com"]
-    resources: ["fleetorgs/status"]
-    verbs: ["get", "update", "patch"]
   - apiGroups: ["console.umkim.com"]
     resources: ["fleetllmapikeys/status"]
     verbs: ["get", "update", "patch"]

@@ -18,6 +18,9 @@ spec:
 {% if item.value.failure_domain is defined %}
   failureDomain: "{{ item.value.failure_domain }}"
 {% endif %}
+{% if item.value.jumphost is defined %}
+  jumphost: "{{ item.value.jumphost }}"
+{% endif %}
   edge:
     edgeDomain: "{{ item.value.edge_domain }}"
     wildcard: "{{ item.value.edge_wildcard | default('*.' ~ item.value.edge_domain) }}"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Button,
@@ -30,7 +30,6 @@ import {
   fleetSiteIsManagement,
   fleetSiteIsRegistry,
   fleetSitePhase,
-  listFleetSites,
   provisionFleetSite,
   validateFleetSite,
 } from '../api/client';
@@ -39,8 +38,9 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
 import { EXPOSURE_TLS_DOCS_URL, recommendedTlsForExposure } from '../edge/exposureTlsPairs';
 import { getFieldHelp } from '../help/fieldHelp';
+import { useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
-import { isCustomerUser, primaryOrg } from '../auth/orgUtils';
+import { canMutate } from '../auth/roles';
 
 const emptyForm = (): FleetSiteCreate => ({
   siteName: '',
@@ -70,10 +70,12 @@ function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey'
 
 export function SitesPage() {
   const { user } = useAuth();
-  const orgSlug = primaryOrg(user);
-  const [rows, setRows] = useState<FleetSite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
+  const { invalidateSites } = useInvalidateFleet();
+  const sitesQuery = useFleetSitesQuery();
+  const rows = sitesQuery.data ?? [];
+  const loading = sitesQuery.isLoading;
+  const fetching = sitesQuery.isFetching;
+  const error = sitesQuery.error;
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FleetSiteCreate>(emptyForm());
   const [saving, setSaving] = useState(false);
@@ -84,21 +86,7 @@ export function SitesPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<unknown>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setRows(await listFleetSites());
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = () => void invalidateSites();
 
   const siteName = (s: FleetSite) => s.metadata?.name || s.spec.siteName;
 
@@ -142,11 +130,7 @@ export function SitesPage() {
     setSaving(true);
     setActionError(null);
     try {
-      const payload = {
-        ...form,
-        orgId: user?.dcAdmin ? form.orgId : orgSlug,
-      };
-      await createFleetSite(payload);
+      await createFleetSite(form);
       setModalOpen(false);
       setForm(emptyForm());
       await load();
@@ -195,8 +179,9 @@ export function SitesPage() {
               <Button
                 variant="primary"
                 icon={<PlusIcon />}
+                isDisabled={!canMutate(user)}
                 onClick={() => {
-                  setForm({ ...emptyForm(), orgId: user?.dcAdmin ? undefined : orgSlug });
+                  setForm(emptyForm());
                   setModalOpen(true);
                 }}
               >
@@ -204,7 +189,7 @@ export function SitesPage() {
               </Button>
             </ToolbarItem>
             <ToolbarItem>
-              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()}>
+              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()} isDisabled={fetching}>
                 Refresh
               </Button>
             </ToolbarItem>
@@ -334,13 +319,8 @@ export function SitesPage() {
               id="siteName"
               value={form.siteName}
               onChange={(_e, v) => setForm({ ...form, siteName: v })}
-              placeholder={orgSlug ? `${orgSlug}-site-a` : 'homelab'}
+              placeholder="homelab"
             />
-            {isCustomerUser(user) && orgSlug ? (
-              <small>
-                Names must start with <code>{orgSlug}-</code>
-              </small>
-            ) : null}
           </LabeledField>
           <LabeledField label="Display name" fieldId="displayName" help={getFieldHelp('site.displayName')}>
             <TextInput

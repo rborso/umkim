@@ -36,6 +36,6 @@ identified by [AGENTS.md](../../../AGENTS.md).
 ## References
 
 - [Design guide](../../../docs/design.md)
-- [Multi-tenancy guide](../../../docs/multi-tenancy.md)
+- [Fleet console auth](../../../docs/fleet-console-auth.md)
 - [Installation guide](../../../docs/install.md)
 - [FleetApp Helm installs](../../../docs/components/fleet-apps.md)

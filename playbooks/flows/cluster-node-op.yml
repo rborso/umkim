@@ -1,0 +1,194 @@
+---
+# API-first post-Ready node operation: validate → execute → validate.
+#
+# Supported operations (fleet_flow_node_op_type):
+#   addWorker | removeWorker | replaceControlPlane
+#
+#   ansible-playbook $INV playbooks/flows/cluster-node-op.yml \
+#     -e fleet_flow_cluster_name=lab-ha-0 \
+#     -e fleet_flow_node_op_type=addWorker \
+#     -e fleet_flow_node_address=172.16.10.140 \
+#     -e fleet_flow_node_hostname=lab-ha-0-w1
+#
+#   ansible-playbook $INV playbooks/flows/cluster-node-op.yml \
+#     -e fleet_flow_cluster_name=lab-ha-0 \
+#     -e fleet_flow_node_op_type=removeWorker \
+#     -e fleet_flow_node_name=virt02-vm01 \
+#     -e fleet_flow_node_force=true
+
+- name: Fleet flow | Cluster node operation
+  hosts: hub
+  gather_facts: false
+  become: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+    _flow_poll_interval_default: 20
+    _flow_poll_retries_default: 45
+    fleet_flow_identity_headers:
+      X-Fleet-Subject-Kind: User
+      X-Fleet-Subject-Name: fleet-flow
+      X-Fleet-DC-Admin: "true"
+  tasks:
+    - name: Require flow variables
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster_name | length > 0
+          - fleet_flow_node_op_type | length > 0
+          - fleet_flow_node_op_type in ['addWorker', 'removeWorker', 'replaceControlPlane']
+
+    - name: Build node operation request body
+      ansible.builtin.set_fact:
+        fleet_flow_node_op_body:
+          type: "{{ fleet_flow_node_op_type }}"
+
+    - name: Add worker fields to request body
+      ansible.builtin.set_fact:
+        fleet_flow_node_op_body: >-
+          {{ fleet_flow_node_op_body | combine({
+            'address': fleet_flow_node_address,
+            'hostname': fleet_flow_node_hostname | default(omit),
+            'role': 'worker'
+          }, recursive=True) }}
+      when:
+        - fleet_flow_node_op_type == 'addWorker'
+        - fleet_flow_node_address | default('') | length > 0
+
+    - name: Require worker address
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_node_address | default('') | length > 0
+        fail_msg: fleet_flow_node_address is required for addWorker
+      when: fleet_flow_node_op_type == 'addWorker'
+
+    - name: Add remove-worker fields to request body
+      ansible.builtin.set_fact:
+        fleet_flow_node_op_body: >-
+          {{ fleet_flow_node_op_body | combine({
+            'node': fleet_flow_node_name,
+            'force': fleet_flow_node_force | default(false) | bool
+          }, recursive=True) }}
+      when: fleet_flow_node_op_type == 'removeWorker'
+
+    - name: Require worker node name
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_node_name | default('') | length > 0
+        fail_msg: fleet_flow_node_name is required for removeWorker
+      when: fleet_flow_node_op_type == 'removeWorker'
+
+    - name: Add replace-control fields to request body
+      ansible.builtin.set_fact:
+        fleet_flow_node_op_body: >-
+          {{ fleet_flow_node_op_body | combine({
+            'oldNode': fleet_flow_node_name,
+            'force': fleet_flow_node_force | default(false) | bool,
+            'newNode': {
+              'address': fleet_flow_node_address,
+              'hostname': fleet_flow_node_hostname | default(omit)
+            }
+          }, recursive=True) }}
+      when: fleet_flow_node_op_type == 'replaceControlPlane'
+
+    - name: Require replace-control fields
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_node_name | default('') | length > 0
+          - fleet_flow_node_address | default('') | length > 0
+        fail_msg: fleet_flow_node_name and fleet_flow_node_address are required for replaceControlPlane
+      when: fleet_flow_node_op_type == 'replaceControlPlane'
+
+    - name: POST pre-validate node operation
+      ansible.builtin.uri:
+        url: >-
+          {{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/node-operations/validate
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers | combine({'Content-Type': 'application/json'}) }}"
+        body: "{{ fleet_flow_node_op_body }}"
+        status_code: [200, 422]
+      register: fleet_flow_node_pre_validate
+
+    - name: Fail when pre-validation does not pass
+      ansible.builtin.fail:
+        msg: "Pre-validation failed: {{ fleet_flow_node_pre_validate.json | to_nice_json }}"
+      when: not (fleet_flow_node_pre_validate.json.ok | default(false) | bool)
+
+    - name: Execute add worker
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/nodes"
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers | combine({'Content-Type': 'application/json'}) }}"
+        body:
+          address: "{{ fleet_flow_node_address }}"
+          hostname: "{{ fleet_flow_node_hostname | default(omit) }}"
+          role: worker
+        status_code: [202, 409, 422]
+      when: fleet_flow_node_op_type == 'addWorker'
+
+    - name: Execute remove worker
+      ansible.builtin.uri:
+        url: >-
+          {{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/nodes/{{ fleet_flow_node_name | urlencode }}{{
+            '?force=1' if (fleet_flow_node_force | default(false) | bool) else ''
+          }}
+        method: DELETE
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: [202, 409, 422]
+      when: fleet_flow_node_op_type == 'removeWorker'
+
+    - name: Execute replace control plane
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/control-plane/replace"
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers | combine({'Content-Type': 'application/json'}) }}"
+        body:
+          oldNode: "{{ fleet_flow_node_name }}"
+          force: "{{ fleet_flow_node_force | default(false) | bool }}"
+          newNode:
+            address: "{{ fleet_flow_node_address }}"
+            hostname: "{{ fleet_flow_node_hostname | default(omit) }}"
+        status_code: [202, 409, 422]
+      when: fleet_flow_node_op_type == 'replaceControlPlane'
+
+    - name: Wait for node operation to finish
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}"
+        method: GET
+        return_content: true
+      register: fleet_flow_node_op_poll
+      until: >-
+        (fleet_flow_node_op_poll.json.nodeOperation.phase | default('')) in ['Succeeded', 'Failed']
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+
+    - name: Fail when node operation failed
+      ansible.builtin.fail:
+        msg: >-
+          Node operation failed: {{
+            fleet_flow_node_op_poll.json.nodeOperation.message | default('unknown error')
+          }}
+      when: (fleet_flow_node_op_poll.json.nodeOperation.phase | default('')) == 'Failed'
+
+    - name: POST post-validate node operation
+      ansible.builtin.uri:
+        url: >-
+          {{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/node-operations/validate?phase=post
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers | combine({'Content-Type': 'application/json'}) }}"
+        body: "{{ fleet_flow_node_op_body }}"
+        status_code: [200, 422]
+      register: fleet_flow_node_post_validate
+
+    - name: Fail when post-validation does not pass
+      ansible.builtin.fail:
+        msg: "Post-validation failed: {{ fleet_flow_node_post_validate.json | to_nice_json }}"
+      when: not (fleet_flow_node_post_validate.json.ok | default(false) | bool)
+
+    - name: Flow complete
+      ansible.builtin.debug:
+        msg: >-
+          Node operation {{ fleet_flow_node_op_type }} on {{ fleet_flow_cluster_name }} completed
+          (pre/post validation passed)

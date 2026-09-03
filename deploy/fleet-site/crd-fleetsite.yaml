@@ -33,10 +33,6 @@ spec:
                   description: OCM ManagedCluster name for greenfield sites (DNS-safe)
                   pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
                   maxLength: 63
-                orgId:
-                  type: string
-                  description: Organization slug owning this site (customer sites require org prefix)
-                  pattern: '^[a-z][a-z0-9-]{1,30}[a-z0-9]$'
                 siteId:
                   type: string
                   description: Datacenter id for fleet.site OCM label
@@ -125,6 +121,9 @@ spec:
                           type: string
                 bootstrapHost:
                   type: string
+                jumphost:
+                  type: string
+                  description: Default SSH bastion (user@host:port) for clusters in this site when the cluster does not set spec.jumphost.
                 mgmtLanIp:
                   type: string
                 rockyVersion:

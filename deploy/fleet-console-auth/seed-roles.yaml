@@ -43,33 +43,9 @@ spec:
 apiVersion: console.umkim.com/v1alpha1
 kind: FleetRole
 metadata:
-  name: customer
+  name: viewer
   namespace: fleet-console
 spec:
   rules:
-    - resources: ["apps"]
-      verbs: ["get", "list", "create", "delete"]
-    - resources: ["charts"]
+    - resources: ["sites", "clusters", "apps", "charts", "infrastructure", "health"]
       verbs: ["get", "list"]
-    - resources: ["sites", "clusters"]
-      verbs: ["get", "list", "create", "delete"]
-    - resources: ["health"]
-      verbs: ["get"]
----
-apiVersion: console.umkim.com/v1alpha1
-kind: FleetRole
-metadata:
-  name: org-admin
-  namespace: fleet-console
-spec:
-  rules:
-    - resources: ["apps"]
-      verbs: ["get", "list", "create", "delete"]
-    - resources: ["charts"]
-      verbs: ["get", "list"]
-    - resources: ["sites", "clusters", "apps"]
-      verbs: ["get", "list", "create", "update", "patch", "delete"]
-    - resources: ["users", "role-bindings", "groups", "llm-api-keys"]
-      verbs: ["get", "list", "create", "update", "patch", "delete"]
-    - resources: ["health"]
-      verbs: ["get"]

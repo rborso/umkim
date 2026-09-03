@@ -52,7 +52,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	_ = s.Audit.Record(r.Context(), authv1.SubjectRef{Kind: "User", Name: principal.ExternalID}, "auth.login", "allow", nil, nil, httpInfo(r), "")
 	perms, _ := s.RBAC.EffectivePermissions(r.Context(), actor)
 	isAdmin, _ := s.RBAC.IsDCAdmin(r.Context(), actor)
-	orgScopes := s.actorOrgScopes(r.Context(), actor)
 	roles := s.actorRoleNames(r.Context(), actor)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"kind":        "User",
@@ -62,7 +61,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		"groups":      groups,
 		"permissions": perms,
 		"dcAdmin":     isAdmin,
-		"orgs":        orgScopes,
 		"roles":       roles,
 	})
 }
@@ -100,7 +98,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	perms, _ := s.RBAC.EffectivePermissions(r.Context(), actor)
 	isAdmin, _ := s.RBAC.IsDCAdmin(r.Context(), actor)
-	orgScopes := s.actorOrgScopes(r.Context(), actor)
 	roles := s.actorRoleNames(r.Context(), actor)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"kind":        actor.Kind,
@@ -108,7 +105,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		"groups":      actor.Groups,
 		"permissions": perms,
 		"dcAdmin":     isAdmin,
-		"orgs":        orgScopes,
 		"roles":       roles,
 	})
 }

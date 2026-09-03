@@ -34,7 +34,6 @@ func ValidateBearer(ctx context.Context, k8s client.Client, ns, token string) (K
 		for _, v := range [][]byte{sec.Data["api_key"], sec.Data["token"], sec.Data["key"]} {
 			if len(v) > 0 && string(v) == token {
 				return KeyInfo{
-					Org:    key.Spec.Org,
 					Name:   key.Name,
 					Models: append([]string(nil), key.Spec.Models...),
 				}, true

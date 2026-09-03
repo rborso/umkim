@@ -15,9 +15,7 @@ import { GroupsPage } from './pages/GroupsPage';
 import { RoleBindingsPage } from './pages/RoleBindingsPage';
 import { ServiceAccountsPage } from './pages/ServiceAccountsPage';
 import { AuditPage } from './pages/AuditPage';
-import { OrgsPage } from './pages/OrgsPage';
 import { LLMApiKeysPage } from './pages/LLMApiKeysPage';
-import { MembersPage } from './pages/MembersPage';
 
 export function App() {
   return (
@@ -46,8 +44,6 @@ export function App() {
             <Route path="admin/role-bindings" element={<RoleBindingsPage />} />
             <Route path="admin/service-accounts" element={<ServiceAccountsPage />} />
             <Route path="admin/audit" element={<AuditPage />} />
-            <Route path="admin/orgs" element={<OrgsPage />} />
-            <Route path="admin/members" element={<MembersPage />} />
             <Route path="admin/llm-api-keys" element={<LLMApiKeysPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

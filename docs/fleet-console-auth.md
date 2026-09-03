@@ -29,21 +29,23 @@ The chart can be configured for:
 For directory setup and the distinction between console and ingress-auth
 LLDAP, see [lldap-bootstrap.md](lldap-bootstrap.md).
 
-## Roles and organization scope
+## Roles
 
 The service seeds these Fleet roles:
 
 | Role | Intended scope |
 |---|---|
-| `dc-admin` | Full platform administration |
+| `dc-admin` | Full platform administration, including global LLM API keys |
+| `viewer` | Read-only access to sites, clusters, apps, charts, infrastructure, and health |
 | `site-admin` | Site, cluster, FleetApp, and chart library operations |
 | `cluster-admin` | Cluster and FleetApp operations; chart library is read-only |
-| `org-admin` | One organization, including delegated membership and policy work; chart library is read-only |
-| `customer` | Organization-scoped site, cluster, and app access; chart library is read-only |
 
-Role bindings and organization scopes are enforced by the proxy before requests
-reach the upstream services. See [multi-tenancy.md](multi-tenancy.md) for the
-organization model and its limits.
+Role bindings are enforced by the proxy before requests reach the upstream
+services. Scoped roles (`site-admin`, `cluster-admin`) use FleetRoleBinding
+scope without organization partitioning.
+
+Global LLM API keys are managed at `/api/v1alpha1/llm-api-keys` (dc-admin
+only). Key names are not org-prefixed.
 
 ## Operational guidance
 

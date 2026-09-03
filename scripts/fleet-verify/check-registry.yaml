@@ -387,14 +387,14 @@
   timeout_s: 600
   blocking: false
 
-- id: console.playwright.admin-orgs
+- id: console.playwright.admin-viewer
   layer: [1]
   suite: [core, hub]
   module: S7
   mode: readonly
   requires: [hub, console]
-  profiles: [hub-only, homelab]
-  handler: checks/playwright-admin-orgs.sh
+  profiles: [homelab]
+  handler: checks/playwright-admin-viewer.sh
   timeout_s: 600
   blocking: false
 

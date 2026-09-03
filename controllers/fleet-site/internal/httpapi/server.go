@@ -176,7 +176,7 @@ func (s *Server) handleSites(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{"sites": sites})
 	case http.MethodPost:
-		actor, ok := s.requireMutatingActor(w, r)
+		_, ok := s.requireMutatingActor(w, r)
 		if !ok {
 			return
 		}
@@ -206,11 +206,6 @@ func (s *Server) handleSites(w http.ResponseWriter, r *http.Request) {
 			fs.Spec.SiteId = fs.Spec.SiteName
 		}
 		normalizeSiteIDOnCreate(&fs)
-		if err := validateSiteCreate(actor, &fs); err != nil {
-			if writeTenancyError(w, err) {
-				return
-			}
-		}
 		if fs.Spec.IsRegistry() {
 			fs.Status.Phase = "Ready"
 			fs.Status.Message = "Registry site"
@@ -283,14 +278,9 @@ func (s *Server) handleOneSite(ctx context.Context, w http.ResponseWriter, r *ht
 	case http.MethodPatch:
 		s.handlePatchSite(ctx, w, r, name)
 	case http.MethodDelete:
-		actor, ok := s.requireMutatingActor(w, r)
+		_, ok := s.requireMutatingActor(w, r)
 		if !ok {
 			return
-		}
-		if err := validateSiteDelete(actor, &fs); err != nil {
-			if writeTenancyError(w, err) {
-				return
-			}
 		}
 		if s.siteIsManagement(ctx, name) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "management site cannot be deleted"})

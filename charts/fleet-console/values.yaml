@@ -62,6 +62,7 @@ lldap:
       - fleet-admins
       - fleet-site-admins
       - fleet-cluster-admins
+      - fleet-viewers
 
 registry:
   prefix: ""

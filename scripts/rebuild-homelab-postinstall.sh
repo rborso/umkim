@@ -99,9 +99,6 @@ else
   log "lab-gpu03 already Ready — skip provision"
 fi
 
-# Confirm shared pool on lab-gpu03 (demo / multi-tenancy shared target)
-curl -sf -X PATCH "${API}/clusters/lab-gpu03" -H 'Content-Type: application/json' -d '{"pool":"shared"}' >/dev/null || true
-
 if [[ "${SKIP_CLUSTER_ACME}" != "1" ]]; then
   log "Enable cluster ACME on ${CLUSTER}"
   curl -sf -X POST "${API}/clusters/${CLUSTER}/acme/enable" >/dev/null || true

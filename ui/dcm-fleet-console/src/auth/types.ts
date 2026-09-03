@@ -14,7 +14,6 @@ export interface AuthUser {
   groups: string[];
   permissions: EffectivePermission[];
   dcAdmin: boolean;
-  orgs?: string[];
   roles?: string[];
 }
 

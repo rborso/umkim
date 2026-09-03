@@ -26,7 +26,6 @@ type FleetSiteSpec struct {
 	SiteName string `json:"siteName"`
 	// SiteId is the datacenter id for fleet.site OCM label (defaults to siteName).
 	SiteId string `json:"siteId,omitempty"`
-	OrgId            string `json:"orgId,omitempty"`
 	// ProvisioningMode: greenfield (bootstrap Jobs) or registry (datacenter metadata only).
 	ProvisioningMode string `json:"provisioningMode,omitempty"`
 	DisplayName      string `json:"displayName,omitempty"`
@@ -35,6 +34,7 @@ type FleetSiteSpec struct {
 	// FailureDomain is an optional finer failure domain within region.
 	FailureDomain string `json:"failureDomain,omitempty"`
 	BootstrapHost    string `json:"bootstrapHost,omitempty"`
+	Jumphost         string `json:"jumphost,omitempty"`
 	MgmtLanIP        string `json:"mgmtLanIp,omitempty"`
 	RockyVersion     string `json:"rockyVersion,omitempty"`
 	ClusterRegion    string `json:"clusterRegion,omitempty"`

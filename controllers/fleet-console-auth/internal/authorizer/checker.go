@@ -14,9 +14,6 @@ var (
 	managedClusterGVK = schema.GroupVersionKind{
 		Group: "cluster.open-cluster-management.io", Version: "v1", Kind: "ManagedCluster",
 	}
-	fleetSiteGVK = schema.GroupVersionKind{
-		Group: "fleet.umkim.com", Version: "v1alpha1", Kind: "FleetSite",
-	}
 )
 
 type Checker struct {
@@ -27,19 +24,6 @@ type Checker struct {
 func (c *Checker) Allow(ctx context.Context, actor rbac.Actor, mapped MappedRequest) (bool, error) {
 	if mapped.Resource == "health" {
 		return true, nil
-	}
-	// Customers may not list policies (empty via proxy filter); org-admins and dc-admins may.
-	if mapped.Resource == "policies" && mapped.Verb == "list" {
-		if isDC, _ := c.RBAC.IsDCAdmin(ctx, actor); isDC {
-			return true, nil
-		}
-		roles := roleNames(ctx, c.RBAC, actor)
-		for _, r := range roles {
-			if r == "org-admin" {
-				return true, nil
-			}
-		}
-		return false, nil
 	}
 	req := rbac.Request{
 		Resource:    mapped.Resource,
@@ -57,22 +41,6 @@ func (c *Checker) Allow(ctx context.Context, actor rbac.Actor, mapped MappedRequ
 		if siteID != "" {
 			req.ScopeKind = "Site"
 			req.ScopeName = siteID
-			if ok, err := c.RBAC.Authorize(ctx, actor, req); ok || err != nil {
-				return ok, err
-			}
-		}
-		orgID, _ := c.clusterOrg(ctx, mapped.ScopeName, siteID)
-		if orgID != "" {
-			req.ScopeKind = "Org"
-			req.ScopeName = orgID
-			return c.RBAC.Authorize(ctx, actor, req)
-		}
-	}
-	if mapped.ScopeKind == "Site" && mapped.ScopeName != "" {
-		orgID, _ := c.siteOrg(ctx, mapped.ScopeName)
-		if orgID != "" {
-			req.ScopeKind = "Org"
-			req.ScopeName = orgID
 			return c.RBAC.Authorize(ctx, actor, req)
 		}
 	}
@@ -88,34 +56,6 @@ func (c *Checker) clusterSite(ctx context.Context, clusterName string) (string, 
 		return "", nil
 	}
 	return labels["fleet.site"], nil
-}
-
-func (c *Checker) ClusterOrg(ctx context.Context, clusterName, siteID string) (string, error) {
-	return c.clusterOrg(ctx, clusterName, siteID)
-}
-
-func (c *Checker) clusterOrg(ctx context.Context, clusterName, siteID string) (string, error) {
-	labels, err := c.managedClusterLabels(ctx, clusterName)
-	if err != nil {
-		return "", err
-	}
-	if labels != nil && labels["fleet.org"] != "" {
-		return labels["fleet.org"], nil
-	}
-	if siteID != "" {
-		return c.siteOrg(ctx, siteID)
-	}
-	return "", nil
-}
-
-func (c *Checker) siteOrg(ctx context.Context, siteName string) (string, error) {
-	var fs unstructured.Unstructured
-	fs.SetGroupVersionKind(fleetSiteGVK)
-	if err := c.Client.Get(ctx, client.ObjectKey{Name: siteName}, &fs); err != nil {
-		return "", err
-	}
-	orgID, _, _ := unstructured.NestedString(fs.Object, "spec", "orgId")
-	return orgID, nil
 }
 
 func (c *Checker) managedClusterLabels(ctx context.Context, clusterName string) (map[string]string, error) {

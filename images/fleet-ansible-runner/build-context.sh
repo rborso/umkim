@@ -11,6 +11,11 @@ for f in site-validate.yml site-provision.yml cluster-validate.yml cluster-provi
   ansible.cfg; do
   cp -f "${ROOT}/${f}" "${DST}/${f}"
 done
+for f in cluster-add-worker.yml cluster-remove-worker.yml cluster-replace-control.yml; do
+  if [[ -f "${ROOT}/${f}" ]]; then
+    cp -f "${ROOT}/${f}" "${DST}/${f}"
+  fi
+done
 cp -f "${ROOT}/cleanup_node_local.sh" "${DST}/cleanup_node_local.sh"
 cp -f "${ROOT}/requirements.yml" "${DST}/requirements.yml"
 cp -f "${ROOT}/LICENSE" "${ROOT}/NOTICE" "${DST}/"

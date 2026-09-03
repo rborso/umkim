@@ -12,24 +12,22 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { Navigate } from 'react-router-dom';
 import {
-  activateOrgLLMApiKey,
-  createOrgLLMApiKey,
-  deleteOrgLLMApiKey,
-  listOrgLLMApiKeys,
-  revokeOrgLLMApiKey,
-  rotateOrgLLMApiKey,
+  activateLLMApiKey,
+  createLLMApiKey,
+  deleteLLMApiKey,
+  listLLMApiKeys,
+  revokeLLMApiKey,
+  rotateLLMApiKey,
   type FleetLLMApiKey,
 } from '../api/authClient';
 import { useAuth } from '../auth/AuthContext';
-import { isOrgAdmin, orgPrefixedName, primaryOrg } from '../auth/orgUtils';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
 import { getFieldHelp } from '../help/fieldHelp';
 
 export function LLMApiKeysPage() {
   const { user } = useAuth();
-  const org = primaryOrg(user);
-  const allowed = user?.dcAdmin || isOrgAdmin(user);
+  const allowed = !!user?.dcAdmin;
 
   const [apiEndpoint, setApiEndpoint] = useState('');
   const [keys, setKeys] = useState<FleetLLMApiKey[]>([]);
@@ -43,10 +41,9 @@ export function LLMApiKeysPage() {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    if (!org) return;
     setError(null);
     try {
-      const data = await listOrgLLMApiKeys(org);
+      const data = await listLLMApiKeys();
       setKeys(data.keys);
       setApiEndpoint(data.apiEndpoint ?? '');
     } catch (e) {
@@ -55,32 +52,23 @@ export function LLMApiKeysPage() {
   };
 
   useEffect(() => {
-    if (allowed && org) void load();
-  }, [allowed, org]);
+    if (allowed) void load();
+  }, [allowed]);
 
   if (!allowed) return <Navigate to="/" replace />;
-  if (!org && !user?.dcAdmin) {
-    return (
-      <PageSection>
-        <Title headingLevel="h1">LLM API keys</Title>
-        <p>No organization scope on your account.</p>
-      </PageSection>
-    );
-  }
 
   const handleCreate = async () => {
-    if (!org || !keyName.trim()) return;
+    if (!keyName.trim()) return;
     setSaving(true);
     setError(null);
-    const name = orgPrefixedName(org, keyName.trim());
     const modelList = models
       .split(',')
       .map((m) => m.trim())
       .filter(Boolean);
     try {
-      const res = await createOrgLLMApiKey(org, {
-        name,
-        displayName: displayName.trim() || name,
+      const res = await createLLMApiKey({
+        name: keyName.trim(),
+        displayName: displayName.trim() || keyName.trim(),
         models: modelList.length ? modelList : undefined,
       });
       setCreateOpen(false);
@@ -99,9 +87,9 @@ export function LLMApiKeysPage() {
 
   return (
     <PageSection>
-      <Title headingLevel="h1">LLM API keys · {org}</Title>
+      <Title headingLevel="h1">LLM API keys</Title>
       <p style={{ marginTop: '0.5rem', maxWidth: '52rem' }}>
-        Create Bearer tokens for your organization to call the public OpenAI-compatible API.
+        Create Bearer tokens for the public OpenAI-compatible API.
         {apiEndpoint ? (
           <>
             {' '}
@@ -142,7 +130,7 @@ export function LLMApiKeysPage() {
                   <Button
                     variant="link"
                     onClick={() =>
-                      void rotateOrgLLMApiKey(org!, meta.name!).then((res) => {
+                      void rotateLLMApiKey(meta.name!).then((res) => {
                         setIssuedToken(res.token);
                         setTokenOpen(true);
                         void load();
@@ -152,24 +140,18 @@ export function LLMApiKeysPage() {
                     Rotate
                   </Button>
                   {status.active ? (
-                    <Button
-                      variant="link"
-                      onClick={() => void revokeOrgLLMApiKey(org!, meta.name!).then(() => load())}
-                    >
+                    <Button variant="link" onClick={() => void revokeLLMApiKey(meta.name!).then(() => load())}>
                       Revoke
                     </Button>
                   ) : (
-                    <Button
-                      variant="link"
-                      onClick={() => void activateOrgLLMApiKey(org!, meta.name!).then(() => load())}
-                    >
+                    <Button variant="link" onClick={() => void activateLLMApiKey(meta.name!).then(() => load())}>
                       Activate
                     </Button>
                   )}
                   <Button
                     variant="link"
                     isDanger
-                    onClick={() => void deleteOrgLLMApiKey(org!, meta.name!).then(() => load())}
+                    onClick={() => void deleteLLMApiKey(meta.name!).then(() => load())}
                   >
                     Delete
                   </Button>
@@ -182,12 +164,7 @@ export function LLMApiKeysPage() {
 
       <Modal variant={ModalVariant.medium} title="Create LLM API key" isOpen={createOpen} onClose={() => setCreateOpen(false)}>
         <Form>
-          <LabeledField
-            label="Key name"
-            fieldId="llmKeyName"
-            help={getFieldHelp('llmApiKey.name')}
-            helperText={`Stored as ${org}-<name>`}
-          >
+          <LabeledField label="Key name" fieldId="llmKeyName" help={getFieldHelp('llmApiKey.name')}>
             <TextInput id="llmKeyName" value={keyName} onChange={(_e, v) => setKeyName(v)} />
           </LabeledField>
           <LabeledField label="Display name" fieldId="llmKeyDisplay" help={getFieldHelp('llmApiKey.displayName')}>

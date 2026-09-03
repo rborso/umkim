@@ -286,6 +286,56 @@ func (in *FleetClusterJoinStatus) DeepCopyInto(out *FleetClusterJoinStatus) {
 	if in.IngressAuth.AccessDomains != nil {
 		out.IngressAuth.AccessDomains = append([]string(nil), in.IngressAuth.AccessDomains...)
 	}
+	if in.NodeOperation != nil {
+		in, out := &in.NodeOperation, &out.NodeOperation
+		*out = new(ClusterNodeOperationStatus)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.NodeOperationHistory != nil {
+		in, out := &in.NodeOperationHistory, &out.NodeOperationHistory
+		*out = make([]ClusterNodeOperationRecord, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+}
+
+func (in *ClusterNodeOperationStatus) DeepCopyInto(out *ClusterNodeOperationStatus) {
+	*out = *in
+	if in.StartedAt != nil {
+		t := *in.StartedAt
+		out.StartedAt = &t
+	}
+}
+
+func (in *ClusterNodeOperationStatus) DeepCopy() *ClusterNodeOperationStatus {
+	if in == nil {
+		return nil
+	}
+	out := new(ClusterNodeOperationStatus)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *ClusterNodeOperationRecord) DeepCopyInto(out *ClusterNodeOperationRecord) {
+	*out = *in
+	if in.StartedAt != nil {
+		t := *in.StartedAt
+		out.StartedAt = &t
+	}
+	if in.FinishedAt != nil {
+		t := *in.FinishedAt
+		out.FinishedAt = &t
+	}
+}
+
+func (in *ClusterNodeOperationRecord) DeepCopy() *ClusterNodeOperationRecord {
+	if in == nil {
+		return nil
+	}
+	out := new(ClusterNodeOperationRecord)
+	in.DeepCopyInto(out)
+	return out
 }
 
 func (in *FleetClusterJoinList) DeepCopyInto(out *FleetClusterJoinList) {

@@ -278,6 +278,35 @@ func DeleteJob(ns, clusterName, siteID, runnerImage, sshSecret, inventoryCM stri
 	return ansibleJob(ns, "fleet-cluster-delete-"+clusterName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 1200)
 }
 
+func nodeOperationJob(ns, jobName, clusterName, siteID, playbook, runnerImage, sshSecret, inventoryCM string, limit string, extraArgs []string, timeoutSec int64) *batchv1.Job {
+	args := ansiblePlaybookArgs(playbook, clusterName, siteID)
+	args = append(args, "-e", "@/secrets/hub/ansible_vars.yml")
+	args = append(args, extraArgs...)
+	if limit != "" {
+		args = append(args, "--limit", limit)
+	}
+	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, HubAnsibleSecretsName, timeoutSec)
+}
+
+func AddWorkerJob(ns, jobName, clusterName, siteID, targetHost, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
+	limit := targetHost
+	if limit != "" {
+		limit += ",site_bootstrap"
+	}
+	return nodeOperationJob(ns, jobName, clusterName, siteID, "/ansible/cluster-add-worker.yml",
+		runnerImage, sshSecret, inventoryCM, limit, extraArgs, 3600)
+}
+
+func RemoveWorkerJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
+	return nodeOperationJob(ns, jobName, clusterName, siteID, "/ansible/cluster-remove-worker.yml",
+		runnerImage, sshSecret, inventoryCM, "site_bootstrap", extraArgs, 2400)
+}
+
+func ReplaceControlJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
+	return nodeOperationJob(ns, jobName, clusterName, siteID, "/ansible/cluster-replace-control.yml",
+		runnerImage, sshSecret, inventoryCM, "", extraArgs, 5400)
+}
+
 func IngressAuthReconcileJob(ns, jobName, runnerImage, inventoryCM, globalSecretsName string, enabledClusters []string) *batchv1.Job {
 	args := []string{
 		"ansible-playbook", "/ansible/ingress-auth-reconcile.yml",

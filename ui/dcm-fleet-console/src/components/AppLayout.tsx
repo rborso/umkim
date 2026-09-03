@@ -25,7 +25,6 @@ import {
   ServerIcon,
 } from '@patternfly/react-icons';
 import { useAuth } from '../auth/AuthContext';
-import { isOrgAdmin } from '../auth/orgUtils';
 
 type NavItemDef = {
   to: string;
@@ -33,9 +32,7 @@ type NavItemDef = {
   icon: ReactNode;
   resource: string;
   verb: string;
-  hideForCustomer?: boolean;
   dcAdminOnly?: boolean;
-  orgAdminOrDcAdmin?: boolean;
 };
 
 const navItems: NavItemDef[] = [
@@ -84,10 +81,6 @@ export function AppLayout() {
             {navItems
               .filter((item) => {
                 if (item.dcAdminOnly && !user?.dcAdmin) return false;
-                if (item.orgAdminOrDcAdmin && !user?.dcAdmin && !isOrgAdmin(user)) {
-                  return false;
-                }
-                if (item.hideForCustomer && !user?.dcAdmin && !isOrgAdmin(user)) return false;
                 return can(item.resource, item.verb);
               })
               .map((item) => (
@@ -110,9 +103,6 @@ export function AppLayout() {
             {user?.dcAdmin && (
               <NavExpandable title="Access control" isExpanded>
                 <NavItem>
-                  <NavLink to="/admin/orgs">Organizations</NavLink>
-                </NavItem>
-                <NavItem>
                   <NavLink to="/admin/users">Users</NavLink>
                 </NavItem>
                 <NavItem>
@@ -125,19 +115,12 @@ export function AppLayout() {
                   <NavLink to="/admin/service-accounts">Service accounts</NavLink>
                 </NavItem>
                 <NavItem>
+                  <NavLink to="/admin/llm-api-keys">LLM API keys</NavLink>
+                </NavItem>
+                <NavItem>
                   <NavLink to="/admin/audit">Audit log</NavLink>
                 </NavItem>
               </NavExpandable>
-            )}
-            {!user?.dcAdmin && isOrgAdmin(user) && (
-              <>
-                <NavItem>
-                  <NavLink to="/admin/members">Members</NavLink>
-                </NavItem>
-                <NavItem>
-                  <NavLink to="/admin/llm-api-keys">LLM API keys</NavLink>
-                </NavItem>
-              </>
             )}
           </NavList>
         </Nav>

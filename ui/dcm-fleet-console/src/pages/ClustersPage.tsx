@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -29,8 +29,6 @@ import {
   fleetSiteEffectiveId,
   fleetSiteIsManagement,
   fleetSiteLabelForId,
-  listFleetClusters,
-  listFleetSites,
 } from '../api/client';
 import type {
   FleetCluster,
@@ -45,8 +43,9 @@ import { NfsStorageSetupHelp } from '../components/clusters/NfsStorageSetupHelp'
 import { LabeledField } from '../components/forms/LabeledField';
 import { LabelKeyValueEditor } from '../components/forms/LabelKeyValueEditor';
 import { getFieldHelp } from '../help/fieldHelp';
+import { useFleetClustersQuery, useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
-import { isCustomerUser, primaryOrg } from '../auth/orgUtils';
+import { canMutate } from '../auth/roles';
 
 const defaultHaControlNodes = (clusterName: string): FleetClusterNodeInput[] =>
   [1, 2, 3].map((i) => ({
@@ -116,12 +115,15 @@ function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey'
 
 export function ClustersPage() {
   const { user } = useAuth();
-  const orgSlug = primaryOrg(user);
+  const { invalidateClusters, invalidateSites } = useInvalidateFleet();
+  const clustersQuery = useFleetClustersQuery(30_000);
+  const sitesQuery = useFleetSitesQuery(30_000);
+  const rows = clustersQuery.data ?? [];
+  const sites = sitesQuery.data ?? [];
+  const loading = clustersQuery.isLoading || sitesQuery.isLoading;
+  const fetching = clustersQuery.isFetching || sitesQuery.isFetching;
+  const error = clustersQuery.error || sitesQuery.error;
   const [searchParams] = useSearchParams();
-  const [rows, setRows] = useState<FleetCluster[]>([]);
-  const [sites, setSites] = useState<FleetSite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FleetClusterCreate>(emptyClusterForm());
   const [saving, setSaving] = useState(false);
@@ -150,10 +152,9 @@ export function ClustersPage() {
       sites.filter(
         (s) =>
           (s.spec.provisioningMode === 'registry' || !s.spec.bootstrapHost) &&
-          !fleetSiteIsManagement(s) &&
-          (user?.dcAdmin || !orgSlug || s.spec.orgId === orgSlug),
+          !fleetSiteIsManagement(s),
       ),
-    [sites, user?.dcAdmin, orgSlug],
+    [sites],
   );
 
   const selectedSite = useMemo(
@@ -208,23 +209,10 @@ export function ClustersPage() {
     }
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [clusters, siteList] = await Promise.all([listFleetClusters(), listFleetSites()]);
-      setRows(clusters);
-      setSites(siteList);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = () => {
+    void invalidateClusters();
+    void invalidateSites();
+  };
 
   useEffect(() => {
     if (sitePrefill) {
@@ -429,12 +417,12 @@ export function ClustersPage() {
         <Toolbar style={{ marginTop: '0.75rem' }}>
           <ToolbarContent>
             <ToolbarItem>
-              <Button variant="primary" icon={<PlusIcon />} onClick={openWizard}>
+              <Button variant="primary" icon={<PlusIcon />} isDisabled={!canMutate(user)} onClick={openWizard}>
                 Create cluster
               </Button>
             </ToolbarItem>
             <ToolbarItem>
-              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()}>
+              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()} isDisabled={fetching}>
                 Refresh
               </Button>
             </ToolbarItem>
@@ -626,13 +614,8 @@ export function ClustersPage() {
                         })),
                 }))
               }
-              placeholder={orgSlug ? `${orgSlug}-cluster-1` : 'lab-cluster1'}
+              placeholder="lab-cluster1"
             />
-            {isCustomerUser(user) && orgSlug ? (
-              <small>
-                Names must start with <code>{orgSlug}-</code>. Clusters are created in the dedicated pool.
-              </small>
-            ) : null}
           </LabeledField>
           <LabeledField label="Topology" fieldId="topology" help={getFieldHelp('clusterJoin.topology')}>
             <FormSelect

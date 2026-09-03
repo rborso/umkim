@@ -58,6 +58,51 @@ charts to the hub library (`FleetChart`) first when you want reuse. See
 KubeVirt remains an optional spoke platform add-on (KVM capability), not a
 chart-install provider.
 
+## Post-Ready node operations
+
+When a cluster is `Ready`, operators can add or remove workers and replace
+control-plane nodes through the console **Operations** panel or the fleet-site
+API:
+
+| Operation | API |
+|-----------|-----|
+| Add worker | `POST /clusters/{name}/nodes` |
+| Remove worker | `DELETE /clusters/{name}/nodes/{node}?force=true` |
+| Replace control plane | `POST /clusters/{name}/control-plane/replace` |
+| Validate node operation (pre/post) | `POST /clusters/{name}/node-operations/validate?phase=pre\|post` |
+| List operation history | `GET /clusters/{name}/node-operations` |
+| Operation Ansible logs | `GET /clusters/{name}/node-operations/{id}/logs` |
+
+Hub Ansible jobs (provision, storage, node operations) reach cluster nodes through
+`FleetClusterJoin.spec.jumphost`, or `FleetSite.spec.jumphost` for the cluster's
+site when the cluster field is empty. Use `user@host:port` (port optional). When
+set, jobs SSH to management LAN addresses via `ProxyJump` instead of the WireGuard
+overlay — required for sites where only a bastion can reach lab nodes.
+
+Workers join during initial provision when listed in the FCJ `spec.nodes` at
+create time. Post-Ready add uses the same Ansible agent-join path without
+re-running full cluster provision.
+
+Offline removal or replacement (`force=true`) skips cordon/drain on unreachable
+hosts and may leave orphaned disk state; run `cleanup_node_local.sh` on revived
+machines before reuse.
+
+Each operation follows **validate → execute → validate**:
+
+1. **Pre-validation** — `POST .../node-operations/validate` (or the same checks
+   run automatically when submitting add/remove/replace). Fails fast on cluster
+   state, duplicate addresses, or missing nodes.
+2. **Execute** — existing add/remove/replace APIs queue an Ansible job.
+3. **Post-validation** — controller and `?phase=post` confirm inventory and
+   spoke node state after the job completes.
+
+Completed operations are appended to `FleetClusterJoin.status.nodeOperationHistory`
+(newest first, capped at 20). Each record stores actor identity, timestamps, outcome,
+and a tail of the Ansible job log so operators can review failures after the Job TTL
+expires.
+
+CLI equivalent: [playbooks/flows/cluster-node-op.yml](../../playbooks/flows/cluster-node-op.yml).
+
 ## Management API
 
 Public fleet-site management API access requires authenticated use through

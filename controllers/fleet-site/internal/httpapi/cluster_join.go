@@ -176,6 +176,20 @@ func applyFleetClusterJoinSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetCl
 			Message: fcj.Status.Acme.Message,
 		}
 	}
+	if fcj.Status.NodeOperation != nil {
+		op := fcj.Status.NodeOperation
+		cs.NodeOperation = &clusterNodeOperationJSON{
+			ID:        op.ID,
+			Type:      op.Type,
+			Node:      op.Node,
+			Phase:     op.Phase,
+			JobName:   op.JobName,
+			Message:   op.Message,
+			Force:     op.Force,
+			ActorKind: op.ActorKind,
+			ActorName: op.ActorName,
+		}
+	}
 }
 
 func applyStorageToSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetClusterJoin) {
@@ -318,13 +332,7 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 	if !ok {
 		return
 	}
-	labels, err := validateClusterCreate(actor, &site, req.ClusterName, req.ClusterLabels)
-	if err != nil {
-		if writeTenancyError(w, err) {
-			return
-		}
-	}
-	req.ClusterLabels = labels
+	_ = actor
 	if _, err := getManagedCluster(ctx, s.Client, req.ClusterName); err == nil {
 		http.Error(w, "cluster already exists in OCM", http.StatusConflict)
 		return

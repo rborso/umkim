@@ -21,9 +21,6 @@
 #   ansible-playbook $INV playbooks/flows/cluster-create.yml \
 #     -e @playbooks/flows/examples/lab-ha01.yml
 #
-# All three examples use fleet.pool=shared. Add organization-specific labels
-# only when testing the separate multi-tenancy flow.
-
 # Hub gateway (also in group_vars/hub/main.yml + vault.yml)
 # fleet_edge_acme_enabled: true
 # fleet_ingress_auth_enabled: true

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
@@ -33,6 +34,7 @@ type sitePatchBody struct {
 	WanEgress             *fleetv1alpha1.FleetSiteWanEgressSpec      `json:"wanEgress,omitempty"`
 	ExternalAccess        *fleetv1alpha1.FleetSiteExternalAccessSpec `json:"externalAccess,omitempty"`
 	ProvisioningMode      *string                                    `json:"provisioningMode,omitempty"`
+	Jumphost              *string                                    `json:"jumphost,omitempty"`
 }
 
 func (s *Server) enrichSite(ctx context.Context, fs *fleetv1alpha1.FleetSite) siteResponse {
@@ -120,6 +122,9 @@ func (s *Server) handlePatchSite(ctx context.Context, w http.ResponseWriter, r *
 	}
 	if patch.FailureDomain != nil {
 		fs.Spec.FailureDomain = *patch.FailureDomain
+	}
+	if patch.Jumphost != nil {
+		fs.Spec.Jumphost = strings.TrimSpace(*patch.Jumphost)
 	}
 	if !mgmtSite {
 		if patch.EdgeDomain != nil {

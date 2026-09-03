@@ -1,0 +1,25 @@
+---
+- name: K3s cluster | Resolve etcd member name
+  ansible.builtin.set_fact:
+    fleet_etcd_member_name: "{{ fleet_etcd_remove_member | default(fleet_node_replace_old) }}"
+  tags: [k3s, k3s_cluster, k3s_etcd]
+
+- name: K3s cluster | List etcd members
+  ansible.builtin.command:
+    cmd: k3s etcd-member-list
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+  register: k3s_etcd_member_list
+  changed_when: false
+  tags: [k3s, k3s_cluster, k3s_etcd]
+
+- name: K3s cluster | Remove stale etcd member
+  ansible.builtin.command:
+    cmd: k3s etcd-member-remove {{ item }}
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+  loop: "{{ k3s_etcd_member_list.stdout_lines | default([]) | select('search', fleet_etcd_member_name) | list }}"
+  when: k3s_etcd_member_list.stdout_lines is defined
+  failed_when: false
+  changed_when: true
+  tags: [k3s, k3s_cluster, k3s_etcd]

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import {
   Button,
   PageSection,
@@ -7,54 +7,49 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { SyncIcon } from '@patternfly/react-icons';
-import {
-  fleetSitePhase,
-  listFleetClusters,
-  listFleetSites,
-} from '../api/client';
+import { fleetSitePhase } from '../api/client';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { HealthCards, type HealthEntry } from '../components/HealthCards';
-import { usePoll } from '../hooks/usePoll';
+import { useFleetClustersQuery, useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 
 export function OverviewPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
-  const [health, setHealth] = useState<HealthEntry[]>([]);
-  const [updated, setUpdated] = useState<string>('');
+  const { invalidateSites, invalidateClusters } = useInvalidateFleet();
+  const sitesQuery = useFleetSitesQuery(30_000);
+  const clustersQuery = useFleetClustersQuery(30_000);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [sites, clusters] = await Promise.all([listFleetSites(), listFleetClusters()]);
-      const ready = clusters.filter((c) => c.provisioning_phase === 'Ready').length;
-      const failed = clusters.filter((c) => c.provisioning_phase === 'Failed').length;
-      const sitePhases = sites.map(fleetSitePhase);
-      setHealth([
-        {
-          label: 'Sites',
-          ok: true,
-          detail: `${sites.length} registered` + (sitePhases.length ? ` (${sitePhases.join(', ')})` : ''),
-        },
-        {
-          label: 'Clusters',
-          ok: failed === 0,
-          detail: `${clusters.length} total · ${ready} Ready` + (failed ? ` · ${failed} Failed` : ''),
-        },
-      ]);
-      setUpdated(new Date().toLocaleString());
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loading = sitesQuery.isLoading || clustersQuery.isLoading;
+  const fetching = sitesQuery.isFetching || clustersQuery.isFetching;
+  const error = sitesQuery.error || clustersQuery.error;
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const health = useMemo((): HealthEntry[] => {
+    const sites = sitesQuery.data ?? [];
+    const clusters = clustersQuery.data ?? [];
+    const ready = clusters.filter((c) => c.provisioning_phase === 'Ready').length;
+    const failed = clusters.filter((c) => c.provisioning_phase === 'Failed').length;
+    const sitePhases = sites.map(fleetSitePhase);
+    return [
+      {
+        label: 'Sites',
+        ok: true,
+        detail: `${sites.length} registered` + (sitePhases.length ? ` (${sitePhases.join(', ')})` : ''),
+      },
+      {
+        label: 'Clusters',
+        ok: failed === 0,
+        detail: `${clusters.length} total · ${ready} Ready` + (failed ? ` · ${failed} Failed` : ''),
+      },
+    ];
+  }, [sitesQuery.data, clustersQuery.data]);
 
-  usePoll(load, 30_000);
+  const updated = useMemo(() => {
+    const t = Math.max(sitesQuery.dataUpdatedAt, clustersQuery.dataUpdatedAt);
+    return t ? new Date(t).toLocaleString() : '';
+  }, [sitesQuery.dataUpdatedAt, clustersQuery.dataUpdatedAt]);
+
+  const refresh = () => {
+    void invalidateSites();
+    void invalidateClusters();
+  };
 
   return (
     <>
@@ -76,10 +71,11 @@ export function OverviewPage() {
             flexWrap: 'wrap',
           }}
         >
-          <Button variant="secondary" icon={<SyncIcon />} onClick={load} isDisabled={loading}>
+          <Button variant="secondary" icon={<SyncIcon />} onClick={refresh} isDisabled={fetching}>
             Refresh
           </Button>
           {loading && <Spinner size="md" />}
+          {fetching && !loading && <Spinner size="sm" />}
           {updated && !loading && (
             <span style={{ fontSize: '0.9rem', color: '#6a6e73' }}>Updated {updated}</span>
           )}
@@ -87,7 +83,7 @@ export function OverviewPage() {
       </PageSection>
       <PageSection>
         <ErrorAlert error={error} />
-        {!error && <HealthCards entries={health} />}
+        {!error && (health.length > 0 || !loading) && <HealthCards entries={health} />}
       </PageSection>
     </>
   );

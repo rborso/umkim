@@ -40,7 +40,7 @@
       --namespace {{ fleet_console_helm_namespace }}
       --create-namespace
       -f /tmp/fleet-console-helm-values.yaml
-      --wait --timeout 15m
+      --wait --timeout 20m
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"

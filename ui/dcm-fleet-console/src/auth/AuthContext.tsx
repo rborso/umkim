@@ -31,7 +31,6 @@ const bypassUser: AuthUser = {
   groups: [],
   permissions: [{ resource: '*', verb: '*' }],
   dcAdmin: true,
-  orgs: [],
   roles: ['dc-admin'],
 };
 
@@ -71,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         groups: me.groups ?? [],
         permissions: me.permissions ?? [],
         dcAdmin: !!me.dcAdmin,
-        orgs: me.orgs ?? [],
         roles: me.roles ?? [],
       });
     } catch {

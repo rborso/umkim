@@ -202,47 +202,6 @@ type FleetAuditEventList struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Namespaced,shortName=forg
-type FleetOrg struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              FleetOrgSpec   `json:"spec,omitempty"`
-	Status            FleetOrgStatus `json:"status,omitempty"`
-}
-
-type FleetOrgSpec struct {
-	// Slug is the immutable org identifier used in name prefixes and fleet.org labels.
-	Slug        string           `json:"slug"`
-	DisplayName string           `json:"displayName,omitempty"`
-	SharedQuota *OrgResourceQuota `json:"sharedQuota,omitempty"`
-}
-
-type OrgResourceQuota struct {
-	CPUMilli      int64 `json:"cpuMilli,omitempty"`
-	MemoryBytes   int64 `json:"memoryBytes,omitempty"`
-	GPUCount      int64 `json:"gpuCount,omitempty"`
-	LlmTokensPerMonth int64 `json:"llmTokensPerMonth,omitempty"`
-}
-
-type FleetOrgStatus struct {
-	SharedUsage *OrgResourceUsage `json:"sharedUsage,omitempty"`
-}
-
-type OrgResourceUsage struct {
-	CPUMilli          int64 `json:"cpuMilli,omitempty"`
-	MemoryBytes       int64 `json:"memoryBytes,omitempty"`
-	GPUCount          int64 `json:"gpuCount,omitempty"`
-	LlmTokensPerMonth int64 `json:"llmTokensPerMonth,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-type FleetOrgList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []FleetOrg `json:"items"`
-}
-
-// +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Namespaced,shortName=flmak
 type FleetLLMApiKey struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -252,7 +211,6 @@ type FleetLLMApiKey struct {
 }
 
 type FleetLLMApiKeySpec struct {
-	Org         string   `json:"org"`
 	DisplayName string   `json:"displayName,omitempty"`
 	SecretRef   string   `json:"secretRef,omitempty"`
 	Models      []string `json:"models,omitempty"`
@@ -279,7 +237,6 @@ func init() {
 		&FleetServiceAccount{}, &FleetServiceAccountList{},
 		&FleetCatalogAccess{}, &FleetCatalogAccessList{},
 		&FleetAuditEvent{}, &FleetAuditEventList{},
-		&FleetOrg{}, &FleetOrgList{},
 		&FleetLLMApiKey{}, &FleetLLMApiKeyList{},
 	)
 }

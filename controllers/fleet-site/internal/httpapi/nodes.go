@@ -22,11 +22,18 @@ func (s *Server) handleClusterNodes(w http.ResponseWriter, r *http.Request, clus
 	sub = strings.TrimPrefix(sub, "nodes")
 	sub = strings.Trim(sub, "/")
 	if sub == "" {
-		if r.Method != http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
+			s.handleListNodes(r.Context(), w, clusterName)
+		case http.MethodPost:
+			s.handleAddWorker(w, r, clusterName)
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
 		}
-		s.handleListNodes(r.Context(), w, clusterName)
+		return
+	}
+	if r.Method == http.MethodDelete {
+		s.handleRemoveWorker(w, r, clusterName, sub)
 		return
 	}
 	if r.Method != http.MethodPatch {

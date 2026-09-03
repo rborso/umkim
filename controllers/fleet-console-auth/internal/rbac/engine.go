@@ -3,11 +3,28 @@ package rbac
 import (
 	"context"
 	"strings"
+	"sync"
+	"time"
 
 	authv1 "github.com/rborso/umkim/controllers/fleet-console-auth/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const policyCacheTTL = 30 * time.Second
+
+type policyCache struct {
+	mu        sync.RWMutex
+	loadedAt  time.Time
+	roles     map[string]authv1.FleetRole
+	bindings  []authv1.FleetRoleBinding
+}
+
+type Engine struct {
+	Client    client.Client
+	Namespace string
+	cache     policyCache
+}
 
 type Actor struct {
 	Kind   string
@@ -21,11 +38,6 @@ type Request struct {
 	ScopeKind   string
 	ScopeName   string
 	AccessLevel string
-}
-
-type Engine struct {
-	Client    client.Client
-	Namespace string
 }
 
 type EffectivePermission struct {
@@ -108,6 +120,15 @@ func (e *Engine) LoadPolicy(ctx context.Context) (map[string]authv1.FleetRole, [
 }
 
 func (e *Engine) loadPolicy(ctx context.Context) (map[string]authv1.FleetRole, []authv1.FleetRoleBinding, error) {
+	e.cache.mu.RLock()
+	if time.Since(e.cache.loadedAt) < policyCacheTTL && e.cache.roles != nil {
+		roles := e.cache.roles
+		bindings := e.cache.bindings
+		e.cache.mu.RUnlock()
+		return roles, bindings, nil
+	}
+	e.cache.mu.RUnlock()
+
 	var roleList authv1.FleetRoleList
 	if err := e.Client.List(ctx, &roleList, client.InNamespace(e.Namespace)); err != nil {
 		return nil, nil, err
@@ -120,7 +141,14 @@ func (e *Engine) loadPolicy(ctx context.Context) (map[string]authv1.FleetRole, [
 	if err := e.Client.List(ctx, &bindingList, client.InNamespace(e.Namespace)); err != nil {
 		return nil, nil, err
 	}
-	return roles, bindingList.Items, nil
+	bindings := bindingList.Items
+
+	e.cache.mu.Lock()
+	e.cache.loadedAt = time.Now()
+	e.cache.roles = roles
+	e.cache.bindings = bindings
+	e.cache.mu.Unlock()
+	return roles, bindings, nil
 }
 
 func subjectMatches(actor Actor, subjects []authv1.SubjectRef) bool {
@@ -159,17 +187,6 @@ func scopeMatches(scopes []authv1.ScopeRef, kind, name string) bool {
 		}
 		if strings.EqualFold(s.Kind, kind) && (s.Name == name || s.Name == "*") {
 			return true
-		}
-		// Org scope applies to Site and Cluster resources in the same org.
-		if strings.EqualFold(s.Kind, "Org") && name != "" {
-			if strings.EqualFold(kind, "Site") || strings.EqualFold(kind, "Cluster") {
-				continue
-			}
-		}
-		// site-admin scope applies to clusters in site via authorizer passing cluster scope
-		if strings.EqualFold(s.Kind, "Site") && strings.EqualFold(kind, "Cluster") {
-			// cluster-in-site check done at authorizer layer; allow binding match on site name when scope name matches site id passed as cluster's site
-			continue
 		}
 	}
 	return false

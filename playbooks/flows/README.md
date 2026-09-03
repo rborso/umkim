@@ -12,6 +12,8 @@ for the supported installation path.
 - [cluster-delete.yml](cluster-delete.yml) drives cluster removal. Default:
   **detach** from hub (preserves K3s and workloads). Opt-in full K3s reset:
   `fleet_flow_cleanup_kubernetes=true`.
+- [cluster-node-op.yml](cluster-node-op.yml) runs post-Ready node operations
+  (add/remove worker, replace control plane) with pre- and post-validation.
 - [app-install.yml](app-install.yml) installs an OCI Helm chart onto a
   **selected Ready cluster** (`fleet_flow_cluster_name` is required).
 - [whoami-helm-deploy.yml](whoami-helm-deploy.yml) installs the Harbor whoami

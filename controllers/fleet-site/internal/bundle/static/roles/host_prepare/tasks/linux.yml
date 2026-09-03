@@ -41,6 +41,26 @@
   when: host_prepare.disable_firewalld | default(true) | bool
   tags: [host_prepare]
 
+- name: Host prepare | Probe br_netfilter module
+  ansible.builtin.command: modprobe br_netfilter
+  register: host_prepare_br_netfilter_probe
+  changed_when: false
+  failed_when: false
+  when: host_prepare.enable_br_netfilter | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Reboot to activate kernel-modules-extra
+  ansible.builtin.reboot:
+    msg: "Fleet host_prepare: load br_netfilter kernel module"
+    connect_timeout: 5
+    reboot_timeout: 600
+    post_reboot_delay: 30
+    test_command: modprobe br_netfilter
+  when:
+    - host_prepare.enable_br_netfilter | default(true) | bool
+    - host_prepare_br_netfilter_probe.rc | default(1) != 0
+  tags: [host_prepare]
+
 - name: Host prepare | Load br_netfilter module
   community.general.modprobe:
     name: br_netfilter

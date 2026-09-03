@@ -112,93 +112,9 @@ export async function upsertCatalogAccess(body: {
   });
 }
 
-export interface FleetOrgSpec {
-  slug: string;
-  displayName?: string;
-  sharedQuota?: { cpuMilli?: number; memoryBytes?: number };
-}
-
-export interface FleetOrgStatus {
-  sharedUsage?: { cpuMilli?: number; memoryBytes?: number };
-}
-
-export interface FleetOrg {
-  metadata?: { name?: string };
-  spec: FleetOrgSpec;
-  status?: FleetOrgStatus;
-}
-
-export interface FleetOrgCreate {
-  slug: string;
-  displayName?: string;
-  sharedQuota?: { cpuMilli?: number; memoryBytes?: number };
-}
-
-export async function listOrgs(): Promise<FleetOrg[]> {
-  const data = await authRequest<{ orgs: FleetOrg[] }>('/orgs');
-  return data.orgs ?? [];
-}
-
-export async function createOrg(body: FleetOrgCreate): Promise<FleetOrg> {
-  return authRequest('/orgs', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      metadata: { name: body.slug },
-      spec: {
-        slug: body.slug,
-        displayName: body.displayName,
-        sharedQuota: body.sharedQuota,
-      },
-    }),
-  });
-}
-
-export async function patchOrg(
-  slug: string,
-  patch: { displayName?: string; sharedQuota?: { cpuMilli?: number; memoryBytes?: number } },
-): Promise<FleetOrg> {
-  return authRequest(`/orgs/${encodeURIComponent(slug)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ spec: patch }),
-  });
-}
-
-export async function deleteOrg(slug: string): Promise<void> {
-  await authRequest(`/orgs/${encodeURIComponent(slug)}`, { method: 'DELETE' });
-}
-
-export async function listOrgUsers(org: string): Promise<unknown[]> {
-  const data = await authRequest<{ users: unknown[] }>(`/orgs/${encodeURIComponent(org)}/users`);
-  return data.users ?? [];
-}
-
-export async function listOrgRoleBindings(org: string): Promise<unknown[]> {
-  const data = await authRequest<{ roleBindings: unknown[] }>(
-    `/orgs/${encodeURIComponent(org)}/role-bindings`,
-  );
-  return data.roleBindings ?? [];
-}
-
-export async function createOrgRoleBinding(org: string, body: unknown): Promise<unknown> {
-  return authRequest(`/orgs/${encodeURIComponent(org)}/role-bindings`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteOrgRoleBinding(org: string, name: string): Promise<void> {
-  await authRequest(`/orgs/${encodeURIComponent(org)}/role-bindings/${encodeURIComponent(name)}`, {
-    method: 'DELETE',
-  });
-}
-
 export interface FleetLLMApiKey {
   metadata?: { name?: string };
   spec?: {
-    org?: string;
     displayName?: string;
     models?: string[];
   };
@@ -208,46 +124,34 @@ export interface FleetLLMApiKey {
   };
 }
 
-export async function listOrgLLMApiKeys(
-  org: string,
-): Promise<{ apiEndpoint?: string; keys: FleetLLMApiKey[] }> {
-  return authRequest(`/orgs/${encodeURIComponent(org)}/llm-api-keys`);
+export async function listLLMApiKeys(): Promise<{ apiEndpoint?: string; keys: FleetLLMApiKey[] }> {
+  return authRequest('/llm-api-keys');
 }
 
-export async function createOrgLLMApiKey(
-  org: string,
-  body: { name: string; displayName?: string; models?: string[] },
-): Promise<{ key: FleetLLMApiKey; token: string }> {
-  return authRequest(`/orgs/${encodeURIComponent(org)}/llm-api-keys`, {
+export async function createLLMApiKey(body: {
+  name: string;
+  displayName?: string;
+  models?: string[];
+}): Promise<{ key: FleetLLMApiKey; token: string }> {
+  return authRequest('/llm-api-keys', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-export async function deleteOrgLLMApiKey(org: string, name: string): Promise<void> {
-  await authRequest(`/orgs/${encodeURIComponent(org)}/llm-api-keys/${encodeURIComponent(name)}`, {
-    method: 'DELETE',
-  });
+export async function deleteLLMApiKey(name: string): Promise<void> {
+  await authRequest(`/llm-api-keys/${encodeURIComponent(name)}`, { method: 'DELETE' });
 }
 
-export async function rotateOrgLLMApiKey(
-  org: string,
-  name: string,
-): Promise<{ key: FleetLLMApiKey; token: string }> {
-  return authRequest(`/orgs/${encodeURIComponent(org)}/llm-api-keys/${encodeURIComponent(name)}/rotate`, {
-    method: 'POST',
-  });
+export async function rotateLLMApiKey(name: string): Promise<{ key: FleetLLMApiKey; token: string }> {
+  return authRequest(`/llm-api-keys/${encodeURIComponent(name)}/rotate`, { method: 'POST' });
 }
 
-export async function revokeOrgLLMApiKey(org: string, name: string): Promise<FleetLLMApiKey> {
-  return authRequest(`/orgs/${encodeURIComponent(org)}/llm-api-keys/${encodeURIComponent(name)}/revoke`, {
-    method: 'POST',
-  });
+export async function revokeLLMApiKey(name: string): Promise<FleetLLMApiKey> {
+  return authRequest(`/llm-api-keys/${encodeURIComponent(name)}/revoke`, { method: 'POST' });
 }
 
-export async function activateOrgLLMApiKey(org: string, name: string): Promise<FleetLLMApiKey> {
-  return authRequest(`/orgs/${encodeURIComponent(org)}/llm-api-keys/${encodeURIComponent(name)}/activate`, {
-    method: 'POST',
-  });
+export async function activateLLMApiKey(name: string): Promise<FleetLLMApiKey> {
+  return authRequest(`/llm-api-keys/${encodeURIComponent(name)}/activate`, { method: 'POST' });
 }

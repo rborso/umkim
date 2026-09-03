@@ -20,8 +20,8 @@ type llmApiKeyCreateBody struct {
 }
 
 type llmApiKeyListResponse struct {
-	APIEndpoint string                    `json:"apiEndpoint,omitempty"`
-	Keys        []authv1.FleetLLMApiKey   `json:"keys"`
+	APIEndpoint string                  `json:"apiEndpoint,omitempty"`
+	Keys        []authv1.FleetLLMApiKey `json:"keys"`
 }
 
 func (s *Server) llmKeys() *llmkeys.Manager {
@@ -43,13 +43,13 @@ func (s *Server) llmPublicEndpoint(ctx context.Context) string {
 	return "https://" + host + "/v1"
 }
 
-func (s *Server) handleOrgLLMApiKeys(w http.ResponseWriter, r *http.Request, orgSlug string) {
-	if _, ok := s.requireOrgAdmin(w, r, orgSlug); !ok {
+func (s *Server) handleLLMApiKeys(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireDCAdmin(w, r); !ok {
 		return
 	}
 	switch r.Method {
 	case http.MethodGet:
-		keys, err := s.llmKeys().List(r.Context(), orgSlug)
+		keys, err := s.llmKeys().List(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -69,15 +69,14 @@ func (s *Server) handleOrgLLMApiKeys(w http.ResponseWriter, r *http.Request, org
 			http.Error(w, "name required", http.StatusBadRequest)
 			return
 		}
-		token, key, err := s.llmKeys().Create(r.Context(), orgSlug, name, strings.TrimSpace(body.DisplayName), body.Models)
+		token, key, err := s.llmKeys().Create(r.Context(), name, strings.TrimSpace(body.DisplayName), body.Models)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 		actor, _ := s.resolveActor(r)
 		_ = s.Audit.Record(r.Context(), authorizer.SubjectRefFromActor(actor), "create.llm-api-key", "allow",
-			&authv1.ScopeRef{Kind: "llm-api-keys", Name: key.Name},
-			&authv1.ScopeRef{Kind: scopeKindOrg, Name: orgSlug}, httpInfo(r), "")
+			&authv1.ScopeRef{Kind: "llm-api-keys", Name: key.Name}, nil, httpInfo(r), "")
 		writeJSON(w, http.StatusCreated, map[string]interface{}{
 			"key":   key,
 			"token": token,
@@ -87,10 +86,11 @@ func (s *Server) handleOrgLLMApiKeys(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
-func (s *Server) handleOrgLLMApiKeyByName(w http.ResponseWriter, r *http.Request, orgSlug, name string) {
-	if _, ok := s.requireOrgAdmin(w, r, orgSlug); !ok {
+func (s *Server) handleLLMApiKeyByName(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireDCAdmin(w, r); !ok {
 		return
 	}
+	name := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/llm-api-keys/")
 	name = strings.Trim(name, "/")
 	parts := strings.SplitN(name, "/", 2)
 	keyName := parts[0]
@@ -100,21 +100,20 @@ func (s *Server) handleOrgLLMApiKeyByName(w http.ResponseWriter, r *http.Request
 	}
 
 	if action == "rotate" && r.Method == http.MethodPost {
-		token, key, err := s.llmKeys().Rotate(r.Context(), orgSlug, keyName)
+		token, key, err := s.llmKeys().Rotate(r.Context(), keyName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		actor, _ := s.resolveActor(r)
 		_ = s.Audit.Record(r.Context(), authorizer.SubjectRefFromActor(actor), "rotate.llm-api-key", "allow",
-			&authv1.ScopeRef{Kind: "llm-api-keys", Name: keyName},
-			&authv1.ScopeRef{Kind: scopeKindOrg, Name: orgSlug}, httpInfo(r), "")
+			&authv1.ScopeRef{Kind: "llm-api-keys", Name: keyName}, nil, httpInfo(r), "")
 		writeJSON(w, http.StatusOK, map[string]interface{}{"key": key, "token": token})
 		return
 	}
 
 	if action == "revoke" && r.Method == http.MethodPost {
-		key, err := s.llmKeys().SetActive(r.Context(), orgSlug, keyName, false)
+		key, err := s.llmKeys().SetActive(r.Context(), keyName, false)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -124,7 +123,7 @@ func (s *Server) handleOrgLLMApiKeyByName(w http.ResponseWriter, r *http.Request
 	}
 
 	if action == "activate" && r.Method == http.MethodPost {
-		key, err := s.llmKeys().SetActive(r.Context(), orgSlug, keyName, true)
+		key, err := s.llmKeys().SetActive(r.Context(), keyName, true)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -140,21 +139,20 @@ func (s *Server) handleOrgLLMApiKeyByName(w http.ResponseWriter, r *http.Request
 
 	switch r.Method {
 	case http.MethodGet:
-		key, err := s.llmKeys().Get(r.Context(), orgSlug, keyName)
+		key, err := s.llmKeys().Get(r.Context(), keyName)
 		if err != nil {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
 		writeJSON(w, http.StatusOK, key)
 	case http.MethodDelete:
-		if err := s.llmKeys().Delete(r.Context(), orgSlug, keyName); err != nil {
+		if err := s.llmKeys().Delete(r.Context(), keyName); err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 		actor, _ := s.resolveActor(r)
 		_ = s.Audit.Record(r.Context(), authorizer.SubjectRefFromActor(actor), "delete.llm-api-key", "allow",
-			&authv1.ScopeRef{Kind: "llm-api-keys", Name: keyName},
-			&authv1.ScopeRef{Kind: scopeKindOrg, Name: orgSlug}, httpInfo(r), "")
+			&authv1.ScopeRef{Kind: "llm-api-keys", Name: keyName}, nil, httpInfo(r), "")
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

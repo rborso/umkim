@@ -23,44 +23,30 @@ type Manager struct {
 }
 
 type KeyInfo struct {
-	Org    string
 	Name   string
 	Models []string
 }
 
-func (m *Manager) List(ctx context.Context, org string) ([]authv1.FleetLLMApiKey, error) {
+func (m *Manager) List(ctx context.Context) ([]authv1.FleetLLMApiKey, error) {
 	var list authv1.FleetLLMApiKeyList
 	if err := m.Client.List(ctx, &list, client.InNamespace(m.Namespace)); err != nil {
 		return nil, err
 	}
-	if org == "" {
-		return list.Items, nil
-	}
-	out := make([]authv1.FleetLLMApiKey, 0, len(list.Items))
-	for _, item := range list.Items {
-		if item.Spec.Org == org {
-			out = append(out, item)
-		}
-	}
-	return out, nil
+	return list.Items, nil
 }
 
-func (m *Manager) Get(ctx context.Context, org, name string) (*authv1.FleetLLMApiKey, error) {
+func (m *Manager) Get(ctx context.Context, name string) (*authv1.FleetLLMApiKey, error) {
 	var key authv1.FleetLLMApiKey
 	if err := m.Client.Get(ctx, types.NamespacedName{Namespace: m.Namespace, Name: name}, &key); err != nil {
 		return nil, err
 	}
-	if org != "" && key.Spec.Org != org {
-		return nil, apierrors.NewForbidden(authv1.GroupVersion.WithResource("fleetllmapikeys").GroupResource(), name, fmt.Errorf("org mismatch"))
-	}
 	return &key, nil
 }
 
-func (m *Manager) Create(ctx context.Context, org, name, displayName string, models []string) (string, *authv1.FleetLLMApiKey, error) {
-	org = strings.TrimSpace(org)
+func (m *Manager) Create(ctx context.Context, name, displayName string, models []string) (string, *authv1.FleetLLMApiKey, error) {
 	name = strings.TrimSpace(name)
-	if org == "" || name == "" {
-		return "", nil, fmt.Errorf("org and name required")
+	if name == "" {
+		return "", nil, fmt.Errorf("name required")
 	}
 	plain, err := randomToken()
 	if err != nil {
@@ -73,7 +59,6 @@ func (m *Manager) Create(ctx context.Context, org, name, displayName string, mod
 			Namespace: m.Namespace,
 			Labels: map[string]string{
 				"fleet.umkim.com/llm-api-key":      "true",
-				"fleet.umkim.com/org":              org,
 				"fleet.umkim.com/llm-api-key-name": name,
 			},
 		},
@@ -87,12 +72,8 @@ func (m *Manager) Create(ctx context.Context, org, name, displayName string, mod
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: m.Namespace,
-			Labels: map[string]string{
-				"fleet.umkim.com/org": org,
-			},
 		},
 		Spec: authv1.FleetLLMApiKeySpec{
-			Org:         org,
 			DisplayName: displayName,
 			SecretRef:   secretName,
 			Models:      models,
@@ -116,8 +97,8 @@ func (m *Manager) Create(ctx context.Context, org, name, displayName string, mod
 	return plain, key, nil
 }
 
-func (m *Manager) Delete(ctx context.Context, org, name string) error {
-	key, err := m.Get(ctx, org, name)
+func (m *Manager) Delete(ctx context.Context, name string) error {
+	key, err := m.Get(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -134,8 +115,8 @@ func (m *Manager) Delete(ctx context.Context, org, name string) error {
 	return m.Client.Delete(ctx, key)
 }
 
-func (m *Manager) SetActive(ctx context.Context, org, name string, active bool) (*authv1.FleetLLMApiKey, error) {
-	key, err := m.Get(ctx, org, name)
+func (m *Manager) SetActive(ctx context.Context, name string, active bool) (*authv1.FleetLLMApiKey, error) {
+	key, err := m.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +127,8 @@ func (m *Manager) SetActive(ctx context.Context, org, name string, active bool) 
 	return key, nil
 }
 
-func (m *Manager) Rotate(ctx context.Context, org, name string) (string, *authv1.FleetLLMApiKey, error) {
-	key, err := m.Get(ctx, org, name)
+func (m *Manager) Rotate(ctx context.Context, name string) (string, *authv1.FleetLLMApiKey, error) {
+	key, err := m.Get(ctx, name)
 	if err != nil {
 		return "", nil, err
 	}

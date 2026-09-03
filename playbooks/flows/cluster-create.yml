@@ -87,6 +87,7 @@
         - "{{ {'clusterRegion': fleet_flow_cluster_region} if (fleet_flow_cluster_region | default('') | length > 0) else {} }}"
         - "{{ {'domainBindings': fleet_flow_domain_bindings} if (fleet_flow_domain_bindings | default([]) | length > 0) else {} }}"
         - "{{ {'clusterLabels': fleet_flow_cluster_labels} if (fleet_flow_cluster_labels | default({}) | length > 0) else {} }}"
+        - "{{ {'minRootDiskGi': fleet_flow_min_root_disk_gi | int} if (fleet_flow_min_root_disk_gi | default('') | string | length > 0) else {} }}"
 
     - name: POST /clusters
       ansible.builtin.uri:
@@ -244,17 +245,6 @@
         body:
           lldapAdminPassword: "{{ fleet_flow_ingress_auth_password }}"
           exposeLldapWebUI: "{{ fleet_flow_expose_lldap_webui | default(false) | bool }}"
-        status_code: [200, 409]
-
-    - name: Mark shared pool when requested (dc-admin)
-      when: (fleet_flow_cluster_labels | default({}))['fleet.pool'] | default('') == 'shared'
-      ansible.builtin.uri:
-        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}"
-        method: PATCH
-        headers: "{{ fleet_flow_identity_headers }}"
-        body_format: json
-        body:
-          pool: shared
         status_code: [200, 409]
 
     - name: Flow complete

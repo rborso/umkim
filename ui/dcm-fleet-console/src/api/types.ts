@@ -54,7 +54,6 @@ export interface FleetSiteEdge {
 export interface FleetSiteSpec {
   siteName: string;
   siteId?: string;
-  orgId?: string;
   provisioningMode?: 'greenfield' | 'registry';
   displayName?: string;
   region?: string;
@@ -268,10 +267,81 @@ export interface FleetChartCreate {
   valuesYaml?: string;
 }
 
+export type ClusterNodeOperationType = 'addWorker' | 'removeWorker' | 'replaceControlPlane';
+export type ClusterNodeOperationPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed';
+
+export interface ClusterNodeOperation {
+  id?: string;
+  type?: ClusterNodeOperationType;
+  node?: string;
+  phase?: ClusterNodeOperationPhase;
+  jobName?: string;
+  message?: string;
+  force?: boolean;
+  actorKind?: string;
+  actorName?: string;
+}
+
+export interface ClusterNodeOperationHistoryItem {
+  id: string;
+  type?: ClusterNodeOperationType;
+  node?: string;
+  phase?: ClusterNodeOperationPhase;
+  jobName?: string;
+  message?: string;
+  force?: boolean;
+  actorKind?: string;
+  actorName?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  hasLogs?: boolean;
+}
+
+export interface ClusterNodeOperationLogs {
+  id: string;
+  jobName?: string;
+  logs: string;
+  source?: string;
+}
+
+export type NodeOperationValidatePhase = 'pre' | 'post';
+export type NodeOperationCheckStatus = 'pass' | 'fail' | 'warn';
+
+export interface NodeOperationValidateCheck {
+  id: string;
+  status: NodeOperationCheckStatus;
+  message?: string;
+}
+
+export interface NodeOperationValidateResult {
+  ok: boolean;
+  phase: NodeOperationValidatePhase;
+  type?: ClusterNodeOperationType;
+  checks: NodeOperationValidateCheck[];
+}
+
+export interface FleetClusterAddWorkerBody {
+  address: string;
+  hostname?: string;
+  role?: 'worker';
+  labels?: Record<string, string>;
+}
+
+export interface FleetClusterReplaceNewNode {
+  address: string;
+  hostname?: string;
+  labels?: Record<string, string>;
+}
+
+export interface FleetClusterReplaceControlPlaneBody {
+  oldNode: string;
+  newNode: FleetClusterReplaceNewNode;
+  force?: boolean;
+}
+
 export interface FleetCluster {
   name: string;
   site?: string;
-  pool?: 'shared' | 'dedicated';
   available?: boolean;
   management?: boolean;
   read_only?: boolean;
@@ -296,6 +366,7 @@ export interface FleetCluster {
   ingressAuthStatus?: FleetClusterIngressAuthStatus;
   acme_enabled?: boolean;
   acmeStatus?: FleetClusterAcmeStatus;
+  nodeOperation?: ClusterNodeOperation;
   labels?: Record<string, string>;
 }
 
@@ -332,10 +403,6 @@ export interface CapabilityDiscovery {
 
 export interface FleetClusterPatch {
   siteId?: string;
-  pool?: 'shared' | 'dedicated';
-  /** dc-admin only: set or clear ManagedCluster fleet.org */
-  org?: string;
-  orgId?: string;
   capabilities?: Record<string, boolean>;
   topology?: Record<string, string>;
   edge?: {
@@ -485,7 +552,6 @@ export interface FleetNodePatch {
 export interface FleetSiteCreate {
   siteName: string;
   siteId?: string;
-  orgId?: string;
   displayName?: string;
   region?: string;
   exposureMode?: FleetExposureMode;

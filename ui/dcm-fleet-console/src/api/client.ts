@@ -3,8 +3,13 @@ import type {
   FleetSiteCreate,
   FleetSitePatch,
   FleetCluster,
+  FleetClusterAddWorkerBody,
   FleetClusterCreate,
   FleetClusterPatch,
+  FleetClusterReplaceControlPlaneBody,
+  ClusterNodeOperation,
+  ClusterNodeOperationHistoryItem,
+  ClusterNodeOperationLogs,
   CapabilityDiscovery,
   FleetNode,
   FleetNodePatch,
@@ -313,6 +318,100 @@ export async function patchFleetClusterNode(
   );
 }
 
+export async function addFleetClusterWorker(
+  clusterName: string,
+  body: FleetClusterAddWorkerBody,
+): Promise<ClusterNodeOperation> {
+  return fleetSiteRequest<ClusterNodeOperation>(
+    '/clusters/' + encodeURIComponent(clusterName) + '/nodes',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export async function removeFleetClusterNode(
+  clusterName: string,
+  nodeName: string,
+  force?: boolean,
+): Promise<ClusterNodeOperation> {
+  const q = force ? '?force=1' : '';
+  return fleetSiteRequest<ClusterNodeOperation>(
+    '/clusters/' + encodeURIComponent(clusterName) + '/nodes/' + encodeURIComponent(nodeName) + q,
+    { method: 'DELETE' },
+  );
+}
+
+export async function replaceFleetClusterControlPlane(
+  clusterName: string,
+  body: FleetClusterReplaceControlPlaneBody,
+): Promise<ClusterNodeOperation> {
+  return fleetSiteRequest<ClusterNodeOperation>(
+    '/clusters/' + encodeURIComponent(clusterName) + '/control-plane/replace',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export async function validateFleetClusterNodeOperation(
+  clusterName: string,
+  body: Record<string, unknown>,
+  phase: 'pre' | 'post' = 'pre',
+): Promise<import('./types').NodeOperationValidateResult> {
+  const q = phase === 'post' ? '?phase=post' : '';
+  const r = await fetch(
+    FLEET_SITE_API_BASE +
+      '/clusters/' +
+      encodeURIComponent(clusterName) +
+      '/node-operations/validate' +
+      q,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  const text = await r.text();
+  let data: import('./types').NodeOperationValidateResult;
+  try {
+    data = JSON.parse(text) as import('./types').NodeOperationValidateResult;
+  } catch {
+    throw new ApiError('node-operation validate → HTTP ' + r.status, r.status, text);
+  }
+  if (!r.ok && r.status !== 422) {
+    throw new ApiError('node-operation validate → HTTP ' + r.status, r.status, text);
+  }
+  return data;
+}
+
+export async function listFleetClusterNodeOperations(
+  clusterName: string,
+): Promise<ClusterNodeOperationHistoryItem[]> {
+  const data = await fleetSiteRequest<{ items: ClusterNodeOperationHistoryItem[] }>(
+    '/clusters/' + encodeURIComponent(clusterName) + '/node-operations',
+  );
+  return data.items || [];
+}
+
+export async function fetchFleetClusterNodeOperationLogs(
+  clusterName: string,
+  operationId: string,
+): Promise<ClusterNodeOperationLogs> {
+  return fleetSiteRequest<ClusterNodeOperationLogs>(
+    '/clusters/' +
+      encodeURIComponent(clusterName) +
+      '/node-operations/' +
+      encodeURIComponent(operationId) +
+      '/logs',
+  );
+}
+
 export async function createFleetSite(body: FleetSiteCreate): Promise<FleetSite> {
   const edgeDomain = body.edgeDomain || body.edge?.edgeDomain;
   const wildcard = body.wildcard || body.edge?.wildcard;
@@ -323,7 +422,6 @@ export async function createFleetSite(body: FleetSiteCreate): Promise<FleetSite>
     metadata: { name: body.siteName },
     spec: {
       siteName: body.siteName,
-      orgId: body.orgId,
       displayName: body.displayName,
       provisioningMode: 'registry',
       region: body.region,

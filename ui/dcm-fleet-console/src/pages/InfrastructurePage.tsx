@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Button,
@@ -10,6 +10,7 @@ import {
   Form,
   PageSection,
   PageSectionVariants,
+  Spinner,
   Title,
   Toolbar,
   ToolbarContent,
@@ -17,63 +18,71 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { SyncIcon } from '@patternfly/react-icons';
-import { getHubInfrastructure, getIngressAuth, getAcme, getLLM, patchIngressAuth, patchAcme, patchLLM } from '../api/client';
-import type { FleetIngressAuth, FleetAcme, FleetLLM, HubInfrastructure } from '../api/types';
+import { patchIngressAuth, patchAcme, patchLLM } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { ClusterNodesPanel } from '../components/clusters/ClusterNodesPanel';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
 import { getFieldHelp } from '../help/fieldHelp';
+import {
+  useAcmeQuery,
+  useHubInfrastructureQuery,
+  useIngressAuthQuery,
+  useInvalidateFleet,
+  useLLMQuery,
+} from '../hooks/useFleetQueries';
 
 export function InfrastructurePage() {
   const { user } = useAuth();
-  const [hub, setHub] = useState<HubInfrastructure | null>(null);
-  const [ingressAuth, setIngressAuth] = useState<FleetIngressAuth | null>(null);
-  const [acme, setAcme] = useState<FleetAcme | null>(null);
-  const [llm, setLlm] = useState<FleetLLM | null>(null);
+  const { invalidateAll } = useInvalidateFleet();
+  const hubQuery = useHubInfrastructureQuery();
+  const ingressQuery = useIngressAuthQuery();
+  const acmeQuery = useAcmeQuery();
+  const llmQuery = useLLMQuery();
+
+  const hub = hubQuery.data ?? null;
+  const ingressAuth = ingressQuery.data ?? null;
+  const acme = acmeQuery.data ?? null;
+  const llm = llmQuery.data ?? null;
+
+  const loading = hubQuery.isLoading;
+  const fetching =
+    hubQuery.isFetching || ingressQuery.isFetching || acmeQuery.isFetching || llmQuery.isFetching;
+  const error = hubQuery.error || ingressQuery.error || acmeQuery.error || llmQuery.error;
+
   const [hubAcmeEnabled, setHubAcmeEnabled] = useState(false);
   const [hubLlmEnabled, setHubLlmEnabled] = useState(false);
   const [hubLlmPublicHost, setHubLlmPublicHost] = useState('');
   const [hubAuthEnabled, setHubAuthEnabled] = useState(false);
   const [hubLldapWebUI, setHubLldapWebUI] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [savingAuth, setSavingAuth] = useState(false);
   const [savingAcme, setSavingAcme] = useState(false);
   const [savingLlm, setSavingLlm] = useState(false);
-  const [error, setError] = useState<unknown>(null);
   const [authError, setAuthError] = useState<unknown>(null);
   const [acmeError, setAcmeError] = useState<unknown>(null);
   const [llmError, setLlmError] = useState<unknown>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [hubData, authData, acmeData, llmData] = await Promise.all([
-        getHubInfrastructure(),
-        getIngressAuth(),
-        getAcme(),
-        getLLM(),
-      ]);
-      setHub(hubData);
-      setIngressAuth(authData);
-      setAcme(acmeData);
-      setLlm(llmData);
-      setHubAuthEnabled(!!authData.hubEnabled);
-      setHubLldapWebUI(!!authData.hubExposeLldapWebUI);
-      setHubAcmeEnabled(!!acmeData.hubEnabled);
-      setHubLlmEnabled(!!llmData.hubEnabled);
-      setHubLlmPublicHost(llmData.publicHost ?? '');
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (ingressAuth) {
+      setHubAuthEnabled(!!ingressAuth.hubEnabled);
+      setHubLldapWebUI(!!ingressAuth.hubExposeLldapWebUI);
     }
-  }, []);
+  }, [ingressAuth]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (acme) {
+      setHubAcmeEnabled(!!acme.hubEnabled);
+    }
+  }, [acme]);
+
+  useEffect(() => {
+    if (llm) {
+      setHubLlmEnabled(!!llm.hubEnabled);
+      setHubLlmPublicHost(llm.publicHost ?? '');
+    }
+  }, [llm]);
+
+  const load = () => void invalidateAll();
 
   const saveIngressAuth = async () => {
     setSavingAuth(true);
@@ -83,10 +92,9 @@ export function InfrastructurePage() {
         hubEnabled: hubAuthEnabled,
         hubExposeLldapWebUI: hubLldapWebUI,
       });
-      setIngressAuth(updated);
       setHubAuthEnabled(!!updated.hubEnabled);
       setHubLldapWebUI(!!updated.hubExposeLldapWebUI);
-      await load();
+      load();
     } catch (e) {
       setAuthError(e);
     } finally {
@@ -99,9 +107,8 @@ export function InfrastructurePage() {
     setAcmeError(null);
     try {
       const updated = await patchAcme({ hubEnabled: hubAcmeEnabled });
-      setAcme(updated);
       setHubAcmeEnabled(!!updated.hubEnabled);
-      await load();
+      load();
     } catch (e) {
       setAcmeError(e);
     } finally {
@@ -117,10 +124,9 @@ export function InfrastructurePage() {
         hubEnabled: hubLlmEnabled,
         ...(hubLlmPublicHost.trim() ? { publicHost: hubLlmPublicHost.trim() } : {}),
       });
-      setLlm(updated);
       setHubLlmEnabled(!!updated.hubEnabled);
       setHubLlmPublicHost(updated.publicHost ?? hubLlmPublicHost.trim());
-      await load();
+      load();
     } catch (e) {
       setLlmError(e);
     } finally {
@@ -152,10 +158,15 @@ export function InfrastructurePage() {
         <Toolbar style={{ marginTop: '0.75rem' }}>
           <ToolbarContent>
             <ToolbarItem>
-              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()}>
+              <Button variant="secondary" icon={<SyncIcon />} onClick={load} isDisabled={fetching}>
                 Refresh
               </Button>
             </ToolbarItem>
+            {fetching && !loading && (
+              <ToolbarItem>
+                <Spinner size="sm" />
+              </ToolbarItem>
+            )}
             <ToolbarItem>
               <Link to={`/sites/${hub?.management_site_id || 'umkim'}`}>
                 Edit hub DNS → Site {hub?.management_site_id || 'umkim'}
@@ -220,6 +231,7 @@ export function InfrastructurePage() {
               separate from fleet console login (Users / Groups). Manage ingress users via the LLDAP
               UI on the auth portal host after enabling.
             </p>
+            {ingressQuery.isLoading && <Spinner size="sm" />}
             <ErrorAlert error={authError} />
             <DescriptionList isHorizontal style={{ maxWidth: '48rem', marginTop: '0.75rem' }}>
               <DescriptionListGroup>
@@ -305,6 +317,7 @@ export function InfrastructurePage() {
               ({hub?.hub_zone ? `*.${hub.hub_zone}` : 'app zone'}). Requires public DNS and WAN
               :80/:443 to this host.
             </p>
+            {acmeQuery.isLoading && <Spinner size="sm" />}
             <ErrorAlert error={acmeError} />
             <DescriptionList isHorizontal style={{ maxWidth: '48rem', marginTop: '0.75rem' }}>
               <DescriptionListGroup>
@@ -355,6 +368,7 @@ export function InfrastructurePage() {
               Public requests use <code>FleetLLMApiKey</code> Bearer auth on{' '}
               <code>https://&lt;public-host&gt;/v1/</code>.
             </p>
+            {llmQuery.isLoading && <Spinner size="sm" />}
             <ErrorAlert error={llmError} />
             <DescriptionList isHorizontal style={{ maxWidth: '48rem', marginTop: '0.75rem' }}>
               <DescriptionListGroup>

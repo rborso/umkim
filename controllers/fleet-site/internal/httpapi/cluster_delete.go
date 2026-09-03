@@ -25,7 +25,7 @@ func queryParamBool(r *http.Request, key string) bool {
 }
 
 func (s *Server) handleDeleteCluster(ctx context.Context, w http.ResponseWriter, r *http.Request, name string) {
-	actor, ok := s.requireMutatingActor(w, r)
+	_, ok := s.requireMutatingActor(w, r)
 	if !ok {
 		return
 	}
@@ -36,13 +36,7 @@ func (s *Server) handleDeleteCluster(ctx context.Context, w http.ResponseWriter,
 	}
 
 	mc, mcErr := getManagedCluster(ctx, s.Client, name)
-	if mcErr == nil {
-		if err := validateClusterDelete(actor, mcLabels(mc)); err != nil {
-			if writeTenancyError(w, err) {
-				return
-			}
-		}
-	}
+	_ = mcErr
 
 	fcj, fcjErr := s.findFleetClusterJoin(ctx, name)
 	if fcjErr == nil {

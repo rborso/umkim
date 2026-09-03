@@ -28,7 +28,7 @@ repository root.
 ```
 
 The currently registered suite names include `hub`, `core`, `edge`, `backup`,
-`tenancy`, `llm`, `nested`, `apps`, `regression`, and `all`.
+`tenancy` (console auth and RBAC checks), `llm`, `nested`, `apps`, `regression`, and `all`.
 
 For a Helm app smoke test on a Ready cluster, use
 `scripts/verify-fleet-app.sh` (set `FLEET_APP_CLUSTER`) or the console **Apps**

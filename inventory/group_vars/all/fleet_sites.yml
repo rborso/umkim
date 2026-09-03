@@ -30,6 +30,7 @@ fleet_sites:
   homelab:
     display_name: Homelab
     region: homelab
+    jumphost: linux@jump.otthol.hu:30200
     edge_domain: "{{ fleet_homelab_edge_domain }}"
     edge_wildcard: "*.{{ fleet_homelab_edge_domain }}"
     exposure_mode: port_forward

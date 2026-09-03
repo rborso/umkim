@@ -3,17 +3,21 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
   Checkbox,
-  Form,
-  FormSelect,
-  FormSelectOption,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
   Label,
   Modal,
   PageSection,
   PageSectionVariants,
+  Tab,
+  Tabs,
+  TabTitleText,
   TextInput,
   Title,
 } from '@patternfly/react-core';
-import { DownloadIcon, ExternalLinkAltIcon } from '@patternfly/react-icons';
+import { DownloadIcon } from '@patternfly/react-icons';
 import {
   deleteFleetCluster,
   disableClusterIngressAuth,
@@ -42,23 +46,18 @@ import type {
   FleetTlsPolicy,
 } from '../api/types';
 import { ClusterCapabilitiesPanel } from '../components/clusters/ClusterCapabilitiesPanel';
+import { ClusterDetailEdgeTab } from '../components/clusters/ClusterDetailEdgeTab';
 import { ClusterNodesPanel } from '../components/clusters/ClusterNodesPanel';
+import { ClusterOperationsPanel } from '../components/clusters/ClusterOperationsPanel';
 import { ClusterStoragePanel } from '../components/clusters/ClusterStoragePanel';
 import { ErrorAlert } from '../components/ErrorAlert';
-import { ExposureTlsPairWarning } from '../components/ExposureTlsPairWarning';
 import { LabeledField } from '../components/forms/LabeledField';
-import { LabelKeyValueEditor } from '../components/forms/LabelKeyValueEditor';
 import { getExposureTlsPairIssue } from '../edge/exposureTlsPairs';
 import { getFieldHelp } from '../help/fieldHelp';
 import { useAuth } from '../auth/AuthContext';
+import { canMutate } from '../auth/roles';
 
 const CAPABILITY_LABEL_PREFIX = 'fleet.capability/';
-
-function editableClusterLabels(labels: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(labels).filter(([k]) => !k.startsWith(CAPABILITY_LABEL_PREFIX)),
-  );
-}
 
 function buildCustomLabelsPatch(labels: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
@@ -115,6 +114,7 @@ export function ClusterDetailPage() {
   const [deleteError, setDeleteError] = useState<unknown>(null);
   const [deleteCleanupKubernetes, setDeleteCleanupKubernetes] = useState(false);
   const [nodesFetchFailed, setNodesFetchFailed] = useState(false);
+  const [tab, setTab] = useState<string | number>('overview');
 
   const [siteId, setSiteId] = useState('');
   const [region, setRegion] = useState('');
@@ -128,8 +128,6 @@ export function ClusterDetailPage() {
   const [upstreamHost, setUpstreamHost] = useState('');
   const [traefikPort, setTraefikPort] = useState('30080');
   const [clusterLabels, setClusterLabels] = useState<Record<string, string>>({});
-  const [pool, setPool] = useState<'shared' | 'dedicated'>('dedicated');
-  const [assignOrg, setAssignOrg] = useState('');
   const [enableAuthOpen, setEnableAuthOpen] = useState(false);
   const [disableAuthOpen, setDisableAuthOpen] = useState(false);
   const [authPassword, setAuthPassword] = useState('');
@@ -151,8 +149,6 @@ export function ClusterDetailPage() {
       }
       setSiteId(c.site || '');
       setClusterLabels(c.labels || {});
-      setPool((c.pool as 'shared' | 'dedicated') || (c.labels?.['fleet.pool'] as 'shared' | 'dedicated') || 'dedicated');
-      setAssignOrg(c.labels?.['fleet.org'] || '');
       setRegion(c.topology?.region || c.labels?.['fleet.topology/region'] || '');
       setNestDepth(c.topology?.nest_depth || c.labels?.['fleet.topology/nest_depth'] || '0');
       setProvisioner(c.topology?.provisioner || c.labels?.['fleet.topology/provisioner'] || 'k3s');
@@ -188,10 +184,15 @@ export function ClusterDetailPage() {
 
   useEffect(() => {
     void load();
-    const ms = cluster?.capability_discovery?.phase === 'Running' ? 3000 : 15000;
+    const nodeOpBusy =
+      cluster?.nodeOperation?.phase === 'Pending' || cluster?.nodeOperation?.phase === 'Running';
+    const storageBusy =
+      cluster?.storageStatus?.phase === 'Applying' || cluster?.storageStatus?.phase === 'Pending';
+    const ms =
+      cluster?.capability_discovery?.phase === 'Running' || nodeOpBusy || storageBusy ? 8000 : 15000;
     const t = setInterval(() => void load(), ms);
     return () => clearInterval(t);
-  }, [load, cluster?.capability_discovery?.phase]);
+  }, [load, cluster?.capability_discovery?.phase, cluster?.nodeOperation?.phase, cluster?.storageStatus?.phase]);
 
   const selectedSite = useMemo(
     () => sites.find((s) => (s.spec.siteId || s.metadata?.name) === (siteId || cluster?.site)),
@@ -282,8 +283,6 @@ export function ClusterDetailPage() {
     const topoProvisioner = clusterLabels['fleet.topology/provisioner'] ?? provisioner;
     const patch: FleetClusterPatch = {
       siteId: site,
-      pool: user?.dcAdmin ? pool : undefined,
-      org: user?.dcAdmin ? assignOrg : undefined,
       topology: { region: topoRegion, nest_depth: topoNest, provisioner: topoProvisioner },
       customLabels: buildCustomLabelsPatch(clusterLabels),
       edge: {
@@ -410,13 +409,6 @@ export function ClusterDetailPage() {
             {phase}
           </Label>
         )}
-        {canDelete && !deletingPhase && (
-          <div style={{ marginTop: '0.75rem' }}>
-            <Button variant="danger" onClick={openDelete} data-testid="cluster-delete">
-              Delete cluster
-            </Button>
-          </div>
-        )}
       </PageSection>
       <PageSection>
         <ErrorAlert error={error} />
@@ -478,380 +470,199 @@ export function ClusterDetailPage() {
           </p>
         )}
         {cluster && !pending && (
-          <>
-            <ClusterCapabilitiesPanel
-              clusterName={name}
-              cluster={cluster}
-              clusterReady={phase === 'Ready' || !!cluster.available}
-              onUpdated={load}
-            />
-            <ClusterStoragePanel cluster={cluster} onUpdated={load} />
-            <Title headingLevel="h2" size="lg">
-              Labels and edge
-            </Title>
-            <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
-              {user?.dcAdmin ? (
-                <LabeledField label="Pool" fieldId="clusterPool" help={getFieldHelp('clusterDetail.pool')}>
-                  <FormSelect
-                    id="clusterPool"
-                    value={pool}
-                    onChange={(_e, v) => setPool((v || 'dedicated') as 'shared' | 'dedicated')}
-                  >
-                    <FormSelectOption value="dedicated" label="Dedicated" />
-                    <FormSelectOption value="shared" label="Shared" />
-                  </FormSelect>
-                </LabeledField>
-              ) : cluster.pool ? (
-                <LabeledField label="Pool" fieldId="clusterPoolReadonly">
-                  <Label color={cluster.pool === 'shared' ? 'blue' : 'green'}>{cluster.pool}</Label>
-                </LabeledField>
-              ) : null}
-              {user?.dcAdmin ? (
-                <LabeledField
-                  label="Org (fleet.org)"
-                  fieldId="clusterOrg"
-                  help={getFieldHelp('clusterDetail.org')}
-                >
-                  <TextInput
-                    id="clusterOrg"
-                    value={assignOrg}
-                    placeholder="Leave empty to clear"
-                    onChange={(_e, v) => setAssignOrg(v)}
-                  />
-                </LabeledField>
-              ) : cluster.labels?.['fleet.org'] ? (
-                <LabeledField label="Org (fleet.org)" fieldId="clusterOrgReadonly">
-                  <Label>{cluster.labels['fleet.org']}</Label>
-                </LabeledField>
-              ) : null}
-              <LabeledField label="Site ID (fleet.site)" fieldId="siteId" help={getFieldHelp('clusterDetail.siteId')}>
-                <TextInput
-                  id="siteId"
-                  value={clusterLabels['fleet.site'] ?? siteId}
-                  onChange={(_e, v) => {
-                    setSiteId(v);
-                    setClusterLabels((current) => ({ ...current, 'fleet.site': v }));
-                  }}
-                />
-              </LabeledField>
-              <LabeledField label="Ingress enabled" fieldId="ingressEnabled" help={getFieldHelp('clusterDetail.ingressEnabled')}>
-                <TextInput
-                  id="ingressEnabled"
-                  value={cluster.ingress_enabled ? 'yes' : 'no'}
-                  readOnly
-                />
-              </LabeledField>
-              <LabeledField label="Ingress forward-auth (Authelia + LLDAP)" fieldId="ingressAuth" help={getFieldHelp('clusterDetail.ingressAuth')}>
-                <div style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                  <p style={{ margin: '0 0 0.35rem' }}>
-                    <strong>Prerequisites</strong>
-                  </p>
-                  <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-                    <li style={{ color: authPrereqReady ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
-                      Cluster phase Ready {authPrereqReady ? '✓' : `(current: ${phase || '—'})`}
-                    </li>
-                    <li style={{ color: authPrereqIngress ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
-                      Ingress enabled (port forward or reverse proxy) {authPrereqIngress ? '✓' : '✗'}
-                    </li>
-                    <li style={{ color: authPrereqDomains ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
-                      Site domain bindings configured {authPrereqDomains ? '✓' : '✗'}
-                    </li>
-                    <li>
-                      DNS: point <code>auth.&lt;site-zone&gt;</code> and app wildcards at this cluster edge
-                      {portalHost ? (
+          <Tabs activeKey={tab} onSelect={(_e, k) => setTab(k)} data-testid="cluster-detail-tabs">
+            <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>} data-testid="cluster-tab-overview">
+              <DescriptionList isHorizontal style={{ marginTop: '1rem', maxWidth: '48rem' }}>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Site</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    {cluster.site ? (
+                      <Link to={`/sites/${encodeURIComponent(cluster.site)}`}>
+                        <code>{cluster.site}</code>
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Available</DescriptionListTerm>
+                  <DescriptionListDescription>{cluster.available ? 'yes' : 'no'}</DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Provisioning</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <code>{cluster.provisioning_mode || '—'}</code>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Topology</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    {region || nestDepth || provisioner ? (
+                      <>
+                        region <code>{region || '—'}</code>, nest{' '}
+                        <code>{nestDepth || '—'}</code>, provisioner{' '}
+                        <code>{provisioner || '—'}</code>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Exposure</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <code>{exposureMode}</code>
+                    {tlsPolicy !== 'inherit' ? (
+                      <>
+                        {' '}
+                        · TLS <code>{tlsPolicy}</code>
+                      </>
+                    ) : null}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Ingress</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    {cluster.ingress_enabled ? 'enabled' : 'disabled'}
+                    {cluster.ingress_auth_enabled ? ' · forward-auth on' : ''}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                {cluster.storageStatus?.phase && (
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>Storage</DescriptionListTerm>
+                    <DescriptionListDescription>
+                      <code>{cluster.storageStatus.phase}</code>
+                      {cluster.storage?.backend ? (
                         <>
                           {' '}
-                          (portal: <code>{portalHost}</code>)
+                          · <code>{cluster.storage.backend}</code>
                         </>
                       ) : null}
-                    </li>
-                  </ul>
-                </div>
-                {cluster.ingressAuthStatus?.phase && (
-                  <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
-                    Status: {cluster.ingressAuthStatus.phase}
-                    {cluster.ingressAuthStatus.message ? ` — ${cluster.ingressAuthStatus.message}` : ''}
-                  </p>
+                    </DescriptionListDescription>
+                  </DescriptionListGroup>
                 )}
-                {authReady && portalUrl && (
-                  <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
-                    <a href={portalUrl} target="_blank" rel="noreferrer">
-                      Auth portal <ExternalLinkAltIcon />
-                    </a>
-                    {lldapWebUIUrl ? (
-                      <>
-                        {' '}
-                        ·{' '}
-                        <a href={lldapWebUIUrl} target="_blank" rel="noreferrer">
-                          LLDAP UI <ExternalLinkAltIcon />
-                        </a>
-                      </>
-                    ) : null}
-                    {cluster.ingressAuthStatus?.accessDomains?.length ? (
-                      <>
-                        {' '}
-                        — access domains: {cluster.ingressAuthStatus.accessDomains.join(', ')}
-                      </>
-                    ) : null}
-                  </p>
+                {cluster.nodeOperation?.phase && (
+                  <DescriptionListGroup>
+                    <DescriptionListTerm>Node operation</DescriptionListTerm>
+                    <DescriptionListDescription>
+                      <code>{cluster.nodeOperation.type || '—'}</code> —{' '}
+                      <code>{cluster.nodeOperation.phase}</code>
+                    </DescriptionListDescription>
+                  </DescriptionListGroup>
                 )}
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      setAuthActionError(null);
-                      setEnableAuthOpen(true);
-                    }}
-                    isDisabled={!authCanEnable || authActionBusy}
-                  >
-                    Enable ingress auth
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setAuthActionError(null);
-                      setDisableAuthOpen(true);
-                    }}
-                    isDisabled={!authEnabled || authActionBusy}
-                  >
-                    Disable
-                  </Button>
-                </div>
-                {authActionError ? <ErrorAlert error={authActionError} /> : null}
-              </LabeledField>
-              {showClusterAcme && (
-                <LabeledField
-                  label="ACME on cluster"
-                  fieldId="clusterAcme"
-                  help={getFieldHelp('clusterDetail.clusterAcme')}
-                >
-                  {cluster.acmeStatus?.phase && (
-                    <p style={{ marginTop: 0, fontSize: '0.875rem' }}>
-                      Status: {cluster.acmeStatus.phase}
-                      {cluster.acmeStatus.message ? ` — ${cluster.acmeStatus.message}` : ''}
-                    </p>
-                  )}
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <Button
-                      variant="primary"
-                      onClick={() => void enableClusterAcmeAction()}
-                      isDisabled={!acmeCanEnable || authActionBusy}
-                    >
-                      Enable Let&apos;s Encrypt on cluster
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => void disableClusterAcmeAction()}
-                      isDisabled={!acmeEnabled || authActionBusy}
-                    >
-                      Disable
-                    </Button>
-                  </div>
-                </LabeledField>
-              )}
-              <LabeledField label="Region" fieldId="region" help={getFieldHelp('clusterDetail.region')}>
-                <TextInput
-                  id="region"
-                  value={clusterLabels['fleet.topology/region'] ?? region}
-                  onChange={(_e, v) => {
-                    setRegion(v);
-                    setClusterLabels((current) => ({ ...current, 'fleet.topology/region': v }));
-                  }}
-                />
-              </LabeledField>
-              <LabeledField label="Nest depth" fieldId="nestDepth" help={getFieldHelp('clusterDetail.nestDepth')}>
-                <TextInput
-                  id="nestDepth"
-                  value={clusterLabels['fleet.topology/nest_depth'] ?? nestDepth}
-                  onChange={(_e, v) => {
-                    setNestDepth(v);
-                    setClusterLabels((current) => ({ ...current, 'fleet.topology/nest_depth': v }));
-                  }}
-                />
-              </LabeledField>
-              <LabeledField label="Provisioner" fieldId="provisioner" help={getFieldHelp('clusterDetail.provisioner')}>
-                <TextInput
-                  id="provisioner"
-                  value={clusterLabels['fleet.topology/provisioner'] ?? provisioner}
-                  onChange={(_e, v) => {
-                    setProvisioner(v);
-                    setClusterLabels((current) => ({ ...current, 'fleet.topology/provisioner': v }));
-                  }}
-                />
-              </LabeledField>
-              <LabeledField
-                label="Cluster labels (OCM)"
-                fieldId="clusterLabels"
-                help={getFieldHelp('clusterDetail.clusterLabels')}
-              >
-                <LabelKeyValueEditor
-                  labels={editableClusterLabels(clusterLabels)}
-                  onChange={(next) =>
-                    setClusterLabels((current) => ({
-                      ...Object.fromEntries(
-                        Object.entries(current).filter(([k]) => k.startsWith(CAPABILITY_LABEL_PREFIX)),
-                      ),
-                      ...next,
-                    }))
-                  }
-                  idPrefix="cluster-detail-label"
-                />
-                {Object.entries(clusterLabels).some(([k]) => k.startsWith(CAPABILITY_LABEL_PREFIX)) ? (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                    <strong>Discovered capabilities (read-only):</strong>
-                    <pre style={{ fontSize: '0.75rem', margin: '0.35rem 0 0' }}>
-                      {JSON.stringify(
-                        Object.fromEntries(
-                          Object.entries(clusterLabels).filter(([k]) =>
-                            k.startsWith(CAPABILITY_LABEL_PREFIX),
-                          ),
-                        ),
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                ) : null}
-              </LabeledField>
-              <LabeledField label="Exposure mode" fieldId="exposureMode" help={getFieldHelp('clusterDetail.exposureMode')}>
-                <FormSelect
-                  id="exposureMode"
-                  value={exposureMode}
-                  onChange={(_e, v) => {
-                    const mode = v as FleetExposureMode | 'inherit';
-                    setExposureMode(mode);
-                    if (mode === 'port_forward' || mode === 'reverse_proxy') setDirectIngress(true);
-                    if (mode === 'none') setDirectIngress(false);
-                    // Match registry.EffectiveClusterTLSPolicy defaults for operator clarity.
-                    if (mode === 'reverse_proxy' && (tlsPolicy === 'inherit' || tlsPolicy === 'acme_hub')) {
-                      setTlsPolicy('external');
-                    }
-                    if (mode === 'port_forward' && (tlsPolicy === 'inherit' || tlsPolicy === 'acme_hub')) {
-                      setTlsPolicy('acme_cluster');
-                    }
-                  }}
-                >
-                  <FormSelectOption
-                    value="inherit"
-                    label={`Inherit from site (${siteExposureMode})`}
-                  />
-                  <FormSelectOption value="none" label="None" />
-                  <FormSelectOption value="hub_gateway" label="Hub gateway" />
-                  <FormSelectOption value="port_forward" label="Port forward" />
-                  <FormSelectOption value="reverse_proxy" label="External reverse proxy" />
-                </FormSelect>
-                {exposureMode === 'inherit' && (
-                  <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
-                    Clusters without an override use the site default exposure mode ({siteExposureMode}).
-                  </p>
-                )}
-              </LabeledField>
-              <LabeledField label="TLS policy" fieldId="tlsPolicy" help={getFieldHelp('clusterDetail.tlsPolicy')}>
-                <FormSelect
-                  id="tlsPolicy"
-                  value={tlsPolicy}
-                  onChange={(_e, v) => setTlsPolicy(v as FleetTlsPolicy)}
-                >
-                  <FormSelectOption value="inherit" label="Inherit" />
-                  <FormSelectOption value="external" label="External (no cluster LE)" />
-                  <FormSelectOption value="acme_cluster" label="ACME on cluster" />
-                  <FormSelectOption value="acme_hub" label="ACME on hub" />
-                  <FormSelectOption value="passthrough" label="TLS passthrough" />
-                </FormSelect>
-              </LabeledField>
-              <ExposureTlsPairWarning issue={exposureTlsIssue} />
-              <LabeledField label="Ingress endpoint ID" fieldId="ingressEndpointId" help={getFieldHelp('clusterDetail.ingressEndpointId')}>
-                <TextInput
-                  id="ingressEndpointId"
-                  value={ingressEndpointId}
-                  onChange={(_e, v) => setIngressEndpointId(v)}
-                  placeholder="openwrt-wan"
-                />
-              </LabeledField>
-              {domainOptions.length > 1 ? (
-                <LabeledField label="Domain bindings" fieldId="domainBindings" help={getFieldHelp('clusterDetail.domainBindings')}>
-                  {domainOptions.map((id) => (
-                    <Checkbox
-                      key={id}
-                      id={`detail-domain-${id}`}
-                      label={id}
-                      isChecked={domainBindings.includes(id)}
-                      onChange={(_e, checked) =>
-                        setDomainBindings((current) =>
-                          checked ? [...current, id] : current.filter((d) => d !== id),
-                        )
-                      }
-                    />
-                  ))}
-                </LabeledField>
-              ) : domainOptions.length === 1 ? (
-                <LabeledField label="Domain binding" fieldId="domainBindings" help={getFieldHelp('clusterDetail.domainBindings')}>
-                  <FormSelect
-                    id="domainBindings"
-                    value={domainBindings[0] || ''}
-                    onChange={(_e, v) => setDomainBindings(v ? [v] : [])}
-                  >
-                    <FormSelectOption value="" label="None" />
-                    <FormSelectOption value={domainOptions[0]} label={domainOptions[0]} />
-                  </FormSelect>
-                </LabeledField>
-              ) : (
-                <LabeledField label="Domain bindings (ids)" fieldId="domainBindings" help={getFieldHelp('clusterDetail.domainBindings')}>
-                  <TextInput
-                    id="domainBindings"
-                    value={domainBindings.join(', ')}
-                    onChange={(_e, v) =>
-                      setDomainBindings(
-                        v
-                          .split(',')
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      )
-                    }
-                    placeholder="site-zone, cluster-a"
-                  />
-                </LabeledField>
-              )}
-              <LabeledField label="Direct ingress (legacy)" fieldId="directIngress" help={getFieldHelp('clusterDetail.directIngress')}>
-                <Checkbox
-                  id="directIngress"
-                  isChecked={directIngress}
-                  onChange={(_e, checked) => setDirectIngress(checked)}
-                />
-              </LabeledField>
-              <LabeledField label="Upstream host (WG or LAN IP)" fieldId="upstreamHost" help={getFieldHelp('clusterDetail.upstreamHost')}>
-                <TextInput
-                  id="upstreamHost"
-                  value={upstreamHost}
-                  onChange={(_e, v) => setUpstreamHost(v)}
-                />
-              </LabeledField>
-              <LabeledField label="Traefik HTTP NodePort" fieldId="traefikPort" help={getFieldHelp('clusterDetail.traefikPort')}>
-                <TextInput
-                  id="traefikPort"
-                  value={traefikPort}
-                  onChange={(_e, v) => setTraefikPort(v)}
-                />
-              </LabeledField>
-              <Button variant="primary" isLoading={saving} onClick={() => void saveCluster()}>
-                Save cluster
-              </Button>
-            </Form>
-
-            <Title headingLevel="h2" size="lg" style={{ marginTop: '2rem' }}>
-              Nodes
-            </Title>
-            <div style={{ marginTop: '0.75rem' }}>
-              <ClusterNodesPanel
-                nodes={nodes}
-                clusterPhase={phase}
-                clusterAvailable={!!cluster.available}
-                nodesFetchFailed={nodesFetchFailed}
-                showLabelEditor
-                onAddLabel={(nodeName, key, value) => void addNodeLabel(nodeName, key, value)}
+              </DescriptionList>
+              <ClusterCapabilitiesPanel
+                clusterName={name}
+                cluster={cluster}
+                clusterReady={phase === 'Ready' || !!cluster.available}
+                onUpdated={load}
               />
-            </div>
-          </>
+            </Tab>
+            {(consoleProvisioned || (canDelete && !deletingPhase)) && (
+              <Tab eventKey="operations" title={<TabTitleText>Operations</TabTitleText>} data-testid="cluster-tab-operations">
+                {consoleProvisioned ? (
+                  <>
+                    <p style={{ marginTop: '1rem', maxWidth: '42rem', fontSize: '0.9rem' }}>
+                      Node lifecycle and cluster teardown. Changes run Ansible jobs against live nodes.
+                    </p>
+                    <ClusterOperationsPanel cluster={cluster} nodes={nodes} onUpdated={load} />
+                  </>
+                ) : null}
+                {canDelete && !deletingPhase && (
+                  <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--pf-v6-global--BorderColor--100)' }}>
+                    <Title headingLevel="h3" size="md">
+                      Delete cluster
+                    </Title>
+                    <p style={{ marginTop: '0.5rem', maxWidth: '42rem', fontSize: '0.9rem' }}>
+                      Remove hub registration, WireGuard peers, and ManifestWorks. Workloads on the
+                      cluster are kept unless you opt in during delete.
+                    </p>
+                    <Button variant="danger" onClick={openDelete} data-testid="cluster-delete" style={{ marginTop: '0.75rem' }}>
+                      Delete cluster
+                    </Button>
+                  </div>
+                )}
+              </Tab>
+            )}
+            <Tab eventKey="edge" title={<TabTitleText>Edge and ingress</TabTitleText>} data-testid="cluster-tab-edge">
+              <ClusterDetailEdgeTab
+                cluster={cluster}
+                phase={phase}
+                siteId={siteId}
+                setSiteId={setSiteId}
+                clusterLabels={clusterLabels}
+                setClusterLabels={setClusterLabels}
+                region={region}
+                setRegion={setRegion}
+                nestDepth={nestDepth}
+                setNestDepth={setNestDepth}
+                provisioner={provisioner}
+                setProvisioner={setProvisioner}
+                exposureMode={exposureMode}
+                setExposureMode={setExposureMode}
+                tlsPolicy={tlsPolicy}
+                setTlsPolicy={setTlsPolicy}
+                directIngress={directIngress}
+                setDirectIngress={setDirectIngress}
+                ingressEndpointId={ingressEndpointId}
+                setIngressEndpointId={setIngressEndpointId}
+                domainBindings={domainBindings}
+                setDomainBindings={setDomainBindings}
+                upstreamHost={upstreamHost}
+                setUpstreamHost={setUpstreamHost}
+                traefikPort={traefikPort}
+                setTraefikPort={setTraefikPort}
+                siteExposureMode={siteExposureMode}
+                exposureTlsIssue={exposureTlsIssue}
+                domainOptions={domainOptions}
+                authPrereqReady={authPrereqReady}
+                authPrereqIngress={authPrereqIngress}
+                authPrereqDomains={authPrereqDomains}
+                authCanEnable={authCanEnable}
+                authEnabled={authEnabled}
+                authActionBusy={authActionBusy}
+                authActionError={authActionError}
+                authReady={!!authReady}
+                portalHost={portalHost}
+                portalUrl={portalUrl}
+                lldapWebUIUrl={lldapWebUIUrl}
+                showClusterAcme={showClusterAcme}
+                acmeEnabled={acmeEnabled}
+                acmeCanEnable={acmeCanEnable}
+                onEnableAuth={() => {
+                  setAuthActionError(null);
+                  setEnableAuthOpen(true);
+                }}
+                onDisableAuth={() => {
+                  setAuthActionError(null);
+                  setDisableAuthOpen(true);
+                }}
+                onEnableAcme={() => void enableClusterAcmeAction()}
+                onDisableAcme={() => void disableClusterAcmeAction()}
+                saving={saving}
+                canSave={canMutate(user)}
+                onSave={() => void saveCluster()}
+              />
+            </Tab>
+            <Tab eventKey="storage" title={<TabTitleText>Storage</TabTitleText>} data-testid="cluster-tab-storage">
+              <div style={{ marginTop: '1rem' }}>
+                <ClusterStoragePanel cluster={cluster} onUpdated={load} />
+              </div>
+            </Tab>
+            <Tab eventKey="nodes" title={<TabTitleText>Nodes</TabTitleText>} data-testid="cluster-tab-nodes">
+              <div style={{ marginTop: '1rem' }}>
+                <ClusterNodesPanel
+                  nodes={nodes}
+                  clusterPhase={phase}
+                  clusterAvailable={!!cluster.available}
+                  nodesFetchFailed={nodesFetchFailed}
+                  showLabelEditor
+                  onAddLabel={(nodeName, key, value) => void addNodeLabel(nodeName, key, value)}
+                />
+              </div>
+            </Tab>
+          </Tabs>
         )}
       </PageSection>
       <Modal

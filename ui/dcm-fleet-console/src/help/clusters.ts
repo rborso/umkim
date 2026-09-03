@@ -22,7 +22,8 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     example: '203.0.113.12',
   },
   'clusterJoin.workerNodeIp': {
-    description: 'IP address of a worker node joined after the control plane is ready (ha_3_node only).',
+    description:
+      'Optional worker IP at cluster create time (ha_3_node only). Provisioned during initial bootstrap with the control plane. To add workers after Ready, use Cluster detail → Node operations.',
     example: '172.16.10.82',
   },
   'clusterJoin.bootstrapHost': {
@@ -131,15 +132,6 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   'clusterDetail.siteId': {
     description: 'fleet.site label on the ManagedCluster (site membership).',
     example: 'homelab',
-  },
-  'clusterDetail.org': {
-    description:
-      'dc-admin only. Assigns fleet.org on the ManagedCluster for dedicated org ownership. Empty clears the label.',
-    example: 'acme',
-  },
-  'clusterDetail.pool': {
-    description: 'dc-admin only. shared = platform pool; dedicated = org-owned or unassigned dedicated capacity.',
-    example: 'shared',
   },
   'clusterDetail.ingressEnabled': {
     description:
@@ -252,6 +244,41 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   'clusterDelete.cleanupKubernetes': {
     description:
       'Uninstall K3s and wipe local cluster state on all nodes. Leave unchecked to detach from the fleet while keeping Kubernetes and your application pods running (standalone K3s).',
+    example: 'false',
+  },
+  'clusterOperations.addWorkerAddress': {
+    description:
+      'SSH-reachable IP or hostname of the new Rocky node on the management LAN. The hub Ansible job installs K3s agent and joins the cluster.',
+    example: '198.51.100.60',
+  },
+  'clusterOperations.addWorkerHostname': {
+    description: 'Kubernetes node name. Defaults to a generated hostname when empty.',
+    example: 'virt02-w1',
+  },
+  'clusterOperations.removeWorker': {
+    description: 'Worker node to drain and remove from K3s and fleet inventory.',
+    example: 'virt02-w1',
+  },
+  'clusterOperations.removeWorkerForce': {
+    description:
+      'Skip drain and remove the node from inventory when it is unreachable. Use only when the host is permanently lost.',
+    example: 'false',
+  },
+  'clusterOperations.replaceOldNode': {
+    description: 'Failed or retiring control-plane node to replace (HA clusters).',
+    example: 'virt02-cp2',
+  },
+  'clusterOperations.replaceNewAddress': {
+    description: 'SSH-reachable IP of the replacement Rocky control-plane node.',
+    example: '198.51.100.61',
+  },
+  'clusterOperations.replaceNewHostname': {
+    description: 'Kubernetes node name for the replacement host. Optional when it matches inventory.',
+    example: 'virt02-cp2',
+  },
+  'clusterOperations.replaceForce': {
+    description:
+      'Replace when the old control-plane node is unreachable (skips graceful leave).',
     example: 'false',
   },
 };

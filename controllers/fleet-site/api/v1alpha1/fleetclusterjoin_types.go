@@ -45,6 +45,15 @@ const (
 	ProviderK8sNodePortBase        = 30190
 	ProviderHelmNodePortBase       = 30194
 	ProviderKubevirtSPNodePortBase = 30220
+
+	NodeOpTypeAddWorker            = "addWorker"
+	NodeOpTypeRemoveWorker         = "removeWorker"
+	NodeOpTypeReplaceControlPlane  = "replaceControlPlane"
+
+	NodeOpPhasePending   = "Pending"
+	NodeOpPhaseRunning   = "Running"
+	NodeOpPhaseSucceeded = "Succeeded"
+	NodeOpPhaseFailed    = "Failed"
 )
 
 // ProviderInstallOrder is the auto-install sequence after cluster Ready.
@@ -148,6 +157,35 @@ type ClusterStorageStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
+type ClusterNodeOperationStatus struct {
+	ID        string       `json:"id,omitempty"`
+	Type      string       `json:"type,omitempty"`
+	Node      string       `json:"node,omitempty"`
+	Phase     string       `json:"phase,omitempty"`
+	JobName   string       `json:"jobName,omitempty"`
+	Message   string       `json:"message,omitempty"`
+	Force     bool         `json:"force,omitempty"`
+	ActorKind string       `json:"actorKind,omitempty"`
+	ActorName string       `json:"actorName,omitempty"`
+	StartedAt *metav1.Time `json:"startedAt,omitempty"`
+}
+
+// ClusterNodeOperationRecord is an append-only history entry for a completed node operation.
+type ClusterNodeOperationRecord struct {
+	ID         string       `json:"id,omitempty"`
+	Type       string       `json:"type,omitempty"`
+	Node       string       `json:"node,omitempty"`
+	Phase      string       `json:"phase,omitempty"`
+	JobName    string       `json:"jobName,omitempty"`
+	Message    string       `json:"message,omitempty"`
+	Force      bool         `json:"force,omitempty"`
+	ActorKind  string       `json:"actorKind,omitempty"`
+	ActorName  string       `json:"actorName,omitempty"`
+	StartedAt  *metav1.Time `json:"startedAt,omitempty"`
+	FinishedAt *metav1.Time `json:"finishedAt,omitempty"`
+	LogTail    string       `json:"logTail,omitempty"`
+}
+
 type FleetClusterJoinNodeStatus struct {
 	Hostname           string `json:"hostname,omitempty"`
 	Address            string `json:"address,omitempty"`
@@ -198,6 +236,8 @@ type FleetClusterJoinStatus struct {
 	Storage                 ClusterStorageStatus             `json:"storage,omitempty"`
 	IngressAuth             FleetClusterJoinIngressAuthStatus `json:"ingressAuth,omitempty"`
 	Acme                    FleetClusterJoinAcmeStatus        `json:"acme,omitempty"`
+	NodeOperation           *ClusterNodeOperationStatus       `json:"nodeOperation,omitempty"`
+	NodeOperationHistory    []ClusterNodeOperationRecord      `json:"nodeOperationHistory,omitempty"`
 }
 
 func (s *FleetClusterJoinSpec) K8sProviderName(clusterName string) string {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Button,
   Form,
@@ -29,16 +29,11 @@ import {
   deleteFleetChart,
   fleetSiteEffectiveDomain,
   fleetSiteEffectiveId,
-  listFleetApps,
-  listFleetCharts,
-  listFleetClusters,
-  listFleetSites,
   uploadFleetChart,
 } from '../api/client';
 import type {
   FleetApp,
   FleetAppCreate,
-  FleetAppDefaults,
   FleetAppRouteMode,
   FleetChart,
   FleetChartImagePolicy,
@@ -48,7 +43,13 @@ import type {
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
 import { getFieldHelp } from '../help/fieldHelp';
-import { usePoll } from '../hooks/usePoll';
+import {
+  useFleetAppsQuery,
+  useFleetChartsQuery,
+  useFleetClustersQuery,
+  useFleetSitesQuery,
+  useInvalidateFleet,
+} from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
 
 const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
@@ -121,14 +122,22 @@ function imagePolicyLabel(p?: string): string {
 export function AppsPage() {
   const { can } = useAuth();
   const canPublish = can('charts', 'create');
+  const { invalidateApps, invalidateCharts, invalidateClusters, invalidateSites } = useInvalidateFleet();
+  const appsQuery = useFleetAppsQuery(10_000);
+  const chartsQuery = useFleetChartsQuery(10_000);
+  const clustersQuery = useFleetClustersQuery(30_000);
+  const sitesQuery = useFleetSitesQuery(30_000);
+  const apps = appsQuery.data?.apps ?? [];
+  const defaults = appsQuery.data?.defaults ?? { chartPrefix: '' };
+  const charts = chartsQuery.data ?? [];
+  const clusters = clustersQuery.data ?? [];
+  const sites = sitesQuery.data ?? [];
+  const loading =
+    appsQuery.isLoading || chartsQuery.isLoading || clustersQuery.isLoading || sitesQuery.isLoading;
+  const fetching =
+    appsQuery.isFetching || chartsQuery.isFetching || clustersQuery.isFetching || sitesQuery.isFetching;
+  const error = appsQuery.error || chartsQuery.error || clustersQuery.error || sitesQuery.error;
   const [tab, setTab] = useState<string | number>(0);
-  const [apps, setApps] = useState<FleetApp[]>([]);
-  const [charts, setCharts] = useState<FleetChart[]>([]);
-  const [defaults, setDefaults] = useState<FleetAppDefaults>({ chartPrefix: '' });
-  const [clusters, setClusters] = useState<FleetCluster[]>([]);
-  const [sites, setSites] = useState<FleetSite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [addChartOpen, setAddChartOpen] = useState(false);
   const [form, setForm] = useState<FleetAppCreate>(emptyForm());
@@ -172,41 +181,12 @@ export function AppsPage() {
   const routeHostValue =
     form.route?.mode === 'site' ? form.route?.siteHost || '' : form.route?.hubHost || '';
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [appData, clusterList, chartList, siteList] = await Promise.all([
-        listFleetApps(),
-        listFleetClusters(),
-        listFleetCharts(),
-        listFleetSites(),
-      ]);
-      setApps(appData.apps);
-      setDefaults(appData.defaults);
-      setClusters(clusterList);
-      setCharts(chartList);
-      setSites(siteList);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  usePoll(() => {
-    void Promise.all([listFleetApps(), listFleetCharts()])
-      .then(([d, c]) => {
-        setApps(d.apps);
-        setDefaults(d.defaults);
-        setCharts(c);
-      })
-      .catch(() => undefined);
-  }, 10_000);
+  const load = () => {
+    void invalidateApps();
+    void invalidateCharts();
+    void invalidateClusters();
+    void invalidateSites();
+  };
 
   const openInstall = () => {
     setActionError(null);
@@ -255,7 +235,7 @@ export function AppsPage() {
       };
       await createFleetApp(body);
       setModalOpen(false);
-      await load();
+      load();
     } catch (e) {
       setActionError(e);
     } finally {
@@ -291,7 +271,7 @@ export function AppsPage() {
       }
       setAddChartOpen(false);
       setTab(1);
-      await load();
+      load();
     } catch (e) {
       setActionError(e);
     } finally {
@@ -306,7 +286,7 @@ export function AppsPage() {
     try {
       await deleteFleetApp(deleteTarget.name);
       setDeleteTarget(null);
-      await load();
+      load();
     } catch (e) {
       setActionError(e);
     } finally {
@@ -321,7 +301,7 @@ export function AppsPage() {
     try {
       await deleteFleetChart(deleteChartTarget.name);
       setDeleteChartTarget(null);
-      await load();
+      load();
     } catch (e) {
       setActionError(e);
     } finally {
@@ -363,7 +343,7 @@ export function AppsPage() {
               </ToolbarItem>
             ) : null}
             <ToolbarItem>
-              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()} isDisabled={loading}>
+              <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()} isDisabled={fetching || loading}>
                 Refresh
               </Button>
             </ToolbarItem>

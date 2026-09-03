@@ -19,7 +19,6 @@ export const DOCS = {
   deployApp: `${DOCS_BASE}/getting-started/deploy-app/`,
   appDeployLifecycle: `${DOCS_BASE}/lifecycles/app-deploy/`,
   failover: `${DOCS_BASE}/lifecycles/failover/`,
-  multiTenancy: `${DOCS_BASE}/components/multi-tenancy/`,
   fleetLlm: `${DOCS_BASE}/components/fleet-llm/`,
   fleetSite: `${DOCS_BASE}/components/fleet-site/`,
   fleetApps: `${DOCS_BASE}/components/fleet-apps/`,
