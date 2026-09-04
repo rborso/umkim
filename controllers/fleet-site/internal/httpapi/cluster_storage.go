@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -53,6 +54,12 @@ func (s *Server) handleConfigureStorage(ctx context.Context, w http.ResponseWrit
 		}
 		next.Rwx = true
 		next.Rwo = true
+		if strings.TrimSpace(next.NFS.ExportBase) == "" {
+			next.NFS.ExportBase = "/srv/fleet-nfs"
+		}
+		if strings.TrimSpace(next.NFS.StorageClass) == "" {
+			next.NFS.StorageClass = "nfs-client"
+		}
 	}
 	if next.NFS == nil && !next.NFSLocalEnabled() {
 		http.Error(w, "storage.nfs is required", http.StatusBadRequest)
@@ -81,6 +88,16 @@ func (s *Server) handleConfigureStorage(ctx context.Context, w http.ResponseWrit
 		http.Error(w, "storage configure already running", http.StatusConflict)
 		return
 	}
+	if fcj.Status.Storage.Phase == fleetv1alpha1.StoragePhasePending {
+		http.Error(w, "storage configure already requested", http.StatusConflict)
+		return
+	}
+	if fcj.Status.NodeOperation != nil &&
+		(fcj.Status.NodeOperation.Phase == fleetv1alpha1.NodeOpPhasePending ||
+			fcj.Status.NodeOperation.Phase == fleetv1alpha1.NodeOpPhaseRunning) {
+		http.Error(w, "cluster node operation already running", http.StatusConflict)
+		return
+	}
 	if fcj.Annotations != nil {
 		if _, ok := fcj.Annotations[configureStorageAnnotation]; ok {
 			if fcj.Status.Storage.Phase != fleetv1alpha1.StoragePhaseFailed {
@@ -94,6 +111,9 @@ func (s *Server) handleConfigureStorage(ctx context.Context, w http.ResponseWrit
 
 	if next.NFS.ClusterPath == "" {
 		next.NFS.ClusterPath = fcj.Spec.EffectiveClusterName(fcj.Name)
+	}
+	if next.NFSLocalEnabled() && strings.TrimSpace(next.NFS.Server) == "" {
+		next.NFS.Server = strings.TrimSpace(fcj.Spec.BootstrapHost)
 	}
 	if err := storage.ValidateNFSSpec(next, fcj); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

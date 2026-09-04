@@ -12,7 +12,8 @@ then install it many times. Publishing is not an install.
 
 ## Library (publish)
 
-Use the console **Apps → Library** tab, `POST /fleet/api/v1alpha1/charts`, or
+Use the console **Apps → Library** tab, `umkim chart add` (see
+[umkim-cli.md](umkim-cli.md)), `POST /fleet/api/v1alpha1/charts`, or
 [scripts/fleet-chart.sh](../../scripts/fleet-chart.sh).
 
 Sources:

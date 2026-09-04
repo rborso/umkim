@@ -25,7 +25,6 @@ import {
   fleetSiteCanDelete,
   fleetSiteClusterCount,
   fleetSiteDisplayName,
-  fleetSiteEffectiveDomain,
   fleetSiteEffectiveId,
   fleetSiteIsManagement,
   fleetSiteIsRegistry,
@@ -36,7 +35,7 @@ import {
 import type { FleetIngressMethod, FleetSite, FleetSiteCreate, FleetSiteIngress } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
-import { defaultPortForwardIngressRow } from '../edge/ingressMethod';
+import { defaultPortForwardIngressRow, fleetSiteIngressSummary } from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
 import { useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
@@ -246,7 +245,7 @@ export function SitesPage() {
               <Th>Name</Th>
               <Th>Type</Th>
               <Th>Phase</Th>
-              <Th>Edge domain</Th>
+              <Th>Ingress</Th>
               <Th>Clusters</Th>
               <Th>Actions</Th>
             </Tr>
@@ -272,8 +271,12 @@ export function SitesPage() {
                   <Td>
                     <Label color={phaseColor(phase)}>{phase}</Label>
                   </Td>
-                  <Td>
-                    <code>{fleetSiteEffectiveDomain(s) || '—'}</code>
+                  <Td style={{ maxWidth: '22rem', whiteSpace: 'normal' }}>
+                    {management ? (
+                      <span>Hub gateway (management)</span>
+                    ) : (
+                      <span style={{ fontSize: '0.9rem' }}>{fleetSiteIngressSummary(s)}</span>
+                    )}
                   </Td>
                   <Td>
                     {management ? (

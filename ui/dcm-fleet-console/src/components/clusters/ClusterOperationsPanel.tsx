@@ -13,6 +13,7 @@ import {
 } from '@patternfly/react-core';
 import {
   addFleetClusterWorker,
+  configureFleetClusterStorage,
   fetchFleetClusterNodeOperationLogs,
   listFleetClusterNodeOperations,
   removeFleetClusterNode,
@@ -41,15 +42,18 @@ const OP_LABELS: Record<string, string> = {
   addWorker: 'Add worker',
   removeWorker: 'Remove worker',
   replaceControlPlane: 'Replace control plane',
+  configureStorage: 'Configure storage',
 };
 
 function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {
   switch (phase) {
     case 'Succeeded':
+    case 'Applied':
       return 'green';
     case 'Pending':
       return 'blue';
     case 'Running':
+    case 'Applying':
       return 'orange';
     case 'Failed':
       return 'red';
@@ -95,6 +99,19 @@ function actorLabel(kind?: string, name?: string): string {
 
 function nodeOpBusy(op?: ClusterNodeOperation): boolean {
   return op?.phase === 'Pending' || op?.phase === 'Running';
+}
+
+function storageOpBusy(phase?: string): boolean {
+  return phase === 'Pending' || phase === 'Applying';
+}
+
+function isSingleNodeCluster(cluster: FleetCluster): boolean {
+  const topo = cluster.labels?.['fleet.topology/topology'];
+  if (topo === 'single_node') return true;
+  if (topo === 'ha_3_node') return false;
+  if (cluster.labels?.['fleet.topology/ha'] === 'true') return false;
+  if (cluster.capabilities?.ha_topology) return false;
+  return true;
 }
 
 function NodeOperationHistory({
@@ -154,8 +171,8 @@ function NodeOperationHistory({
         Operation history
       </Title>
       <p style={{ marginTop: '0.35rem', fontSize: '0.875rem', maxWidth: '42rem' }}>
-        Recent completed node operations (newest first). Ansible log tails are retained on the hub
-        for troubleshooting after jobs expire.
+        Recent completed cluster operations (newest first), including node lifecycle and storage
+        configure. Ansible log tails are retained on the hub for troubleshooting after jobs expire.
       </p>
       <ErrorAlert error={historyError} />
       {loading ? (
@@ -277,7 +294,11 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const phase = cluster.provisioning_phase;
   const clusterReady = phase === 'Ready' || !!cluster.available;
   const nodeOp = cluster.nodeOperation;
-  const busy = nodeOpBusy(nodeOp);
+  const storagePhase = cluster.storageStatus?.phase || '';
+  const storageBusy = storageOpBusy(storagePhase);
+  const busy = nodeOpBusy(nodeOp) || storageBusy;
+  const singleNode = isSingleNodeCluster(cluster);
+  const nfsLocalApplied = cluster.storage?.backend === 'nfs_local' && storagePhase === 'Applied';
 
   const workerNodes = useMemo(() => nodes.filter(isWorkerNode), [nodes]);
   const controlNodes = useMemo(() => nodes.filter(isControlNode), [nodes]);
@@ -291,6 +312,7 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const [replaceAddress, setReplaceAddress] = useState('');
   const [replaceHostname, setReplaceHostname] = useState('');
   const [replaceForce, setReplaceForce] = useState(false);
+  const [nfsDir, setNfsDir] = useState('/srv/fleet-nfs');
   const [acting, setActing] = useState(false);
   const [validating, setValidating] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -299,6 +321,10 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const lastPostValidated = useRef('');
   const [historyRefreshKey, setHistoryRefreshKey] = useState('');
   const lastHistoryPhase = useRef('');
+
+  useEffect(() => {
+    setNfsDir(cluster.storage?.nfs?.exportBase || '/srv/fleet-nfs');
+  }, [clusterName, cluster.storage?.nfs?.exportBase]);
 
   useEffect(() => {
     if (!busy) return;
@@ -319,16 +345,17 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   }, [controlNodes, replaceOldNode]);
 
   useEffect(() => {
-    const phaseKey = `${nodeOp?.id || ''}:${nodeOp?.phase || ''}`;
+    const phaseKey = `${nodeOp?.id || ''}:${nodeOp?.phase || ''}:${storagePhase}`;
     if (
-      nodeOp?.phase &&
-      (nodeOp.phase === 'Succeeded' || nodeOp.phase === 'Failed') &&
+      ((nodeOp?.phase === 'Succeeded' || nodeOp?.phase === 'Failed') ||
+        storagePhase === 'Applied' ||
+        storagePhase === 'Failed') &&
       lastHistoryPhase.current !== phaseKey
     ) {
       lastHistoryPhase.current = phaseKey;
       setHistoryRefreshKey(phaseKey);
     }
-  }, [nodeOp?.id, nodeOp?.phase]);
+  }, [nodeOp?.id, nodeOp?.phase, storagePhase]);
 
   useEffect(() => {
     if (nodeOp?.phase !== 'Succeeded' || !nodeOp.type) return;
@@ -476,15 +503,42 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
     }
   };
 
+  const enableLocalNfs = async () => {
+    const dir = nfsDir.trim() || '/srv/fleet-nfs';
+    if (!dir.startsWith('/')) {
+      setActionError(new Error('NFS share directory must be an absolute path'));
+      return;
+    }
+    setActing(true);
+    setActionError(null);
+    try {
+      await configureFleetClusterStorage(clusterName, {
+        backend: 'nfs_local',
+        rwo: true,
+        rwx: true,
+        force: nfsLocalApplied || storagePhase === 'Failed' || undefined,
+        nfs: {
+          exportBase: dir.replace(/\/$/, '') || '/srv/fleet-nfs',
+          clusterPath: cluster.storage?.nfs?.clusterPath || clusterName,
+          storageClass: cluster.storage?.nfs?.storageClass || 'nfs-client',
+        },
+      });
+      await onUpdated();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setActing(false);
+    }
+  };
+
   return (
     <div style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
       <Title headingLevel="h2" size="lg">
-        Node operations
+        Cluster operations
       </Title>
       <p style={{ marginTop: '0.5rem', maxWidth: '42rem' }}>
-        Add workers, remove workers, or replace a failed control-plane node after the cluster is
-        Ready. Each action runs pre-validation, executes an Ansible job, then post-validates cluster
-        inventory and node state.
+        Node lifecycle and single-node local RWX storage. Each action runs an Ansible job on the
+        hub; only one cluster operation runs at a time.
       </p>
       {nodeOp?.phase && (
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -507,10 +561,24 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           ) : null}
         </div>
       )}
+      {storagePhase && (storageBusy || storagePhase === 'Failed' || nfsLocalApplied) && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Label color={phaseColor(storagePhase)}>{storagePhase}</Label>
+          <span style={{ fontSize: '0.875rem' }}>{OP_LABELS.configureStorage}</span>
+          {cluster.storage?.backend ? (
+            <span style={{ fontSize: '0.875rem' }}>
+              backend: <code>{cluster.storage.backend}</code>
+            </span>
+          ) : null}
+          {cluster.storageStatus?.message ? (
+            <span style={{ fontSize: '0.875rem' }}>{cluster.storageStatus.message}</span>
+          ) : null}
+        </div>
+      )}
       {busy && (
         <Alert
           variant="info"
-          title="Node operation in progress"
+          title="Cluster operation in progress"
           isInline
           style={{ marginTop: '0.75rem', maxWidth: '42rem' }}
         >
@@ -521,6 +589,45 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
       <ValidationChecks title="Pre-validation" result={preValidate} />
       <ValidationChecks title="Post-validation" result={postValidate} />
       <ErrorAlert error={actionError} />
+
+      {singleNode && (
+        <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
+          <Title headingLevel="h3" size="md">
+            Local RWX storage
+          </Title>
+          <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
+            Installs nfs-server on this node and StorageClass <code>nfs-client</code>. Same as{' '}
+            <code>umkim cluster storage enable-local</code>.
+          </p>
+          <LabeledField
+            label="NFS share directory"
+            fieldId="opNfsDir"
+            help={getFieldHelp('clusterStorage.nfsExportBase')}
+          >
+            <TextInput
+              id="opNfsDir"
+              value={nfsDir}
+              onChange={(_e, v) => setNfsDir(v)}
+              placeholder="/srv/fleet-nfs"
+              isDisabled={!canMutate}
+            />
+          </LabeledField>
+          <Button
+            variant="primary"
+            isLoading={acting}
+            isDisabled={!canMutate || !nfsDir.trim().startsWith('/')}
+            onClick={() => void enableLocalNfs()}
+            data-testid="op-enable-local-nfs"
+          >
+            {storagePhase === 'Failed'
+              ? 'Retry local RWX'
+              : nfsLocalApplied
+                ? 'Re-apply local RWX'
+                : 'Enable local RWX'}
+          </Button>
+        </Form>
+      )}
+
       <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
         <Title headingLevel="h3" size="md">
           Add worker

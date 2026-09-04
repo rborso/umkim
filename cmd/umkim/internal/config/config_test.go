@@ -1,8 +1,19 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestResolveDevDefaults(t *testing.T) {
+	t.Setenv("UMKIM_API_URL", "")
+	t.Setenv("UMKIM_AUTH_URL", "")
+	t.Setenv("UMKIM_TOKEN", "")
+	t.Setenv("UMKIM_DEV", "")
+	_ = os.Unsetenv("UMKIM_API_URL")
+	_ = os.Unsetenv("UMKIM_AUTH_URL")
+	_ = os.Unsetenv("UMKIM_TOKEN")
+	_ = os.Unsetenv("UMKIM_DEV")
 	f := Resolve(File{DevMode: true}, "", "", "")
 	if f.APIURL != "http://127.0.0.1:18080/api/v1alpha1" {
 		t.Fatalf("api url: %q", f.APIURL)

@@ -56,12 +56,26 @@ umkim config show
 
 umkim site list | get NAME | create -f site.yaml
 umkim site patch NAME [--jumphost user@host:port] [--region REGION] [--failure-domain FD] [-f patch.json]
+umkim site ingress list SITE
+umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--address A] [--zone Z] [--wildcard W]
+umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--zone …] [--wildcard …]
+umkim site ingress delete SITE ID
 
 umkim cluster list | get NAME | create -f cluster.yaml
+umkim cluster list --require gpu,kvm
+umkim cluster candidates [--require gpu|kvm|ha_topology|storage.rwx|…] [--site SITE]
 umkim cluster patch NAME [--jumphost user@host:port] [--ingress-id ID] [-f patch.json]
 umkim cluster provision NAME | wait NAME [--phase Ready]
 umkim cluster bootstrap NAME [--ssh-user linux]
 umkim cluster delete NAME [--cleanup-kubernetes]
+umkim cluster storage enable-local NAME [--dir /path] [--cluster-path NAME] [--force] [--wait 10m]
+umkim cluster storage status NAME
+
+umkim chart list | get NAME
+umkim chart add --origin oci://… [--version V] [--image-policy external|proxy|copy]
+umkim chart add --chart package.tgz [--name N] [--version V] [--image-policy …]
+umkim chart add -f chart.json
+umkim chart delete NAME
 
 umkim node list --cluster NAME
 umkim node add --cluster NAME --address IP [--hostname HN]
@@ -70,6 +84,10 @@ umkim node remove --cluster NAME NODE [--force]
 umkim node-op history --cluster NAME
 umkim node-op logs --cluster NAME --id ID
 ```
+
+`chart add` mirrors console **Apps → Library** (`POST /charts`): OCI/HTTP origin
+JSON or multipart `.tgz` upload. Example:
+[examples/umkim/chart-add-oci.json](../../examples/umkim/chart-add-oci.json).
 
 `cluster create` + `bootstrap` + `provision` + `wait` mirrors
 [playbooks/flows/cluster-create.yml](../../playbooks/flows/cluster-create.yml).
@@ -101,6 +119,60 @@ umkim cluster list -o json
 
 Example patch files: [examples/umkim/site-patch-jumphost.json](../../examples/umkim/site-patch-jumphost.json),
 [examples/umkim/cluster-patch-jumphost.json](../../examples/umkim/cluster-patch-jumphost.json).
+
+### Site ingress entries
+
+Each site can define named **ingress entries** (`port_forward` / `reverse_proxy`)
+under `FleetSite.spec.edge.ingress[]`. Clusters bind with
+`umkim cluster patch --ingress-id`. Hub gateway (`hubGateway`) is a separate
+site toggle, not an ingress row.
+
+```bash
+umkim site ingress list homelab
+umkim site ingress add homelab --id site-pf --method port_forward \
+  --address 203.0.113.50 --zone site.example.com
+umkim site ingress set homelab site-pf --description "Router WAN"
+umkim site ingress delete homelab edge-rp
+umkim cluster patch lab-single-0 --ingress-id site-pf
+```
+
+Mutating commands print `OK: …` on success (and re-list ingress after site changes).
+Failures exit non-zero with an error (including when a patch is accepted but not
+persisted — for example an outdated FleetSite CRD).
+
+### Capability candidates (placement helper)
+
+Filter Ready clusters by discovered capabilities (AND semantics):
+
+```bash
+umkim cluster candidates --require gpu
+umkim cluster candidates --require kvm,ha_topology
+umkim cluster candidates --require storage.rwx --site homelab
+umkim cluster list --require gpu,kvm
+```
+
+Supported `--require` tokens: `gpu`, `kvm`, `ha_topology` (alias `ha`),
+`storage.rwx` (alias `rwx`), `storage.rwo` (alias `rwo`). This only filters;
+you still pick `FleetApp.spec.clusterName` explicitly.
+
+### Single-node local RWX storage
+
+Local RWX (`nfs_local`) is a **cluster operation** (Ansible job on the hub), same
+queue as node lifecycle — it cannot run while a node operation is in progress.
+Completed runs appear in operation history (`umkim node-op history`).
+
+```bash
+umkim cluster storage enable-local lab-single-0
+umkim cluster storage enable-local lab-single-0 --dir /data/nfs --wait 10m
+umkim cluster storage enable-local lab-single-0 --wait 10m --force
+umkim cluster storage status lab-single-0
+umkim node-op history --cluster lab-single-0
+```
+
+Installs `nfs-server` on the node (`nfs_local`), exports `--dir` (default
+`/srv/fleet-nfs`) with a per-cluster subdirectory, and deploys StorageClass
+`nfs-client`. Single-node only; see
+[fleet-cluster-storage.md](fleet-cluster-storage.md).
 
 ## Install
 

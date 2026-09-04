@@ -3,6 +3,7 @@ import type { FleetSite } from '../api/types';
 import {
   clusterIngressZone,
   effectiveIngressWildcard,
+  fleetSiteIngressSummary,
   fleetSitePortForwardZone,
   formatIngressOptionLabel,
   ingressAuthSupported,
@@ -66,5 +67,20 @@ describe('ingressMethod', () => {
       'lab.example.com',
     );
     expect(clusterIngressZone(s, { name: 'c2', ingress_id: 'pf', method: 'reverse_proxy' })).toBe('');
+  });
+
+  it('summarizes hub gateway and ingress entries', () => {
+    const s = site({
+      hubGateway: true,
+      hubZone: 'hub.example.com',
+      ingress: [
+        { id: 'site-pf', method: 'port_forward', zone: 'site.example.com', address: '203.0.113.50' },
+        { id: 'edge-rp', method: 'reverse_proxy' },
+      ],
+    });
+    const summary = fleetSiteIngressSummary(s);
+    expect(summary).toContain('hub gateway (hub.example.com)');
+    expect(summary).toContain('site-pf: Port forward → site.example.com');
+    expect(summary).toContain('edge-rp: Reverse proxy');
   });
 });

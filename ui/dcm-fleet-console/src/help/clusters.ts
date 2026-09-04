@@ -89,9 +89,15 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     example: 'true',
     learnMoreUrl: DOCS.clusterStorage,
   },
+  'clusterJoin.nfsLocal': {
+    description:
+      'Single-node only: install nfs-server on the cluster node, export /srv/fleet-nfs, and deploy StorageClass nfs-client for ReadWriteMany. Evaluation convenience — not a managed shared-storage service.',
+    example: 'false',
+    learnMoreUrl: DOCS.clusterStorage,
+  },
   'clusterJoin.nfsEnabled': {
     description:
-      'Install nfs-subdir-external-provisioner for ReadWriteMany volumes on a shared NFS export (nfs_external). Server and export must exist before enable. For single-node RWX without an external server, use configure-storage with nfs_local after Ready (not in this create form).',
+      'Install nfs-subdir-external-provisioner for ReadWriteMany on a shared external NFS export (nfs_external). Server and export must exist before enable. Mutually exclusive with Local RWX (nfs_local) on single_node.',
     example: 'false',
     learnMoreUrl: DOCS.clusterStorage,
   },

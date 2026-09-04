@@ -16,6 +16,7 @@ func nodeCmd() *cobra.Command {
 	cmd.AddCommand(nodeListCmd())
 	cmd.AddCommand(nodeAddCmd())
 	cmd.AddCommand(nodeRemoveCmd())
+	cmd.AddCommand(nodeReplaceCmd())
 	return cmd
 }
 
@@ -110,5 +111,44 @@ func nodeRemoveCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&cluster, "cluster", "", "Cluster name")
 	c.Flags().BoolVar(&force, "force", false, "Force remove")
+	return c
+}
+
+func nodeReplaceCmd() *cobra.Command {
+	var cluster, oldNode, address, hostname string
+	var force bool
+	c := &cobra.Command{
+		Use:   "replace",
+		Short: "Replace a control-plane node (POST /clusters/{name}/control-plane/replace)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cluster == "" || oldNode == "" || address == "" {
+				return fmt.Errorf("--cluster, --old-node, and --address required")
+			}
+			body := map[string]interface{}{
+				"oldNode": oldNode,
+				"force":   force,
+				"newNode": map[string]string{
+					"address": address,
+				},
+			}
+			if hostname != "" {
+				body["newNode"].(map[string]string)["hostname"] = hostname
+			}
+			raw, code, err := api.Post("/clusters/"+cluster+"/control-plane/replace", body)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, http.StatusAccepted); err != nil {
+				return err
+			}
+			printJSON(raw)
+			return nil
+		},
+	}
+	c.Flags().StringVar(&cluster, "cluster", "", "Cluster name")
+	c.Flags().StringVar(&oldNode, "old-node", "", "Control-plane node name to replace (Kubernetes node name)")
+	c.Flags().StringVar(&address, "address", "", "New node management address")
+	c.Flags().StringVar(&hostname, "hostname", "", "New node hostname (optional)")
+	c.Flags().BoolVar(&force, "force", false, "Force replace when old node is offline")
 	return c
 }

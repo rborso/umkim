@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -107,6 +108,60 @@ func (c *Client) Patch(path string, body interface{}) ([]byte, int, error) {
 
 func (c *Client) Post(path string, body interface{}) ([]byte, int, error) {
 	return c.do(http.MethodPost, path, body)
+}
+
+// PostMultipart POSTs multipart/form-data (for FleetChart .tgz uploads).
+// fileField is the form field name for the file (API expects "chart").
+func (c *Client) PostMultipart(path, fileField, filePath string, fields map[string]string) ([]byte, int, error) {
+	if c.apiURL == "" {
+		return nil, 0, fmt.Errorf("API URL not configured (set UMKIM_API_URL)")
+	}
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, err := w.CreateFormFile(fileField, filepath.Base(filePath))
+	if err != nil {
+		return nil, 0, err
+	}
+	if _, err := io.Copy(part, f); err != nil {
+		return nil, 0, err
+	}
+	for k, v := range fields {
+		if strings.TrimSpace(v) == "" {
+			continue
+		}
+		if err := w.WriteField(k, v); err != nil {
+			return nil, 0, err
+		}
+	}
+	if err := w.Close(); err != nil {
+		return nil, 0, err
+	}
+
+	u := c.apiURL + path
+	req, err := http.NewRequest(http.MethodPost, u, &buf)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	c.applyAuth(req)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+	_ = c.saveCookies()
+	return raw, resp.StatusCode, nil
 }
 
 func (c *Client) Delete(path string) ([]byte, int, error) {

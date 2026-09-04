@@ -136,6 +136,7 @@ export function ClustersPage() {
   const [deleteError, setDeleteError] = useState<unknown>(null);
   const [deleteCleanupKubernetes, setDeleteCleanupKubernetes] = useState(false);
   const [localPathEnabled, setLocalPathEnabled] = useState(true);
+  const [nfsLocalEnabled, setNfsLocalEnabled] = useState(false);
   const [nfsEnabled, setNfsEnabled] = useState(false);
   const [longhornEnabled, setLonghornEnabled] = useState(false);
   const [longhornDevice, setLonghornDevice] = useState('/dev/sdb');
@@ -146,6 +147,21 @@ export function ClustersPage() {
   const [nfsMountPath, setNfsMountPath] = useState('');
   const [clusterLabels, setClusterLabels] = useState<Record<string, string>>({});
   const [topology, setTopology] = useState<FleetClusterTopology>('single_node');
+  const [filterGpu, setFilterGpu] = useState(false);
+  const [filterKvm, setFilterKvm] = useState(false);
+  const [filterHa, setFilterHa] = useState(false);
+  const [filterRwx, setFilterRwx] = useState(false);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((c) => {
+      const caps = c.capabilities || {};
+      if (filterGpu && !caps.gpu) return false;
+      if (filterKvm && !caps.kvm) return false;
+      if (filterHa && !caps.ha_topology) return false;
+      if (filterRwx && !caps['storage.rwx']) return false;
+      return true;
+    });
+  }, [rows, filterGpu, filterKvm, filterHa, filterRwx]);
 
   const sitePrefill = searchParams.get('site') || '';
 
@@ -231,6 +247,7 @@ export function ClustersPage() {
       clusterRegion: clusterRegionForSite(site, siteId),
     });
     setLocalPathEnabled(true);
+    setNfsLocalEnabled(false);
     setNfsEnabled(false);
     setLonghornEnabled(false);
     setLonghornDevice('/dev/sdb');
@@ -369,25 +386,38 @@ export function ClustersPage() {
         nodes,
         clusterLabels,
         clusterCapabilities: caps,
-        storage: {
-          localPath: { enabled: longhornEnabled ? false : localPathEnabled },
-          longhorn: longhornEnabled
-            ? {
-                enabled: true,
-                device: longhornDevice.trim() || '/dev/sdb',
-              }
-            : { enabled: false },
-          nfs: nfsEnabled
-            ? {
-                enabled: true,
-                server: nfsServer.trim(),
-                exportBase: nfsExportBase.trim() || '/srv/fleet-nfs',
+        storage: nfsLocalEnabled && !isHa
+          ? {
+              backend: 'nfs_local',
+              localPath: { enabled: localPathEnabled },
+              rwo: true,
+              rwx: true,
+              nfs: {
+                exportBase: '/srv/fleet-nfs',
                 clusterPath: form.clusterName.trim() || undefined,
-                delegateHost: nfsDelegateHost.trim() || undefined,
-                mountPath: nfsMountPath.trim() || undefined,
-              }
-            : { enabled: false },
-        },
+                storageClass: 'nfs-client',
+              },
+              longhorn: { enabled: false },
+            }
+          : {
+              localPath: { enabled: longhornEnabled ? false : localPathEnabled },
+              longhorn: longhornEnabled
+                ? {
+                    enabled: true,
+                    device: longhornDevice.trim() || '/dev/sdb',
+                  }
+                : { enabled: false },
+              nfs: nfsEnabled
+                ? {
+                    enabled: true,
+                    server: nfsServer.trim(),
+                    exportBase: nfsExportBase.trim() || '/srv/fleet-nfs',
+                    clusterPath: form.clusterName.trim() || undefined,
+                    delegateHost: nfsDelegateHost.trim() || undefined,
+                    mountPath: nfsMountPath.trim() || undefined,
+                  }
+                : { enabled: false },
+            },
       });
       setModalOpen(false);
       await load();
@@ -419,8 +449,43 @@ export function ClustersPage() {
                 Refresh
               </Button>
             </ToolbarItem>
+            <ToolbarItem>
+              <Checkbox
+                id="filter-gpu"
+                label="GPU"
+                isChecked={filterGpu}
+                onChange={(_e, checked) => setFilterGpu(checked)}
+              />
+            </ToolbarItem>
+            <ToolbarItem>
+              <Checkbox
+                id="filter-kvm"
+                label="KVM"
+                isChecked={filterKvm}
+                onChange={(_e, checked) => setFilterKvm(checked)}
+              />
+            </ToolbarItem>
+            <ToolbarItem>
+              <Checkbox
+                id="filter-ha"
+                label="HA topology"
+                isChecked={filterHa}
+                onChange={(_e, checked) => setFilterHa(checked)}
+              />
+            </ToolbarItem>
+            <ToolbarItem>
+              <Checkbox
+                id="filter-rwx"
+                label="RWX storage"
+                isChecked={filterRwx}
+                onChange={(_e, checked) => setFilterRwx(checked)}
+              />
+            </ToolbarItem>
           </ToolbarContent>
         </Toolbar>
+        <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--pf-v6-global--Color--200)' }}>
+          Capability filters (placement helper): show clusters that report the selected capabilities.
+        </p>
       </PageSection>
       <PageSection>
         <ErrorAlert error={error} />
@@ -432,6 +497,7 @@ export function ClustersPage() {
               <Th>Site</Th>
               <Th>Phase</Th>
               <Th>Available</Th>
+              <Th>Caps</Th>
               <Th>Ingress</Th>
               <Th>Auth</Th>
               <Th>Provisioner</Th>
@@ -439,9 +505,16 @@ export function ClustersPage() {
             </Tr>
           </Thead>
           <Tbody>
-            {rows.map((c) => {
+            {filteredRows.map((c) => {
               const phase = fleetClusterPhase(c);
               const canDelete = !c.read_only && !c.management;
+              const caps = c.capabilities || {};
+              const capBits = [
+                caps.gpu ? 'GPU' : null,
+                caps.kvm ? 'KVM' : null,
+                caps.ha_topology ? 'HA' : null,
+                caps['storage.rwx'] ? 'RWX' : null,
+              ].filter(Boolean);
               return (
                 <Tr key={c.name}>
                   <Td>
@@ -463,6 +536,13 @@ export function ClustersPage() {
                     <Label color={c.available ? 'green' : 'grey'}>
                       {c.available ? 'Yes' : 'No'}
                     </Label>
+                  </Td>
+                  <Td>
+                    {capBits.length > 0 ? (
+                      <span style={{ fontSize: '0.85rem' }}>{capBits.join(' · ')}</span>
+                    ) : (
+                      <span style={{ color: 'var(--pf-v6-global--Color--200)' }}>—</span>
+                    )}
                   </Td>
                   <Td>{c.ingress_enabled ? 'Yes' : 'No'}</Td>
                   <Td>{c.ingress_auth_enabled ? 'Yes' : 'No'}</Td>
@@ -490,7 +570,9 @@ export function ClustersPage() {
             })}
           </Tbody>
         </Table>
-        {!loading && rows.length === 0 && <p>No managed clusters found.</p>}
+        {!loading && filteredRows.length === 0 && (
+          <p>{rows.length === 0 ? 'No managed clusters found.' : 'No clusters match the capability filters.'}</p>
+        )}
       </PageSection>
 
       <Modal
@@ -633,6 +715,7 @@ export function ClustersPage() {
                   }));
                   setLonghornEnabled(true);
                   setLocalPathEnabled(false);
+                  setNfsLocalEnabled(false);
                   setControlPlaneVip('198.51.100.84');
                   setLonghornDevice('/dev/vdb');
                 } else {
@@ -843,12 +926,37 @@ export function ClustersPage() {
               onChange={(_e, checked) => setLocalPathEnabled(checked)}
             />
           </LabeledField>
+          {topology === 'single_node' && (
+            <LabeledField
+              label="Local RWX (NFS on this node)"
+              fieldId="nfsLocalEnabled"
+              help={getFieldHelp('clusterJoin.nfsLocal')}
+            >
+              <Checkbox
+                id="nfsLocalEnabled"
+                label="Install nfs-server on this node and nfs-client StorageClass"
+                isChecked={nfsLocalEnabled}
+                onChange={(_e, checked) => {
+                  setNfsLocalEnabled(checked);
+                  if (checked) setNfsEnabled(false);
+                }}
+              />
+              <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                Evaluation only: exports <code>/srv/fleet-nfs</code> on the node and deploys
+                StorageClass <code>nfs-client</code> during bootstrap.
+              </p>
+            </LabeledField>
+          )}
           <LabeledField label="External NFS (RWX)" fieldId="nfsEnabled" help={getFieldHelp('clusterJoin.nfsEnabled')}>
             <Checkbox
               id="nfsEnabled"
-              label="Install nfs-subdir-external-provisioner"
+              label="Install nfs-subdir-external-provisioner on a shared export"
               isChecked={nfsEnabled}
-              onChange={(_e, checked) => setNfsEnabled(checked)}
+              isDisabled={nfsLocalEnabled && topology === 'single_node'}
+              onChange={(_e, checked) => {
+                setNfsEnabled(checked);
+                if (checked) setNfsLocalEnabled(false);
+              }}
             />
           </LabeledField>
           {nfsEnabled && (

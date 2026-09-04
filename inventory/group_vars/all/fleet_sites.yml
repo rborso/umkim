@@ -23,10 +23,10 @@ fleet_sites:
     ingress:
       - id: homelab-pf
         method: port_forward
-        address: "134.255.112.204"
+        address: "172.16.10.4"
         zone: "{{ fleet_homelab_edge_domain }}"
         wildcard: "*.{{ fleet_homelab_edge_domain }}"
-        description: "WAN forwards TCP 80→30080 and 443→30443 on virt03"
+        description: "Port-forward to virt03.lab.local (lab-single-0): 80→30080, 443→30443"
       - id: edge-rp
         method: reverse_proxy
         operator_notes: "External reverse proxy terminates TLS; operator configures vhosts"

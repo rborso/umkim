@@ -509,7 +509,7 @@ export function ClusterDetailPage() {
                 </DescriptionListGroup>
                 {cluster.storageStatus?.phase && (
                   <DescriptionListGroup>
-                    <DescriptionListTerm>Storage</DescriptionListTerm>
+                    <DescriptionListTerm>Storage operation</DescriptionListTerm>
                     <DescriptionListDescription>
                       <code>{cluster.storageStatus.phase}</code>
                       {cluster.storage?.backend ? (
@@ -543,7 +543,8 @@ export function ClusterDetailPage() {
                 {consoleProvisioned ? (
                   <>
                     <p style={{ marginTop: '1rem', maxWidth: '42rem', fontSize: '0.9rem' }}>
-                      Node lifecycle and cluster teardown. Changes run Ansible jobs against live nodes.
+                      Cluster operations: node lifecycle and single-node local RWX storage. Changes
+                      run Ansible jobs against live nodes (one at a time).
                     </p>
                     <ClusterOperationsPanel cluster={cluster} nodes={nodes} onUpdated={load} />
                   </>

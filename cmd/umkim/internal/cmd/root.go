@@ -22,7 +22,7 @@ func Execute() error {
 
 var rootCmd = &cobra.Command{
 	Use:   "umkim",
-	Short: "UMKIM fleet CLI — hub API for sites, clusters, and node operations",
+	Short: "UMKIM fleet CLI — hub API for sites, clusters, charts, and node operations",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if shouldSkipAPIInit(cmd) {
 			return nil
@@ -50,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(whoamiCmd())
 	rootCmd.AddCommand(siteCmd())
 	rootCmd.AddCommand(clusterCmd())
+	rootCmd.AddCommand(chartCmd())
 	rootCmd.AddCommand(nodeCmd())
 	rootCmd.AddCommand(nodeOpCmd())
 }

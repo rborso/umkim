@@ -291,7 +291,7 @@ func (r *ClusterJoinReconciler) issueClusterScript(ctx context.Context, fcj *fle
 	if len(nodeWG) == 0 {
 		return fmt.Errorf("no cluster nodes to allocate wireguard identities")
 	}
-	bootstrapNode := firstControlNodeWG(nodeWG)
+	bootstrapNode := bootstrapControlNodeWG(fcj, nodeWG)
 	addr := bootstrapNode.WGAddress
 	priv := bootstrapNode.PrivateKey
 	pub := bootstrapNode.PublicKey
@@ -738,7 +738,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		return ""
 	}
 	site := r.loadFleetSite(ctx, fcj.Spec.SiteId)
-	bootstrap := firstControlNodeWG(nodeWG)
+	bootstrap := bootstrapControlNodeWG(fcj, nodeWG)
 	bootstrapWG := wg.HostIP(bootstrap.WGAddress)
 	bootstrapMgmt := bootstrap.Address
 	if bootstrapMgmt == "" {
@@ -1054,6 +1054,24 @@ func firstControlNodeWG(nodes []wg.NodeWG) wg.NodeWG {
 		}
 	}
 	return nodes[0]
+}
+
+func bootstrapControlNodeWG(fcj *fleetv1alpha1.FleetClusterJoin, nodes []wg.NodeWG) wg.NodeWG {
+	want := ""
+	if fcj != nil {
+		want = strings.TrimSpace(fcj.Spec.BootstrapHost)
+	}
+	if want != "" {
+		for _, n := range nodes {
+			if nodeWGIsWorker(n) {
+				continue
+			}
+			if strings.TrimSpace(n.Address) == want {
+				return n
+			}
+		}
+	}
+	return firstControlNodeWG(nodes)
 }
 
 func nodeLabelsForHost(fcj *fleetv1alpha1.FleetClusterJoin, hostname string) map[string]string {

@@ -391,6 +391,27 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 	}
 	if req.Storage != nil {
 		st := storageSpecFromCreateBody(req.Storage)
+		if st != nil && st.NFSLocalEnabled() {
+			if st.NFS == nil {
+				st.NFS = &fleetv1alpha1.ClusterNFSSpec{}
+			}
+			if strings.TrimSpace(st.NFS.ExportBase) == "" {
+				st.NFS.ExportBase = "/srv/fleet-nfs"
+			}
+			if strings.TrimSpace(st.NFS.StorageClass) == "" {
+				st.NFS.StorageClass = "nfs-client"
+			}
+			if strings.TrimSpace(st.NFS.ClusterPath) == "" {
+				st.NFS.ClusterPath = req.ClusterName
+			}
+			if strings.TrimSpace(st.NFS.Server) == "" {
+				st.NFS.Server = strings.TrimSpace(req.BootstrapHost)
+			}
+			st.Rwx = true
+			if !st.Rwo {
+				st.Rwo = true
+			}
+		}
 		fcj.Spec.Storage = st
 		if err := storage.ValidateNFSSpec(st, &fcj); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -529,6 +550,10 @@ func (s *Server) handleClusterProgress(w http.ResponseWriter, r *http.Request, c
 		if fcj.Spec.Storage != nil && fcj.Spec.Storage.EffectiveBackend() == fleetv1alpha1.StorageBackendNFSExternal {
 			fcj.Status.Storage.Phase = fleetv1alpha1.StoragePhaseApplied
 			fcj.Status.Storage.Message = "NFS provisioner installed during local provision"
+		}
+		if fcj.Spec.Storage != nil && fcj.Spec.Storage.NFSLocalEnabled() {
+			fcj.Status.Storage.Phase = fleetv1alpha1.StoragePhaseApplied
+			fcj.Status.Storage.Message = "Local NFS server and provisioner installed during local provision"
 		}
 		if fcj.Spec.Storage != nil && fcj.Spec.Storage.LonghornEnabled() {
 			fcj.Status.Storage.Phase = fleetv1alpha1.StoragePhaseApplied

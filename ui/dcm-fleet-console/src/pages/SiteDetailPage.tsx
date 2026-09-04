@@ -51,9 +51,11 @@ import { LabeledField } from '../components/forms/LabeledField';
 import {
   defaultPortForwardIngressRow,
   effectiveIngressWildcard,
+  fleetSiteIngressSummary,
   fleetSitePortForwardZone,
   ingressMethodLabel,
 } from '../edge/ingressMethod';
+import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { getFieldHelp } from '../help/fieldHelp';
 
 export function SiteDetailPage() {
@@ -379,6 +381,16 @@ export function SiteDetailPage() {
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>
+                    <DescriptionListTerm>Ingress</DescriptionListTerm>
+                    <DescriptionListDescription>
+                      {isManagement ? (
+                        <span>Hub gateway (management site)</span>
+                      ) : (
+                        <span>{fleetSiteIngressSummary(site)}</span>
+                      )}
+                    </DescriptionListDescription>
+                  </DescriptionListGroup>
+                  <DescriptionListGroup>
                     <DescriptionListTerm>{isManagement ? 'Hub host' : 'Clusters'}</DescriptionListTerm>
                     <DescriptionListDescription>
                       {isManagement ? (
@@ -542,16 +554,90 @@ export function SiteDetailPage() {
                     </>
                   )}
                   <Title headingLevel="h4" style={{ marginTop: '1rem' }}>
-                    Ingress paths
+                    Ingress entries
                   </Title>
+                  <p style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                    Named public paths at this site. Clusters bind with an ingress id (
+                    <code>umkim cluster patch --ingress-id</code>). Hub gateway (above) is separate
+                    from these rows.
+                  </p>
                   {isManagement ? (
                     <p style={{ fontSize: '0.85rem' }}>
                       Ingress rows are managed outside the console for the management site.
                     </p>
                   ) : (
                     <>
+                      {(site.spec.edge?.ingress || []).length > 0 && !edgeFormDirty && (
+                        <Table aria-label="Site ingress entries" variant="compact" style={{ marginBottom: '1rem' }}>
+                          <Thead>
+                            <Tr>
+                              <Th>ID</Th>
+                              <Th>Method</Th>
+                              <Th>Address / zone</Th>
+                              <Th>Clusters</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {(site.spec.edge?.ingress || []).map((row) => (
+                              <Tr key={row.id || row.method}>
+                                <Td>
+                                  <code>{row.id || '—'}</code>
+                                </Td>
+                                <Td>
+                                  <Label color={row.method === 'port_forward' ? 'blue' : 'purple'}>
+                                    {ingressMethodLabel(row.method)}
+                                  </Label>
+                                </Td>
+                                <Td>
+                                  {row.method === 'port_forward' ? (
+                                    <>
+                                      <code>{row.address || '—'}</code>
+                                      {row.zone ? (
+                                        <>
+                                          <br />
+                                          <code>{row.zone}</code>
+                                        </>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    <span>{row.description || row.operatorNotes || '—'}</span>
+                                  )}
+                                </Td>
+                                <Td>
+                                  {(row.assignedClusters || []).length === 0
+                                    ? '—'
+                                    : (row.assignedClusters || []).map((c, i) => (
+                                        <span key={c}>
+                                          {i > 0 ? ', ' : ''}
+                                          <Link to={`/clusters/${c}`}>{c}</Link>
+                                        </span>
+                                      ))}
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      )}
                       {ingress.map((row, i) => (
-                        <div key={`ingress-row-${i}`} style={{ display: 'grid', gap: '0.5rem', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--pf-v5-global--BorderColor--100)' }}>
+                        <div
+                          key={`ingress-row-${i}`}
+                          style={{
+                            display: 'grid',
+                            gap: '0.5rem',
+                            marginBottom: '0.75rem',
+                            padding: '0.75rem',
+                            border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <Title headingLevel="h5" style={{ margin: 0 }}>
+                              {row.id?.trim() || `Entry ${i + 1}`}
+                            </Title>
+                            <Label color={row.method === 'port_forward' ? 'blue' : 'purple'}>
+                              {ingressMethodLabel(row.method)}
+                            </Label>
+                          </div>
                           <LabeledField label="Ingress ID" fieldId={`ingress-id-${i}`} help={getFieldHelp('site.domainZoneId')}>
                             <TextInput
                               aria-label="Ingress id"
@@ -660,23 +746,21 @@ export function SiteDetailPage() {
                               readOnly
                             />
                           </LabeledField>
-                          <p style={{ fontSize: '0.85rem', margin: 0 }}>
-                            {ingressMethodLabel(row.method)} — assigned from cluster ingress binding.
-                          </p>
                           <Button
                             variant="link"
                             isDisabled={ingress.length <= 1}
+                            isDanger
                             onClick={() => {
                               markEdgeDirty();
                               setIngress(ingress.filter((_, idx) => idx !== i));
                             }}
                           >
-                            Remove ingress row
+                            Remove entry
                           </Button>
                         </div>
                       ))}
                       <Button
-                        variant="link"
+                        variant="secondary"
                         onClick={() => {
                           markEdgeDirty();
                           setIngress([
@@ -688,7 +772,7 @@ export function SiteDetailPage() {
                           ]);
                         }}
                       >
-                        + Add ingress row
+                        Add ingress entry
                       </Button>
                     </>
                   )}

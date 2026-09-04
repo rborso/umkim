@@ -82,8 +82,10 @@ set, jobs SSH to management LAN addresses via `ProxyJump` instead of the WireGua
 overlay — required for sites where only a bastion can reach lab nodes.
 
 Edit jumphost (and site region / failure domain) in the console **Sites** detail
-(Edge and DNS → Connectivity) or via `umkim site patch`. Per-cluster overrides:
-console **Clusters** detail (Edge and ingress) or `umkim cluster patch`.
+(Edge and DNS → Connectivity) or via `umkim site patch`. Edit **ingress entries**
+(`port_forward` / `reverse_proxy`) in Sites detail or
+`umkim site ingress list|add|set|delete`. Per-cluster ingress binding:
+console **Clusters** detail (Edge and ingress) or `umkim cluster patch --ingress-id`.
 `umkim cluster bootstrap` resolves jumphost as cluster override, then site default.
 
 When a cluster reaches **Ready**, the controller ensures a hub secret

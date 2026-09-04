@@ -9,8 +9,11 @@
     cmd: k3s etcd-member-list
   environment:
     KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
   register: k3s_etcd_member_list
   changed_when: false
+  # k3s 1.32+ no longer ships etcd-member-list; force replace falls back to node delete.
+  failed_when: false
   tags: [k3s, k3s_cluster, k3s_etcd]
 
 - name: K3s cluster | Remove stale etcd member
@@ -18,8 +21,11 @@
     cmd: k3s etcd-member-remove {{ item }}
   environment:
     KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
   loop: "{{ k3s_etcd_member_list.stdout_lines | default([]) | select('search', fleet_etcd_member_name) | list }}"
-  when: k3s_etcd_member_list.stdout_lines is defined
+  when:
+    - k3s_etcd_member_list.rc | default(1) == 0
+    - k3s_etcd_member_list.stdout_lines is defined
   failed_when: false
   changed_when: true
   tags: [k3s, k3s_cluster, k3s_etcd]

@@ -37,9 +37,10 @@ type Result struct {
 }
 
 type NodeInfo struct {
-	Name  string
-	Roles []string
-	Ready bool
+	Name    string
+	Address string
+	Roles   []string
+	Ready   bool
 }
 
 type NewNode struct {
@@ -63,12 +64,22 @@ func NodesFromK8s(items []corev1.Node) []NodeInfo {
 	for i := range items {
 		n := &items[i]
 		out = append(out, NodeInfo{
-			Name:  n.Name,
-			Roles: nodeRoles(n),
-			Ready: nodeReady(n),
+			Name:    n.Name,
+			Address: nodeInternalIP(n),
+			Roles:   nodeRoles(n),
+			Ready:   nodeReady(n),
 		})
 	}
 	return out
+}
+
+func nodeInternalIP(n *corev1.Node) string {
+	for _, a := range n.Status.Addresses {
+		if a.Type == corev1.NodeInternalIP && strings.TrimSpace(a.Address) != "" {
+			return strings.TrimSpace(a.Address)
+		}
+	}
+	return ""
 }
 
 func Validate(phase Phase, fcj *fleetv1alpha1.FleetClusterJoin, req *Request, nodes []NodeInfo, readOnly bool) Result {
@@ -235,14 +246,34 @@ func validatePreReplaceControl(fcj *fleetv1alpha1.FleetClusterJoin, req *Request
 		add("new_address", CheckPass, "replacement address provided")
 	}
 	addr := ""
+	newHN := ""
 	if req.NewNode != nil {
 		addr = strings.TrimSpace(req.NewNode.Address)
+		newHN = strings.TrimSpace(req.NewNode.Hostname)
+	}
+	oldAddr := ""
+	if k8s != nil {
+		oldAddr = strings.TrimSpace(k8s.Address)
+	}
+	if oldAddr == "" {
+		if spec, ok := findSpecNode(fcj, oldNode); ok {
+			oldAddr = strings.TrimSpace(spec.Address)
+		}
 	}
 	for _, n := range fcj.Spec.Nodes {
-		if strings.TrimSpace(n.Address) == addr && addr != "" && n.Hostname != oldNode {
-			add("new_address_unique", CheckFail, fmt.Sprintf("address %s is already used by %s", addr, n.Hostname))
-			return
+		nAddr := strings.TrimSpace(n.Address)
+		if nAddr == "" || nAddr != addr {
+			continue
 		}
+		if n.Hostname == oldNode || (oldAddr != "" && nAddr == oldAddr) {
+			continue
+		}
+		// Idempotent retry: replacement hostname already owns the new address.
+		if newHN != "" && n.Hostname == newHN {
+			continue
+		}
+		add("new_address_unique", CheckFail, fmt.Sprintf("address %s is already used by %s", addr, n.Hostname))
+		return
 	}
 	if addr != "" {
 		add("new_address_unique", CheckPass, "replacement address is available")

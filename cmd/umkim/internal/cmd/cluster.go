@@ -20,6 +20,7 @@ func clusterCmd() *cobra.Command {
 		Short: "Manage fleet clusters (FleetClusterJoin via API)",
 	}
 	cmd.AddCommand(clusterListCmd())
+	cmd.AddCommand(clusterCandidatesCmd())
 	cmd.AddCommand(clusterGetCmd())
 	cmd.AddCommand(clusterCreateCmd())
 	cmd.AddCommand(clusterPatchCmd())
@@ -27,11 +28,13 @@ func clusterCmd() *cobra.Command {
 	cmd.AddCommand(clusterProvisionCmd())
 	cmd.AddCommand(clusterWaitCmd())
 	cmd.AddCommand(clusterBootstrapCmd())
+	cmd.AddCommand(clusterStorageCmd())
 	return cmd
 }
 
 func clusterListCmd() *cobra.Command {
-	return &cobra.Command{
+	var require []string
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List clusters",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,13 +45,92 @@ func clusterListCmd() *cobra.Command {
 			if err := mustOK(raw, code); err != nil {
 				return err
 			}
+			reqs, err := output.ParseRequireFlags(require)
+			if err != nil {
+				return err
+			}
+			if len(reqs) > 0 {
+				raw, err = output.FilterClustersJSON(raw, reqs, false)
+				if err != nil {
+					return err
+				}
+			}
 			format, err := outputFormat()
 			if err != nil {
 				return err
 			}
+			if len(reqs) > 0 && format != output.FormatJSON {
+				return output.WriteClusterCandidates(raw, format)
+			}
 			return output.WriteClusters(raw, format)
 		},
 	}
+	c.Flags().StringArrayVar(&require, "require", nil, "Filter by capability (repeatable/comma): gpu, kvm, ha_topology, storage.rwx, storage.rwo")
+	return c
+}
+
+func clusterCandidatesCmd() *cobra.Command {
+	var require []string
+	var site string
+	c := &cobra.Command{
+		Use:   "candidates",
+		Short: "List Ready clusters matching capability requirements (placement helper)",
+		Long: `Placement helper: show Ready clusters that have the requested capabilities.
+
+Examples:
+  umkim cluster candidates --require gpu
+  umkim cluster candidates --require kvm,ha_topology
+  umkim cluster candidates --require storage.rwx --site homelab`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, code, err := api.Get("/clusters")
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code); err != nil {
+				return err
+			}
+			reqs, err := output.ParseRequireFlags(require)
+			if err != nil {
+				return err
+			}
+			raw, err = output.FilterClustersJSON(raw, reqs, true)
+			if err != nil {
+				return err
+			}
+			site = strings.TrimSpace(site)
+			if site != "" {
+				raw, err = filterClustersBySite(raw, site)
+				if err != nil {
+					return err
+				}
+			}
+			format, err := outputFormat()
+			if err != nil {
+				return err
+			}
+			return output.WriteClusterCandidates(raw, format)
+		},
+	}
+	c.Flags().StringArrayVar(&require, "require", nil, "Required capability (repeatable/comma): gpu, kvm, ha_topology, storage.rwx, storage.rwo")
+	c.Flags().StringVar(&site, "site", "", "Limit to clusters on this site id")
+	return c
+}
+
+func filterClustersBySite(raw []byte, site string) ([]byte, error) {
+	var body struct {
+		Clusters []map[string]interface{} `json:"clusters"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return nil, err
+	}
+	out := make([]map[string]interface{}, 0, len(body.Clusters))
+	for _, c := range body.Clusters {
+		if strings.TrimSpace(fmt.Sprint(c["site"])) == site {
+			out = append(out, c)
+		}
+	}
+	body.Clusters = out
+	return json.Marshal(body)
 }
 
 func clusterGetCmd() *cobra.Command {
@@ -309,7 +391,53 @@ func clusterPatchCmd() *cobra.Command {
 			if err := mustOK(raw, code); err != nil {
 				return err
 			}
-			printJSON(raw)
+			format, ferr := outputFormat()
+			if ferr != nil {
+				return ferr
+			}
+			if format == output.FormatJSON {
+				printJSON(raw)
+				return nil
+			}
+			msg := fmt.Sprintf("cluster %q patched", args[0])
+			if cmd.Flags().Changed("ingress-id") {
+				if ingressID == "" {
+					msg = fmt.Sprintf("cluster %q ingress binding cleared", args[0])
+				} else {
+					msg = fmt.Sprintf("cluster %q bound to ingress %q", args[0], ingressID)
+				}
+			}
+			if cmd.Flags().Changed("jumphost") {
+				if jumphost == "" {
+					msg += "; jumphost cleared"
+				} else {
+					msg += "; jumphost=" + jumphost
+				}
+			}
+			fmt.Printf("OK: %s\n", msg)
+			if cmd.Flags().Changed("ingress-id") {
+				rawGet, codeGet, gerr := api.Get("/clusters/" + args[0])
+				if gerr != nil {
+					return fmt.Errorf("patch accepted but failed to re-read cluster: %w", gerr)
+				}
+				if err := mustOK(rawGet, codeGet); err != nil {
+					return fmt.Errorf("patch accepted but failed to re-read cluster: %w", err)
+				}
+				var got struct {
+					IngressID string `json:"ingress_id"`
+					Edge      *struct {
+						IngressID string `json:"ingress_id"`
+					} `json:"edge"`
+				}
+				_ = json.Unmarshal(rawGet, &got)
+				have := strings.TrimSpace(got.IngressID)
+				if have == "" && got.Edge != nil {
+					have = strings.TrimSpace(got.Edge.IngressID)
+				}
+				if have != strings.TrimSpace(ingressID) {
+					return fmt.Errorf("patch reported OK but cluster ingress_id is %q (want %q)", have, ingressID)
+				}
+			}
 			return nil
 		},
 	}

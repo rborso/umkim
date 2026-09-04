@@ -46,9 +46,11 @@ const (
 	ProviderHelmNodePortBase       = 30194
 	ProviderKubevirtSPNodePortBase = 30220
 
-	NodeOpTypeAddWorker            = "addWorker"
-	NodeOpTypeRemoveWorker         = "removeWorker"
-	NodeOpTypeReplaceControlPlane  = "replaceControlPlane"
+	NodeOpTypeAddWorker           = "addWorker"
+	NodeOpTypeRemoveWorker        = "removeWorker"
+	NodeOpTypeReplaceControlPlane = "replaceControlPlane"
+	// NodeOpTypeConfigureStorage is a cluster-level storage configure job (nfs_local / nfs_external).
+	NodeOpTypeConfigureStorage = "configureStorage"
 
 	NodeOpPhasePending   = "Pending"
 	NodeOpPhaseRunning   = "Running"

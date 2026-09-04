@@ -180,6 +180,11 @@ func (s *Server) submitNodeOperation(ctx context.Context, w http.ResponseWriter,
 		http.Error(w, errClusterNodeOperationBusy.Error(), http.StatusConflict)
 		return
 	}
+	if fcj.Status.Storage.Phase == fleetv1alpha1.StoragePhasePending ||
+		fcj.Status.Storage.Phase == fleetv1alpha1.StoragePhaseApplying {
+		http.Error(w, "cluster storage operation already running", http.StatusConflict)
+		return
+	}
 	edge, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
 	if s.clusterReadOnly(clusterName, edge) {
 		http.Error(w, "cluster is read-only", http.StatusForbidden)

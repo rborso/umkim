@@ -60,6 +60,24 @@ export function formatIngressOptionLabel(ent: FleetSiteIngress): string {
   return `${ent.id} · ${method}${zone}${availability}`;
 }
 
+/** Compact site-list / overview summary of hub gateway + ingress entries. */
+export function fleetSiteIngressSummary(site: FleetSite): string {
+  const parts: string[] = [];
+  if (site.spec.edge?.hubGateway) {
+    parts.push(site.spec.edge.hubZone ? `hub gateway (${site.spec.edge.hubZone})` : 'hub gateway');
+  }
+  for (const ent of site.spec.edge?.ingress || []) {
+    if (!ent.id) continue;
+    const method = ingressMethodLabel(ent.method);
+    const detail =
+      ent.method === 'port_forward' && ent.zone
+        ? `${ent.id}: ${method} → ${ent.zone}`
+        : `${ent.id}: ${method}`;
+    parts.push(detail);
+  }
+  return parts.length ? parts.join(' · ') : '—';
+}
+
 /** Port-forward ingress rows are exclusive to one cluster. */
 export function ingressOptionDisabled(
   ent: FleetSiteIngress,

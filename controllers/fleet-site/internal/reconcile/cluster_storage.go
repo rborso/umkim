@@ -147,16 +147,44 @@ func (r *ClusterJoinReconciler) finishStorageJob(ctx context.Context, fcj *fleet
 		return ctrl.Result{}, err
 	}
 
+	jobName := latest.Status.Storage.JobName
+	if jobName == "" && latest.Annotations != nil {
+		jobName = latest.Annotations[configureStorageJobAnnotation]
+	}
+	logTail := r.captureNodeOpLogTail(ctx, latest.Namespace, jobName)
+	finishedAt := metav1.Now()
+	phase := fleetv1alpha1.NodeOpPhaseFailed
+	if ok {
+		phase = fleetv1alpha1.NodeOpPhaseSucceeded
+	}
+	if message == "" && ok {
+		message = "NFS storage configured"
+	}
+	backend := ""
+	if latest.Spec.Storage != nil {
+		backend = latest.Spec.Storage.EffectiveBackend()
+	}
+
 	latest.Status.Storage.JobName = ""
 	if ok {
 		latest.Status.Storage.Phase = fleetv1alpha1.StoragePhaseApplied
-		latest.Status.Storage.Message = "NFS storage configured"
+		latest.Status.Storage.Message = message
 		latest.Status.Message = latest.Status.Storage.Message
 	} else {
 		latest.Status.Storage.Phase = fleetv1alpha1.StoragePhaseFailed
 		latest.Status.Storage.Message = message
 		latest.Status.Message = message
 	}
+	latest.Status.NodeOperationHistory = prependNodeOpHistory(latest.Status.NodeOperationHistory, fleetv1alpha1.ClusterNodeOperationRecord{
+		ID:         fmt.Sprintf("sop-%d", finishedAt.UnixNano()),
+		Type:       fleetv1alpha1.NodeOpTypeConfigureStorage,
+		Node:       backend,
+		Phase:      phase,
+		JobName:    jobName,
+		Message:    message,
+		FinishedAt: &finishedAt,
+		LogTail:    logTail,
+	})
 	if err := r.Status().Update(ctx, &latest); err != nil {
 		if apierrors.IsConflict(err) {
 			return ctrl.Result{Requeue: true}, nil

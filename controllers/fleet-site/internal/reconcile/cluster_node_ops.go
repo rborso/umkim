@@ -25,6 +25,7 @@ import (
 )
 
 const annotationNodeOperationRequest = "fleet.umkim.com/node-operation-request"
+const annotationNodeOperationActive = "fleet.umkim.com/node-operation-active"
 
 type nodeOperationRequest struct {
 	Type     string            `json:"type"`
@@ -52,8 +53,26 @@ func (r *ClusterJoinReconciler) reconcileNodeOperation(ctx context.Context, fcj 
 	}
 	if fcj.Annotations != nil {
 		if raw := strings.TrimSpace(fcj.Annotations[annotationNodeOperationRequest]); raw != "" {
-			if fcj.Status.NodeOperation != nil && fcj.Status.NodeOperation.Phase == fleetv1alpha1.NodeOpPhaseRunning {
-				return ctrl.Result{}, nil
+			if fcj.Status.NodeOperation != nil {
+				phase := fcj.Status.NodeOperation.Phase
+				if phase == fleetv1alpha1.NodeOpPhaseRunning || phase == fleetv1alpha1.NodeOpPhasePending {
+					key := client.ObjectKeyFromObject(fcj)
+					_ = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+						var latest fleetv1alpha1.FleetClusterJoin
+						if err := r.Get(ctx, key, &latest); err != nil {
+							return err
+						}
+						if latest.Annotations == nil {
+							return nil
+						}
+						if _, ok := latest.Annotations[annotationNodeOperationRequest]; !ok {
+							return nil
+						}
+						delete(latest.Annotations, annotationNodeOperationRequest)
+						return r.Update(ctx, &latest)
+					})
+					return ctrl.Result{Requeue: true}, nil
+				}
 			}
 			var req nodeOperationRequest
 			if err := json.Unmarshal([]byte(raw), &req); err != nil {
@@ -119,6 +138,7 @@ func (r *ClusterJoinReconciler) acceptNodeOperationRequest(ctx context.Context, 
 	now := metav1.Now()
 	key := client.ObjectKeyFromObject(fcj)
 	opMessage := "Node operation queued"
+	rawReq, _ := json.Marshal(req)
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin
 		if err := r.Get(ctx, key, &latest); err != nil {
@@ -127,11 +147,13 @@ func (r *ClusterJoinReconciler) acceptNodeOperationRequest(ctx context.Context, 
 		if latest.Status.NodeOperation != nil && latest.Status.NodeOperation.Phase == fleetv1alpha1.NodeOpPhaseRunning {
 			return fmt.Errorf("node operation already running")
 		}
-		if latest.Annotations != nil {
-			delete(latest.Annotations, annotationNodeOperationRequest)
-			if err := r.Update(ctx, &latest); err != nil {
-				return err
-			}
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		delete(latest.Annotations, annotationNodeOperationRequest)
+		latest.Annotations[annotationNodeOperationActive] = string(rawReq)
+		if err := r.Update(ctx, &latest); err != nil {
+			return err
 		}
 		if err := r.Get(ctx, key, &latest); err != nil {
 			return err
@@ -215,6 +237,19 @@ func (r *ClusterJoinReconciler) startNodeOperationJob(ctx context.Context, fcj *
 		if err := r.Get(ctx, key, &latest); err != nil {
 			return err
 		}
+		// Keep annotationNodeOperationActive until finish/fail so post-validation
+		// can recover NewNode for replaceControlPlane.
+		if latest.Annotations != nil {
+			if _, ok := latest.Annotations[annotationNodeOperationRequest]; ok {
+				delete(latest.Annotations, annotationNodeOperationRequest)
+				if err := r.Update(ctx, &latest); err != nil {
+					return err
+				}
+				if err := r.Get(ctx, key, &latest); err != nil {
+					return err
+				}
+			}
+		}
 		if latest.Status.NodeOperation == nil {
 			latest.Status.NodeOperation = &fleetv1alpha1.ClusterNodeOperationStatus{}
 		}
@@ -244,7 +279,7 @@ func nodeOperationRunningMessage(opType string) string {
 }
 
 func (r *ClusterJoinReconciler) prepareNodeOperation(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, op *fleetv1alpha1.ClusterNodeOperationStatus, nodeWG []wg.NodeWG) ([]string, string, error) {
-	req, err := r.nodeOperationRequestFromStatus(fcj, op)
+	req, err := r.nodeOperationRequestForJob(fcj, op)
 	if err != nil {
 		return nil, "", err
 	}
@@ -311,6 +346,31 @@ func (r *ClusterJoinReconciler) wgExtraArgsForTarget(ctx context.Context, fcj *f
 	}
 	out = append(out, "-e", "wireguard_subnet="+r.Cfg.WireguardSubnet)
 	return out
+}
+
+func (r *ClusterJoinReconciler) nodeOperationRequestForJob(fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus) (*nodeOperationRequest, error) {
+	if fcj.Annotations != nil {
+		for _, key := range []string{annotationNodeOperationActive, annotationNodeOperationRequest} {
+			if raw := strings.TrimSpace(fcj.Annotations[key]); raw != "" {
+				var req nodeOperationRequest
+				if err := json.Unmarshal([]byte(raw), &req); err != nil {
+					return nil, fmt.Errorf("invalid node operation request annotation: %w", err)
+				}
+				if strings.TrimSpace(req.Type) == "" {
+					req.Type = op.Type
+				}
+				if strings.TrimSpace(req.OldNode) == "" && op.Type == fleetv1alpha1.NodeOpTypeReplaceControlPlane {
+					req.OldNode = op.Node
+				}
+				if strings.TrimSpace(req.Node) == "" {
+					req.Node = op.Node
+				}
+				req.Force = req.Force || op.Force
+				return &req, nil
+			}
+		}
+	}
+	return r.nodeOperationRequestFromStatus(fcj, op)
 }
 
 func (r *ClusterJoinReconciler) nodeOperationRequestFromStatus(fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus) (*nodeOperationRequest, error) {
@@ -397,6 +457,7 @@ func (r *ClusterJoinReconciler) ensureReplaceControlSpec(ctx context.Context, fc
 	if newHN == "" {
 		newHN = req.OldNode
 	}
+	oldHN, oldAddr := r.resolveSpecNodeIdentity(ctx, fcj, clusterName, req.OldNode)
 	key := client.ObjectKeyFromObject(fcj)
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin
@@ -407,14 +468,26 @@ func (r *ClusterJoinReconciler) ensureReplaceControlSpec(ctx context.Context, fc
 		replaced := false
 		for _, n := range latest.Spec.Nodes {
 			hn := n.Hostname
-			if hn == req.OldNode {
+			match := hn == req.OldNode || (oldHN != "" && hn == oldHN) || (oldAddr != "" && strings.TrimSpace(n.Address) == oldAddr)
+			// Already applied on a prior reconcile: treat existing new node as replaced.
+			if !replaced && (hn == newHN && strings.TrimSpace(n.Address) == strings.TrimSpace(req.NewNode.Address)) {
+				nodes = append(nodes, n)
+				replaced = true
+				continue
+			}
+			if match && !replaced {
 				nodes = append(nodes, fleetv1alpha1.FleetClusterJoinNodeSpec{
 					Hostname: newHN,
 					Address:  req.NewNode.Address,
 					Role:     fleetv1alpha1.NodeRoleControl,
 					Labels:   req.NewNode.Labels,
+					GPU:      n.GPU,
 				})
 				replaced = true
+				continue
+			}
+			// Drop duplicate copies of the replacement node from a prior bad retry.
+			if hn == newHN && strings.TrimSpace(n.Address) == strings.TrimSpace(req.NewNode.Address) {
 				continue
 			}
 			nodes = append(nodes, n)
@@ -426,9 +499,73 @@ func (r *ClusterJoinReconciler) ensureReplaceControlSpec(ctx context.Context, fc
 				Role:     fleetv1alpha1.NodeRoleControl,
 			})
 		}
+		if oldAddr != "" && strings.TrimSpace(latest.Spec.BootstrapHost) == oldAddr {
+			for _, n := range nodes {
+				if n.EffectiveRole() != fleetv1alpha1.NodeRoleControl {
+					continue
+				}
+				if strings.TrimSpace(n.Address) == strings.TrimSpace(req.NewNode.Address) {
+					continue
+				}
+				if strings.TrimSpace(n.Address) != "" {
+					latest.Spec.BootstrapHost = n.Address
+					break
+				}
+			}
+		}
 		latest.Spec.Nodes = nodes
 		return r.Update(ctx, &latest)
 	})
+}
+
+func (r *ClusterJoinReconciler) resolveSpecNodeIdentity(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName, name string) (hostname, address string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", ""
+	}
+	if spec, ok := findNodeSpec(fcj, name); ok {
+		return spec.Hostname, strings.TrimSpace(spec.Address)
+	}
+	for _, n := range fcj.Spec.Nodes {
+		if strings.TrimSpace(n.Address) == name {
+			return n.Hostname, strings.TrimSpace(n.Address)
+		}
+	}
+	list, err := spoke.ListNodes(ctx, spoke.ListParams{
+		HubClient:             r.Client,
+		ClusterName:           clusterName,
+		EdgeClustersNamespace: r.Cfg.EdgeClustersCMNamespace,
+		EdgeClustersName:      r.Cfg.EdgeClustersCMName,
+	})
+	if err != nil || list == nil {
+		return name, ""
+	}
+	for i := range list.Items {
+		n := &list.Items[i]
+		if n.Name != name {
+			continue
+		}
+		ip := nodeInternalIP(n)
+		if ip == "" {
+			return name, ""
+		}
+		for _, sn := range fcj.Spec.Nodes {
+			if strings.TrimSpace(sn.Address) == ip {
+				return sn.Hostname, ip
+			}
+		}
+		return name, ip
+	}
+	return name, ""
+}
+
+func nodeInternalIP(n *corev1.Node) string {
+	for _, a := range n.Status.Addresses {
+		if a.Type == corev1.NodeInternalIP && strings.TrimSpace(a.Address) != "" {
+			return strings.TrimSpace(a.Address)
+		}
+	}
+	return ""
 }
 
 func (r *ClusterJoinReconciler) syncNodeWGForSpec(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) error {
@@ -527,6 +664,7 @@ func (r *ClusterJoinReconciler) finishNodeOperation(ctx context.Context, fcj *fl
 		}
 	}
 	key := client.ObjectKeyFromObject(fcj)
+	_ = r.clearNodeOpAnnotations(ctx, key)
 	ns := fcj.Namespace
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin
@@ -561,6 +699,8 @@ func (r *ClusterJoinReconciler) finishNodeOperation(ctx context.Context, fcj *fl
 }
 
 func (r *ClusterJoinReconciler) removeNodeFromSpec(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, hostname string) error {
+	clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)
+	specHN, specAddr := r.resolveSpecNodeIdentity(ctx, fcj, clusterName, hostname)
 	key := client.ObjectKeyFromObject(fcj)
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin
@@ -570,7 +710,7 @@ func (r *ClusterJoinReconciler) removeNodeFromSpec(ctx context.Context, fcj *fle
 		out := make([]fleetv1alpha1.FleetClusterJoinNodeSpec, 0, len(latest.Spec.Nodes))
 		for _, n := range latest.Spec.Nodes {
 			hn := n.Hostname
-			if hn == hostname {
+			if hn == hostname || (specHN != "" && hn == specHN) || (specAddr != "" && strings.TrimSpace(n.Address) == specAddr) {
 				continue
 			}
 			out = append(out, n)
@@ -581,7 +721,7 @@ func (r *ClusterJoinReconciler) removeNodeFromSpec(ctx context.Context, fcj *fle
 }
 
 func (r *ClusterJoinReconciler) postValidateNodeOperation(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, op *fleetv1alpha1.ClusterNodeOperationStatus) string {
-	req := nodeOperationValidateRequest(fcj, op)
+	req := r.nodeOperationValidateRequest(ctx, fcj, clusterName, op)
 	var nodeInfos []nodeops.NodeInfo
 	list, err := spoke.ListNodes(ctx, spoke.ListParams{
 		HubClient:             r.Client,
@@ -607,7 +747,36 @@ func (r *ClusterJoinReconciler) postValidateNodeOperation(ctx context.Context, f
 	return "Post-validation failed"
 }
 
-func nodeOperationValidateRequest(fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus) *nodeops.Request {
+func (r *ClusterJoinReconciler) nodeOperationValidateRequest(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, op *fleetv1alpha1.ClusterNodeOperationStatus) *nodeops.Request {
+	if full, err := r.nodeOperationRequestForJob(fcj, op); err == nil && full != nil {
+		out := &nodeops.Request{
+			Type:     full.Type,
+			Node:     full.Node,
+			Address:  full.Address,
+			Hostname: full.Hostname,
+			Role:     full.Role,
+			OldNode:  full.OldNode,
+			Force:    full.Force,
+		}
+		if full.NewNode != nil {
+			out.NewNode = &nodeops.NewNode{
+				Address:  full.NewNode.Address,
+				Hostname: full.NewNode.Hostname,
+			}
+		}
+		if out.Type == "" {
+			out.Type = op.Type
+		}
+		if out.Node == "" {
+			out.Node = op.Node
+		}
+		if out.Type == fleetv1alpha1.NodeOpTypeReplaceControlPlane && out.OldNode == "" {
+			out.OldNode = op.Node
+		}
+		if out.Type != fleetv1alpha1.NodeOpTypeReplaceControlPlane || out.NewNode != nil {
+			return out
+		}
+	}
 	req := &nodeops.Request{
 		Type:  op.Type,
 		Node:  op.Node,
@@ -621,21 +790,50 @@ func nodeOperationValidateRequest(fcj *fleetv1alpha1.FleetClusterJoin, op *fleet
 		}
 	case fleetv1alpha1.NodeOpTypeReplaceControlPlane:
 		req.OldNode = op.Node
+		oldHN, oldAddr := r.resolveSpecNodeIdentity(ctx, fcj, clusterName, op.Node)
 		for _, n := range fcj.Spec.Nodes {
 			if n.EffectiveRole() != fleetv1alpha1.NodeRoleControl {
 				continue
 			}
-			if n.Hostname != op.Node {
-				req.NewNode = &nodeops.NewNode{Address: n.Address, Hostname: n.Hostname}
-				break
+			if n.Hostname == op.Node || (oldHN != "" && n.Hostname == oldHN) || (oldAddr != "" && strings.TrimSpace(n.Address) == oldAddr) {
+				continue
 			}
+			// Prefer a control node that is not one of the stable pre-existing peers
+			// when multiple remain (post-replace inventory).
+			req.NewNode = &nodeops.NewNode{Address: n.Address, Hostname: n.Hostname}
 		}
+		// Last matching control node wins — ensureReplace updates the replaced
+		// entry in place, so the new hostname is typically the last control.
 	}
 	return req
 }
 
+func (r *ClusterJoinReconciler) clearNodeOpAnnotations(ctx context.Context, key types.NamespacedName) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var latest fleetv1alpha1.FleetClusterJoin
+		if err := r.Get(ctx, key, &latest); err != nil {
+			return err
+		}
+		if latest.Annotations == nil {
+			return nil
+		}
+		changed := false
+		for _, k := range []string{annotationNodeOperationRequest, annotationNodeOperationActive} {
+			if _, ok := latest.Annotations[k]; ok {
+				delete(latest.Annotations, k)
+				changed = true
+			}
+		}
+		if !changed {
+			return nil
+		}
+		return r.Update(ctx, &latest)
+	})
+}
+
 func (r *ClusterJoinReconciler) failNodeOperation(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, err error) (ctrl.Result, error) {
 	key := client.ObjectKeyFromObject(fcj)
+	_ = r.clearNodeOpAnnotations(ctx, key)
 	msg := err.Error()
 	_ = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin

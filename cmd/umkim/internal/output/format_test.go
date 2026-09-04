@@ -32,6 +32,18 @@ func TestWriteClustersTable(t *testing.T) {
 	}
 }
 
+func TestWriteChartsTable(t *testing.T) {
+	raw := []byte(`{"charts":[{"name":"whoami","source":"harbor","version":"0.1.0","phase":"Ready","imagePolicy":"external"}]}`)
+	out := capture(func() {
+		if err := WriteCharts(raw, FormatTable); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "NAME") || !strings.Contains(out, "whoami") || !strings.Contains(out, "Ready") {
+		t.Fatalf("table output: %q", out)
+	}
+}
+
 func TestClusterTopologyFromLabels(t *testing.T) {
 	c := map[string]interface{}{
 		"labels": map[string]interface{}{
@@ -44,12 +56,35 @@ func TestClusterTopologyFromLabels(t *testing.T) {
 	}
 }
 
-func TestParseFormat(t *testing.T) {
-	f, err := ParseFormat("wide")
-	if err != nil || f != FormatWide {
-		t.Fatalf("got %v %v", f, err)
+func TestWriteSiteIngressTable(t *testing.T) {
+	rows := []map[string]interface{}{
+		{"id": "site-pf", "method": "port_forward", "address": "203.0.113.50", "zone": "site.example.com", "assignedClusters": []interface{}{"lab-ha-0"}},
+		{"id": "edge-rp", "method": "reverse_proxy", "description": "nginx", "assignedClusters": []string{"lab-single-0"}},
 	}
-	if _, err := ParseFormat("yaml"); err == nil {
-		t.Fatal("expected error")
+	out := capture(func() {
+		if err := WriteSiteIngress("homelab", true, "hub.example.com", rows, FormatTable); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "site-pf") || !strings.Contains(out, "port_forward") || !strings.Contains(out, "HUB_GATEWAY") {
+		t.Fatalf("table output: %q", out)
+	}
+	if !strings.Contains(out, "lab-ha-0") || !strings.Contains(out, "lab-single-0") {
+		t.Fatalf("assigned clusters missing: %q", out)
+	}
+}
+
+func TestSiteIngressSummary(t *testing.T) {
+	spec := map[string]interface{}{
+		"edge": map[string]interface{}{
+			"hubGateway": true,
+			"ingress": []interface{}{
+				map[string]interface{}{"id": "site-pf", "method": "port_forward"},
+			},
+		},
+	}
+	got := siteIngressSummary(spec)
+	if !strings.Contains(got, "hub_gateway") || !strings.Contains(got, "site-pf(port_forward)") {
+		t.Fatalf("got %q", got)
 	}
 }

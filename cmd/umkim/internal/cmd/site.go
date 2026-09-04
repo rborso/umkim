@@ -38,6 +38,7 @@ func siteCmd() *cobra.Command {
 	create.Flags().StringVarP(&file, "file", "f", "", "FleetSite JSON (apiVersion/kind/metadata/spec)")
 	cmd.AddCommand(create)
 	cmd.AddCommand(sitePatchCmd())
+	cmd.AddCommand(siteIngressCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List sites",

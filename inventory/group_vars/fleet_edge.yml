@@ -13,7 +13,7 @@ fleet_edge_clusters:
     method: port_forward
     tls_policy: acme_cluster
     dns_zone: "{{ fleet_homelab_edge_domain }}"
-    edge_wan_ip: "134.255.112.204"
+    edge_wan_ip: "172.16.10.4"
     upstream_host: 10.10.0.10
     traefik_http_port: 30080
     traefik_https_port: 30443

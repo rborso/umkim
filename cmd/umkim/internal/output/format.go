@@ -81,6 +81,136 @@ func WriteClusters(raw []byte, format Format) error {
 	return nil
 }
 
+func WriteCharts(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		Charts []map[string]interface{} `json:"charts"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	if format == FormatWide {
+		printTable(
+			[]string{"NAME", "SOURCE", "VERSION", "PHASE", "POLICY", "CHART", "ORIGIN"},
+			body.Charts,
+			func(c map[string]interface{}) []string {
+				return []string{
+					strField(c, "name"),
+					strField(c, "source"),
+					strField(c, "version"),
+					strField(c, "phase"),
+					strField(c, "imagePolicy"),
+					strField(c, "chart"),
+					truncate(strField(c, "origin"), 48),
+				}
+			},
+		)
+		return nil
+	}
+	printTable(
+		[]string{"NAME", "SOURCE", "VERSION", "PHASE", "POLICY"},
+		body.Charts,
+		func(c map[string]interface{}) []string {
+			return []string{
+				strField(c, "name"),
+				strField(c, "source"),
+				strField(c, "version"),
+				strField(c, "phase"),
+				strField(c, "imagePolicy"),
+			}
+		},
+	)
+	return nil
+}
+
+// WriteSiteIngress prints ingress entries for one site (kubectl-style table).
+func WriteSiteIngress(site string, hubGateway bool, hubZone string, rows []map[string]interface{}, format Format) error {
+	if format == FormatJSON {
+		payload, err := json.Marshal(map[string]interface{}{
+			"site":       site,
+			"hubGateway": hubGateway,
+			"hubZone":    hubZone,
+			"ingress":    rows,
+		})
+		if err != nil {
+			return err
+		}
+		WriteJSON(payload)
+		return nil
+	}
+	if hubGateway {
+		fmt.Printf("SITE\t%s\nHUB_GATEWAY\tyes\n", site)
+		if strings.TrimSpace(hubZone) != "" {
+			fmt.Printf("HUB_ZONE\t%s\n", hubZone)
+		}
+	} else {
+		fmt.Printf("SITE\t%s\nHUB_GATEWAY\tno\n", site)
+	}
+	if len(rows) == 0 {
+		fmt.Println("No ingress entries.")
+		return nil
+	}
+	headers := []string{"ID", "METHOD", "ADDRESS", "ZONE", "CLUSTERS"}
+	if format == FormatWide {
+		headers = []string{"ID", "METHOD", "ADDRESS", "ZONE", "WILDCARD", "CLUSTERS", "DESCRIPTION"}
+	}
+	printTable(headers, rows, func(r map[string]interface{}) []string {
+		assigned := joinStrings(r, "assignedClusters")
+		if assigned == "" {
+			assigned = "—"
+		}
+		if format == FormatWide {
+			desc := strField(r, "description")
+			if desc == "" {
+				desc = strField(r, "operatorNotes")
+			}
+			if desc == "" {
+				desc = "—"
+			}
+			wc := strField(r, "wildcard")
+			if wc == "" {
+				wc = "—"
+			}
+			addr := strField(r, "address")
+			if addr == "" {
+				addr = "—"
+			}
+			zone := strField(r, "zone")
+			if zone == "" {
+				zone = "—"
+			}
+			return []string{
+				strField(r, "id"),
+				strField(r, "method"),
+				addr,
+				zone,
+				wc,
+				assigned,
+				desc,
+			}
+		}
+		addr := strField(r, "address")
+		if addr == "" {
+			addr = "—"
+		}
+		zone := strField(r, "zone")
+		if zone == "" {
+			zone = "—"
+		}
+		return []string{
+			strField(r, "id"),
+			strField(r, "method"),
+			addr,
+			zone,
+			assigned,
+		}
+	})
+	return nil
+}
+
 func WriteSites(raw []byte, format Format) error {
 	if format == FormatJSON {
 		WriteJSON(raw)
@@ -94,19 +224,18 @@ func WriteSites(raw []byte, format Format) error {
 	}
 	if format == FormatWide {
 		printTable(
-			[]string{"NAME", "SITE_ID", "PHASE", "CLUSTERS", "REGION", "EXPOSURE", "JUMPHOST"},
+			[]string{"NAME", "SITE_ID", "PHASE", "CLUSTERS", "REGION", "INGRESS", "JUMPHOST"},
 			body.Sites,
 			func(s map[string]interface{}) []string {
 				spec, _ := s["spec"].(map[string]interface{})
 				status, _ := s["status"].(map[string]interface{})
-				edge, _ := spec["edge"].(map[string]interface{})
 				return []string{
 					strField(s, "metadata", "name"),
 					specStr(spec, "siteId", "siteName"),
 					strField(status, "phase"),
 					fmt.Sprintf("%d", intField(s, "clusterCount")),
 					specStr(spec, "region"),
-					specStr(edge, "exposureMode"),
+					siteIngressSummary(spec),
 					specStr(spec, "jumphost"),
 				}
 			},
@@ -114,7 +243,7 @@ func WriteSites(raw []byte, format Format) error {
 		return nil
 	}
 	printTable(
-		[]string{"NAME", "SITE_ID", "PHASE", "CLUSTERS"},
+		[]string{"NAME", "SITE_ID", "PHASE", "CLUSTERS", "INGRESS"},
 		body.Sites,
 		func(s map[string]interface{}) []string {
 			spec, _ := s["spec"].(map[string]interface{})
@@ -124,10 +253,46 @@ func WriteSites(raw []byte, format Format) error {
 				specStr(spec, "siteId", "siteName"),
 				strField(status, "phase"),
 				fmt.Sprintf("%d", intField(s, "clusterCount")),
+				siteIngressSummary(spec),
 			}
 		},
 	)
 	return nil
+}
+
+func siteIngressSummary(spec map[string]interface{}) string {
+	if spec == nil {
+		return "—"
+	}
+	edge, _ := spec["edge"].(map[string]interface{})
+	if edge == nil {
+		return "—"
+	}
+	parts := []string{}
+	if boolField(edge, "hubGateway") {
+		parts = append(parts, "hub_gateway")
+	}
+	raw, _ := edge["ingress"].([]interface{})
+	for _, item := range raw {
+		row, _ := item.(map[string]interface{})
+		if row == nil {
+			continue
+		}
+		id := strField(row, "id")
+		method := strField(row, "method")
+		if id == "" {
+			continue
+		}
+		if method != "" {
+			parts = append(parts, id+"("+method+")")
+		} else {
+			parts = append(parts, id)
+		}
+	}
+	if len(parts) == 0 {
+		return "—"
+	}
+	return strings.Join(parts, ",")
 }
 
 func WriteNodes(raw []byte, format Format) error {
@@ -345,17 +510,24 @@ func intField(m map[string]interface{}, key string) int {
 }
 
 func joinStrings(m map[string]interface{}, key string) string {
-	raw, ok := m[key].([]interface{})
-	if !ok {
+	raw, ok := m[key]
+	if !ok || raw == nil {
 		return ""
 	}
-	parts := make([]string, 0, len(raw))
-	for _, v := range raw {
-		if s, ok := v.(string); ok {
-			parts = append(parts, s)
+	switch v := raw.(type) {
+	case []string:
+		return strings.Join(v, ",")
+	case []interface{}:
+		parts := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				parts = append(parts, s)
+			}
 		}
+		return strings.Join(parts, ",")
+	default:
+		return ""
 	}
-	return strings.Join(parts, ",")
 }
 
 func printTable[T any](headers []string, rows []T, rowFn func(T) []string) {
