@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -33,5 +34,16 @@ func (r *AppReconciler) clusterEdgeDomain(ctx context.Context, clusterName strin
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: siteID}, &fs); err != nil {
 		return ""
 	}
-	return fs.Spec.EffectiveEdgeDomain()
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
+	if ingressID == "" {
+		ingressID = fs.Spec.AutoIngressID()
+	}
+	if ingressID == "" {
+		return ""
+	}
+	ci, err := ingress.ResolveClusterIngress(fs.Spec, ingressID)
+	if err != nil || ci.Method != fleetv1alpha1.IngressMethodPortForward {
+		return ""
+	}
+	return ci.Zone
 }

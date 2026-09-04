@@ -73,13 +73,13 @@ func ManagedClusterExists(ctx context.Context, c client.Client, clusterName stri
 }
 
 type edgeEntry struct {
-	Site            string   `yaml:"site"`
-	DirectIngress   bool     `yaml:"direct_ingress"`
-	ExposureMode    string   `yaml:"exposure_mode,omitempty"`
-	TlsPolicy       string   `yaml:"tls_policy,omitempty"`
-	DomainBindings  []string `yaml:"domain_bindings,omitempty"`
-	UpstreamHost    string   `yaml:"upstream_host"`
-	TraefikHTTPPort int      `yaml:"traefik_http_port"`
+	Site            string `yaml:"site"`
+	DirectIngress   bool   `yaml:"direct_ingress"`
+	IngressID       string `yaml:"ingress_id,omitempty"`
+	Method          string `yaml:"method,omitempty"`
+	TlsPolicy       string `yaml:"tls_policy,omitempty"`
+	UpstreamHost    string `yaml:"upstream_host"`
+	TraefikHTTPPort int    `yaml:"traefik_http_port"`
 }
 
 type edgeFile struct {

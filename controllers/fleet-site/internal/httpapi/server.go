@@ -191,7 +191,7 @@ func (s *Server) handleSites(w http.ResponseWriter, r *http.Request) {
 		if fs.Namespace == "" {
 			fs.Namespace = s.Cfg.Namespace
 		}
-		fs.Spec.NormalizeEdge()
+		fs.Spec.NormalizeIngress()
 		if fs.Spec.ProvisioningMode == "" {
 			fs.Spec.ProvisioningMode = fleetv1alpha1.ProvisioningModeRegistry
 		}

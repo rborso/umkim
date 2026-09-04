@@ -42,6 +42,14 @@ API_ID_HEADERS=(
   -H "X-Fleet-DC-Admin: true"
 )
 
+api_get() {
+  curl -sf "${API_ID_HEADERS[@]}" "$@" 2>/dev/null || true
+}
+
+api_get_code() {
+  curl -s -o /dev/null -w '%{http_code}' "${API_ID_HEADERS[@]}" "$@" 2>/dev/null || echo "000"
+}
+
 CONFIRM=0
 DRY_RUN=0
 SKIP_CLUSTER_DELETE=0
@@ -120,12 +128,19 @@ wait_cluster_gone() {
   local name="$1"
   local max="${CLUSTER_TIMEOUT}"
   local elapsed=0
+  local last_log=0
   while [[ "${elapsed}" -lt "${max}" ]]; do
-    local code
-    code=$(curl -s -o /dev/null -w '%{http_code}' "${API}/clusters/${name}" || true)
+    local code phase jobs
+    code=$(api_get_code "${API}/clusters/${name}")
     if [[ "${code}" == "404" ]]; then
       log "Cluster ${name} removed from fleet API"
       return 0
+    fi
+    if [[ $((elapsed - last_log)) -ge 300 ]]; then
+      phase="$(api_get "${API}/clusters/${name}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('provisioning_phase','?'))" 2>/dev/null || echo '?')"
+      jobs="$(kubectl_cmd get jobs -n fleet-console -o name 2>/dev/null | grep -E "fleet-cluster-delete-${name}" | tr '\n' ' ' || true)"
+      log "Still waiting for ${name} (${elapsed}s): HTTP ${code} phase=${phase} jobs=${jobs:-none}"
+      last_log=${elapsed}
     fi
     sleep "${POLL_INTERVAL}"
     elapsed=$((elapsed + POLL_INTERVAL))
@@ -153,7 +168,7 @@ wait_delete_jobs() {
 }
 
 list_fleet_clusters() {
-  curl -sf "${API}/clusters" 2>/dev/null | python3 -c "
+  api_get "${API}/clusters" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 for c in data.get('clusters', []):

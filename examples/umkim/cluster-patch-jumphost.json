@@ -1,0 +1,3 @@
+{
+  "jumphost": "jump@bastion.example.com:22"
+}

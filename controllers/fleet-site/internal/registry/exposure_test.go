@@ -7,7 +7,7 @@ import (
 )
 
 func TestEffectiveClusterExposureMode(t *testing.T) {
-	mode := EffectiveClusterExposureMode(ClusterExposureInput{ExposureMode: "reverse_proxy"}, "")
+	mode := EffectiveClusterExposureMode(ClusterExposureInput{Method: "reverse_proxy"}, "")
 	if mode != fleetv1alpha1.ExposureModeReverseProxy {
 		t.Fatalf("got %q", mode)
 	}
@@ -15,9 +15,9 @@ func TestEffectiveClusterExposureMode(t *testing.T) {
 	if mode != fleetv1alpha1.ExposureModePortForward {
 		t.Fatalf("legacy got %q", mode)
 	}
-	mode = EffectiveClusterExposureMode(ClusterExposureInput{ExposureMode: "inherit"}, fleetv1alpha1.ExposureModePortForward)
+	mode = EffectiveClusterExposureMode(ClusterExposureInput{Method: "port_forward"}, "")
 	if mode != fleetv1alpha1.ExposureModePortForward {
-		t.Fatalf("inherit with site port_forward got %q", mode)
+		t.Fatalf("port_forward got %q", mode)
 	}
 }
 

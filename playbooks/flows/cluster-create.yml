@@ -81,11 +81,11 @@
       loop:
         - "{{ {'nodes': fleet_flow_nodes} if (fleet_flow_nodes | default([]) | length > 0) else {} }}"
         - "{{ {'edge': fleet_flow_edge} if (fleet_flow_edge | default({}) | length > 0) else {} }}"
+        - "{{ {'edge': {'ingressId': fleet_flow_ingress_id}} if (fleet_flow_ingress_id | default('') | length > 0) else {} }}"
         - "{{ {'providers': fleet_flow_providers} if (fleet_flow_providers | default({}) | length > 0) else {} }}"
         - "{{ {'controlPlaneVip': fleet_flow_control_plane_vip} if (fleet_flow_control_plane_vip | default('') | length > 0) else {} }}"
         - "{{ {'storage': fleet_flow_storage} if (fleet_flow_storage | default({}) | length > 0) else {} }}"
         - "{{ {'clusterRegion': fleet_flow_cluster_region} if (fleet_flow_cluster_region | default('') | length > 0) else {} }}"
-        - "{{ {'domainBindings': fleet_flow_domain_bindings} if (fleet_flow_domain_bindings | default([]) | length > 0) else {} }}"
         - "{{ {'clusterLabels': fleet_flow_cluster_labels} if (fleet_flow_cluster_labels | default({}) | length > 0) else {} }}"
         - "{{ {'minRootDiskGi': fleet_flow_min_root_disk_gi | int} if (fleet_flow_min_root_disk_gi | default('') | string | length > 0) else {} }}"
 

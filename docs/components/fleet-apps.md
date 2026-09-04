@@ -66,7 +66,11 @@ Per-app `route.mode` must match the site's exposure model. See
 |---|---|---|
 | `none` | Chart-only; no `FleetAppRoute` | No |
 | `hub` | Hub Traefik publishes `hubHost` (default `<release>.<hub edge domain>`) to this cluster's Service | Yes |
-| `site` | Spoke ingress publishes `siteHost` (default `<release>.<site edge domain>`); requires `port_forward` or `reverse_proxy` site exposure | No |
+| `site` | Spoke ingress publishes `siteHost`; cluster must bind a `port_forward` or `reverse_proxy` ingress entry | No |
+
+For `route.mode: site`, `siteHost` defaults to `<release>.<zone>` only when the
+cluster is bound to a **`port_forward`** ingress (zone comes from that ingress row).
+**`reverse_proxy`** clusters must set `siteHost` explicitly (no default).
 
 Set `route.hubHost` or `route.siteHost` on create to override the default hostname. The console **Install chart** dialog exposes the same fields when route mode is `hub` or `site`.
 

@@ -42,6 +42,7 @@ installation guide take precedence. Keep design documentation topology-neutral.
 | Site exposure / ingress | [docs/components/fleet-edge.md](docs/components/fleet-edge.md), [examples/site-profiles/](examples/site-profiles/) |
 | Cluster lifecycle / detach | [docs/components/fleet-site.md](docs/components/fleet-site.md), [playbooks/flows/cluster-delete.yml](playbooks/flows/cluster-delete.yml) |
 | Console route or user workflow | `ui/dcm-fleet-console/README.md` and [docs/fleet-console-auth.md](docs/fleet-console-auth.md) |
+| Fleet CLI (`umkim`) | [docs/components/umkim-cli.md](docs/components/umkim-cli.md) and `cmd/umkim/` |
 | Security or secret handling | [SECURITY.md](SECURITY.md) and [docs/secrets.md](docs/secrets.md) |
 | Image or version pin | [VERSIONS.md](VERSIONS.md) and `inventory/group_vars/all/common.yml` |
 

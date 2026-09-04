@@ -7,6 +7,7 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,10 +16,10 @@ import (
 )
 
 type ClusterDNSConfig struct {
-	PrimaryZone     string
-	PortalHost      string
-	LLDAPWebUIHost  string
-	AccessDomains   []string
+	PrimaryZone    string
+	PortalHost     string
+	LLDAPWebUIHost string
+	AccessDomains  []string
 }
 
 func PortalHost(zone string) string {
@@ -49,8 +50,8 @@ func AccessDomainsForZones(zones []string) []string {
 }
 
 type edgeClusterDNS struct {
-	Site           string   `yaml:"site"`
-	DomainBindings []string `yaml:"domain_bindings,omitempty"`
+	Site      string `yaml:"site"`
+	IngressID string `yaml:"ingress_id,omitempty"`
 }
 
 type edgeClustersDNSFile struct {
@@ -58,18 +59,18 @@ type edgeClustersDNSFile struct {
 }
 
 func ResolveClusterDNS(ctx context.Context, c client.Client, cfg config.Config, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) (ClusterDNSConfig, error) {
-	bindingIDs := fcj.Spec.DomainBindings
-	if len(bindingIDs) == 0 {
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
+	if ingressID == "" {
 		edge, err := loadEdgeClustersDNS(ctx, c, cfg.EdgeClustersCMNamespace, cfg.EdgeClustersCMName)
 		if err != nil {
 			return ClusterDNSConfig{}, err
 		}
 		if ent, ok := edge.Clusters[clusterName]; ok {
-			bindingIDs = ent.DomainBindings
+			ingressID = ent.IngressID
 		}
 	}
-	if len(bindingIDs) == 0 {
-		return ClusterDNSConfig{}, fmt.Errorf("cluster has no domain bindings; configure site DNS zone bindings before enabling ingress auth")
+	if ingressID == "" {
+		return ClusterDNSConfig{}, fmt.Errorf("cluster has no ingress binding; configure ingressId before enabling ingress auth")
 	}
 
 	site, err := loadFleetSiteForJoin(ctx, c, cfg.Namespace, fcj)
@@ -77,40 +78,19 @@ func ResolveClusterDNS(ctx context.Context, c client.Client, cfg config.Config, 
 		return ClusterDNSConfig{}, err
 	}
 
-	zones := matchedZones(site, bindingIDs)
-	if len(zones) == 0 {
-		return ClusterDNSConfig{}, fmt.Errorf("no site DNS zone matches domain bindings %v", bindingIDs)
+	ci, err := ingress.ResolveClusterIngress(site.Spec, ingressID)
+	if err != nil {
+		return ClusterDNSConfig{}, err
 	}
-	primary := zones[0]
+	if !ci.AllowsAuth || ci.Zone == "" {
+		return ClusterDNSConfig{}, fmt.Errorf("ingress auth requires port_forward ingress with a DNS zone")
+	}
 	return ClusterDNSConfig{
-		PrimaryZone:    primary,
-		PortalHost:     PortalHost(primary),
-		LLDAPWebUIHost: LLDAPWebUIHost(primary),
-		AccessDomains:  AccessDomainsForZones(zones),
+		PrimaryZone:    ci.Zone,
+		PortalHost:     PortalHost(ci.Zone),
+		LLDAPWebUIHost: LLDAPWebUIHost(ci.Zone),
+		AccessDomains:  AccessDomainsForZones([]string{ci.Zone}),
 	}, nil
-}
-
-func matchedZones(site *fleetv1alpha1.FleetSite, bindingIDs []string) []string {
-	byID := map[string]fleetv1alpha1.FleetSiteDomainSpec{}
-	for _, d := range site.Spec.Edge.Domains {
-		if d.ID != "" && d.Zone != "" {
-			byID[d.ID] = d
-		}
-	}
-	out := []string{}
-	seen := map[string]struct{}{}
-	for _, id := range bindingIDs {
-		d, ok := byID[id]
-		if !ok || d.Zone == "" {
-			continue
-		}
-		if _, ok := seen[d.Zone]; ok {
-			continue
-		}
-		seen[d.Zone] = struct{}{}
-		out = append(out, d.Zone)
-	}
-	return out
 }
 
 func loadFleetSiteForJoin(ctx context.Context, c client.Client, ns string, fcj *fleetv1alpha1.FleetClusterJoin) (*fleetv1alpha1.FleetSite, error) {

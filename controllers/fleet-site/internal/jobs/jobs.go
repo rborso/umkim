@@ -237,6 +237,11 @@ func DiscoverJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inven
 	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 600)
 }
 
+func KubeconfigSyncJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string) *batchv1.Job {
+	args := ansiblePlaybookArgs("/ansible/cluster-kubeconfig-sync.yml", clusterName, siteID)
+	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 300)
+}
+
 func providerJobDeadlineSec(kind, action string) int64 {
 	if action == "delete" {
 		return 1200

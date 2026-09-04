@@ -31,3 +31,4 @@ ui/dcm-fleet-console/tsconfig.tsbuildinfo
 controllers/fleet-edge/controller
 controllers/fleet-site/controller
 controllers/fleet-bootstrap/controller
+cmd/umkim/umkim

@@ -3,7 +3,7 @@ package clusters
 import "testing"
 
 func TestSpokeACMEEnabled(t *testing.T) {
-	c := Cluster{TlsPolicy: TLSPolicyACMECluster}
+	c := Cluster{Method: methodPortForward, TlsPolicy: TLSPolicyACMECluster}
 	if !c.SpokeACMEEnabled(true) {
 		t.Fatal("expected acme_cluster with global ACME enabled")
 	}

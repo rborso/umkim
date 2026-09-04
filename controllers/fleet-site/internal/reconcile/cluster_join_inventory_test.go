@@ -39,7 +39,7 @@ func TestBuildClusterInventoryINI_singleNodeUsesMgmtLAN(t *testing.T) {
 		Address:   "198.51.100.92",
 		WGAddress: "10.10.0.14/32",
 	}}
-	ini := r.buildClusterInventoryINI(context.Background(), fcj, "single-lab", nodes, false, "")
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "single-lab", nodes, false)
 	assertInventoryLANNetworking(t, ini)
 	if !strings.Contains(ini, "fleet_node_mgmt_address=198.51.100.92") {
 		t.Fatal("missing fleet_node_mgmt_address on bootstrap vars")
@@ -73,7 +73,7 @@ func TestBuildClusterInventoryINI_haUsesMgmtLANPerNode(t *testing.T) {
 		{Hostname: "virt02-ha-cp2", Address: "198.51.100.82", WGAddress: "10.10.0.12/32", Role: fleetv1alpha1.NodeRoleControl},
 		{Hostname: "virt02-ha-cp3", Address: "198.51.100.83", WGAddress: "10.10.0.13/32", Role: fleetv1alpha1.NodeRoleControl},
 	}
-	ini := r.buildClusterInventoryINI(context.Background(), fcj, "homelab-ha", nodes, false, "")
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "homelab-ha", nodes, false)
 	assertInventoryLANNetworking(t, ini)
 	for _, want := range []string{
 		"fleet_node_mgmt_address=198.51.100.81",
@@ -104,7 +104,7 @@ func TestBuildClusterInventoryINI_haHubRunnerKeepsMgmtOnNodes(t *testing.T) {
 	nodes := []wg.NodeWG{
 		{Hostname: "virt02-ha-cp1", Address: "198.51.100.81", WGAddress: "10.10.0.10/32", Role: fleetv1alpha1.NodeRoleControl},
 	}
-	ini := r.buildClusterInventoryINI(context.Background(), fcj, "homelab-ha", nodes, true, "")
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "homelab-ha", nodes, true)
 	if !strings.Contains(ini, "virt02-ha-cp1 ansible_host=10.10.0.10") {
 		t.Fatal("hub runner should SSH via overlay ansible_host")
 	}
@@ -132,12 +132,22 @@ func TestBuildClusterInventoryINI_haHubRunnerJumphostUsesMgmtLAN(t *testing.T) {
 	nodes := []wg.NodeWG{
 		{Hostname: "virt02-vm01", Address: "172.16.10.140", WGAddress: "10.10.0.16/32", Role: fleetv1alpha1.NodeRoleWorker},
 	}
-	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, true, "")
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, true)
 	if !strings.Contains(ini, "virt02-vm01 ansible_host=172.16.10.140") {
 		t.Fatal("jumphost hub runner should SSH via mgmt LAN ansible_host")
 	}
 	if !strings.Contains(ini, "ProxyCommand") || !strings.Contains(ini, "jump.example.com") {
 		t.Fatal("jumphost hub runner should set ProxyCommand in ansible_ssh_common_args")
+	}
+	if !strings.Contains(ini, "umkim-hub ansible_host=127.0.0.1") {
+		t.Fatal("hub runner hub group must SSH to 127.0.0.1 on the hub host")
+	}
+	if strings.Contains(ini, "umkim-hub ansible_connection=local") {
+		t.Fatal("hub runner must not use ansible_connection=local (clusteradm runs on host)")
+	}
+	hubVars := ini[strings.Index(ini, "[hub:vars]"):]
+	if strings.Contains(hubVars, "ProxyCommand") {
+		t.Fatal("hub:vars must not include jumphost ProxyCommand when hubRunner")
 	}
 }
 

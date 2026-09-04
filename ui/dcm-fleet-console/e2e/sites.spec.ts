@@ -36,8 +36,12 @@ test.describe('Sites CRUD', () => {
 
     await page.locator('#siteName').fill(SITE_NAME);
     await page.locator('#displayName').fill(DISPLAY_NAME);
-    await page.locator('#edgeDomain').fill(`e2e-${RUN_ID}.example.com`);
-    await page.locator('#wildcard').fill(`*.e2e-${RUN_ID}.example.com`);
+    await page.locator('#siteRegion').fill('e2e-region');
+    await page.locator('#siteJumphost').fill('jump@203.0.113.1:22');
+    await page.locator('#ingressId').fill('default');
+    await page.locator('#ingressAddress').fill('203.0.113.50');
+    await page.locator('#ingressZone').fill(`e2e-${RUN_ID}.example.com`);
+    await page.locator('#ingressWildcard').fill(`*.e2e-${RUN_ID}.example.com`);
     await page.locator('#dnsNote').fill('Playwright E2E');
 
     const createResponse = page.waitForResponse(
@@ -49,6 +53,12 @@ test.describe('Sites CRUD', () => {
 
     verifyFleetApi('assert-exists', '--name', SITE_NAME);
     verifyFleetApi('assert-exists', '--display-name', DISPLAY_NAME);
+
+    const siteRes = await page.request.get(`./fleet/api/v1alpha1/sites/${SITE_NAME}`);
+    expect(siteRes.ok()).toBeTruthy();
+    const siteBody = await siteRes.json();
+    expect(siteBody.spec?.jumphost).toBe('jump@203.0.113.1:22');
+    expect(siteBody.spec?.region).toBe('e2e-region');
 
     await expect(page.getByRole('link', { name: DISPLAY_NAME })).toBeVisible();
     await expect(page.getByTestId(`site-delete-${SITE_NAME}`)).toBeVisible();

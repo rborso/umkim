@@ -34,32 +34,28 @@ type domainRegistry struct {
 	ClusterPatterns []map[string]string  `json:"cluster_patterns,omitempty"`
 }
 
-type domainRegistryEndpoint struct {
-	ID          string `json:"id"`
-	Address     string `json:"address"`
-	Role        string `json:"role,omitempty"`
-	Description string `json:"description,omitempty"`
-}
-
-type domainRegistryDomain struct {
-	ID                string   `json:"id"`
-	Zone              string   `json:"zone"`
-	Wildcard          string   `json:"wildcard,omitempty"`
-	TlsPolicy         string   `json:"tls_policy,omitempty"`
-	AssignedClusters  []string `json:"assigned_clusters,omitempty"`
-	IngressEndpointID string   `json:"ingress_endpoint_id,omitempty"`
+type domainRegistryIngress struct {
+	ID               string   `json:"id"`
+	Method           string   `json:"method"`
+	Address          string   `json:"address,omitempty"`
+	Zone             string   `json:"zone,omitempty"`
+	Wildcard         string   `json:"wildcard,omitempty"`
+	Description      string   `json:"description,omitempty"`
+	OperatorNotes    string   `json:"operator_notes,omitempty"`
+	AssignedClusters []string `json:"assigned_clusters,omitempty"`
 }
 
 type domainRegistrySite struct {
-	ID                string                   `json:"id"`
-	DisplayName       string                   `json:"display_name"`
-	Zone              string                   `json:"zone"`
-	Wildcard          string                   `json:"wildcard"`
-	ExposureMode      string                   `json:"exposure_mode,omitempty"`
-	ExternalEndpoints []domainRegistryEndpoint `json:"external_endpoints,omitempty"`
-	Domains           []domainRegistryDomain   `json:"domains,omitempty"`
-	Clusters          []string                 `json:"clusters"`
-	DnsTargetNote     string                   `json:"dns_target_note,omitempty"`
+	ID            string                  `json:"id"`
+	DisplayName   string                  `json:"display_name"`
+	Zone          string                  `json:"zone"`
+	Wildcard      string                  `json:"wildcard"`
+	HubGateway    bool                    `json:"hub_gateway,omitempty"`
+	HubZone       string                  `json:"hub_zone,omitempty"`
+	HubWildcard   string                  `json:"hub_wildcard,omitempty"`
+	Ingress       []domainRegistryIngress `json:"ingress,omitempty"`
+	Clusters      []string                `json:"clusters"`
+	DnsTargetNote string                  `json:"dns_target_note,omitempty"`
 }
 
 func ReconcileEdgeDomains(ctx context.Context, c client.Client, cfg DomainConfig) error {
@@ -105,12 +101,9 @@ func ReconcileEdgeDomains(ctx context.Context, c client.Client, cfg DomainConfig
 
 	for i := range list.Items {
 		fs := &list.Items[i]
-		fs.Spec.NormalizeEdge()
+		fs.Spec.NormalizeIngress()
 		siteID := fs.Spec.EffectiveSiteID(fs.Name)
 		edgeDomain := fs.Spec.EffectiveEdgeDomain()
-		if edgeDomain == "" {
-			continue
-		}
 		wildcard := fs.Spec.EffectiveWildcard()
 		display := fs.Spec.DisplayName
 		if display == "" {
@@ -121,34 +114,26 @@ func ReconcileEdgeDomains(ctx context.Context, c client.Client, cfg DomainConfig
 			clusters = []string{}
 		}
 		dnsNote := ""
-		if fs.Spec.Edge.ExternalAccess != nil {
-			dnsNote = fs.Spec.Edge.ExternalAccess.DnsTargetNote
+		if we := fs.Spec.EffectiveWanEgress(); we != nil {
+			dnsNote = we.DnsTargetNote
 		}
-		endpoints := make([]domainRegistryEndpoint, 0, len(fs.Spec.Edge.ExternalEndpoints))
-		for _, ep := range fs.Spec.Edge.ExternalEndpoints {
-			endpoints = append(endpoints, domainRegistryEndpoint{
-				ID: ep.ID, Address: ep.Address, Role: ep.Role, Description: ep.Description,
-			})
-		}
-		domains := make([]domainRegistryDomain, 0, len(fs.Spec.Edge.Domains))
-		for _, d := range fs.Spec.Edge.Domains {
-			wc := d.Wildcard
-			if wc == "" && d.Zone != "" {
-				wc = "*." + d.Zone
-			}
-			assigned := d.AssignedClusters
+		ingressRows := make([]domainRegistryIngress, 0, len(fs.Spec.Edge.Ingress))
+		for _, ent := range fs.Spec.Edge.Ingress {
+			wc := ent.EffectiveWildcard()
+			assigned := ent.AssignedClusters
 			if assigned == nil {
 				assigned = []string{}
 			}
-			domains = append(domains, domainRegistryDomain{
-				ID: d.ID, Zone: d.Zone, Wildcard: wc, TlsPolicy: d.TlsPolicy,
-				AssignedClusters: assigned, IngressEndpointID: d.IngressEndpointId,
+			ingressRows = append(ingressRows, domainRegistryIngress{
+				ID: ent.ID, Method: ent.Method, Address: ent.Address, Zone: ent.Zone,
+				Wildcard: wc, Description: ent.Description, OperatorNotes: ent.OperatorNotes,
+				AssignedClusters: assigned,
 			})
 		}
 		reg.Sites = append(reg.Sites, domainRegistrySite{
-			ID: siteID, DisplayName: display, Zone: edgeDomain,
-			Wildcard: wildcard, ExposureMode: fs.Spec.EffectiveExposureMode(),
-			ExternalEndpoints: endpoints, Domains: domains,
+			ID: siteID, DisplayName: display, Zone: edgeDomain, Wildcard: wildcard,
+			HubGateway: fs.Spec.HubGatewayEnabled(), HubZone: fs.Spec.EffectiveHubZone(),
+			HubWildcard: fs.Spec.EffectiveHubWildcard(), Ingress: ingressRows,
 			Clusters: clusters, DnsTargetNote: dnsNote,
 		})
 		if siteID == "homelab" {

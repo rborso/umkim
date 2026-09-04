@@ -9,23 +9,23 @@ fleet_edge_clusters:
   lab-single-0:
     site: homelab
     direct_ingress: true
-    exposure_mode: port_forward
+    ingress_id: homelab-pf
+    method: port_forward
     tls_policy: acme_cluster
+    dns_zone: "{{ fleet_homelab_edge_domain }}"
+    edge_wan_ip: "134.255.112.204"
     upstream_host: 10.10.0.10
     traefik_http_port: 30080
     traefik_https_port: 30443
-    domain_bindings:
-      - homelab-zone
   lab-ha-0:
     site: homelab
     direct_ingress: true
-    exposure_mode: hub_gateway
-    tls_policy: acme_hub
+    ingress_id: edge-rp
+    method: reverse_proxy
+    tls_policy: external
     upstream_host: 10.10.0.12
     traefik_http_port: 30080
     traefik_https_port: 30443
-    domain_bindings:
-      - homelab-zone
 
 fleet_edge_apps: []
 # Populated after FCJ clusters reach Ready (spoke_ingress push); avoid hub-install failure on greenfield.

@@ -34,7 +34,7 @@ func TestEffectiveModeDirectIngress(t *testing.T) {
 func TestEffectiveModeReverseProxy(t *testing.T) {
 	reg := clusters.Registry{
 		Clusters: map[string]clusters.Cluster{
-			"virt01": {ExposureMode: "reverse_proxy", TlsPolicy: "external", UpstreamHost: "10.0.0.1", TraefikHTTPPort: 30080},
+			"virt01": {Method: "reverse_proxy", TlsPolicy: "external", UpstreamHost: "10.0.0.1", TraefikHTTPPort: 30080},
 		},
 	}
 	mode, _ := effectiveMode(fleetv1alpha1.RouteModeSite, "virt01", reg)

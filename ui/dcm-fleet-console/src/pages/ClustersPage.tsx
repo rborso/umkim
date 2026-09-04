@@ -35,13 +35,16 @@ import type {
   FleetClusterCreate,
   FleetClusterNodeInput,
   FleetClusterTopology,
-  FleetExposureMode,
   FleetSite,
 } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { NfsStorageSetupHelp } from '../components/clusters/NfsStorageSetupHelp';
 import { LabeledField } from '../components/forms/LabeledField';
 import { LabelKeyValueEditor } from '../components/forms/LabelKeyValueEditor';
+import {
+  formatIngressOptionLabel,
+  ingressOptionDisabled,
+} from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
 import { useFleetClustersQuery, useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
@@ -76,11 +79,10 @@ const emptyClusterForm = (siteId = ''): FleetClusterCreate => ({
       keepIp: true,
     },
   },
-  domainBindings: [],
+  edge: {},
   topology: 'single_node',
   networkMode: 'wireguard',
   nodes: defaultSingleNode('', '198.51.100.11'),
-  edge: { exposureMode: 'inherit' },
 });
 
 function defaultClusterSiteId(sites: FleetSite[], prefill: string): string {
@@ -162,14 +164,15 @@ export function ClustersPage() {
     [registrySites, form.siteId],
   );
 
-  const domainOptions = useMemo(() => {
-    const domains = selectedSite?.spec.edge?.domains || [];
-    if (domains.length > 0) return domains.map((d) => d.id);
-    const zone = selectedSite?.spec.edge?.edgeDomain || selectedSite?.spec.edgeDomain;
-    return zone ? ['primary'] : [];
-  }, [selectedSite]);
+  const ingressOptions = useMemo(
+    () => selectedSite?.spec.edge?.ingress || [],
+    [selectedSite],
+  );
 
-  const siteExposureMode = selectedSite?.spec.edge?.exposureMode || 'none';
+  const autoIngressId = useMemo(() => {
+    if (ingressOptions.length !== 1) return '';
+    return ingressOptions[0].method === 'port_forward' ? ingressOptions[0].id : '';
+  }, [ingressOptions]);
 
   const controlNodes = useMemo(
     () => (form.nodes || []).filter((n) => (n.role || 'control') === 'control'),
@@ -302,16 +305,6 @@ export function ClustersPage() {
         labels: Object.keys(labels).length > 0 ? labels : undefined,
       };
       return { ...f, nodes };
-    });
-  };
-
-  const toggleDomainBinding = (id: string, checked: boolean) => {
-    setForm((f) => {
-      const current = f.domainBindings || [];
-      if (checked) {
-        return { ...f, domainBindings: current.includes(id) ? current : [...current, id] };
-      }
-      return { ...f, domainBindings: current.filter((d) => d !== id) };
     });
   };
 
@@ -572,7 +565,7 @@ export function ClustersPage() {
                 setForm({
                   ...form,
                   siteId: v,
-                  domainBindings: [],
+                  edge: {},
                   clusterRegion: clusterRegionForSite(site, v),
                 });
               }}
@@ -615,6 +608,14 @@ export function ClustersPage() {
                 }))
               }
               placeholder="lab-cluster1"
+            />
+          </LabeledField>
+          <LabeledField label="Jumphost" fieldId="clusterJumphost" help={getFieldHelp('clusterJoin.jumphost')}>
+            <TextInput
+              id="clusterJumphost"
+              value={form.jumphost || ''}
+              onChange={(_e, v) => setForm({ ...form, jumphost: v })}
+              placeholder="Leave empty to use site jumphost"
             />
           </LabeledField>
           <LabeledField label="Topology" fieldId="topology" help={getFieldHelp('clusterJoin.topology')}>
@@ -893,57 +894,34 @@ export function ClustersPage() {
               </LabeledField>
             </>
           )}
-          {domainOptions.length > 1 && (
-            <LabeledField label="Domain bindings" fieldId="domainBindings" help={getFieldHelp('clusterJoin.domainBindings')}>
-              {domainOptions.map((id) => (
-                <Checkbox
-                  key={id}
-                  id={`domain-${id}`}
-                  label={id}
-                  isChecked={(form.domainBindings || []).includes(id)}
-                  onChange={(_e, checked) => toggleDomainBinding(id, checked)}
-                />
-              ))}
-            </LabeledField>
-          )}
-          {domainOptions.length === 1 && (
-            <LabeledField label="Domain binding" fieldId="domainBindings" help={getFieldHelp('clusterJoin.domainBindings')}>
+          {ingressOptions.length > 0 && (
+            <LabeledField label="Site ingress" fieldId="ingressId" help={getFieldHelp('clusterJoin.domainBindings')}>
               <FormSelect
-                id="domainBindings"
-                value={form.domainBindings?.[0] || ''}
-                onChange={(_e, v) => setForm({ ...form, domainBindings: v ? [v] : [] })}
+                id="ingressId"
+                value={form.edge?.ingressId || autoIngressId || ''}
+                onChange={(_e, v) =>
+                  setForm({
+                    ...form,
+                    edge: { ingressId: v || undefined },
+                  })
+                }
               >
                 <FormSelectOption value="" label="None" />
-                <FormSelectOption value={domainOptions[0]} label={domainOptions[0]} />
+                {ingressOptions.map((ent) => (
+                  <FormSelectOption
+                    key={ent.id}
+                    value={ent.id}
+                    label={formatIngressOptionLabel(ent)}
+                    isDisabled={ingressOptionDisabled(ent)}
+                  />
+                ))}
               </FormSelect>
+              <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                Port-forward ingress allows one cluster; reverse-proxy rows stay available for
+                multiple clusters.
+              </p>
             </LabeledField>
           )}
-          <LabeledField label="Exposure override" fieldId="exposureMode" help={getFieldHelp('clusterJoin.exposureMode')}>
-            <FormSelect
-              id="exposureMode"
-              value={form.edge?.exposureMode || 'inherit'}
-              onChange={(_e, v) =>
-                setForm({
-                  ...form,
-                  edge: { ...form.edge, exposureMode: v as FleetExposureMode | 'inherit' },
-                })
-              }
-            >
-              <FormSelectOption
-                value="inherit"
-                label={`Inherit from site (${siteExposureMode})`}
-              />
-              <FormSelectOption value="none" label="None" />
-              <FormSelectOption value="hub_gateway" label="Hub gateway" />
-              <FormSelectOption value="port_forward" label="Port forward" />
-              <FormSelectOption value="reverse_proxy" label="External reverse proxy" />
-            </FormSelect>
-            {(form.edge?.exposureMode || 'inherit') === 'inherit' && (
-              <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
-                Clusters without an override use the site default exposure mode ({siteExposureMode}).
-              </p>
-            )}
-          </LabeledField>
           <p style={{ fontSize: '0.85rem', color: 'var(--pf-v6-global--Color--200)' }}>
             GPU and storage capabilities (RWO/RWX) are detected automatically after the cluster reaches Ready.
           </p>

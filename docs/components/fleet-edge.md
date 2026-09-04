@@ -7,24 +7,25 @@ Fleet edge turns a `FleetApp` route intent into `FleetAppRoute` resources and
 controller-managed hub or site ingress configuration. The target cluster is
 the one named on the FleetApp; the edge controller does not place workloads.
 
-## Site exposure
+## Site ingress
 
-Each `FleetSite` selects how that location reaches the WAN. Clusters inherit
-the site default unless overridden on `FleetClusterJoin`. Inventory examples:
+Each `FleetSite` declares one or more **ingress entries** under
+`spec.edge.ingress[]`. Clusters bind to an entry with
+`FleetClusterJoin.spec.edge.ingressId`. Inventory examples:
 [../../examples/site-profiles/](../../examples/site-profiles/).
 
-| `exposure_mode` | Meaning |
-|---|---|
-| `hub_gateway` | Public HTTP/S on the hub; hub forwards to spokes over WireGuard |
-| `port_forward` | WAN port-forwards to spoke Traefik NodePorts (`30080`/`30443`) |
-| `reverse_proxy` | External reverse proxy terminates TLS and reaches cluster ingress |
-| `none` | No fleet-managed WAN exposure at the site |
+| Ingress `method` | Cardinality | TLS (derived) | Ingress auth |
+|---|---|---|---|
+| `port_forward` | One cluster per entry (`id`, `address`, `zone` required) | `acme_cluster` on spoke | Allowed (zone from ingress) |
+| `reverse_proxy` | Many clusters per entry (`id` required; optional `address`, `operatorNotes`) | `external` (off-cluster) | Not available |
 
-Inventory snippets use `exposure_mode`; the CRD field is `exposureMode`.
+Optional `spec.edge.hubGateway` (with `hubZone` / `hubWildcard`) enables hub-routed
+public URLs for clusters using `route.mode: hub`. This replaces the former site-level
+`exposure_mode` / `domains` / `external_endpoints` model.
 
 The controller does not create external DNS records, router port-forwards,
 cloud firewall rules, or third-party reverse-proxy configuration. Operators
-configure those per site.
+configure those per ingress entry.
 
 ## Per-app routing modes
 
@@ -34,9 +35,9 @@ configure those per site.
 | `site` | Route through site ingress (port-forward or reverse proxy) | No |
 | `none` | The workload owns its own ingress; no FleetAppRoute is required | No |
 
-Use `route.mode: hub` when the site uses `hub_gateway` and DNS for `hubHost`
-is ready. Use `route.mode: site` when the site uses `port_forward` or
-`reverse_proxy` and `siteHost` is configured.
+Use `route.mode: hub` when the site has `hubGateway` enabled and DNS for
+`hubHost` is ready. Use `route.mode: site` when the cluster is bound to a
+`port_forward` or `reverse_proxy` ingress entry and `siteHost` is configured.
 
 ## Hub independence
 

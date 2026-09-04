@@ -22,44 +22,38 @@ spec:
   jumphost: "{{ item.value.jumphost }}"
 {% endif %}
   edge:
-    edgeDomain: "{{ item.value.edge_domain }}"
-    wildcard: "{{ item.value.edge_wildcard | default('*.' ~ item.value.edge_domain) }}"
-{% if item.value.exposure_mode is defined %}
-    exposureMode: {{ item.value.exposure_mode }}
+{% if item.value.hub_gateway | default(false) | bool %}
+    hubGateway: true
 {% endif %}
-{% if item.value.default_exposure_mode is defined %}
-    defaultExposureMode: {{ item.value.default_exposure_mode }}
+{% if item.value.hub_zone is defined %}
+    hubZone: "{{ item.value.hub_zone }}"
+{% elif item.value.edge_domain is defined and (item.value.hub_gateway | default(false) | bool) %}
+    hubZone: "{{ item.value.edge_domain }}"
 {% endif %}
-{% if item.value.external_endpoints is defined %}
-    externalEndpoints:
-{% for ep in item.value.external_endpoints %}
-      - id: {{ ep.id }}
-        address: "{{ ep.address }}"
-{% if ep.role is defined %}
-        role: {{ ep.role }}
+{% if item.value.hub_wildcard is defined %}
+    hubWildcard: "{{ item.value.hub_wildcard }}"
+{% elif item.value.edge_wildcard is defined and (item.value.hub_gateway | default(false) | bool) %}
+    hubWildcard: "{{ item.value.edge_wildcard }}"
 {% endif %}
-{% if ep.description is defined %}
-        description: "{{ ep.description }}"
+{% if item.value.ingress is defined %}
+    ingress:
+{% for ing in item.value.ingress %}
+      - id: {{ ing.id }}
+        method: {{ ing.method }}
+{% if ing.address is defined %}
+        address: "{{ ing.address }}"
 {% endif %}
-{% endfor %}
+{% if ing.zone is defined %}
+        zone: "{{ ing.zone }}"
 {% endif %}
-{% if item.value.domains is defined %}
-    domains:
-{% for dom in item.value.domains %}
-      - id: {{ dom.id }}
-        zone: "{{ dom.zone }}"
-        wildcard: "{{ dom.wildcard | default('*.' ~ dom.zone) }}"
-{% if dom.tls_policy is defined %}
-        tlsPolicy: {{ dom.tls_policy }}
+{% if ing.wildcard is defined %}
+        wildcard: "{{ ing.wildcard }}"
 {% endif %}
-{% if dom.ingress_endpoint_id is defined %}
-        ingressEndpointId: {{ dom.ingress_endpoint_id }}
+{% if ing.description is defined %}
+        description: "{{ ing.description }}"
 {% endif %}
-{% if dom.assigned_clusters is defined %}
-        assignedClusters:
-{% for c in dom.assigned_clusters %}
-          - {{ c }}
-{% endfor %}
+{% if ing.operator_notes is defined %}
+        operatorNotes: "{{ ing.operator_notes }}"
 {% endif %}
 {% endfor %}
 {% endif %}

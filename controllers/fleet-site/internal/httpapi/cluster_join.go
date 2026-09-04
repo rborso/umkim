@@ -53,7 +53,6 @@ type clusterCreateBody struct {
 			StorageClass string `json:"storageClass,omitempty"`
 		} `json:"longhorn,omitempty"`
 	} `json:"storage,omitempty"`
-	DomainBindings []string                               `json:"domainBindings,omitempty"`
 	Edge           fleetv1alpha1.FleetClusterJoinEdgeSpec `json:"edge,omitempty"`
 	Topology       string                                 `json:"topology,omitempty"`
 	NetworkMode    string                                 `json:"networkMode,omitempty"`
@@ -138,6 +137,9 @@ func (s *Server) fleetClusterJoinsByClusterName(ctx context.Context) map[string]
 
 // applyFleetClusterJoinSummary overlays FleetClusterJoin status onto an OCM-backed cluster summary.
 func applyFleetClusterJoinSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetClusterJoin) {
+	if fcj.Spec.Jumphost != "" {
+		cs.Jumphost = fcj.Spec.Jumphost
+	}
 	if fcj.Status.Phase == "" {
 		return
 	}
@@ -217,15 +219,13 @@ func clusterSummaryFromJoin(fcj *fleetv1alpha1.FleetClusterJoin) clusterSummary 
 			"topology": fcj.Spec.Topology,
 		},
 		ProvisioningMode: clusterJoinProvisioningMode(fcj),
-		DomainBindings:   fcj.Spec.DomainBindings,
+		IngressID:        fcj.Spec.Edge.IngressId,
+		Jumphost:         fcj.Spec.Jumphost,
 		UpstreamHost:     clusterJoinUpstreamHost(fcj),
 		TraefikHTTPPort:  30080,
 	}
-	if fcj.Spec.Edge.ExposureMode != "" && fcj.Spec.Edge.ExposureMode != "inherit" {
-		cs.ExposureMode = fcj.Spec.Edge.ExposureMode
-	}
-	if fcj.Spec.Edge.TlsPolicy != "" {
-		cs.TlsPolicy = fcj.Spec.Edge.TlsPolicy
+	if fcj.Spec.Edge.IngressId != "" {
+		cs.IngressID = fcj.Spec.Edge.IngressId
 	}
 	applyStorageToSummary(&cs, fcj)
 	return cs
@@ -328,6 +328,20 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 		http.Error(w, "cannot create clusters on management site", http.StatusBadRequest)
 		return
 	}
+	if err := validateJumphostValue(req.Jumphost); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ingressID := strings.TrimSpace(req.Edge.IngressId)
+	if ingressID == "" {
+		ingressID = site.Spec.AutoIngressID()
+	}
+	if ingressID != "" {
+		if err := s.validateClusterIngressBinding(ctx, req.SiteId, req.ClusterName, ingressID); err != nil {
+			writeIngressConflict(w, err)
+			return
+		}
+	}
 	actor, ok := s.requireMutatingActor(w, r)
 	if !ok {
 		return
@@ -360,8 +374,9 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 			ClusterLabels:       req.ClusterLabels,
 			ClusterCapabilities: req.ClusterCapabilities,
 			GPU:                 req.GPU,
-			DomainBindings:      req.DomainBindings,
-			Edge:                req.Edge,
+			Edge: fleetv1alpha1.FleetClusterJoinEdgeSpec{
+				IngressId: ingressID,
+			},
 			Topology:            topology,
 			NetworkMode:         networkMode,
 			RockyVersion:        s.Cfg.RockyMajor(req.RockyVersion),

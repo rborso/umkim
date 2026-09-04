@@ -40,10 +40,8 @@ import {
 import type {
   FleetCluster,
   FleetClusterPatch,
-  FleetExposureMode,
   FleetNode,
   FleetSite,
-  FleetTlsPolicy,
 } from '../api/types';
 import { ClusterCapabilitiesPanel } from '../components/clusters/ClusterCapabilitiesPanel';
 import { ClusterDetailEdgeTab } from '../components/clusters/ClusterDetailEdgeTab';
@@ -52,7 +50,7 @@ import { ClusterOperationsPanel } from '../components/clusters/ClusterOperations
 import { ClusterStoragePanel } from '../components/clusters/ClusterStoragePanel';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
-import { getExposureTlsPairIssue } from '../edge/exposureTlsPairs';
+import { ingressAuthSupported, isPortForwardMethod } from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
 import { useAuth } from '../auth/AuthContext';
 import { canMutate } from '../auth/roles';
@@ -120,11 +118,8 @@ export function ClusterDetailPage() {
   const [region, setRegion] = useState('');
   const [nestDepth, setNestDepth] = useState('');
   const [provisioner, setProvisioner] = useState('');
-  const [directIngress, setDirectIngress] = useState(false);
-  const [exposureMode, setExposureMode] = useState<FleetExposureMode | 'inherit'>('inherit');
-  const [tlsPolicy, setTlsPolicy] = useState<FleetTlsPolicy>('inherit');
-  const [ingressEndpointId, setIngressEndpointId] = useState('');
-  const [domainBindings, setDomainBindings] = useState<string[]>([]);
+  const [ingressId, setIngressId] = useState('');
+  const [jumphost, setJumphost] = useState('');
   const [upstreamHost, setUpstreamHost] = useState('');
   const [traefikPort, setTraefikPort] = useState('30080');
   const [clusterLabels, setClusterLabels] = useState<Record<string, string>>({});
@@ -152,14 +147,8 @@ export function ClusterDetailPage() {
       setRegion(c.topology?.region || c.labels?.['fleet.topology/region'] || '');
       setNestDepth(c.topology?.nest_depth || c.labels?.['fleet.topology/nest_depth'] || '0');
       setProvisioner(c.topology?.provisioner || c.labels?.['fleet.topology/provisioner'] || 'k3s');
-      setDirectIngress(!!c.direct_ingress);
-      setExposureMode(
-        (c.exposure_mode as FleetExposureMode | 'inherit') ||
-          (c.direct_ingress ? 'port_forward' : 'none'),
-      );
-      setTlsPolicy(c.tls_policy || 'inherit');
-      setIngressEndpointId(c.ingress_endpoint_id || '');
-      setDomainBindings(c.domain_bindings || []);
+      setIngressId(c.ingress_id || '');
+      setJumphost(c.jumphost || '');
       setUpstreamHost(c.upstream_host || '');
       setTraefikPort(String(c.traefik_http_port || 30080));
       const clusterReady = c.available || fleetClusterPhase(c) === 'Ready';
@@ -198,16 +187,9 @@ export function ClusterDetailPage() {
     () => sites.find((s) => (s.spec.siteId || s.metadata?.name) === (siteId || cluster?.site)),
     [sites, siteId, cluster?.site],
   );
-  const domainOptions = useMemo(() => {
-    const domains = selectedSite?.spec.edge?.domains || [];
-    if (domains.length > 0) return domains.map((d) => d.id);
-    const zone = selectedSite?.spec.edge?.edgeDomain || selectedSite?.spec.edgeDomain;
-    return zone ? ['primary'] : [];
-  }, [selectedSite]);
-  const siteExposureMode = selectedSite?.spec.edge?.exposureMode || 'none';
-  const exposureTlsIssue = useMemo(
-    () => getExposureTlsPairIssue(exposureMode, tlsPolicy, siteExposureMode),
-    [exposureMode, tlsPolicy, siteExposureMode],
+  const ingressOptions = useMemo(
+    () => selectedSite?.spec.edge?.ingress || [],
+    [selectedSite],
   );
 
   const pending = cluster ? fleetClusterIsPending(cluster) : false;
@@ -283,14 +265,11 @@ export function ClusterDetailPage() {
     const topoProvisioner = clusterLabels['fleet.topology/provisioner'] ?? provisioner;
     const patch: FleetClusterPatch = {
       siteId: site,
+      jumphost: jumphost.trim(),
       topology: { region: topoRegion, nest_depth: topoNest, provisioner: topoProvisioner },
       customLabels: buildCustomLabelsPatch(clusterLabels),
       edge: {
-        exposure_mode: exposureMode,
-        tls_policy: tlsPolicy,
-        ingress_endpoint_id: ingressEndpointId || undefined,
-        domain_bindings: domainBindings,
-        direct_ingress: directIngress,
+        ingress_id: ingressId || undefined,
         upstream_host: upstreamHost,
         traefik_http_port: parseInt(traefikPort, 10) || 30080,
       },
@@ -309,8 +288,9 @@ export function ClusterDetailPage() {
   const authEnabled = !!cluster?.ingress_auth_enabled;
   const authPrereqReady = phase === 'Ready';
   const authPrereqIngress = !!cluster?.ingress_enabled;
-  const authPrereqDomains = (cluster?.domain_bindings?.length ?? 0) > 0;
-  const authCanEnable = authPrereqReady && authPrereqIngress && authPrereqDomains && !authEnabled;
+  const authPrereqIngressBinding = !!cluster?.ingress_id;
+  const authCanEnable =
+    authPrereqReady && authPrereqIngress && authPrereqIngressBinding && !authEnabled && ingressAuthSupported(cluster?.method);
   const portalHost = cluster?.ingressAuthStatus?.portalHost;
   const portalUrl = portalHost ? `https://${portalHost}` : undefined;
   const lldapWebUIHost = cluster?.ingressAuthStatus?.lldapWebUIHost;
@@ -351,9 +331,7 @@ export function ClusterDetailPage() {
     }
   };
 
-  const effectiveTlsPolicy =
-    tlsPolicy !== 'inherit' ? tlsPolicy : (cluster?.tls_policy ?? 'inherit');
-  const showClusterAcme = effectiveTlsPolicy === 'acme_cluster';
+  const showClusterAcme = isPortForwardMethod(cluster?.method);
   const acmeEnabled = !!cluster?.acme_enabled;
   const acmeCanEnable =
     showClusterAcme && phase === 'Ready' && !!cluster?.ingress_enabled && !acmeEnabled;
@@ -510,21 +488,22 @@ export function ClusterDetailPage() {
                   </DescriptionListDescription>
                 </DescriptionListGroup>
                 <DescriptionListGroup>
-                  <DescriptionListTerm>Exposure</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    <code>{exposureMode}</code>
-                    {tlsPolicy !== 'inherit' ? (
-                      <>
-                        {' '}
-                        · TLS <code>{tlsPolicy}</code>
-                      </>
-                    ) : null}
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
-                <DescriptionListGroup>
                   <DescriptionListTerm>Ingress</DescriptionListTerm>
                   <DescriptionListDescription>
-                    {cluster.ingress_enabled ? 'enabled' : 'disabled'}
+                    {cluster.ingress_id ? (
+                      <>
+                        <code>{cluster.ingress_id}</code>
+                        {cluster.method ? (
+                          <>
+                            {' '}
+                            · <code>{cluster.method}</code>
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      'none'
+                    )}
+                    {cluster.ingress_enabled ? ' · enabled' : ' · disabled'}
                     {cluster.ingress_auth_enabled ? ' · forward-auth on' : ''}
                   </DescriptionListDescription>
                 </DescriptionListGroup>
@@ -589,6 +568,7 @@ export function ClusterDetailPage() {
               <ClusterDetailEdgeTab
                 cluster={cluster}
                 phase={phase}
+                site={selectedSite}
                 siteId={siteId}
                 setSiteId={setSiteId}
                 clusterLabels={clusterLabels}
@@ -599,26 +579,18 @@ export function ClusterDetailPage() {
                 setNestDepth={setNestDepth}
                 provisioner={provisioner}
                 setProvisioner={setProvisioner}
-                exposureMode={exposureMode}
-                setExposureMode={setExposureMode}
-                tlsPolicy={tlsPolicy}
-                setTlsPolicy={setTlsPolicy}
-                directIngress={directIngress}
-                setDirectIngress={setDirectIngress}
-                ingressEndpointId={ingressEndpointId}
-                setIngressEndpointId={setIngressEndpointId}
-                domainBindings={domainBindings}
-                setDomainBindings={setDomainBindings}
+                ingressId={ingressId}
+                setIngressId={setIngressId}
+                jumphost={jumphost}
+                setJumphost={setJumphost}
                 upstreamHost={upstreamHost}
                 setUpstreamHost={setUpstreamHost}
                 traefikPort={traefikPort}
                 setTraefikPort={setTraefikPort}
-                siteExposureMode={siteExposureMode}
-                exposureTlsIssue={exposureTlsIssue}
-                domainOptions={domainOptions}
+                ingressOptions={ingressOptions}
                 authPrereqReady={authPrereqReady}
                 authPrereqIngress={authPrereqIngress}
-                authPrereqDomains={authPrereqDomains}
+                authPrereqIngressBinding={authPrereqIngressBinding}
                 authCanEnable={authCanEnable}
                 authEnabled={authEnabled}
                 authActionBusy={authActionBusy}

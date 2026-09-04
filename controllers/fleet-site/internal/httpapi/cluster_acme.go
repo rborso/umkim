@@ -3,10 +3,11 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (s *Server) handleClusterAcme(w http.ResponseWriter, r *http.Request, clusterName, sub string) {
@@ -114,26 +115,33 @@ func (s *Server) handleDisableClusterAcme(ctx context.Context, w http.ResponseWr
 }
 
 func (s *Server) clusterAcmeEligible(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {
-	tls := fcj.Spec.Edge.TlsPolicy
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
 	edge, err := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
 	if err == nil {
-		if e, ok := edge.Clusters[clusterName]; ok && e.TlsPolicy != "" {
-			tls = e.TlsPolicy
-		}
-	}
-	if tls == "" || tls == "inherit" {
-		var fs fleetv1alpha1.FleetSite
-		if err := s.Client.Get(ctx, client.ObjectKey{Namespace: s.Cfg.Namespace, Name: fcj.Spec.SiteId}, &fs); err == nil {
-			fs.Spec.NormalizeEdge()
-			for _, d := range fs.Spec.Edge.Domains {
-				if d.TlsPolicy != "" {
-					tls = d.TlsPolicy
-					break
-				}
+		if e, ok := edge.Clusters[clusterName]; ok {
+			if e.Method == fleetv1alpha1.IngressMethodReverseProxy {
+				return false
+			}
+			if e.IngressID != "" {
+				ingressID = e.IngressID
+			}
+			if e.TlsPolicy != "" {
+				return e.TlsPolicy == fleetv1alpha1.TLSPolicyACMECluster
 			}
 		}
 	}
-	return tls == fleetv1alpha1.TLSPolicyACMECluster
+	if ingressID == "" {
+		return false
+	}
+	site, err := s.loadSiteForCluster(ctx, fcj.Spec.SiteId)
+	if err != nil {
+		return false
+	}
+	ci, err := ingress.ResolveClusterIngress(site.Spec, ingressID)
+	if err != nil {
+		return false
+	}
+	return ci.AllowsSpokeACME
 }
 
 func (s *Server) clusterDirectIngress(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {

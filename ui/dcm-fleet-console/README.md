@@ -49,6 +49,11 @@ Helm installs use the console **Apps** page (`FleetApp`). Publish charts on
 See [fleet-apps.md](../../docs/components/fleet-apps.md) and
 [examples/site-profiles/](../../examples/site-profiles/) for site exposure.
 
+**Site connectivity:** registry sites expose jumphost, region, and failure domain
+on **Sites → detail → Edge and DNS** (and on create). Cluster jumphost overrides
+are on **Clusters → detail → Edge and ingress**. CLI equivalents: `umkim site patch`
+and `umkim cluster patch` ([umkim-cli.md](../../docs/components/umkim-cli.md)).
+
 Deploy through the console playbooks and `roles/fleet_webui/`; build and image
 publication are controlled by the Harbor role. Resolve all hosts, registries,
 tags, and credentials from authorized inventory and secret configuration.

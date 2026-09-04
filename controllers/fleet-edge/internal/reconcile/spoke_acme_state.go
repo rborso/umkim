@@ -34,7 +34,7 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 		return spokeACMEState{Blocked: true, TLSPhase: route.Status.TLSPhase, TLSMessage: route.Status.TLSMessage}
 	}
 
-	if r.Config.ACMEDNSCheckEnabled {
+	if r.Config.ACMEDNSCheckEnabled && regCluster.EffectiveMethod() != "reverse_proxy" {
 		ok, msg := r.validateSiteDNS(ctx, siteHost, regCluster)
 		if !ok {
 			_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseFailedDNS, msg)

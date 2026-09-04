@@ -21,9 +21,10 @@ procedures between the two deployments.
 
 ## Before enabling a public route
 
-1. Confirm the cluster is ready and site exposure matches the route:
-   - `route.mode: site` needs `port_forward` or `reverse_proxy` site exposure.
-   - `route.mode: hub` needs `hub_gateway` on the site (or hub-managed path).
+1. Confirm the cluster is ready and ingress matches the route:
+   - `route.mode: site` needs a cluster bound to `port_forward` or `reverse_proxy` ingress.
+   - **Ingress auth** is only available on **`port_forward`** ingress (not `reverse_proxy`).
+   - `route.mode: hub` needs site `hubGateway` (and hub zone DNS).
    - `route.mode: none` is out of scope unless the chart exposes its own ingress.
 2. Configure DNS for the application and authentication portal with the
    organization’s DNS provider.

@@ -13,6 +13,7 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/bundle"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ingressauth"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
@@ -78,6 +79,11 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		// console or kubectl patches to FleetClusterJoin.spec.edge.
 		if err := r.upsertEdgeClusterEntry(ctx, &fcj, clusterName); err != nil {
 			return ctrl.Result{}, err
+		}
+		if res, err := r.reconcileKubeconfigSecret(ctx, &fcj, clusterName); err != nil {
+			return ctrl.Result{}, err
+		} else if res.Requeue || res.RequeueAfter > 0 {
+			return res, nil
 		}
 		if res, err := r.reconcileClusterStorage(ctx, &fcj, clusterName); err != nil {
 			return ctrl.Result{}, err
@@ -353,7 +359,7 @@ func (r *ClusterJoinReconciler) issueClusterScript(ctx context.Context, fcj *fle
 	}
 
 	if bundleMode {
-	ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, false, r.siteDefaultExposure(ctx, fcj.Spec.SiteId))
+	ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, false)
 		hostBridgeScript := ""
 		if fcj.Spec.WantsKubevirtBridge() {
 			hb := fcj.Spec.Providers.KubevirtBridge
@@ -570,7 +576,7 @@ func (r *ClusterJoinReconciler) startClusterProvision(ctx context.Context, fcj *
 }
 
 func (r *ClusterJoinReconciler) ensureClusterInventoryCM(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, nodeWG []wg.NodeWG) error {
-	ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, true, r.siteDefaultExposure(ctx, fcj.Spec.SiteId))
+	ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, true)
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterInventoryCMName(clusterName), Namespace: fcj.Namespace},
 		Data:       map[string]string{"inventory.ini": ini},
@@ -655,22 +661,23 @@ func writeFleetNFSDelegateInventory(b *strings.Builder, fcj *fleetv1alpha1.Fleet
 	}
 }
 
-func writeFleetClusterEdgeVars(b *strings.Builder, fcj *fleetv1alpha1.FleetClusterJoin, siteDefaultExposure string) {
-	exposure := fcj.Spec.Edge.ExposureMode
-	if exposure == "" {
-		exposure = "inherit"
+func writeFleetClusterEdgeVars(b *strings.Builder, fcj *fleetv1alpha1.FleetClusterJoin, site *fleetv1alpha1.FleetSite) {
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
+	if ingressID == "" && site != nil {
+		ingressID = site.Spec.AutoIngressID()
 	}
-	tls := fcj.Spec.Edge.TlsPolicy
-	if tls == "" {
-		tls = "inherit"
+	method := ""
+	tls := ""
+	direct := false
+	if site != nil && ingressID != "" {
+		if ci, err := ingress.ResolveClusterIngress(site.Spec, ingressID); err == nil {
+			method = ci.Method
+			tls = ci.TlsPolicy
+			direct = ci.AllowsSiteRoute
+		}
 	}
-	clusterInput := registry.ClusterExposureInput{
-		ExposureMode: exposure,
-		TlsPolicy:    tls,
-	}
-	effectiveExposure := registry.EffectiveClusterExposureMode(clusterInput, siteDefaultExposure)
-	direct := registry.DirectIngressFromExposure(effectiveExposure)
-	b.WriteString(fmt.Sprintf("fleet_cluster_exposure_mode=%s\n", exposure))
+	b.WriteString(fmt.Sprintf("fleet_cluster_ingress_id=%s\n", ingressID))
+	b.WriteString(fmt.Sprintf("fleet_cluster_exposure_mode=%s\n", method))
 	b.WriteString(fmt.Sprintf("fleet_cluster_tls_policy=%s\n", tls))
 	b.WriteString(fmt.Sprintf("fleet_cluster_spoke_direct_ingress=%s\n", boolLabel(direct)))
 	b.WriteString("fleet_cluster_traefik_http_port=30080\n")
@@ -678,20 +685,23 @@ func writeFleetClusterEdgeVars(b *strings.Builder, fcj *fleetv1alpha1.FleetClust
 	b.WriteString("phase6_deploy_whoami_demo=false\n")
 }
 
-func (r *ClusterJoinReconciler) siteDefaultExposure(ctx context.Context, siteID string) string {
-	if siteID == "" {
-		return ""
+func (r *ClusterJoinReconciler) loadFleetSite(ctx context.Context, siteID string) *fleetv1alpha1.FleetSite {
+	if siteID == "" || r.Reconciler == nil || r.Reconciler.Client == nil {
+		return nil
 	}
 	var fs fleetv1alpha1.FleetSite
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: siteID}, &fs); err != nil {
-		return ""
+		return nil
 	}
-	return fs.Spec.EffectiveDefaultExposureMode()
+	return &fs
 }
 
 func (r *ClusterJoinReconciler) effectiveJumphost(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) string {
 	if j := strings.TrimSpace(fcj.Spec.Jumphost); j != "" {
 		return j
+	}
+	if r.Reconciler == nil || r.Reconciler.Client == nil {
+		return ""
 	}
 	siteID := strings.TrimSpace(fcj.Spec.SiteId)
 	if siteID == "" {
@@ -723,10 +733,11 @@ func nodeAnsibleHost(n wg.NodeWG, fallback string, hubRunner, useMgmtLAN bool) s
 	return fallback
 }
 
-func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, nodeWG []wg.NodeWG, hubRunner bool, siteDefaultExposure string) string {
+func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, nodeWG []wg.NodeWG, hubRunner bool) string {
 	if len(nodeWG) == 0 {
 		return ""
 	}
+	site := r.loadFleetSite(ctx, fcj.Spec.SiteId)
 	bootstrap := firstControlNodeWG(nodeWG)
 	bootstrapWG := wg.HostIP(bootstrap.WGAddress)
 	bootstrapMgmt := bootstrap.Address
@@ -830,7 +841,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString(fmt.Sprintf("fleet_site_wg_ip=%s/32\n", bootstrapWG))
 		writeFleetClusterK3sNetworkVars(&b)
 		writeFleetClusterStorageVars(&b, fcj, clusterName)
-		writeFleetClusterEdgeVars(&b, fcj, siteDefaultExposure)
+		writeFleetClusterEdgeVars(&b, fcj, site)
 		b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
@@ -848,19 +859,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString(fmt.Sprintf("fleet_site=%s\n", fcj.Spec.SiteId))
 		b.WriteString(fmt.Sprintf("cluster_region=%s\n", fcj.Spec.ClusterRegion))
 		b.WriteString(fmt.Sprintf("wireguard_address=%s\n", bootstrap.WGAddress))
-		b.WriteString("\n[hub]\n")
-		b.WriteString(fmt.Sprintf("%s ansible_host=10.10.0.1 ansible_user=%s\n", r.Cfg.HubHostInventoryName, r.Cfg.SSHUser))
-		b.WriteString("\n[hub:vars]\n")
-		b.WriteString("wireguard_address=10.10.0.1/24\n")
-		b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
-		b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
-		if hubRunner {
-			b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
-			b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
-			b.WriteString("ocm_spoke_kubeconfig_delegate_local=true\n")
-			b.WriteString(fmt.Sprintf("ocm_spoke_kubeconfig_ssh_private_key_file=%s\n", sshKeyFile))
-			b.WriteString("ocm_spoke_kubeconfig_kubectl_config=/etc/kube/config\n")
-		}
+		writeHubInventorySection(&b, r, hubRunner, sshKeyFile, sshArgs)
 		writeFleetNFSDelegateInventory(&b, fcj, hubRunner, r.Cfg.SSHUser)
 		return b.String()
 	}
@@ -909,7 +908,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	writeFleetClusterKubevirtBridgeVars(&b, fcj)
 	writeFleetClusterK3sNetworkVars(&b)
 	writeFleetClusterStorageVars(&b, fcj, clusterName)
-	writeFleetClusterEdgeVars(&b, fcj, siteDefaultExposure)
+	writeFleetClusterEdgeVars(&b, fcj, site)
 	b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString("\n[ocm_spoke_join:children]\n")
@@ -922,21 +921,35 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	b.WriteString(fmt.Sprintf("fleet_site=%s\n", fcj.Spec.SiteId))
 	b.WriteString(fmt.Sprintf("cluster_region=%s\n", fcj.Spec.ClusterRegion))
 	b.WriteString(fmt.Sprintf("wireguard_address=%s\n", n.WGAddress))
+	writeHubInventorySection(&b, r, hubRunner, sshKeyFile, sshArgs)
+	writeFleetNFSDelegateInventory(&b, fcj, hubRunner, r.Cfg.SSHUser)
+	return b.String()
+}
+
+// writeHubInventorySection emits [hub] for cluster Ansible jobs. Hub-runner pods run
+// on the hub with hostNetwork; delegate tasks SSH to 127.0.0.1 (clusteradm, kubectl on host).
+// Jumphost ProxyCommand applies only to spoke nodes, never to [hub].
+func writeHubInventorySection(b *strings.Builder, r *ClusterJoinReconciler, hubRunner bool, sshKeyFile, sshArgs string) {
 	b.WriteString("\n[hub]\n")
-	b.WriteString(fmt.Sprintf("%s ansible_host=10.10.0.1 ansible_user=%s\n", r.Cfg.HubHostInventoryName, r.Cfg.SSHUser))
+	if hubRunner {
+		b.WriteString(fmt.Sprintf("%s ansible_host=127.0.0.1 ansible_user=%s\n", r.Cfg.HubHostInventoryName, r.Cfg.SSHUser))
+	} else {
+		b.WriteString(fmt.Sprintf("%s ansible_host=10.10.0.1 ansible_user=%s\n", r.Cfg.HubHostInventoryName, r.Cfg.SSHUser))
+	}
 	b.WriteString("\n[hub:vars]\n")
 	b.WriteString("wireguard_address=10.10.0.1/24\n")
 	b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
 	if hubRunner {
 		b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
-		b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
+		b.WriteString("ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\n")
 		b.WriteString("ocm_spoke_kubeconfig_delegate_local=true\n")
 		b.WriteString(fmt.Sprintf("ocm_spoke_kubeconfig_ssh_private_key_file=%s\n", sshKeyFile))
 		b.WriteString("ocm_spoke_kubeconfig_kubectl_config=/etc/kube/config\n")
+		return
 	}
-	writeFleetNFSDelegateInventory(&b, fcj, hubRunner, r.Cfg.SSHUser)
-	return b.String()
+	b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
+	b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
 }
 
 func writeHarborBootstrapVars(b *strings.Builder, hubIP, password string) {
@@ -1134,6 +1147,9 @@ func (r *ClusterJoinReconciler) finishClusterReady(ctx context.Context, fcj *fle
 	if err := r.patchClusterLabels(ctx, fcj, clusterName); err != nil {
 		return err
 	}
+	if err := r.triggerKubeconfigSync(ctx, fcj); err != nil {
+		return err
+	}
 	if err := r.triggerCapabilityDiscover(ctx, fcj); err != nil {
 		return err
 	}
@@ -1231,16 +1247,17 @@ func (r *ClusterJoinReconciler) upsertEdgeClusterEntry(ctx context.Context, fcj 
 		return nil
 	}
 	type edgeEntry struct {
-		Site              string   `yaml:"site"`
-		Management        bool     `yaml:"management,omitempty"`
-		ReadOnly          bool     `yaml:"read_only,omitempty"`
-		DirectIngress     bool     `yaml:"direct_ingress"`
-		ExposureMode      string   `yaml:"exposure_mode,omitempty"`
-		TlsPolicy         string   `yaml:"tls_policy,omitempty"`
-		IngressEndpointID string   `yaml:"ingress_endpoint_id,omitempty"`
-		DomainBindings    []string `yaml:"domain_bindings,omitempty"`
-		UpstreamHost      string   `yaml:"upstream_host"`
-		TraefikHTTPPort   int      `yaml:"traefik_http_port"`
+		Site            string `yaml:"site"`
+		Management      bool   `yaml:"management,omitempty"`
+		ReadOnly        bool   `yaml:"read_only,omitempty"`
+		DirectIngress   bool   `yaml:"direct_ingress"`
+		IngressID       string `yaml:"ingress_id,omitempty"`
+		Method          string `yaml:"method,omitempty"`
+		TlsPolicy       string `yaml:"tls_policy,omitempty"`
+		DNSZone         string `yaml:"dns_zone,omitempty"`
+		EdgeWANIP       string `yaml:"edge_wan_ip,omitempty"`
+		UpstreamHost    string `yaml:"upstream_host"`
+		TraefikHTTPPort int    `yaml:"traefik_http_port"`
 	}
 	type edgeFile struct {
 		Clusters map[string]edgeEntry `yaml:"clusters"`
@@ -1260,35 +1277,37 @@ func (r *ClusterJoinReconciler) upsertEdgeClusterEntry(ctx context.Context, fcj 
 	prev := edgeClusterUpsert{}
 	if existingEnt, ok := f.Clusters[clusterName]; ok {
 		prev = edgeClusterUpsert{
-			Site:              existingEnt.Site,
-			Management:        existingEnt.Management,
-			ReadOnly:          existingEnt.ReadOnly,
-			DirectIngress:     existingEnt.DirectIngress,
-			ExposureMode:      existingEnt.ExposureMode,
-			TlsPolicy:         existingEnt.TlsPolicy,
-			IngressEndpointID: existingEnt.IngressEndpointID,
-			DomainBindings:    existingEnt.DomainBindings,
-			UpstreamHost:      existingEnt.UpstreamHost,
-			TraefikHTTPPort:   existingEnt.TraefikHTTPPort,
+			Site:            existingEnt.Site,
+			Management:      existingEnt.Management,
+			ReadOnly:        existingEnt.ReadOnly,
+			DirectIngress:   existingEnt.DirectIngress,
+			Method:          existingEnt.Method,
+			TlsPolicy:       existingEnt.TlsPolicy,
+			IngressID:       existingEnt.IngressID,
+			DNSZone:         existingEnt.DNSZone,
+			EdgeWANIP:       existingEnt.EdgeWANIP,
+			UpstreamHost:    existingEnt.UpstreamHost,
+			TraefikHTTPPort: existingEnt.TraefikHTTPPort,
 		}
 	}
-	siteDefault := r.siteDefaultExposure(ctx, fcj.Spec.SiteId)
+	site := r.loadFleetSite(ctx, fcj.Spec.SiteId)
 	upstream := wg.HostIP(fcj.Status.WireguardAddress)
 	if fcj.Spec.IsLAN() && fcj.Spec.BootstrapHost != "" {
 		upstream = fcj.Spec.BootstrapHost
 	}
-	merged := mergeEdgeClusterEntryForJoin(prev, fcj, siteDefault, upstream)
+	merged := mergeEdgeClusterEntryForJoin(prev, fcj, site, upstream)
 	f.Clusters[clusterName] = edgeEntry{
-		Site:              merged.Site,
-		Management:        merged.Management,
-		ReadOnly:          merged.ReadOnly,
-		DirectIngress:     merged.DirectIngress,
-		ExposureMode:      merged.ExposureMode,
-		TlsPolicy:         merged.TlsPolicy,
-		IngressEndpointID: merged.IngressEndpointID,
-		DomainBindings:    merged.DomainBindings,
-		UpstreamHost:      merged.UpstreamHost,
-		TraefikHTTPPort:   merged.TraefikHTTPPort,
+		Site:            merged.Site,
+		Management:      merged.Management,
+		ReadOnly:        merged.ReadOnly,
+		DirectIngress:   merged.DirectIngress,
+		IngressID:       merged.IngressID,
+		Method:          merged.Method,
+		TlsPolicy:       merged.TlsPolicy,
+		DNSZone:         merged.DNSZone,
+		EdgeWANIP:       merged.EdgeWANIP,
+		UpstreamHost:    merged.UpstreamHost,
+		TraefikHTTPPort: merged.TraefikHTTPPort,
 	}
 	out, err := yaml.Marshal(f)
 	if err != nil {

@@ -14,18 +14,19 @@ import (
 )
 
 type edgeClusterEntry struct {
-	Site              string                 `yaml:"site"`
-	Management        bool                   `yaml:"management,omitempty"`
-	ReadOnly          bool                   `yaml:"read_only,omitempty"`
-	DirectIngress     bool                   `yaml:"direct_ingress"`
-	ExposureMode      string                 `yaml:"exposure_mode,omitempty"`
-	TlsPolicy         string                 `yaml:"tls_policy,omitempty"`
-	IngressEndpointID string                 `yaml:"ingress_endpoint_id,omitempty"`
-	DomainBindings    []string               `yaml:"domain_bindings,omitempty"`
-	UpstreamHost      string                 `yaml:"upstream_host"`
-	TraefikHTTPPort   int                    `yaml:"traefik_http_port"`
-	Capabilities      map[string]interface{} `yaml:"capabilities,omitempty"`
-	Region            string                 `yaml:"region,omitempty"`
+	Site            string                 `yaml:"site"`
+	Management      bool                   `yaml:"management,omitempty"`
+	ReadOnly        bool                   `yaml:"read_only,omitempty"`
+	DirectIngress   bool                   `yaml:"direct_ingress"`
+	IngressID       string                 `yaml:"ingress_id,omitempty"`
+	Method          string                 `yaml:"method,omitempty"`
+	TlsPolicy       string                 `yaml:"tls_policy,omitempty"`
+	DNSZone         string                 `yaml:"dns_zone,omitempty"`
+	EdgeWANIP       string                 `yaml:"edge_wan_ip,omitempty"`
+	UpstreamHost    string                 `yaml:"upstream_host"`
+	TraefikHTTPPort int                    `yaml:"traefik_http_port"`
+	Capabilities    map[string]interface{} `yaml:"capabilities,omitempty"`
+	Region          string                 `yaml:"region,omitempty"`
 }
 
 type edgeClustersFile struct {

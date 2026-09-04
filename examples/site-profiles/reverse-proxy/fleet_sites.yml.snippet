@@ -3,22 +3,18 @@
 edge_rp_example:
   display_name: Edge reverse-proxy site
   region: edge
-  exposure_mode: reverse_proxy
-  default_exposure_mode: reverse_proxy
-  edge_domain: rp.site.example.com
-  edge_wildcard: "*.rp.site.example.com"
-  external_endpoints:
-    - id: edge-rp-wan
-      address: "203.0.113.51"   # RFC5737 — edge router public IP
-      role: primary
-      description: "Edge router — host-based reverse proxy, TLS on router"
-  domains:
-    - id: rp-zone
-      zone: rp.site.example.com
-      wildcard: "*.rp.site.example.com"
-      tls_policy: external
-      ingress_endpoint_id: edge-rp-wan
-  dns_target_note: "A/AAAA *.rp.site.example.com → 203.0.113.51 (edge-rp-wan) → RP → node 203.0.113.101:30080"
+  ingress:
+    - id: edge-rp
+      method: reverse_proxy
+      address: "203.0.113.51"   # RFC5737 — optional WAN hint
+      operator_notes: "Edge router — host-based reverse proxy, TLS on router"
+    - id: site-pf
+      method: port_forward
+      address: "203.0.113.52"
+      zone: pf.site.example.com
+      wildcard: "*.pf.site.example.com"
+      description: "Optional port-forward path on same site"
+  dns_target_note: "RP vhosts on 203.0.113.51 → node :30080; PF zone pf.site.example.com → 203.0.113.52"
   wan_egress:
     enabled: true
     expected_wan_ip: "203.0.113.51"

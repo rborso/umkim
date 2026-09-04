@@ -21,20 +21,18 @@ type siteResponse struct {
 }
 
 type sitePatchBody struct {
-	DisplayName           *string                                    `json:"displayName,omitempty"`
-	SiteID                *string                                    `json:"siteId,omitempty"`
-	Region                *string                                    `json:"region,omitempty"`
-	FailureDomain         *string                                    `json:"failureDomain,omitempty"`
-	EdgeDomain            *string                                    `json:"edgeDomain,omitempty"`
-	Wildcard              *string                                    `json:"wildcard,omitempty"`
-	ExposureMode          *string                                    `json:"exposureMode,omitempty"`
-	DefaultExposureMode   *string                                    `json:"defaultExposureMode,omitempty"`
-	ExternalEndpoints     *[]fleetv1alpha1.FleetSiteExternalEndpointSpec `json:"externalEndpoints,omitempty"`
-	Domains               *[]fleetv1alpha1.FleetSiteDomainSpec       `json:"domains,omitempty"`
-	WanEgress             *fleetv1alpha1.FleetSiteWanEgressSpec      `json:"wanEgress,omitempty"`
-	ExternalAccess        *fleetv1alpha1.FleetSiteExternalAccessSpec `json:"externalAccess,omitempty"`
-	ProvisioningMode      *string                                    `json:"provisioningMode,omitempty"`
-	Jumphost              *string                                    `json:"jumphost,omitempty"`
+	DisplayName      *string                                   `json:"displayName,omitempty"`
+	SiteID           *string                                   `json:"siteId,omitempty"`
+	Region           *string                                   `json:"region,omitempty"`
+	FailureDomain    *string                                   `json:"failureDomain,omitempty"`
+	HubGateway       *bool                                     `json:"hubGateway,omitempty"`
+	HubZone          *string                                   `json:"hubZone,omitempty"`
+	HubWildcard      *string                                   `json:"hubWildcard,omitempty"`
+	Ingress          *[]fleetv1alpha1.FleetSiteIngressSpec     `json:"ingress,omitempty"`
+	WanEgress        *fleetv1alpha1.FleetSiteWanEgressSpec     `json:"wanEgress,omitempty"`
+	ExternalAccess   *fleetv1alpha1.FleetSiteExternalAccessSpec `json:"externalAccess,omitempty"`
+	ProvisioningMode *string                                   `json:"provisioningMode,omitempty"`
+	Jumphost         *string                                   `json:"jumphost,omitempty"`
 }
 
 func (s *Server) enrichSite(ctx context.Context, fs *fleetv1alpha1.FleetSite) siteResponse {
@@ -99,9 +97,9 @@ func (s *Server) handlePatchSite(ctx context.Context, w http.ResponseWriter, r *
 	mgmtSite := isManagementFleetSite(&fs, siteID, s.managementSiteID())
 
 	if mgmtSite {
-		if patch.SiteID != nil || patch.ProvisioningMode != nil || patch.ExposureMode != nil ||
-			patch.EdgeDomain != nil || patch.Wildcard != nil {
-			http.Error(w, "management site: only display name, domains, external endpoints, and DNS notes may be changed", http.StatusForbidden)
+		if patch.SiteID != nil || patch.ProvisioningMode != nil || patch.HubGateway != nil ||
+			patch.HubZone != nil || patch.HubWildcard != nil || patch.Ingress != nil {
+			http.Error(w, "management site: only display name and DNS notes may be changed", http.StatusForbidden)
 			return
 		}
 	}
@@ -124,32 +122,33 @@ func (s *Server) handlePatchSite(ctx context.Context, w http.ResponseWriter, r *
 		fs.Spec.FailureDomain = *patch.FailureDomain
 	}
 	if patch.Jumphost != nil {
+		if err := validateJumphostValue(*patch.Jumphost); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		fs.Spec.Jumphost = strings.TrimSpace(*patch.Jumphost)
 	}
 	if !mgmtSite {
-		if patch.EdgeDomain != nil {
-			fs.Spec.Edge.EdgeDomain = *patch.EdgeDomain
-			fs.Spec.EdgeDomain = *patch.EdgeDomain
+		if patch.HubGateway != nil {
+			fs.Spec.Edge.HubGateway = *patch.HubGateway
 		}
-		if patch.Wildcard != nil {
-			fs.Spec.Edge.Wildcard = *patch.Wildcard
+		if patch.HubZone != nil {
+			fs.Spec.Edge.HubZone = *patch.HubZone
 		}
-		if patch.ExposureMode != nil {
-			fs.Spec.Edge.ExposureMode = *patch.ExposureMode
+		if patch.HubWildcard != nil {
+			fs.Spec.Edge.HubWildcard = *patch.HubWildcard
 		}
-		if patch.DefaultExposureMode != nil {
-			fs.Spec.Edge.DefaultExposureMode = *patch.DefaultExposureMode
+		if patch.Ingress != nil {
+			rows := *patch.Ingress
+			for i := range rows {
+				rows[i].AssignedClusters = nil
+			}
+			if err := validateSiteIngressRows(rows); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			fs.Spec.Edge.Ingress = rows
 		}
-	}
-	if patch.ExternalEndpoints != nil {
-		fs.Spec.Edge.ExternalEndpoints = *patch.ExternalEndpoints
-	}
-	if patch.Domains != nil {
-		domains := *patch.Domains
-		for i := range domains {
-			domains[i].AssignedClusters = nil
-		}
-		fs.Spec.Edge.Domains = domains
 	}
 	if patch.WanEgress != nil {
 		fs.Spec.Edge.WanEgress = patch.WanEgress
@@ -167,7 +166,7 @@ func (s *Server) handlePatchSite(ctx context.Context, w http.ResponseWriter, r *
 	if patch.ProvisioningMode != nil {
 		fs.Spec.ProvisioningMode = *patch.ProvisioningMode
 	}
-	fs.Spec.NormalizeEdge()
+	fs.Spec.NormalizeIngress()
 
 	if err := s.Client.Update(ctx, &fs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

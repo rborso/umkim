@@ -50,8 +50,7 @@ continuing:
 |------|-------------|
 | `inventory/hosts.yml` | Hub inventory host key, public IPv4 (`ansible_host`), SSH user |
 | `inventory/host_vars/umkim-hub.yml` | `fleet_hub_public_ipv4` (same WAN IPv4 as in `hosts.yml`) |
-| `inventory/group_vars/all/site.yml` | DNS zone, ACME email, WireGuard hostname, LDAP/`domain`, management site ids, per-site `exposure_mode` |
-| `inventory/group_vars/all/fleet_sites.yml` | Per-site exposure profiles — see [examples/site-profiles/](../examples/site-profiles/) |
+| `inventory/group_vars/all/fleet_sites.yml` | Per-site ingress profiles — see [examples/site-profiles/](../examples/site-profiles/) |
 
 Then run:
 
@@ -215,6 +214,23 @@ test ! -f /etc/rancher/k3s/k3s.yaml && echo OK
 ./scripts/install-hub.sh
 ./scripts/verify-hub-install.sh
 ```
+
+## Migrating to the ingress entry model
+
+v0.2 uses `FleetSite.spec.edge.ingress[]` and `FleetClusterJoin.spec.edge.ingressId`
+instead of `domains`, `external_endpoints`, and per-cluster `domain_bindings`.
+
+1. Patch each `FleetSite`: map each former domain id to an `ingress[]` row
+   (`port_forward` with `address` + `zone`, or `reverse_proxy` with `id` only).
+   Set `hubGateway` / `hubZone` where the site used `hub_gateway`.
+2. Patch each `FleetClusterJoin`: set `spec.edge.ingressId` to the chosen ingress
+   row (former `domainBindings[0]` is a common mapping).
+3. Re-apply `fleet_edge.yml` or let the fleet-site controller reconcile
+   `fleet-edge-clusters` and `fleet-edge-domains` ConfigMaps.
+4. Verify no two `port_forward` clusters share the same `ingressId`.
+
+Inventory snippets under [examples/site-profiles/](../examples/site-profiles/)
+show the new shape.
 
 ## Safe troubleshooting
 

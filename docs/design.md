@@ -18,7 +18,7 @@ port-forward, reverse proxy, or private-only exposure.
 | Layer | Responsibility |
 | --- | --- |
 | Hub | K3s, OCM, Harbor, console, WireGuard, and optional edge services |
-| Site | A `FleetSite` logical location with `exposure_mode` and edge metadata |
+| Site | A `FleetSite` logical location with `ingress[]` and optional `hubGateway` |
 | Cluster | An independent K3s data plane represented by `FleetClusterJoin` and OCM `ManagedCluster` |
 | App | A `FleetApp` Helm release on a cluster the operator selects |
 
@@ -39,24 +39,24 @@ OCM registers workload clusters and delivers platform manifests through
 `ManifestWork`. Application charts are installed with `FleetApp` onto a
 named Ready cluster. There is no placement engine and no DCM catalog.
 
-## Site exposure
+## Site ingress
 
-Each `FleetSite` (or cluster override) selects how that location reaches the
-WAN. Inventory examples live under [../examples/site-profiles/](../examples/site-profiles/).
+Each `FleetSite` declares `spec.edge.ingress[]` entries (see
+[fleet-edge.md](components/fleet-edge.md)). Clusters select an entry with
+`FleetClusterJoin.spec.edge.ingressId`. Optional `hubGateway` replaces the
+former site-wide `hub_gateway` exposure mode.
 
-| `exposure_mode` | Meaning |
+| Ingress `method` | Meaning |
 | --- | --- |
-| `hub_gateway` | Public HTTP/S on the hub; hub forwards to spokes over WireGuard |
-| `port_forward` | WAN port-forwards (e.g. router) to spoke Traefik NodePorts |
-| `reverse_proxy` | External reverse proxy terminates TLS and reaches cluster ingress |
-| `none` | No fleet-managed WAN exposure at the site |
+| `port_forward` | WAN port-forwards to spoke Traefik NodePorts; one cluster per entry |
+| `reverse_proxy` | External reverse proxy terminates TLS; many clusters may share an entry |
 
-Inventory uses `exposure_mode`; the CRD field is `exposureMode`. Values are
-the same.
+Sites with no ingress rows and no `hubGateway` have no fleet-managed WAN path.
+Inventory examples live under [../examples/site-profiles/](../examples/site-profiles/).
 
 ## Cluster lifecycle
 
-1. An operator creates a registry `FleetSite` with the intended exposure mode.
+1. An operator creates a registry `FleetSite` with ingress entries (and optional `hubGateway`).
 2. The operator creates a `FleetClusterJoin` for a non-management site.
 3. The controller issues a bootstrap bundle containing enrollment material.
 4. The operator runs the bundle on the cluster control node.

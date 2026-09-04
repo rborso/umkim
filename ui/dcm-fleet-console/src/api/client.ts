@@ -15,6 +15,7 @@ import type {
   FleetNodePatch,
   HubInfrastructure,
 } from './types';
+import { fleetSitePortForwardZone } from '../edge/ingressMethod';
 
 const FLEET_SITE_API_BASE = '/fleet/api/v1alpha1';
 
@@ -86,7 +87,9 @@ export async function patchFleetSite(name: string, patch: FleetSitePatch): Promi
 }
 
 export function fleetSiteEffectiveDomain(s: FleetSite): string {
-  return s.spec?.edge?.edgeDomain || s.spec?.edgeDomain || '';
+  const pfZone = fleetSitePortForwardZone(s);
+  if (pfZone) return pfZone;
+  return s.spec?.edge?.hubZone || s.spec?.edgeDomain || '';
 }
 
 export function fleetSiteEffectiveId(s: FleetSite): string {
@@ -413,9 +416,17 @@ export async function fetchFleetClusterNodeOperationLogs(
 }
 
 export async function createFleetSite(body: FleetSiteCreate): Promise<FleetSite> {
-  const edgeDomain = body.edgeDomain || body.edge?.edgeDomain;
-  const wildcard = body.wildcard || body.edge?.wildcard;
-  const exposureMode = body.exposureMode || body.edge?.exposureMode || 'none';
+  const ingress = body.edge?.ingress?.length
+    ? body.edge.ingress
+    : [
+        {
+          id: 'default',
+          method: 'port_forward' as const,
+          address: '',
+          zone: '',
+          wildcard: '',
+        },
+      ];
   const payload = {
     apiVersion: 'fleet.umkim.com/v1alpha1',
     kind: 'FleetSite',
@@ -425,11 +436,13 @@ export async function createFleetSite(body: FleetSiteCreate): Promise<FleetSite>
       displayName: body.displayName,
       provisioningMode: 'registry',
       region: body.region,
+      failureDomain: body.failureDomain,
+      jumphost: body.jumphost,
       edge: {
-        edgeDomain,
-        wildcard: wildcard || (edgeDomain ? `*.${edgeDomain}` : undefined),
-        exposureMode,
-        defaultExposureMode: body.defaultExposureMode || body.edge?.defaultExposureMode,
+        hubGateway: body.hubGateway ?? body.edge?.hubGateway,
+        hubZone: body.hubZone ?? body.edge?.hubZone,
+        hubWildcard: body.hubWildcard ?? body.edge?.hubWildcard,
+        ingress,
         wanEgress:
           body.wanEgress ||
           body.edge?.wanEgress ||
@@ -476,12 +489,12 @@ export async function createFleetCluster(body: FleetClusterCreate): Promise<Flee
       clusterName: body.clusterName,
       siteId: body.siteId,
       bootstrapHost: body.bootstrapHost,
+      jumphost: body.jumphost,
       minRootDiskGi: body.minRootDiskGi ?? 40,
       clusterRegion: body.clusterRegion || 'fleet',
       clusterLabels: body.clusterLabels,
       clusterCapabilities: caps,
       storage: body.storage,
-      domainBindings: body.domainBindings,
       edge: body.edge,
       topology: body.topology,
       networkMode: body.networkMode,

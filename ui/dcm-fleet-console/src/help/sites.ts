@@ -69,4 +69,17 @@ export const SITES_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'Hostname to resolve when running Validate DNS on this site (A/AAAA check).',
     example: 'whoami.lab.example.com',
   },
+  'site.jumphost': {
+    description:
+      'Default SSH bastion for hub Ansible jobs targeting clusters in this site (user@host:port). Clusters may override.',
+    example: 'jump@bastion.example.com:22',
+  },
+  'site.region': {
+    description: 'Logical region label for clusters and inventory (fleet.topology/region default).',
+    example: 'homelab',
+  },
+  'site.failureDomain': {
+    description: 'Failure domain or rack label for placement documentation.',
+    example: 'rack-a',
+  },
 };

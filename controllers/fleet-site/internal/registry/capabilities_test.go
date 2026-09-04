@@ -27,10 +27,10 @@ func TestApplyCapabilityPatchAliases(t *testing.T) {
 }
 
 func TestClusterIngressEnabled(t *testing.T) {
-	if !ClusterIngressEnabled(ClusterExposureInput{ExposureMode: "port_forward"}, "") {
+	if !ClusterIngressEnabled(ClusterExposureInput{Method: "port_forward"}, "") {
 		t.Fatal("port_forward should enable ingress")
 	}
-	if ClusterIngressEnabled(ClusterExposureInput{ExposureMode: "none"}, "port_forward") {
-		t.Fatal("explicit none should not inherit site default")
+	if ClusterIngressEnabled(ClusterExposureInput{Method: ""}, "") {
+		t.Fatal("empty method should not enable ingress")
 	}
 }

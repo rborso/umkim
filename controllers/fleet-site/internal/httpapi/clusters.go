@@ -23,15 +23,17 @@ type clusterSummary struct {
 	ReadOnly          bool              `json:"read_only,omitempty"`
 	Capabilities      map[string]bool   `json:"capabilities,omitempty"`
 	Topology          map[string]string `json:"topology,omitempty"`
-	IngressEnabled    bool              `json:"ingress_enabled,omitempty"`
-	IngressAuthEnabled bool             `json:"ingress_auth_enabled,omitempty"`
-	DirectIngress     bool              `json:"direct_ingress,omitempty"`
-	ExposureMode      string            `json:"exposure_mode,omitempty"`
-	TlsPolicy         string            `json:"tls_policy,omitempty"`
-	IngressEndpointID string            `json:"ingress_endpoint_id,omitempty"`
-	DomainBindings    []string          `json:"domain_bindings,omitempty"`
+	IngressEnabled     bool              `json:"ingress_enabled,omitempty"`
+	IngressAuthEnabled bool              `json:"ingress_auth_enabled,omitempty"`
+	DirectIngress      bool              `json:"direct_ingress,omitempty"`
+	IngressID          string            `json:"ingress_id,omitempty"`
+	Method             string            `json:"method,omitempty"`
+	TlsPolicy          string            `json:"tls_policy,omitempty"`
+	DNSZone            string            `json:"dns_zone,omitempty"`
+	EdgeWANIP          string            `json:"edge_wan_ip,omitempty"`
 	UpstreamHost      string            `json:"upstream_host,omitempty"`
 	TraefikHTTPPort   int               `json:"traefik_http_port,omitempty"`
+	Jumphost          string            `json:"jumphost,omitempty"`
 	ConsoleManaged          bool              `json:"console_managed,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty"`
 	ProvisioningPhase       string            `json:"provisioning_phase,omitempty"`
@@ -82,6 +84,7 @@ type clusterNodeOperationJSON struct {
 
 type clusterPatchBody struct {
 	SiteID       string            `json:"siteId,omitempty"`
+	Jumphost     *string           `json:"jumphost,omitempty"`
 	Capabilities map[string]bool   `json:"capabilities,omitempty"`
 	Topology     map[string]string `json:"topology,omitempty"`
 	Edge         *clusterEdgePatch `json:"edge,omitempty"`
@@ -94,13 +97,9 @@ type clusterIngressAuthPatch struct {
 }
 
 type clusterEdgePatch struct {
-	DirectIngress     *bool    `json:"direct_ingress,omitempty"`
-	ExposureMode      string   `json:"exposure_mode,omitempty"`
-	TlsPolicy         string   `json:"tls_policy,omitempty"`
-	IngressEndpointID string   `json:"ingress_endpoint_id,omitempty"`
-	DomainBindings    []string `json:"domain_bindings,omitempty"`
-	UpstreamHost      string   `json:"upstream_host,omitempty"`
-	TraefikHTTPPort   *int     `json:"traefik_http_port,omitempty"`
+	IngressID       string `json:"ingress_id,omitempty"`
+	UpstreamHost    string `json:"upstream_host,omitempty"`
+	TraefikHTTPPort *int   `json:"traefik_http_port,omitempty"`
 }
 
 func (s *Server) handleClusters(w http.ResponseWriter, r *http.Request) {
@@ -205,10 +204,9 @@ func (s *Server) handleListClusters(ctx context.Context, w http.ResponseWriter) 
 	edge, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
 	seen := map[string]bool{}
 	out := make([]clusterSummary, 0, len(items))
-	siteDefaults := s.siteDefaultExposureMap(ctx)
 	fcjByCluster := s.fleetClusterJoinsByClusterName(ctx)
 	for _, mc := range items {
-		cs := clusterFromMC(&mc, edge, siteDefaults)
+		cs := clusterFromMC(&mc, edge)
 		if fcj, ok := fcjByCluster[mc.GetName()]; ok {
 			applyFleetClusterJoinSummary(&cs, fcj)
 			cs.ManagedClusterAvailable = mcConditionAvailable(&mc)
@@ -255,8 +253,7 @@ func (s *Server) handleGetCluster(ctx context.Context, w http.ResponseWriter, na
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	siteDefaults := s.siteDefaultExposureMap(ctx)
-	cs := clusterFromMC(mc, edge, siteDefaults)
+	cs := clusterFromMC(mc, edge)
 	if fcj, jerr := s.findFleetClusterJoin(ctx, name); jerr == nil {
 		applyFleetClusterJoinSummary(&cs, fcj)
 		cs.ManagedClusterAvailable = mcConditionAvailable(mc)
@@ -269,15 +266,6 @@ func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, 
 	if !ok {
 		return
 	}
-	if fcj, err := s.getFleetClusterJoin(ctx, name); err == nil && fcj.Status.Phase != fleetv1alpha1.JoinPhaseReady {
-		http.Error(w, "cluster is not provisioned yet", http.StatusConflict)
-		return
-	}
-	edgePre, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
-	if s.clusterReadOnly(name, edgePre) {
-		http.Error(w, "cluster "+name+" is read-only and cannot be modified via the API", http.StatusForbidden)
-		return
-	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -287,6 +275,49 @@ func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, 
 	var patch clusterPatchBody
 	if err := json.Unmarshal(body, &patch); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if patch.Jumphost != nil {
+		if err := validateJumphostValue(*patch.Jumphost); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	fcj, fcjErr := s.findFleetClusterJoin(ctx, name)
+	notReady := fcjErr == nil && fcj.Status.Phase != "" && fcj.Status.Phase != fleetv1alpha1.JoinPhaseReady
+	jumphostOnly := patchJumphostOnly(patch)
+	if notReady && !jumphostOnly {
+		http.Error(w, "cluster is not provisioned yet", http.StatusConflict)
+		return
+	}
+
+	if jumphostOnly {
+		edgePre, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
+		if s.clusterReadOnly(name, edgePre) {
+			http.Error(w, "cluster "+name+" is read-only and cannot be modified via the API", http.StatusForbidden)
+			return
+		}
+		if err := s.syncFleetClusterJoinFromPatch(ctx, name, &patch); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if fcjErr == nil {
+			updated, err := s.findFleetClusterJoin(ctx, name)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, clusterSummaryFromJoin(updated))
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	edgePre, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
+	if s.clusterReadOnly(name, edgePre) {
+		http.Error(w, "cluster "+name+" is read-only and cannot be modified via the API", http.StatusForbidden)
 		return
 	}
 
@@ -356,26 +387,34 @@ func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, 
 			ent.Site = patch.SiteID
 		}
 		if patch.Edge != nil {
-			if patch.Edge.ExposureMode != "" {
-				ent.ExposureMode = patch.Edge.ExposureMode
-			}
-			if patch.Edge.TlsPolicy != "" {
-				ent.TlsPolicy = patch.Edge.TlsPolicy
-			}
-			if patch.Edge.IngressEndpointID != "" {
-				ent.IngressEndpointID = patch.Edge.IngressEndpointID
-			}
-			if patch.Edge.DomainBindings != nil {
-				ent.DomainBindings = patch.Edge.DomainBindings
-			}
-			if patch.Edge.DirectIngress != nil {
-				ent.DirectIngress = *patch.Edge.DirectIngress
-			} else if patch.Edge.ExposureMode != "" {
-				ent.DirectIngress = registry.DirectIngressFromExposure(
-					registry.EffectiveClusterExposureMode(registry.ClusterExposureInput{
-						ExposureMode: patch.Edge.ExposureMode,
-					}, ""),
-				)
+			if patch.Edge.IngressID != "" {
+				siteID := ent.Site
+				if patch.SiteID != "" {
+					siteID = patch.SiteID
+				}
+				if siteID == "" {
+					siteID = labels["fleet.site"]
+				}
+				if err := s.validateClusterIngressBinding(ctx, siteID, name, patch.Edge.IngressID); err != nil {
+					writeIngressConflict(w, err)
+					return
+				}
+				site, serr := s.loadSiteForCluster(ctx, siteID)
+				if serr != nil {
+					http.Error(w, serr.Error(), http.StatusBadRequest)
+					return
+				}
+				resolved, rerr := resolveEdgeFromIngress(site, patch.Edge.IngressID)
+				if rerr != nil {
+					http.Error(w, rerr.Error(), http.StatusBadRequest)
+					return
+				}
+				ent.IngressID = resolved.IngressID
+				ent.Method = resolved.Method
+				ent.TlsPolicy = resolved.TlsPolicy
+				ent.DirectIngress = resolved.DirectIngress
+				ent.DNSZone = resolved.DNSZone
+				ent.EdgeWANIP = resolved.EdgeWANIP
 			}
 			if patch.Edge.UpstreamHost != "" {
 				ent.UpstreamHost = patch.Edge.UpstreamHost
@@ -416,8 +455,7 @@ func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, 
 
 	_ = registry.ReconcileEdgeDomains(ctx, s.Client, s.domainRegistryConfig())
 	edgeAfter, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
-	siteDefaults := s.siteDefaultExposureMap(ctx)
-	cs := clusterFromMC(mc, edgeAfter, siteDefaults)
+	cs := clusterFromMC(mc, edgeAfter)
 	if fcj, jerr := s.findFleetClusterJoin(ctx, name); jerr == nil {
 		applyFleetClusterJoinSummary(&cs, fcj)
 		cs.ManagedClusterAvailable = mcConditionAvailable(mc)
@@ -438,21 +476,16 @@ func (s *Server) syncFleetClusterJoinFromPatch(ctx context.Context, clusterName 
 		fcj.Spec.SiteId = patch.SiteID
 		updated = true
 	}
-	if patch.Edge != nil {
-		if patch.Edge.ExposureMode != "" && fcj.Spec.Edge.ExposureMode != patch.Edge.ExposureMode {
-			fcj.Spec.Edge.ExposureMode = patch.Edge.ExposureMode
+	if patch.Edge != nil && patch.Edge.IngressID != "" {
+		if fcj.Spec.Edge.IngressId != patch.Edge.IngressID {
+			fcj.Spec.Edge.IngressId = patch.Edge.IngressID
 			updated = true
 		}
-		if patch.Edge.TlsPolicy != "" && fcj.Spec.Edge.TlsPolicy != patch.Edge.TlsPolicy {
-			fcj.Spec.Edge.TlsPolicy = patch.Edge.TlsPolicy
-			updated = true
-		}
-		if patch.Edge.IngressEndpointID != "" && fcj.Spec.Edge.IngressEndpointId != patch.Edge.IngressEndpointID {
-			fcj.Spec.Edge.IngressEndpointId = patch.Edge.IngressEndpointID
-			updated = true
-		}
-		if patch.Edge.DomainBindings != nil {
-			fcj.Spec.DomainBindings = append([]string(nil), patch.Edge.DomainBindings...)
+	}
+	if patch.Jumphost != nil {
+		patchJumphost := strings.TrimSpace(*patch.Jumphost)
+		if fcj.Spec.Jumphost != patchJumphost {
+			fcj.Spec.Jumphost = patchJumphost
 			updated = true
 		}
 	}
@@ -462,21 +495,7 @@ func (s *Server) syncFleetClusterJoinFromPatch(ctx context.Context, clusterName 
 	return s.Client.Update(ctx, fcj)
 }
 
-func (s *Server) siteDefaultExposureMap(ctx context.Context) map[string]string {
-	out := map[string]string{}
-	var list fleetv1alpha1.FleetSiteList
-	if err := s.Client.List(ctx, &list, client.InNamespace(s.Cfg.Namespace)); err != nil {
-		return out
-	}
-	for i := range list.Items {
-		fs := &list.Items[i]
-		siteID := fs.Spec.EffectiveSiteID(fs.Name)
-		out[siteID] = fs.Spec.EffectiveDefaultExposureMode()
-	}
-	return out
-}
-
-func clusterFromMC(mc *unstructured.Unstructured, edge edgeClustersFile, siteDefaults map[string]string) clusterSummary {
+func clusterFromMC(mc *unstructured.Unstructured, edge edgeClustersFile) clusterSummary {
 	labels := mcLabels(mc)
 	cs := clusterSummary{
 		Name:                mc.GetName(),
@@ -494,23 +513,25 @@ func clusterFromMC(mc *unstructured.Unstructured, edge edgeClustersFile, siteDef
 		ConsoleManaged: labels["fleet.umkim.com/console-managed"] == "true" ||
 			(mc.GetAnnotations() != nil && mc.GetAnnotations()["fleet.umkim.com/console-managed"] == "true"),
 	}
-	var edgeEnt registry.ClusterExposureInput
+	var edgeEnt registry.ClusterIngressInput
 	if e, ok := edge.Clusters[mc.GetName()]; ok {
 		cs.Management = e.Management
 		cs.ReadOnly = e.ReadOnly
 		cs.DirectIngress = e.DirectIngress
-		cs.ExposureMode = e.ExposureMode
+		cs.IngressID = e.IngressID
+		cs.Method = e.Method
 		cs.TlsPolicy = e.TlsPolicy
-		cs.IngressEndpointID = e.IngressEndpointID
-		cs.DomainBindings = e.DomainBindings
+		cs.DNSZone = e.DNSZone
+		cs.EdgeWANIP = e.EdgeWANIP
 		cs.UpstreamHost = e.UpstreamHost
 		cs.TraefikHTTPPort = e.TraefikHTTPPort
-		edgeEnt = registry.ClusterExposureInput{
-			ExposureMode:      e.ExposureMode,
-			TlsPolicy:         e.TlsPolicy,
-			DirectIngress:     e.DirectIngress,
-			IngressEndpointID: e.IngressEndpointID,
-			DomainBindings:    e.DomainBindings,
+		edgeEnt = registry.ClusterIngressInput{
+			IngressID:     e.IngressID,
+			Method:        e.Method,
+			TlsPolicy:     e.TlsPolicy,
+			DirectIngress: e.DirectIngress,
+			DNSZone:       e.DNSZone,
+			EdgeWANIP:     e.EdgeWANIP,
 		}
 		if cs.Site == "" {
 			cs.Site = e.Site
@@ -519,13 +540,11 @@ func clusterFromMC(mc *unstructured.Unstructured, edge edgeClustersFile, siteDef
 	if cs.Available {
 		cs.ProvisioningPhase = fleetv1alpha1.JoinPhaseReady
 	}
-	siteDefault := siteDefaults[cs.Site]
-	effectiveMode := registry.EffectiveClusterExposureMode(edgeEnt, siteDefault)
-	if cs.ExposureMode == "" {
-		cs.ExposureMode = effectiveMode
+	cs.IngressEnabled = registry.ClusterIngressEnabled(edgeEnt, "")
+	cs.DirectIngress = registry.DirectIngressFromMethod(cs.Method)
+	if cs.TlsPolicy == "" {
+		cs.TlsPolicy = registry.EffectiveClusterTLSPolicy(edgeEnt, "")
 	}
-	cs.IngressEnabled = registry.ClusterIngressEnabled(edgeEnt, siteDefault)
-	cs.DirectIngress = registry.DirectIngressFromExposure(effectiveMode)
 	return cs
 }
 

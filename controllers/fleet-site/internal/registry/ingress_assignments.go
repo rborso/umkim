@@ -13,17 +13,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type edgeClusterBindings struct {
-	Site           string   `yaml:"site"`
-	DomainBindings []string `yaml:"domain_bindings,omitempty"`
+type edgeClusterBinding struct {
+	Site      string `yaml:"site"`
+	IngressID string `yaml:"ingress_id,omitempty"`
 }
 
 type edgeClustersYAML struct {
-	Clusters map[string]edgeClusterBindings `yaml:"clusters"`
+	Clusters map[string]edgeClusterBinding `yaml:"clusters"`
 }
 
-// SyncSiteAssignedClusters derives FleetSite domain assignedClusters from cluster domain_bindings.
-func SyncSiteAssignedClusters(ctx context.Context, c client.Client, cfg DomainConfig) error {
+// SyncSiteIngressAssignments derives FleetSite ingress assignedClusters from cluster ingress_id bindings.
+func SyncSiteIngressAssignments(ctx context.Context, c client.Client, cfg DomainConfig) error {
 	bindings, err := loadEdgeClusterBindings(ctx, c, cfg.EdgeClustersCMNamespace, cfg.EdgeClustersCMName)
 	if err != nil {
 		return err
@@ -55,18 +55,18 @@ func SyncSiteAssignedClusters(ctx context.Context, c client.Client, cfg DomainCo
 
 	for i := range list.Items {
 		fs := &list.Items[i]
-		fs.Spec.NormalizeEdge()
+		fs.Spec.NormalizeIngress()
 		siteID := fs.Spec.EffectiveSiteID(fs.Name)
 		mgmt := isManagementSite(fs, siteID, cfg.ManagementSiteID)
 		changed := false
-		for j := range fs.Spec.Edge.Domains {
-			d := &fs.Spec.Edge.Domains[j]
+		for j := range fs.Spec.Edge.Ingress {
+			ent := &fs.Spec.Edge.Ingress[j]
 			var assigned []string
 			if !mgmt {
-				assigned = clustersForDomain(siteID, d.ID, bindings, clusterSite)
+				assigned = clustersForIngress(siteID, ent.ID, bindings, clusterSite)
 			}
-			if !stringSliceEqual(d.AssignedClusters, assigned) {
-				d.AssignedClusters = assigned
+			if !stringSliceEqual(ent.AssignedClusters, assigned) {
+				ent.AssignedClusters = assigned
 				changed = true
 			}
 		}
@@ -79,51 +79,46 @@ func SyncSiteAssignedClusters(ctx context.Context, c client.Client, cfg DomainCo
 	return nil
 }
 
-func isManagementSite(fs *fleetv1alpha1.FleetSite, siteID, managementSiteID string) bool {
-	if managementSiteID != "" && siteID == managementSiteID {
-		return true
-	}
-	return fs.Annotations != nil && fs.Annotations[AnnotationManagementSite] == "true"
+// SyncSiteAssignedClusters is an alias for ingress assignment sync.
+func SyncSiteAssignedClusters(ctx context.Context, c client.Client, cfg DomainConfig) error {
+	return SyncSiteIngressAssignments(ctx, c, cfg)
 }
 
-func clustersForDomain(siteID, domainID string, bindings map[string]edgeClusterBindings, clusterSite map[string]string) []string {
+func clustersForIngress(siteID, ingressID string, bindings map[string]edgeClusterBinding, clusterSite map[string]string) []string {
 	out := []string{}
 	for clusterName, ent := range bindings {
 		if clusterSite[clusterName] != siteID {
 			continue
 		}
-		for _, b := range ent.DomainBindings {
-			if b == domainID {
-				out = append(out, clusterName)
-				break
-			}
+		if ent.IngressID == ingressID {
+			out = append(out, clusterName)
 		}
 	}
 	sort.Strings(out)
 	return out
 }
 
-func loadEdgeClusterBindings(ctx context.Context, c client.Client, ns, name string) (map[string]edgeClusterBindings, error) {
+func loadEdgeClusterBindings(ctx context.Context, c client.Client, ns, name string) (map[string]edgeClusterBinding, error) {
 	if ns == "" || name == "" {
-		return map[string]edgeClusterBindings{}, nil
+		return map[string]edgeClusterBinding{}, nil
 	}
 	var cm corev1.ConfigMap
 	if err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &cm); err != nil {
 		if apierrors.IsNotFound(err) {
-			return map[string]edgeClusterBindings{}, nil
+			return map[string]edgeClusterBinding{}, nil
 		}
 		return nil, err
 	}
 	raw := cm.Data["clusters.yaml"]
 	if raw == "" {
-		return map[string]edgeClusterBindings{}, nil
+		return map[string]edgeClusterBinding{}, nil
 	}
 	var f edgeClustersYAML
 	if err := yaml.Unmarshal([]byte(raw), &f); err != nil {
 		return nil, err
 	}
 	if f.Clusters == nil {
-		return map[string]edgeClusterBindings{}, nil
+		return map[string]edgeClusterBinding{}, nil
 	}
 	return f.Clusters, nil
 }
@@ -137,4 +132,14 @@ func stringSliceEqual(a, b []string) bool {
 	sort.Strings(ac)
 	sort.Strings(bc)
 	return reflect.DeepEqual(ac, bc)
+}
+
+func isManagementSite(fs *fleetv1alpha1.FleetSite, siteID, managementSiteID string) bool {
+	if siteID == managementSiteID && managementSiteID != "" {
+		return true
+	}
+	if fs.Annotations != nil && fs.Annotations[AnnotationManagementSite] == "true" {
+		return true
+	}
+	return false
 }

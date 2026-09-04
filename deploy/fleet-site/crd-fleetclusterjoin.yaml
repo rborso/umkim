@@ -151,22 +151,12 @@ spec:
                         type: object
                         additionalProperties:
                           type: string
-                domainBindings:
-                  type: array
-                  items:
-                    type: string
-                  description: Site DNS domain binding IDs for ingress and catalog routing.
                 edge:
                   type: object
                   properties:
-                    exposureMode:
+                    ingressId:
                       type: string
-                      enum: [inherit, none, port_forward, reverse_proxy]
-                    tlsPolicy:
-                      type: string
-                      enum: [inherit, external, acme_cluster, acme_hub, passthrough]
-                    ingressEndpointId:
-                      type: string
+                      description: Site ingress entry id (FleetSite.spec.edge.ingress[].id)
                 ingressAuth:
                   type: object
                   properties:

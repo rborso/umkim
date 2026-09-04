@@ -212,7 +212,7 @@ func TestBuildStandbyHubRouteUsesHTTPUpstreamOnACMECluster(t *testing.T) {
 	reg := clusters.Registry{
 		Clusters: map[string]clusters.Cluster{
 			"virt01": {UpstreamHost: "10.10.0.10", TraefikHTTPPort: 30080},
-			"virt02": {TlsPolicy: clusters.TLSPolicyACMECluster, UpstreamHost: "10.10.0.12", TraefikHTTPPort: 30080},
+			"virt02": {Method: "port_forward", TlsPolicy: clusters.TLSPolicyACMECluster, UpstreamHost: "10.10.0.12", TraefikHTTPPort: 30080},
 		},
 	}
 	out, err := Build(routes, reg, true, BuildOptions{
@@ -249,7 +249,7 @@ func TestBuildHubRouteUsesHTTPUpstreamWhenEffectiveModeUnset(t *testing.T) {
 	}}
 	reg := clusters.Registry{
 		Clusters: map[string]clusters.Cluster{
-			"virt02": {TlsPolicy: clusters.TLSPolicyACMECluster, UpstreamHost: "10.10.0.12", TraefikHubHTTPPort: 30081},
+			"virt02": {Method: "port_forward", TlsPolicy: clusters.TLSPolicyACMECluster, UpstreamHost: "10.10.0.12", TraefikHubHTTPPort: 30081},
 		},
 	}
 	out, err := Build(routes, reg, true, BuildOptions{})
@@ -277,7 +277,7 @@ func TestBuildHubRouteUsesHTTPUpstreamWhenEffectiveModeSite(t *testing.T) {
 	}}
 	reg := clusters.Registry{
 		Clusters: map[string]clusters.Cluster{
-			"virt02": {TlsPolicy: clusters.TLSPolicyACMECluster, UpstreamHost: "10.10.0.12", TraefikHubHTTPPort: 30081},
+			"virt02": {Method: "port_forward", TlsPolicy: clusters.TLSPolicyACMECluster, UpstreamHost: "10.10.0.12", TraefikHubHTTPPort: 30081},
 		},
 	}
 	out, err := Build(routes, reg, true, BuildOptions{})

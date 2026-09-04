@@ -154,6 +154,15 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'Cluster region label (fleet.topology/region) for display.',
     example: 'homelab',
   },
+  'clusterDetail.jumphost': {
+    description:
+      'Optional SSH bastion override for this cluster (user@host:port). When empty, the parent site jumphost is used for hub Ansible jobs.',
+    example: 'jump@bastion.example.com:22',
+  },
+  'clusterJoin.jumphost': {
+    description: 'Optional cluster jumphost at create time. Leave empty to inherit the site default.',
+    example: 'jump@bastion.example.com:22',
+  },
   'clusterDetail.clusterLabels': {
     description:
       'OCM ManagedCluster fleet.* labels. Capability labels (fleet.capability/*) are discovered automatically and read-only here.',

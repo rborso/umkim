@@ -10,10 +10,13 @@ const (
 	ProvisioningModeGreenfield = "greenfield"
 	ProvisioningModeRegistry   = "registry"
 
-	ExposureModeNone          = "none"
-	ExposureModePortForward   = "port_forward"
-	ExposureModeReverseProxy  = "reverse_proxy"
-	ExposureModeHubGateway    = "hub_gateway"
+	ExposureModeNone         = "none"
+	ExposureModePortForward  = "port_forward"
+	ExposureModeReverseProxy = "reverse_proxy"
+	ExposureModeHubGateway   = "hub_gateway"
+
+	IngressMethodPortForward  = "port_forward"
+	IngressMethodReverseProxy = "reverse_proxy"
 
 	TLSPolicyInherit      = "inherit"
 	TLSPolicyExternal     = "external"
@@ -43,37 +46,39 @@ type FleetSiteSpec struct {
 	ClusterCapabilities map[string]bool `json:"clusterCapabilities,omitempty"`
 	GPU              bool   `json:"gpu,omitempty"`
 	Storage          *ClusterStorageSpec `json:"storage,omitempty"`
-	Edge             FleetSiteEdgeSpec     `json:"edge,omitempty"`
-	// EdgeDomain is deprecated; use edge.edgeDomain.
-	EdgeDomain string `json:"edgeDomain,omitempty"`
+	Edge FleetSiteEdgeSpec `json:"edge,omitempty"`
 }
 
 type FleetSiteEdgeSpec struct {
-	EdgeDomain           string                         `json:"edgeDomain,omitempty"`
-	Wildcard             string                         `json:"wildcard,omitempty"`
-	ExposureMode         string                         `json:"exposureMode,omitempty"`
-	DefaultExposureMode  string                         `json:"defaultExposureMode,omitempty"`
-	ExternalEndpoints    []FleetSiteExternalEndpointSpec `json:"externalEndpoints,omitempty"`
-	Domains              []FleetSiteDomainSpec          `json:"domains,omitempty"`
-	WanEgress            *FleetSiteWanEgressSpec        `json:"wanEgress,omitempty"`
+	HubGateway  bool                    `json:"hubGateway,omitempty"`
+	HubZone     string                  `json:"hubZone,omitempty"`
+	HubWildcard string                  `json:"hubWildcard,omitempty"`
+	Ingress     []FleetSiteIngressSpec  `json:"ingress,omitempty"`
+	WanEgress   *FleetSiteWanEgressSpec `json:"wanEgress,omitempty"`
 	// Deprecated: use edge.wanEgress (site internet path, not cluster ingress).
-	ExternalAccess       *FleetSiteExternalAccessSpec   `json:"externalAccess,omitempty"`
+	ExternalAccess *FleetSiteExternalAccessSpec `json:"externalAccess,omitempty"`
 }
 
-type FleetSiteExternalEndpointSpec struct {
-	ID          string `json:"id"`
-	Address     string `json:"address"`
-	Role        string `json:"role,omitempty"`
-	Description string `json:"description,omitempty"`
+// FleetSiteIngressSpec is one public ingress path at a site (port-forward or reverse-proxy).
+type FleetSiteIngressSpec struct {
+	ID               string   `json:"id"`
+	Method           string   `json:"method"`
+	Address          string   `json:"address,omitempty"`
+	Zone             string   `json:"zone,omitempty"`
+	Wildcard         string   `json:"wildcard,omitempty"`
+	Description      string   `json:"description,omitempty"`
+	OperatorNotes    string   `json:"operatorNotes,omitempty"`
+	AssignedClusters []string `json:"assignedClusters,omitempty"`
 }
 
-type FleetSiteDomainSpec struct {
-	ID                string   `json:"id"`
-	Zone              string   `json:"zone"`
-	Wildcard          string   `json:"wildcard,omitempty"`
-	TlsPolicy         string   `json:"tlsPolicy,omitempty"`
-	AssignedClusters  []string `json:"assignedClusters,omitempty"`
-	IngressEndpointId string   `json:"ingressEndpointId,omitempty"`
+func (i FleetSiteIngressSpec) EffectiveWildcard() string {
+	if w := strings.TrimSpace(i.Wildcard); w != "" {
+		return w
+	}
+	if z := strings.TrimSpace(i.Zone); z != "" {
+		return "*." + z
+	}
+	return ""
 }
 
 type FleetSiteExternalAccessSpec struct {
@@ -254,91 +259,86 @@ type FleetSiteStatus struct {
 	Conditions              []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// EffectiveEdgeDomain returns primary domain zone, legacy edgeDomain, or first domains[] entry.
+// IngressByID returns a site ingress entry by id.
+func (s *FleetSiteSpec) IngressByID(id string) (FleetSiteIngressSpec, bool) {
+	id = strings.TrimSpace(id)
+	s.NormalizeIngress()
+	for _, ent := range s.Edge.Ingress {
+		if ent.ID == id {
+			return ent, true
+		}
+	}
+	return FleetSiteIngressSpec{}, false
+}
+
+// NormalizeIngress fills default wildcards on port_forward ingress rows.
+func (s *FleetSiteSpec) NormalizeIngress() {
+	for i := range s.Edge.Ingress {
+		ent := &s.Edge.Ingress[i]
+		if ent.Wildcard == "" && ent.Zone != "" && ent.Method == IngressMethodPortForward {
+			ent.Wildcard = "*." + ent.Zone
+		}
+	}
+}
+
+// AutoIngressID returns the sole port_forward ingress id when the site has exactly one ingress row.
+func (s *FleetSiteSpec) AutoIngressID() string {
+	s.NormalizeIngress()
+	if len(s.Edge.Ingress) != 1 {
+		return ""
+	}
+	if s.Edge.Ingress[0].Method == IngressMethodPortForward {
+		return s.Edge.Ingress[0].ID
+	}
+	return ""
+}
+
+// EffectiveHubZone returns hub catalog DNS zone when hubGateway is enabled.
+func (s *FleetSiteSpec) EffectiveHubZone() string {
+	if z := strings.TrimSpace(s.Edge.HubZone); z != "" {
+		return z
+	}
+	return ""
+}
+
+// EffectiveHubWildcard returns hub wildcard when hubGateway is enabled.
+func (s *FleetSiteSpec) EffectiveHubWildcard() string {
+	if w := strings.TrimSpace(s.Edge.HubWildcard); w != "" {
+		return w
+	}
+	if z := s.EffectiveHubZone(); z != "" {
+		return "*." + z
+	}
+	return ""
+}
+
+// EffectiveEdgeDomain returns the first port_forward ingress zone (app siteHost defaults).
 func (s *FleetSiteSpec) EffectiveEdgeDomain() string {
-	if s.Edge.EdgeDomain != "" {
-		return s.Edge.EdgeDomain
-	}
-	if s.EdgeDomain != "" {
-		return s.EdgeDomain
-	}
-	for _, d := range s.Edge.Domains {
-		if d.Zone != "" {
-			return d.Zone
+	s.NormalizeIngress()
+	for _, ent := range s.Edge.Ingress {
+		if ent.Method == IngressMethodPortForward && ent.Zone != "" {
+			return ent.Zone
 		}
 	}
-	return ""
+	return s.EffectiveHubZone()
 }
 
-// EffectiveExposureMode returns site exposure mode (not inferred from wan egress).
-func (s *FleetSiteSpec) EffectiveExposureMode() string {
-	if s.Edge.ExposureMode != "" {
-		return s.Edge.ExposureMode
-	}
-	return ExposureModeNone
-}
-
-// EffectiveDefaultExposureMode is the default for clusters with exposure_mode inherit.
-func (s *FleetSiteSpec) EffectiveDefaultExposureMode() string {
-	if s.Edge.DefaultExposureMode != "" {
-		return s.Edge.DefaultExposureMode
-	}
-	return s.EffectiveExposureMode()
-}
-
-// EffectiveWildcard returns wildcard for the primary site zone.
+// EffectiveWildcard returns wildcard for the first port_forward ingress.
 func (s *FleetSiteSpec) EffectiveWildcard() string {
-	if s.Edge.Wildcard != "" {
-		return s.Edge.Wildcard
-	}
-	for _, d := range s.Edge.Domains {
-		if d.Wildcard != "" {
-			return d.Wildcard
-		}
-		if d.Zone != "" {
-			return "*." + d.Zone
+	s.NormalizeIngress()
+	for _, ent := range s.Edge.Ingress {
+		if ent.Method == IngressMethodPortForward {
+			if w := ent.EffectiveWildcard(); w != "" {
+				return w
+			}
 		}
 	}
-	zone := s.EffectiveEdgeDomain()
-	if zone != "" {
-		return "*." + zone
-	}
-	return ""
+	return s.EffectiveHubWildcard()
 }
 
-// NormalizeEdge fills domains[] from legacy edgeDomain when empty.
-func (s *FleetSiteSpec) NormalizeEdge() {
-	zone := s.EffectiveEdgeDomain()
-	if zone == "" {
-		return
-	}
-	if len(s.Edge.Domains) == 0 {
-		s.Edge.Domains = []FleetSiteDomainSpec{{
-			ID:       "primary",
-			Zone:     zone,
-			Wildcard: s.EffectiveWildcard(),
-			TlsPolicy: defaultTlsForExposure(s.EffectiveExposureMode()),
-		}}
-	}
-	if s.Edge.EdgeDomain == "" {
-		s.Edge.EdgeDomain = zone
-	}
-	if s.Edge.Wildcard == "" {
-		s.Edge.Wildcard = s.EffectiveWildcard()
-	}
-}
-
-func defaultTlsForExposure(mode string) string {
-	switch mode {
-	case ExposureModeReverseProxy:
-		return TLSPolicyExternal
-	case ExposureModePortForward:
-		return TLSPolicyACMECluster
-	case ExposureModeHubGateway:
-		return TLSPolicyACMEHub
-	default:
-		return TLSPolicyInherit
-	}
+// HubGatewayEnabled reports whether hub-routed public URLs are configured for the site.
+func (s *FleetSiteSpec) HubGatewayEnabled() bool {
+	return s.Edge.HubGateway
 }
 
 // EffectiveSiteID returns siteId or siteName or metadata name fallback.

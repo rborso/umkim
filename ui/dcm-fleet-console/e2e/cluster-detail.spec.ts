@@ -16,6 +16,10 @@ test.describe('Cluster detail read-only', () => {
 
     await page.getByTestId('cluster-tab-edge').click();
     await expect(page.getByRole('heading', { name: 'Site and topology' })).toBeVisible();
+    await expect(page.getByTestId('cluster-jumphost')).toBeVisible();
+
+    const clusterRes = await apiRequest.get(`/fleet/api/v1alpha1/clusters/${encodeURIComponent(name)}`);
+    expect(clusterRes.ok()).toBeTruthy();
 
     await page.getByTestId('cluster-tab-storage').click();
     await expect(page.getByText('Storage', { exact: true }).first()).toBeVisible();

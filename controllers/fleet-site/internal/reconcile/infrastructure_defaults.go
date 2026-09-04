@@ -7,8 +7,8 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/acme"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ingressauth"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,11 +17,10 @@ import (
 )
 
 type infraEdgeClusterEntry struct {
-	DirectIngress     bool     `yaml:"direct_ingress"`
-	TlsPolicy         string   `yaml:"tls_policy,omitempty"`
-	ExposureMode      string   `yaml:"exposure_mode,omitempty"`
-	IngressEndpointID string   `yaml:"ingress_endpoint_id,omitempty"`
-	DomainBindings    []string `yaml:"domain_bindings,omitempty"`
+	DirectIngress bool   `yaml:"direct_ingress"`
+	TlsPolicy     string `yaml:"tls_policy,omitempty"`
+	Method        string `yaml:"method,omitempty"`
+	IngressID     string `yaml:"ingress_id,omitempty"`
 }
 
 type infraEdgeClustersFile struct {
@@ -175,26 +174,30 @@ func (r *ClusterJoinReconciler) triggerAcmeReconcile(ctx context.Context) error 
 }
 
 func (r *ClusterJoinReconciler) clusterAcmeEligible(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {
-	tls := fcj.Spec.Edge.TlsPolicy
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
 	edge, err := loadInfraEdgeClusters(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName)
 	if err == nil {
-		if e, ok := edge.Clusters[clusterName]; ok && e.TlsPolicy != "" {
-			tls = e.TlsPolicy
-		}
-	}
-	if tls == "" || tls == "inherit" {
-		var fs fleetv1alpha1.FleetSite
-		if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fcj.Spec.SiteId}, &fs); err == nil {
-			fs.Spec.NormalizeEdge()
-			for _, d := range fs.Spec.Edge.Domains {
-				if d.TlsPolicy != "" {
-					tls = d.TlsPolicy
-					break
-				}
+		if e, ok := edge.Clusters[clusterName]; ok {
+			if e.Method == fleetv1alpha1.IngressMethodReverseProxy {
+				return false
+			}
+			if e.IngressID != "" {
+				ingressID = e.IngressID
+			}
+			if e.TlsPolicy != "" {
+				return e.TlsPolicy == fleetv1alpha1.TLSPolicyACMECluster
 			}
 		}
 	}
-	return tls == fleetv1alpha1.TLSPolicyACMECluster
+	if ingressID == "" {
+		return false
+	}
+	var fs fleetv1alpha1.FleetSite
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fcj.Spec.SiteId}, &fs); err != nil {
+		return false
+	}
+	ci, err := ingress.ResolveClusterIngress(fs.Spec, ingressID)
+	return err == nil && ci.AllowsSpokeACME
 }
 
 func (r *ClusterJoinReconciler) clusterDirectIngress(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {
@@ -209,30 +212,20 @@ func (r *ClusterJoinReconciler) clusterDirectIngress(ctx context.Context, cluste
 }
 
 func (r *ClusterJoinReconciler) clusterIngressEnabled(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
 	edge, err := loadInfraEdgeClusters(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName)
-	if err != nil {
+	if err == nil {
+		if e, ok := edge.Clusters[clusterName]; ok && e.IngressID != "" {
+			ingressID = e.IngressID
+		}
+	}
+	if ingressID == "" {
 		return false
 	}
-	siteDefault := ""
 	var fs fleetv1alpha1.FleetSite
-	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fcj.Spec.SiteId}, &fs); err == nil {
-		siteDefault = fs.Spec.EffectiveDefaultExposureMode()
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fcj.Spec.SiteId}, &fs); err != nil {
+		return false
 	}
-	var edgeEnt registry.ClusterExposureInput
-	if e, ok := edge.Clusters[clusterName]; ok {
-		edgeEnt = registry.ClusterExposureInput{
-			ExposureMode:      e.ExposureMode,
-			TlsPolicy:         e.TlsPolicy,
-			DirectIngress:     e.DirectIngress,
-			IngressEndpointID: e.IngressEndpointID,
-			DomainBindings:    e.DomainBindings,
-		}
-	} else {
-		edgeEnt = registry.ClusterExposureInput{
-			ExposureMode:   fcj.Spec.Edge.ExposureMode,
-			TlsPolicy:      fcj.Spec.Edge.TlsPolicy,
-			DomainBindings: fcj.Spec.DomainBindings,
-		}
-	}
-	return registry.ClusterIngressEnabled(edgeEnt, siteDefault)
+	ci, err := ingress.ResolveClusterIngress(fs.Spec, ingressID)
+	return err == nil && ci.AllowsAuth
 }

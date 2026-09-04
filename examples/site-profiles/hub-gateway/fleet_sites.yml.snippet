@@ -3,22 +3,12 @@
 management:
   display_name: Management DC
   region: management
-  exposure_mode: hub_gateway
+  hub_gateway: true
+  hub_zone: apps.example.com
+  hub_wildcard: "*.apps.example.com"
   management_site: true
-  edge_domain: apps.example.com
-  edge_wildcard: "*.apps.example.com"
-  external_endpoints:
-    - id: hub-wan
-      address: "203.0.113.10"   # RFC5737 — VPS public IP
-      role: primary
-      description: "VPS public IP — hub Traefik :80/:443"
-  domains:
-    - id: hub-zone
-      zone: apps.example.com
-      wildcard: "*.apps.example.com"
-      tls_policy: acme_hub
-  dns_target_note: "A/AAAA *.apps.example.com → 203.0.113.10 (hub-wan)"
+  dns_target_note: "A/AAAA *.apps.example.com → hub WAN"
   wan_egress:
     enabled: true
-    expected_wan_ip: "203.0.113.10"
+    expected_wan_ip: "203.0.113.10"   # RFC5737 — VPS public IP
   wireguard_pool: null

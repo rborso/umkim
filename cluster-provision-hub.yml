@@ -96,6 +96,17 @@
         tasks_from: approve_registration_csrs.yml
       tags: [ocm, ocm_approve_csr, fleet_cluster_provision]
 
+    # Node API (umkim node list) needs this secret; run before ManifestWorks/ingress
+    # steps that can fail or exceed the provision job deadline.
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: sync_spoke_kubeconfig_secret.yml
+      vars:
+        ocm_spoke_kubeconfig_sync_targets:
+          - cluster: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+            api_host: "{{ hostvars[fleet_cluster_name | default(fleet_site_name)].fleet_site_sp_endpoint | default(hostvars[fleet_cluster_name | default(fleet_site_name)].ansible_host) }}"
+      tags: [ocm, ocm_spoke_kubeconfig, fleet_cluster_provision]
+
     - ansible.builtin.import_role:
         name: ocm
         tasks_from: sync_cluster_labels.yml
@@ -122,13 +133,4 @@
         tasks_from: push_cluster_spoke_ingress.yml
       when: fleet_cluster_spoke_ingress_enabled | default(true) | bool
       tags: [phase6, phase6_push, spoke_ingress, fleet_cluster_provision]
-
-    - ansible.builtin.import_role:
-        name: ocm
-        tasks_from: sync_spoke_kubeconfig_secret.yml
-      vars:
-        ocm_spoke_kubeconfig_sync_targets:
-          - cluster: "{{ fleet_cluster_name | default(fleet_site_name) }}"
-            api_host: "{{ hostvars[fleet_cluster_name | default(fleet_site_name)].fleet_site_sp_endpoint | default(hostvars[fleet_cluster_name | default(fleet_site_name)].ansible_host) }}"
-      tags: [ocm, ocm_spoke_kubeconfig, fleet_cluster_provision]
 

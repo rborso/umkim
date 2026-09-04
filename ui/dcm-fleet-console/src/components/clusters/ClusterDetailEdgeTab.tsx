@@ -1,6 +1,5 @@
 import {
   Button,
-  Checkbox,
   Form,
   FormSelect,
   FormSelectOption,
@@ -8,10 +7,16 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
-import type { FleetCluster, FleetExposureMode, FleetTlsPolicy } from '../../api/types';
+import type { FleetCluster, FleetSite, FleetSiteIngress } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
-import { ExposureTlsPairWarning } from '../ExposureTlsPairWarning';
-import type { ExposureTlsPairIssue } from '../../edge/exposureTlsPairs';
+import { effectiveClusterJumphost } from '../../edge/jumphost';
+import {
+  formatIngressOptionLabel,
+  ingressAuthSupported,
+  ingressMethodLabel,
+  ingressOptionDisabled,
+  siteIngressById,
+} from '../../edge/ingressMethod';
 import { LabeledField } from '../forms/LabeledField';
 import { LabelKeyValueEditor } from '../forms/LabelKeyValueEditor';
 import { getFieldHelp } from '../../help/fieldHelp';
@@ -27,6 +32,7 @@ function editableClusterLabels(labels: Record<string, string>): Record<string, s
 export type ClusterDetailEdgeTabProps = {
   cluster: FleetCluster;
   phase: string;
+  site?: FleetSite;
   siteId: string;
   setSiteId: (v: string) => void;
   clusterLabels: Record<string, string>;
@@ -37,26 +43,18 @@ export type ClusterDetailEdgeTabProps = {
   setNestDepth: (v: string) => void;
   provisioner: string;
   setProvisioner: (v: string) => void;
-  exposureMode: FleetExposureMode | 'inherit';
-  setExposureMode: (v: FleetExposureMode | 'inherit') => void;
-  tlsPolicy: FleetTlsPolicy;
-  setTlsPolicy: (v: FleetTlsPolicy) => void;
-  directIngress: boolean;
-  setDirectIngress: (v: boolean) => void;
-  ingressEndpointId: string;
-  setIngressEndpointId: (v: string) => void;
-  domainBindings: string[];
-  setDomainBindings: React.Dispatch<React.SetStateAction<string[]>>;
+  ingressId: string;
+  setIngressId: (v: string) => void;
+  jumphost: string;
+  setJumphost: (v: string) => void;
   upstreamHost: string;
   setUpstreamHost: (v: string) => void;
   traefikPort: string;
   setTraefikPort: (v: string) => void;
-  siteExposureMode: string;
-  exposureTlsIssue: ExposureTlsPairIssue | null;
-  domainOptions: string[];
+  ingressOptions: FleetSiteIngress[];
   authPrereqReady: boolean;
   authPrereqIngress: boolean;
-  authPrereqDomains: boolean;
+  authPrereqIngressBinding: boolean;
   authCanEnable: boolean;
   authEnabled: boolean;
   authActionBusy: boolean;
@@ -81,6 +79,7 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
   const {
     cluster,
     phase,
+    site,
     siteId,
     setSiteId,
     clusterLabels,
@@ -91,26 +90,18 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
     setNestDepth,
     provisioner,
     setProvisioner,
-    exposureMode,
-    setExposureMode,
-    tlsPolicy,
-    setTlsPolicy,
-    directIngress,
-    setDirectIngress,
-    ingressEndpointId,
-    setIngressEndpointId,
-    domainBindings,
-    setDomainBindings,
+    ingressId,
+    setIngressId,
+    jumphost,
+    setJumphost,
     upstreamHost,
     setUpstreamHost,
     traefikPort,
     setTraefikPort,
-    siteExposureMode,
-    exposureTlsIssue,
-    domainOptions,
+    ingressOptions,
     authPrereqReady,
     authPrereqIngress,
-    authPrereqDomains,
+    authPrereqIngressBinding,
     authCanEnable,
     authEnabled,
     authActionBusy,
@@ -131,9 +122,39 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
     onSave,
   } = props;
 
+  const boundIngress = site && ingressId ? siteIngressById(site, ingressId) : undefined;
+  const ingressMethod = cluster.method || boundIngress?.method;
+  const authSupported = ingressAuthSupported(ingressMethod);
+  const effectiveJumphost = effectiveClusterJumphost(jumphost, site?.spec?.jumphost);
+
   return (
     <Form style={{ maxWidth: '40rem', marginTop: '1rem' }}>
       <Title headingLevel="h3" size="md">
+        Connectivity
+      </Title>
+      <LabeledField label="Jumphost override" fieldId="clusterJumphost" help={getFieldHelp('clusterDetail.jumphost')}>
+        <TextInput
+          id="clusterJumphost"
+          data-testid="cluster-jumphost"
+          value={jumphost}
+          onChange={(_e, v) => setJumphost(v)}
+          placeholder="user@bastion.example.com:22"
+        />
+      </LabeledField>
+      <p style={{ fontSize: '0.85rem', marginTop: '-0.25rem' }}>
+        Effective jumphost:{' '}
+        {effectiveJumphost.source === 'none' ? (
+          <em>none (direct SSH)</em>
+        ) : effectiveJumphost.source === 'site' ? (
+          <>
+            <code>{effectiveJumphost.effective}</code> <em>(from site)</em>
+          </>
+        ) : (
+          <code>{effectiveJumphost.effective}</code>
+        )}
+      </p>
+
+      <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
         Site and topology
       </Title>
       <LabeledField label="Site ID (fleet.site)" fieldId="siteId" help={getFieldHelp('clusterDetail.siteId')}>
@@ -210,113 +231,52 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
       </LabeledField>
 
       <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
-        Exposure and ingress
+        Ingress binding
       </Title>
       <LabeledField label="Ingress enabled" fieldId="ingressEnabled" help={getFieldHelp('clusterDetail.ingressEnabled')}>
         <TextInput id="ingressEnabled" value={cluster.ingress_enabled ? 'yes' : 'no'} readOnly />
       </LabeledField>
-      <LabeledField label="Exposure mode" fieldId="exposureMode" help={getFieldHelp('clusterDetail.exposureMode')}>
-        <FormSelect
-          id="exposureMode"
-          value={exposureMode}
-          onChange={(_e, v) => {
-            const mode = v as FleetExposureMode | 'inherit';
-            setExposureMode(mode);
-            if (mode === 'port_forward' || mode === 'reverse_proxy') setDirectIngress(true);
-            if (mode === 'none') setDirectIngress(false);
-            if (mode === 'reverse_proxy' && (tlsPolicy === 'inherit' || tlsPolicy === 'acme_hub')) {
-              setTlsPolicy('external');
-            }
-            if (mode === 'port_forward' && (tlsPolicy === 'inherit' || tlsPolicy === 'acme_hub')) {
-              setTlsPolicy('acme_cluster');
-            }
-          }}
-        >
-          <FormSelectOption value="inherit" label={`Inherit from site (${siteExposureMode})`} />
-          <FormSelectOption value="none" label="None" />
-          <FormSelectOption value="hub_gateway" label="Hub gateway" />
-          <FormSelectOption value="port_forward" label="Port forward" />
-          <FormSelectOption value="reverse_proxy" label="External reverse proxy" />
-        </FormSelect>
-        {exposureMode === 'inherit' && (
-          <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
-            Clusters without an override use the site default exposure mode ({siteExposureMode}).
-          </p>
-        )}
-      </LabeledField>
-      <LabeledField label="TLS policy" fieldId="tlsPolicy" help={getFieldHelp('clusterDetail.tlsPolicy')}>
-        <FormSelect id="tlsPolicy" value={tlsPolicy} onChange={(_e, v) => setTlsPolicy(v as FleetTlsPolicy)}>
-          <FormSelectOption value="inherit" label="Inherit" />
-          <FormSelectOption value="external" label="External (no cluster LE)" />
-          <FormSelectOption value="acme_cluster" label="ACME on cluster" />
-          <FormSelectOption value="acme_hub" label="ACME on hub" />
-          <FormSelectOption value="passthrough" label="TLS passthrough" />
-        </FormSelect>
-      </LabeledField>
-      <ExposureTlsPairWarning issue={exposureTlsIssue} />
-      <LabeledField
-        label="Ingress endpoint ID"
-        fieldId="ingressEndpointId"
-        help={getFieldHelp('clusterDetail.ingressEndpointId')}
-      >
-        <TextInput
-          id="ingressEndpointId"
-          value={ingressEndpointId}
-          onChange={(_e, v) => setIngressEndpointId(v)}
-          placeholder="openwrt-wan"
-        />
-      </LabeledField>
-      {domainOptions.length > 1 ? (
-        <LabeledField label="Domain bindings" fieldId="domainBindings" help={getFieldHelp('clusterDetail.domainBindings')}>
-          {domainOptions.map((id) => (
-            <Checkbox
-              key={id}
-              id={`detail-domain-${id}`}
-              label={id}
-              isChecked={domainBindings.includes(id)}
-              onChange={(_e, checked) =>
-                setDomainBindings((current) =>
-                  checked ? [...current, id] : current.filter((d) => d !== id),
-                )
-              }
-            />
-          ))}
-        </LabeledField>
-      ) : domainOptions.length === 1 ? (
-        <LabeledField label="Domain binding" fieldId="domainBindings" help={getFieldHelp('clusterDetail.domainBindings')}>
-          <FormSelect
-            id="domainBindings"
-            value={domainBindings[0] || ''}
-            onChange={(_e, v) => setDomainBindings(v ? [v] : [])}
-          >
+      {ingressOptions.length > 0 ? (
+        <LabeledField label="Site ingress" fieldId="ingressId" help={getFieldHelp('clusterDetail.domainBindings')}>
+          <FormSelect id="ingressId" value={ingressId} onChange={(_e, v) => setIngressId(v)}>
             <FormSelectOption value="" label="None" />
-            <FormSelectOption value={domainOptions[0]} label={domainOptions[0]} />
+            {ingressOptions.map((ent) => (
+              <FormSelectOption
+                key={ent.id}
+                value={ent.id}
+                label={formatIngressOptionLabel(ent)}
+                isDisabled={ingressOptionDisabled(ent, cluster.name)}
+              />
+            ))}
           </FormSelect>
         </LabeledField>
       ) : (
-        <LabeledField label="Domain bindings (ids)" fieldId="domainBindings" help={getFieldHelp('clusterDetail.domainBindings')}>
-          <TextInput
-            id="domainBindings"
-            value={domainBindings.join(', ')}
-            onChange={(_e, v) =>
-              setDomainBindings(
-                v
-                  .split(',')
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              )
-            }
-            placeholder="site-zone, cluster-a"
-          />
+        <LabeledField label="Site ingress ID" fieldId="ingressId" help={getFieldHelp('clusterDetail.domainBindings')}>
+          <TextInput id="ingressId" value={ingressId} onChange={(_e, v) => setIngressId(v)} />
         </LabeledField>
       )}
-      <LabeledField label="Direct ingress (legacy)" fieldId="directIngress" help={getFieldHelp('clusterDetail.directIngress')}>
-        <Checkbox
-          id="directIngress"
-          isChecked={directIngress}
-          onChange={(_e, checked) => setDirectIngress(checked)}
+      <LabeledField label="Ingress method" fieldId="ingressMethod">
+        <TextInput
+          id="ingressMethod"
+          value={ingressMethod ? ingressMethodLabel(ingressMethod) : '—'}
+          readOnly
         />
       </LabeledField>
+      {boundIngress?.method === 'port_forward' && (
+        <>
+          <LabeledField label="DNS zone" fieldId="dnsZone">
+            <TextInput id="dnsZone" value={cluster.dns_zone || boundIngress.zone || '—'} readOnly />
+          </LabeledField>
+          <LabeledField label="WAN address" fieldId="edgeWanIp">
+            <TextInput id="edgeWanIp" value={cluster.edge_wan_ip || boundIngress.address || '—'} readOnly />
+          </LabeledField>
+        </>
+      )}
+      {boundIngress?.method === 'reverse_proxy' && boundIngress.description && (
+        <LabeledField label="Ingress description" fieldId="ingressDescription">
+          <TextInput id="ingressDescription" value={boundIngress.description} readOnly />
+        </LabeledField>
+      )}
       <LabeledField label="Upstream host (WG or LAN IP)" fieldId="upstreamHost" help={getFieldHelp('clusterDetail.upstreamHost')}>
         <TextInput id="upstreamHost" value={upstreamHost} onChange={(_e, v) => setUpstreamHost(v)} />
       </LabeledField>
@@ -328,31 +288,37 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
         Ingress authentication
       </Title>
       <LabeledField label="Forward-auth (Authelia + LLDAP)" fieldId="ingressAuth" help={getFieldHelp('clusterDetail.ingressAuth')}>
-        <div style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-          <p style={{ margin: '0 0 0.35rem' }}>
-            <strong>Prerequisites</strong>
+        {!authSupported ? (
+          <p style={{ fontSize: '0.875rem', margin: '0 0 0.5rem' }}>
+            Ingress authentication is only available for <code>port_forward</code> clusters.
           </p>
-          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
-            <li style={{ color: authPrereqReady ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
-              Cluster phase Ready {authPrereqReady ? '✓' : `(current: ${phase || '—'})`}
-            </li>
-            <li style={{ color: authPrereqIngress ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
-              Ingress enabled (port forward or reverse proxy) {authPrereqIngress ? '✓' : '✗'}
-            </li>
-            <li style={{ color: authPrereqDomains ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
-              Site domain bindings configured {authPrereqDomains ? '✓' : '✗'}
-            </li>
-            <li>
-              DNS: point <code>auth.&lt;site-zone&gt;</code> and app wildcards at this cluster edge
-              {portalHost ? (
-                <>
-                  {' '}
-                  (portal: <code>{portalHost}</code>)
-                </>
-              ) : null}
-            </li>
-          </ul>
-        </div>
+        ) : (
+          <div style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+            <p style={{ margin: '0 0 0.35rem' }}>
+              <strong>Prerequisites</strong>
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+              <li style={{ color: authPrereqReady ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
+                Cluster phase Ready {authPrereqReady ? '✓' : `(current: ${phase || '—'})`}
+              </li>
+              <li style={{ color: authPrereqIngress ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
+                Ingress enabled {authPrereqIngress ? '✓' : '✗'}
+              </li>
+              <li style={{ color: authPrereqIngressBinding ? 'inherit' : 'var(--pf-v6-global--danger-color--100)' }}>
+                Site ingress binding configured {authPrereqIngressBinding ? '✓' : '✗'}
+              </li>
+              <li>
+                DNS: point <code>auth.&lt;site-zone&gt;</code> and app wildcards at this cluster edge
+                {portalHost ? (
+                  <>
+                    {' '}
+                    (portal: <code>{portalHost}</code>)
+                  </>
+                ) : null}
+              </li>
+            </ul>
+          </div>
+        )}
         {cluster.ingressAuthStatus?.phase && (
           <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
             Status: {cluster.ingressAuthStatus.phase}
@@ -379,17 +345,25 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
           </p>
         )}
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <Button variant="primary" onClick={onEnableAuth} isDisabled={!authCanEnable || authActionBusy}>
+          <Button
+            variant="primary"
+            onClick={onEnableAuth}
+            isDisabled={!authSupported || !authCanEnable || authActionBusy}
+          >
             Enable ingress auth
           </Button>
-          <Button variant="secondary" onClick={onDisableAuth} isDisabled={!authEnabled || authActionBusy}>
+          <Button
+            variant="secondary"
+            onClick={onDisableAuth}
+            isDisabled={!authSupported || !authEnabled || authActionBusy}
+          >
             Disable
           </Button>
         </div>
         {authActionError ? <ErrorAlert error={authActionError} /> : null}
       </LabeledField>
 
-      {showClusterAcme && (
+      {showClusterAcme && authSupported && (
         <>
           <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
             Certificates

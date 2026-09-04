@@ -33,10 +33,10 @@ import {
   provisionFleetSite,
   validateFleetSite,
 } from '../api/client';
-import type { FleetExposureMode, FleetSite, FleetSiteCreate } from '../api/types';
+import type { FleetIngressMethod, FleetSite, FleetSiteCreate, FleetSiteIngress } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
-import { EXPOSURE_TLS_DOCS_URL, recommendedTlsForExposure } from '../edge/exposureTlsPairs';
+import { defaultPortForwardIngressRow } from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
 import { useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
@@ -45,11 +45,13 @@ import { canMutate } from '../auth/roles';
 const emptyForm = (): FleetSiteCreate => ({
   siteName: '',
   displayName: '',
-  exposureMode: 'port_forward',
-  edgeDomain: '',
-  wildcard: '',
+  edge: {
+    ingress: [defaultPortForwardIngressRow()],
+  },
   wanEgress: { enabled: true, dnsTargetNote: '' },
 });
+
+type SiteCreateProfile = 'port_forward' | 'hub_gateway' | 'custom';
 
 function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {
   switch (phase) {
@@ -78,6 +80,7 @@ export function SitesPage() {
   const error = sitesQuery.error;
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FleetSiteCreate>(emptyForm());
+  const [profile, setProfile] = useState<SiteCreateProfile>('port_forward');
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -130,9 +133,24 @@ export function SitesPage() {
     setSaving(true);
     setActionError(null);
     try {
-      await createFleetSite(form);
+      const payload: FleetSiteCreate = {
+        ...form,
+        hubGateway: profile === 'hub_gateway',
+        edge:
+          profile === 'hub_gateway'
+            ? {
+                hubGateway: true,
+                hubZone: form.hubZone,
+                hubWildcard: form.hubWildcard,
+                ingress: [],
+                wanEgress: form.wanEgress,
+              }
+            : form.edge,
+      };
+      await createFleetSite(payload);
       setModalOpen(false);
       setForm(emptyForm());
+      setProfile('port_forward');
       await load();
     } catch (e) {
       setActionError(e);
@@ -146,6 +164,28 @@ export function SitesPage() {
     setDeleteConfirm('');
     setDeleteError(null);
     setDeleteOpen(true);
+  };
+
+  const ingressRows = form.edge?.ingress?.length ? form.edge.ingress : [defaultPortForwardIngressRow()];
+
+  const updateIngressAt = (index: number, patch: Partial<FleetSiteIngress>) => {
+    const rows = [...ingressRows];
+    const next = { ...rows[index], ...patch };
+    if (patch.zone !== undefined && !rows[index]?.wildcard) {
+      next.wildcard = patch.zone ? `*.${patch.zone}` : '';
+    }
+    rows[index] = next;
+    setForm({
+      ...form,
+      edge: { ...form.edge, ingress: rows },
+    });
+  };
+
+  const addIngressRow = () => {
+    setForm({
+      ...form,
+      edge: { ...form.edge, ingress: [...ingressRows, defaultPortForwardIngressRow()] },
+    });
   };
 
   const confirmDelete = async () => {
@@ -182,6 +222,7 @@ export function SitesPage() {
                 isDisabled={!canMutate(user)}
                 onClick={() => {
                   setForm(emptyForm());
+                  setProfile('port_forward');
                   setModalOpen(true);
                 }}
               >
@@ -329,47 +370,141 @@ export function SitesPage() {
               onChange={(_e, v) => setForm({ ...form, displayName: v })}
             />
           </LabeledField>
-          <LabeledField label="Exposure mode" fieldId="exposureMode" help={getFieldHelp('site.exposureMode')}>
+          <LabeledField label="Region" fieldId="siteRegion" help={getFieldHelp('site.region')}>
+            <TextInput
+              id="siteRegion"
+              value={form.region || ''}
+              onChange={(_e, v) => setForm({ ...form, region: v })}
+              placeholder="homelab"
+            />
+          </LabeledField>
+          <LabeledField label="Jumphost" fieldId="siteJumphost" help={getFieldHelp('site.jumphost')}>
+            <TextInput
+              id="siteJumphost"
+              value={form.jumphost || ''}
+              onChange={(_e, v) => setForm({ ...form, jumphost: v })}
+              placeholder="user@bastion.example.com:22"
+            />
+          </LabeledField>
+          <LabeledField label="Site profile" fieldId="siteProfile" help={getFieldHelp('site.exposureMode')}>
             <FormSelect
-              id="exposureMode"
-              value={form.exposureMode || 'none'}
-              onChange={(_e, v) => setForm({ ...form, exposureMode: v as FleetExposureMode })}
+              id="siteProfile"
+              value={profile}
+              onChange={(_e, v) => setProfile(v as SiteCreateProfile)}
             >
-              <FormSelectOption value="none" label="None" />
-              <FormSelectOption value="port_forward" label="Port forward" />
-              <FormSelectOption value="reverse_proxy" label="Reverse proxy" />
+              <FormSelectOption value="port_forward" label="Port forward (default)" />
+              <FormSelectOption value="hub_gateway" label="Hub gateway catalog" />
+              <FormSelectOption value="custom" label="Custom (multi-ingress)" />
             </FormSelect>
           </LabeledField>
-          <p style={{ fontSize: '0.85rem', marginTop: '-0.25rem' }}>
-            Default TLS for this exposure: <code>{recommendedTlsForExposure(form.exposureMode || 'none')}</code>
-            {' · '}
-            Override per domain on the site page if needed — mismatched pairs show a warning.{' '}
-            <a href={EXPOSURE_TLS_DOCS_URL} target="_blank" rel="noreferrer">
-              Working pairs
-            </a>
-          </p>
-          <LabeledField label="Primary edge domain" fieldId="edgeDomain" help={getFieldHelp('site.edgeDomain')}>
-            <TextInput
-              id="edgeDomain"
-              value={form.edgeDomain || ''}
-              onChange={(_e, v) =>
-                setForm({
-                  ...form,
-                  edgeDomain: v,
-                  wildcard: form.wildcard || (v ? `*.${v}` : ''),
-                })
-              }
-              placeholder="lab.example.com"
-            />
-          </LabeledField>
-          <LabeledField label="Wildcard" fieldId="wildcard" help={getFieldHelp('site.wildcard')}>
-            <TextInput
-              id="wildcard"
-              value={form.wildcard || ''}
-              onChange={(_e, v) => setForm({ ...form, wildcard: v })}
-              placeholder="*.lab.example.com"
-            />
-          </LabeledField>
+          {profile === 'hub_gateway' ? (
+            <>
+              <LabeledField label="Hub zone" fieldId="hubZone" isRequired help={getFieldHelp('site.edgeDomain')}>
+                <TextInput
+                  id="hubZone"
+                  value={form.hubZone || ''}
+                  onChange={(_e, v) => setForm({ ...form, hubZone: v })}
+                  placeholder="hub.example.com"
+                />
+              </LabeledField>
+              <LabeledField label="Hub wildcard" fieldId="hubWildcard" help={getFieldHelp('site.wildcard')}>
+                <TextInput
+                  id="hubWildcard"
+                  value={form.hubWildcard || ''}
+                  onChange={(_e, v) => setForm({ ...form, hubWildcard: v })}
+                  placeholder={form.hubZone ? `*.${form.hubZone}` : '*.hub.example.com'}
+                />
+              </LabeledField>
+            </>
+          ) : (
+            <>
+              {(profile === 'custom' ? ingressRows : [ingressRows[0]]).map((row, index) => (
+                <div key={`ingress-${index}`} style={{ marginTop: index > 0 ? '1rem' : 0 }}>
+                  {profile === 'custom' && (
+                    <Title headingLevel="h4" size="md">
+                      Ingress row {index + 1}
+                    </Title>
+                  )}
+                  {profile === 'custom' && (
+                    <LabeledField label="Method" fieldId={`ingressMethod-${index}`}>
+                      <FormSelect
+                        id={`ingressMethod-${index}`}
+                        value={row.method}
+                        onChange={(_e, v) => updateIngressAt(index, { method: v as FleetIngressMethod })}
+                      >
+                        <FormSelectOption value="port_forward" label="port_forward" />
+                        <FormSelectOption value="reverse_proxy" label="reverse_proxy" />
+                      </FormSelect>
+                    </LabeledField>
+                  )}
+                  <LabeledField
+                    label="Ingress ID"
+                    fieldId={index === 0 ? 'ingressId' : `ingressId-${index}`}
+                    isRequired
+                    help={getFieldHelp('site.domainZoneId')}
+                  >
+                    <TextInput
+                      id={index === 0 ? 'ingressId' : `ingressId-${index}`}
+                      value={row.id}
+                      onChange={(_e, v) => updateIngressAt(index, { id: v })}
+                      placeholder="default"
+                    />
+                  </LabeledField>
+                  {row.method !== 'reverse_proxy' && (
+                    <LabeledField
+                      label="WAN address"
+                      fieldId={index === 0 ? 'ingressAddress' : `ingressAddress-${index}`}
+                      isRequired={row.method === 'port_forward'}
+                      help={getFieldHelp('site.endpointAddress')}
+                    >
+                      <TextInput
+                        id={index === 0 ? 'ingressAddress' : `ingressAddress-${index}`}
+                        value={row.address || ''}
+                        onChange={(_e, v) => updateIngressAt(index, { address: v })}
+                        placeholder="203.0.113.1"
+                      />
+                    </LabeledField>
+                  )}
+                  <LabeledField
+                    label="DNS zone"
+                    fieldId={index === 0 ? 'ingressZone' : `ingressZone-${index}`}
+                    isRequired
+                    help={getFieldHelp('site.domainZone')}
+                  >
+                    <TextInput
+                      id={index === 0 ? 'ingressZone' : `ingressZone-${index}`}
+                      value={row.zone || ''}
+                      onChange={(_e, v) => updateIngressAt(index, { zone: v })}
+                      placeholder="lab.example.com"
+                    />
+                  </LabeledField>
+                  <LabeledField
+                    label="Wildcard"
+                    fieldId={index === 0 ? 'ingressWildcard' : `ingressWildcard-${index}`}
+                    help={getFieldHelp('site.wildcard')}
+                  >
+                    <TextInput
+                      id={index === 0 ? 'ingressWildcard' : `ingressWildcard-${index}`}
+                      value={row.wildcard || ''}
+                      onChange={(_e, v) => updateIngressAt(index, { wildcard: v })}
+                      placeholder={row.zone ? `*.${row.zone}` : '*.lab.example.com'}
+                    />
+                  </LabeledField>
+                </div>
+              ))}
+              {profile === 'custom' && (
+                <Button variant="secondary" onClick={addIngressRow} style={{ marginTop: '0.5rem' }}>
+                  Add ingress row
+                </Button>
+              )}
+              {profile === 'port_forward' && (
+                <p style={{ fontSize: '0.85rem', marginTop: '-0.25rem' }}>
+                  Creates one <code>port_forward</code> ingress row. Add reverse-proxy rows on the site
+                  detail page.
+                </p>
+              )}
+            </>
+          )}
           <LabeledField label="DNS target note" fieldId="dnsNote" help={getFieldHelp('site.dnsNote')}>
             <TextInput
               id="dnsNote"

@@ -17,15 +17,15 @@ type hubService struct {
 }
 
 type hubInfrastructureResponse struct {
-	HostName         string       `json:"host_name"`
-	ManagementSiteID string       `json:"management_site_id"`
-	WireguardIP      string       `json:"wireguard_ip,omitempty"`
-	PublicEndpoint   string       `json:"public_endpoint,omitempty"`
-	ExposureMode     string       `json:"exposure_mode,omitempty"`
-	HubZone          string       `json:"hub_zone,omitempty"`
-	DnsTargetNote    string       `json:"dns_target_note,omitempty"`
-	Services         []hubService `json:"services,omitempty"`
-	Nodes            []nodeSummary `json:"nodes,omitempty"`
+	HostName         string                 `json:"host_name"`
+	ManagementSiteID string                 `json:"management_site_id"`
+	WireguardIP      string                 `json:"wireguard_ip,omitempty"`
+	PublicEndpoint   string                 `json:"public_endpoint,omitempty"`
+	HubGateway       bool                   `json:"hub_gateway,omitempty"`
+	HubZone          string                 `json:"hub_zone,omitempty"`
+	DnsTargetNote    string                 `json:"dns_target_note,omitempty"`
+	Services         []hubService           `json:"services,omitempty"`
+	Nodes            []nodeSummary          `json:"nodes,omitempty"`
 	IngressAuth      *hubIngressAuthSummary `json:"ingress_auth,omitempty"`
 }
 
@@ -60,13 +60,13 @@ func (s *Server) handleGetHubInfrastructure(ctx context.Context, w http.Response
 		}
 	}
 
-	fs.Spec.NormalizeEdge()
+	fs.Spec.NormalizeIngress()
 	resp := hubInfrastructureResponse{
 		HostName:         s.hubHostName(),
 		ManagementSiteID: siteID,
 		WireguardIP:      s.Cfg.HubWireguardIP,
-		ExposureMode:     fs.Spec.EffectiveExposureMode(),
-		HubZone:          fs.Spec.EffectiveEdgeDomain(),
+		HubGateway:       fs.Spec.HubGatewayEnabled(),
+		HubZone:          fs.Spec.EffectiveHubZone(),
 		Services: []hubService{
 			{Name: "Harbor", Description: "Fleet image registry"},
 			{Name: "Fleet Console", Description: "Sites and clusters"},
@@ -92,12 +92,13 @@ func (s *Server) handleGetHubInfrastructure(ctx context.Context, w http.Response
 			)
 		}
 	}
-	if fs.Spec.Edge.ExternalAccess != nil {
-		resp.DnsTargetNote = fs.Spec.Edge.ExternalAccess.DnsTargetNote
+	if we := fs.Spec.EffectiveWanEgress(); we != nil {
+		resp.DnsTargetNote = we.DnsTargetNote
 	}
-	for _, ep := range fs.Spec.Edge.ExternalEndpoints {
-		if ep.Role == "primary" || resp.PublicEndpoint == "" {
-			resp.PublicEndpoint = ep.Address
+	for _, ent := range fs.Spec.Edge.Ingress {
+		if ent.Method == fleetv1alpha1.IngressMethodPortForward && ent.Address != "" {
+			resp.PublicEndpoint = ent.Address
+			break
 		}
 	}
 	if cs, err := s.localClientset(); err == nil {

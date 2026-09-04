@@ -11,47 +11,46 @@ import (
 )
 
 type Cluster struct {
-	Site              string   `yaml:"site"`
-	DirectIngress     bool     `yaml:"direct_ingress"`
-	ExposureMode      string   `yaml:"exposure_mode,omitempty"`
-	TlsPolicy         string   `yaml:"tls_policy,omitempty"`
-	IngressEndpointID string   `yaml:"ingress_endpoint_id,omitempty"`
-	DomainBindings    []string `yaml:"domain_bindings,omitempty"`
-	UpstreamHost      string   `yaml:"upstream_host"`
-	EdgeWANIP         string   `yaml:"edge_wan_ip,omitempty"`
-	TraefikHTTPPort   int      `yaml:"traefik_http_port"`
-	TraefikHubHTTPPort int     `yaml:"traefik_hub_http_port,omitempty"`
-	TraefikHTTPSPort  int      `yaml:"traefik_https_port,omitempty"`
+	Site              string `yaml:"site"`
+	DirectIngress     bool   `yaml:"direct_ingress"`
+	IngressID         string `yaml:"ingress_id,omitempty"`
+	Method            string `yaml:"method,omitempty"`
+	TlsPolicy         string `yaml:"tls_policy,omitempty"`
+	DNSZone           string `yaml:"dns_zone,omitempty"`
+	UpstreamHost      string `yaml:"upstream_host"`
+	EdgeWANIP         string `yaml:"edge_wan_ip,omitempty"`
+	TraefikHTTPPort   int    `yaml:"traefik_http_port"`
+	TraefikHubHTTPPort int   `yaml:"traefik_hub_http_port,omitempty"`
+	TraefikHTTPSPort  int    `yaml:"traefik_https_port,omitempty"`
 }
 
 const (
-	exposureNone         = "none"
-	exposurePortForward  = "port_forward"
-	exposureReverseProxy = "reverse_proxy"
+	methodPortForward  = "port_forward"
+	methodReverseProxy = "reverse_proxy"
 
 	TLSPolicyACMECluster = "acme_cluster"
 )
 
-// EffectiveExposureMode resolves cluster exposure with legacy direct_ingress fallback.
-func (c Cluster) EffectiveExposureMode() string {
-	if c.ExposureMode != "" && c.ExposureMode != "inherit" {
-		return c.ExposureMode
+// EffectiveMethod resolves cluster ingress method (legacy direct_ingress → port_forward).
+func (c Cluster) EffectiveMethod() string {
+	if c.Method != "" {
+		return c.Method
 	}
 	if c.DirectIngress {
-		return exposurePortForward
+		return methodPortForward
 	}
-	return exposureNone
+	return ""
 }
 
 // AllowsDirectSiteIngress is true when WAN can reach cluster Traefik (port-forward or reverse-proxy).
 func (c Cluster) AllowsDirectSiteIngress() bool {
-	mode := c.EffectiveExposureMode()
-	return mode == exposurePortForward || mode == exposureReverseProxy
+	m := c.EffectiveMethod()
+	return m == methodPortForward || m == methodReverseProxy
 }
 
 // SpokeACMEEnabled reports whether catalog spoke Ingresses should use cluster Let's Encrypt.
 func (c Cluster) SpokeACMEEnabled(globalACME bool) bool {
-	return globalACME && c.TlsPolicy == TLSPolicyACMECluster
+	return globalACME && c.EffectiveMethod() == methodPortForward && c.TlsPolicy == TLSPolicyACMECluster
 }
 
 type Registry struct {

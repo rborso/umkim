@@ -64,9 +64,7 @@ var ProviderInstallOrder = []string{
 }
 
 type FleetClusterJoinEdgeSpec struct {
-	ExposureMode      string `json:"exposureMode,omitempty"`
-	TlsPolicy         string `json:"tlsPolicy,omitempty"`
-	IngressEndpointId string `json:"ingressEndpointId,omitempty"`
+	IngressId string `json:"ingressId,omitempty"`
 }
 
 type FleetClusterJoinNodeSpec struct {
@@ -205,7 +203,6 @@ type FleetClusterJoinSpec struct {
 	ClusterCapabilities map[string]bool           `json:"clusterCapabilities,omitempty"`
 	GPU                 bool                      `json:"gpu,omitempty"`
 	Storage             *ClusterStorageSpec       `json:"storage,omitempty"`
-	DomainBindings      []string                  `json:"domainBindings,omitempty"`
 	Edge                FleetClusterJoinEdgeSpec  `json:"edge,omitempty"`
 	Topology            string                    `json:"topology,omitempty"`
 	NetworkMode         string                    `json:"networkMode,omitempty"`

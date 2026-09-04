@@ -3,21 +3,13 @@
 homelab_example:
   display_name: Example homelab
   region: homelab
-  exposure_mode: port_forward
-  default_exposure_mode: port_forward
-  edge_domain: site.example.com
-  edge_wildcard: "*.site.example.com"
-  external_endpoints:
-    - id: router-wan
+  ingress:
+    - id: site-pf
+      method: port_forward
       address: "203.0.113.50"   # RFC5737 — router public IP / DDNS
-      role: primary
-      description: "Router WAN — port-forward :80/:443 to cluster NodePorts"
-  domains:
-    - id: site-zone
       zone: site.example.com
       wildcard: "*.site.example.com"
-      tls_policy: acme_cluster
-      ingress_endpoint_id: router-wan
+      description: "Router WAN — port-forward :80/:443 to cluster NodePorts"
   dns_target_note: "A/AAAA *.site.example.com → 203.0.113.50 (router-wan) → node 203.0.113.100:30080/30443"
   wan_egress:
     enabled: true

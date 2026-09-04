@@ -107,9 +107,6 @@ func (in *FleetClusterJoin) DeepCopyInto(out *FleetClusterJoin) {
 			(*out).NFS = &nfs
 		}
 	}
-	if in.Spec.DomainBindings != nil {
-		out.Spec.DomainBindings = append([]string(nil), in.Spec.DomainBindings...)
-	}
 	if in.Spec.Nodes != nil {
 		out.Spec.Nodes = append([]FleetClusterJoinNodeSpec(nil), in.Spec.Nodes...)
 	}

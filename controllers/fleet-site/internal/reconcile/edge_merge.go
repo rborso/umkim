@@ -1,67 +1,62 @@
 package reconcile
 
 import (
-	"strings"
-
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
 )
 
 // edgeClusterUpsert mirrors fleet-edge-clusters YAML fields written by FCJ reconcile.
 type edgeClusterUpsert struct {
-	Site              string
-	Management        bool
-	ReadOnly          bool
-	DirectIngress     bool
-	ExposureMode      string
-	TlsPolicy         string
-	IngressEndpointID string
-	DomainBindings    []string
-	UpstreamHost      string
-	TraefikHTTPPort   int
+	Site          string
+	Management    bool
+	ReadOnly      bool
+	DirectIngress bool
+	IngressID     string
+	Method        string
+	TlsPolicy     string
+	DNSZone       string
+	EdgeWANIP     string
+	UpstreamHost  string
+	TraefikHTTPPort int
 }
 
-func mergeEdgeClusterEntryForJoin(prev edgeClusterUpsert, fcj *fleetv1alpha1.FleetClusterJoin, siteDefaultExposure, upstreamHost string) edgeClusterUpsert {
-	exposure := fcj.Spec.Edge.ExposureMode
-	if exposure == "" {
-		exposure = "inherit"
+func mergeEdgeClusterEntryForJoin(prev edgeClusterUpsert, fcj *fleetv1alpha1.FleetClusterJoin, site *fleetv1alpha1.FleetSite, upstreamHost string) edgeClusterUpsert {
+	ingressID := fcj.Spec.Edge.IngressId
+	if ingressID == "" {
+		ingressID = prev.IngressID
 	}
-	tls := fcj.Spec.Edge.TlsPolicy
-	if tls == "" {
-		tls = "inherit"
-	}
-	clusterInput := registry.ClusterExposureInput{
-		ExposureMode:   exposure,
-		TlsPolicy:      tls,
-		DomainBindings: fcj.Spec.DomainBindings,
-	}
-	effectiveExposure := registry.EffectiveClusterExposureMode(clusterInput, siteDefaultExposure)
-
-	domainBindings := append([]string(nil), fcj.Spec.DomainBindings...)
-	if len(domainBindings) == 0 {
-		domainBindings = append([]string(nil), prev.DomainBindings...)
+	if ingressID == "" && site != nil {
+		ingressID = site.Spec.AutoIngressID()
 	}
 
-	ingressEndpointID := strings.TrimSpace(fcj.Spec.Edge.IngressEndpointId)
-	if ingressEndpointID == "" {
-		ingressEndpointID = prev.IngressEndpointID
+	out := edgeClusterUpsert{
+		Site:            fcj.Spec.SiteId,
+		Management:      prev.Management,
+		ReadOnly:        prev.ReadOnly,
+		UpstreamHost:    upstreamHost,
+		TraefikHTTPPort: prev.TraefikHTTPPort,
+		IngressID:       ingressID,
+	}
+	if out.TraefikHTTPPort == 0 {
+		out.TraefikHTTPPort = 30080
 	}
 
-	traefikHTTPPort := prev.TraefikHTTPPort
-	if traefikHTTPPort == 0 {
-		traefikHTTPPort = 30080
+	if site != nil && ingressID != "" {
+		if ci, err := ingress.ResolveClusterIngress(site.Spec, ingressID); err == nil {
+			out.Method = ci.Method
+			out.TlsPolicy = ci.TlsPolicy
+			out.DNSZone = ci.Zone
+			out.EdgeWANIP = ci.Address
+			out.DirectIngress = registry.DirectIngressFromMethod(ci.Method)
+		}
 	}
-
-	return edgeClusterUpsert{
-		Site:              fcj.Spec.SiteId,
-		Management:        prev.Management,
-		ReadOnly:          prev.ReadOnly,
-		DirectIngress:     registry.DirectIngressFromExposure(effectiveExposure),
-		ExposureMode:      effectiveExposure,
-		TlsPolicy:         registry.EffectiveClusterTLSPolicy(clusterInput, siteDefaultExposure),
-		IngressEndpointID: ingressEndpointID,
-		DomainBindings:    domainBindings,
-		UpstreamHost:      upstreamHost,
-		TraefikHTTPPort:   traefikHTTPPort,
+	if out.Method == "" {
+		out.DirectIngress = prev.DirectIngress
+		out.Method = prev.Method
+		out.TlsPolicy = prev.TlsPolicy
+		out.DNSZone = prev.DNSZone
+		out.EdgeWANIP = prev.EdgeWANIP
 	}
+	return out
 }

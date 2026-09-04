@@ -25,22 +25,6 @@ func TestAccessDomainsForZones(t *testing.T) {
 	}
 }
 
-func TestMatchedZones(t *testing.T) {
-	site := &fleetv1alpha1.FleetSite{
-		Spec: fleetv1alpha1.FleetSiteSpec{
-			Edge: fleetv1alpha1.FleetSiteEdgeSpec{
-				Domains: []fleetv1alpha1.FleetSiteDomainSpec{
-					{ID: "homelab", Zone: "apps.umkim.com", Wildcard: "*.apps.umkim.com"},
-				},
-			},
-		},
-	}
-	zones := matchedZones(site, []string{"homelab"})
-	if len(zones) != 1 || zones[0] != "apps.umkim.com" {
-		t.Fatalf("zones = %v", zones)
-	}
-}
-
 func TestDNSFromFCJStatus(t *testing.T) {
 	fcj := &fleetv1alpha1.FleetClusterJoin{
 		Status: fleetv1alpha1.FleetClusterJoinStatus{

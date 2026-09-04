@@ -1,11 +1,8 @@
 # Merge under fleet_sites: in inventory/group_vars/all/fleet_sites.yml
-# Internal — WireGuard/LAN only; maps to live site "lab-remote".
+# Internal — WireGuard/LAN only; no public ingress entries.
 internal_lab:
   display_name: Internal lab
   region: lab
-  exposure_mode: none
-  edge_domain: remote.example.com
-  edge_wildcard: "*.remote.example.com"
   wan_egress:
     enabled: false
   wireguard_pool: null

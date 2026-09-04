@@ -12,7 +12,6 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ingressauth"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -24,8 +23,7 @@ type clusterIngressAuthEnableBody struct {
 
 var (
 	errClusterIngressAuthNotReady    = errors.New("cluster must be Ready before enabling ingress auth")
-	errClusterIngressDisabled        = errors.New("cluster ingress must be enabled (port_forward or reverse_proxy)")
-	errClusterIngressAuthNoDNS       = errors.New("cluster requires site DNS domain bindings with a resolvable zone")
+	errClusterIngressDisabled        = errors.New("ingress auth requires port_forward ingress with a DNS zone")
 	errClusterIngressAuthPassword    = errors.New("lldapAdminPassword is required")
 	errClusterIngressAuthUseEnable   = errors.New("use POST /clusters/{name}/ingress-auth/enable with lldapAdminPassword")
 )
@@ -187,23 +185,21 @@ func (s *Server) triggerIngressAuthReconcile(ctx context.Context) error {
 }
 
 func (s *Server) clusterIngressEnabled(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
 	edge, err := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
+	if err == nil {
+		if e, ok := edge.Clusters[clusterName]; ok && e.IngressID != "" {
+			ingressID = e.IngressID
+		}
+	}
+	if ingressID == "" {
+		return false
+	}
+	site, err := s.loadSiteForCluster(ctx, fcj.Spec.SiteId)
 	if err != nil {
 		return false
 	}
-	siteDefaults := s.siteDefaultExposureMap(ctx)
-	var edgeEnt registry.ClusterExposureInput
-	if e, ok := edge.Clusters[clusterName]; ok {
-		edgeEnt = registry.ClusterExposureInput{
-			ExposureMode:      e.ExposureMode,
-			TlsPolicy:         e.TlsPolicy,
-			DirectIngress:     e.DirectIngress,
-			IngressEndpointID: e.IngressEndpointID,
-			DomainBindings:    e.DomainBindings,
-		}
-	}
-	siteDefault := siteDefaults[fcj.Spec.SiteId]
-	return registry.ClusterIngressEnabled(edgeEnt, siteDefault)
+	return clusterIngressAllowsAuth(site, ingressID)
 }
 
 func (s *Server) buildClusterSummary(ctx context.Context, name string) (clusterSummary, error) {
@@ -212,8 +208,7 @@ func (s *Server) buildClusterSummary(ctx context.Context, name string) (clusterS
 		return clusterSummary{}, err
 	}
 	edge, _ := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
-	siteDefaults := s.siteDefaultExposureMap(ctx)
-	cs := clusterFromMC(mc, edge, siteDefaults)
+	cs := clusterFromMC(mc, edge)
 	if fcj, jerr := s.findFleetClusterJoin(ctx, name); jerr == nil {
 		applyFleetClusterJoinSummary(&cs, fcj)
 	}

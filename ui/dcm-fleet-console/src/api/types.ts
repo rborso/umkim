@@ -9,7 +9,7 @@ export type FleetSitePhase =
   | 'Ready'
   | 'Failed';
 
-export type FleetExposureMode = 'none' | 'port_forward' | 'reverse_proxy' | 'hub_gateway';
+export type FleetIngressMethod = 'port_forward' | 'reverse_proxy';
 export type FleetTlsPolicy = 'inherit' | 'external' | 'acme_cluster' | 'acme_hub' | 'passthrough';
 
 export interface FleetSiteExternalAccess {
@@ -24,29 +24,22 @@ export interface FleetSiteWanEgress {
   expectedWanIp?: string;
 }
 
-export interface FleetSiteExternalEndpoint {
+export interface FleetSiteIngress {
   id: string;
-  address: string;
-  role?: string;
-  description?: string;
-}
-
-export interface FleetSiteDomain {
-  id: string;
-  zone: string;
+  method: FleetIngressMethod;
+  address?: string;
+  zone?: string;
   wildcard?: string;
-  tlsPolicy?: FleetTlsPolicy;
+  description?: string;
+  operatorNotes?: string;
   assignedClusters?: string[];
-  ingressEndpointId?: string;
 }
 
 export interface FleetSiteEdge {
-  edgeDomain?: string;
-  wildcard?: string;
-  exposureMode?: FleetExposureMode;
-  defaultExposureMode?: FleetExposureMode;
-  externalEndpoints?: FleetSiteExternalEndpoint[];
-  domains?: FleetSiteDomain[];
+  hubGateway?: boolean;
+  hubZone?: string;
+  hubWildcard?: string;
+  ingress?: FleetSiteIngress[];
   wanEgress?: FleetSiteWanEgress;
   externalAccess?: FleetSiteExternalAccess;
 }
@@ -58,6 +51,7 @@ export interface FleetSiteSpec {
   displayName?: string;
   region?: string;
   failureDomain?: string;
+  jumphost?: string;
   edgeDomain?: string;
   edge?: FleetSiteEdge;
   bootstrapHost?: string;
@@ -114,12 +108,11 @@ export interface FleetSitePatch {
   siteId?: string;
   region?: string;
   failureDomain?: string;
-  edgeDomain?: string;
-  wildcard?: string;
-  exposureMode?: FleetExposureMode;
-  defaultExposureMode?: FleetExposureMode;
-  externalEndpoints?: FleetSiteExternalEndpoint[];
-  domains?: FleetSiteDomain[];
+  jumphost?: string;
+  hubGateway?: boolean;
+  hubZone?: string;
+  hubWildcard?: string;
+  ingress?: FleetSiteIngress[];
   wanEgress?: FleetSiteWanEgress;
   externalAccess?: FleetSiteExternalAccess;
   provisioningMode?: 'greenfield' | 'registry';
@@ -350,12 +343,14 @@ export interface FleetCluster {
   topology?: Record<string, string>;
   ingress_enabled?: boolean;
   direct_ingress?: boolean;
-  exposure_mode?: FleetExposureMode | 'inherit';
+  ingress_id?: string;
+  method?: FleetIngressMethod;
   tls_policy?: FleetTlsPolicy;
-  ingress_endpoint_id?: string;
-  domain_bindings?: string[];
+  dns_zone?: string;
+  edge_wan_ip?: string;
   upstream_host?: string;
   traefik_http_port?: number;
+  jumphost?: string;
   console_managed?: boolean;
   provisioning_mode?: 'bundle' | 'hub_job';
   managed_cluster_available?: boolean;
@@ -403,14 +398,11 @@ export interface CapabilityDiscovery {
 
 export interface FleetClusterPatch {
   siteId?: string;
+  jumphost?: string;
   capabilities?: Record<string, boolean>;
   topology?: Record<string, string>;
   edge?: {
-    direct_ingress?: boolean;
-    exposure_mode?: FleetExposureMode | 'inherit';
-    tls_policy?: FleetTlsPolicy;
-    ingress_endpoint_id?: string;
-    domain_bindings?: string[];
+    ingress_id?: string;
     upstream_host?: string;
     traefik_http_port?: number;
   };
@@ -554,10 +546,11 @@ export interface FleetSiteCreate {
   siteId?: string;
   displayName?: string;
   region?: string;
-  exposureMode?: FleetExposureMode;
-  defaultExposureMode?: FleetExposureMode;
-  edgeDomain?: string;
-  wildcard?: string;
+  failureDomain?: string;
+  jumphost?: string;
+  hubGateway?: boolean;
+  hubZone?: string;
+  hubWildcard?: string;
   wanEgress?: FleetSiteWanEgress;
   externalAccess?: FleetSiteExternalAccess;
   edge?: FleetSiteEdge;
@@ -580,6 +573,7 @@ export interface FleetClusterCreate {
   clusterName: string;
   siteId: string;
   bootstrapHost: string;
+  jumphost?: string;
   minRootDiskGi?: number;
   clusterRegion?: string;
   clusterLabels?: Record<string, string>;
@@ -587,16 +581,13 @@ export interface FleetClusterCreate {
   kvm?: boolean;
   clusterCapabilities?: Record<string, boolean>;
   storage?: FleetClusterStorageSpec;
-  domainBindings?: string[];
   topology?: FleetClusterTopology;
   networkMode?: FleetClusterNetworkMode;
   hubLanApi?: string;
   controlPlaneVip?: string;
   nodes?: FleetClusterNodeInput[];
   edge?: {
-    exposureMode?: FleetExposureMode | 'inherit';
-    tlsPolicy?: FleetTlsPolicy;
-    ingressEndpointId?: string;
+    ingressId?: string;
   };
   /** Optional KubeVirt platform add-on (not a chart install path). */
   providers?: {

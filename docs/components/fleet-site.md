@@ -25,16 +25,18 @@ is opt-in (`cleanupKubernetes=true` on delete, or
 `fleet_flow_cleanup_kubernetes=true` in
 [playbooks/flows/cluster-delete.yml](../../playbooks/flows/cluster-delete.yml)).
 
-## Site exposure
+## Site ingress
 
-Each `FleetSite` carries edge metadata, including `exposureMode` (`hub_gateway`,
-`port_forward`, `reverse_proxy`, `none`). Clusters can inherit or override.
+Each `FleetSite` carries `spec.edge.ingress[]` (port-forward and/or
+reverse-proxy entries) and optional `hubGateway` for hub-routed DNS. Clusters
+bind with `FleetClusterJoin.spec.edge.ingressId`. When a site has exactly one
+`port_forward` ingress, an empty `ingressId` auto-binds at reconcile time.
 Inventory examples: [../../examples/site-profiles/](../../examples/site-profiles/).
 
-Match per-app `FleetApp` `route.mode` to site exposure:
+Match per-app `FleetApp` `route.mode` to cluster ingress:
 
-- `hub` with `hub_gateway`
-- `site` with `port_forward` or `reverse_proxy`
+- `hub` with site `hubGateway` (and hub zone DNS)
+- `site` with `port_forward` or `reverse_proxy` ingress binding
 - `none` for chart-owned or internal ingress
 
 See [fleet-edge.md](fleet-edge.md).
@@ -78,6 +80,17 @@ Hub Ansible jobs (provision, storage, node operations) reach cluster nodes throu
 site when the cluster field is empty. Use `user@host:port` (port optional). When
 set, jobs SSH to management LAN addresses via `ProxyJump` instead of the WireGuard
 overlay — required for sites where only a bastion can reach lab nodes.
+
+Edit jumphost (and site region / failure domain) in the console **Sites** detail
+(Edge and DNS → Connectivity) or via `umkim site patch`. Per-cluster overrides:
+console **Clusters** detail (Edge and ingress) or `umkim cluster patch`.
+`umkim cluster bootstrap` resolves jumphost as cluster override, then site default.
+
+When a cluster reaches **Ready**, the controller ensures a hub secret
+`fleet-system/fleet-kubeconfig-<cluster>` exists (SSH to the spoke API over the
+overlay). Provision playbooks sync it immediately after CSR approval; if a
+provision job times out or fails later, a dedicated kubeconfig-sync Ansible job
+is retried automatically so node list APIs keep working.
 
 Workers join during initial provision when listed in the FCJ `spec.nodes` at
 create time. Post-Ready add uses the same Ansible agent-join path without

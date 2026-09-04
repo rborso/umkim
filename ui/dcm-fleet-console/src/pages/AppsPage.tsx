@@ -27,7 +27,6 @@ import {
   createFleetChart,
   deleteFleetApp,
   deleteFleetChart,
-  fleetSiteEffectiveDomain,
   fleetSiteEffectiveId,
   uploadFleetChart,
 } from '../api/client';
@@ -42,6 +41,7 @@ import type {
 } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
+import { clusterIngressZone, isReverseProxyMethod } from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
 import {
   useFleetAppsQuery,
@@ -63,14 +63,12 @@ const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
 });
 
 function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
-  if (!cluster?.site) return '';
+  if (!cluster?.site || isReverseProxyMethod(cluster.method)) return '';
   const site = sites.find(
     (s) => fleetSiteEffectiveId(s) === cluster.site || s.metadata?.name === cluster.site,
   );
   if (!site) return '';
-  const zone = fleetSiteEffectiveDomain(site);
-  if (zone) return zone;
-  return site.spec?.edge?.domains?.[0]?.zone || '';
+  return clusterIngressZone(site, cluster);
 }
 
 function suggestedRouteHost(release: string, domain: string): string {
@@ -173,10 +171,14 @@ export function AppsPage() {
       return suggestedRouteHost(release, defaults.hubEdgeDomain || '');
     }
     if (form.route?.mode === 'site') {
-      return suggestedRouteHost(release, clusterSiteDomain(sites, selectedCluster));
+      const zone = clusterSiteDomain(sites, selectedCluster);
+      return zone ? suggestedRouteHost(release, zone) : '';
     }
     return '';
   }, [form.releaseName, form.route?.mode, defaults.hubEdgeDomain, sites, selectedCluster]);
+
+  const siteRouteNeedsManualHost =
+    form.route?.mode === 'site' && isReverseProxyMethod(selectedCluster?.method);
 
   const routeHostValue =
     form.route?.mode === 'site' ? form.route?.siteHost || '' : form.route?.hubHost || '';
@@ -564,6 +566,11 @@ export function AppsPage() {
                   }))
                 }
               />
+              {siteRouteNeedsManualHost ? (
+                <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                  Reverse-proxy clusters have no site DNS zone — enter the public hostname manually.
+                </p>
+              ) : null}
             </LabeledField>
           ) : null}
           <LabeledField label="Values (YAML)" fieldId="app-values" help={getFieldHelp('apps.valuesYaml')}>

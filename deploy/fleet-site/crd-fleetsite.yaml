@@ -48,57 +48,41 @@ spec:
                 failureDomain:
                   type: string
                   description: Optional failure domain within region
-                edgeDomain:
-                  type: string
-                  description: Legacy; prefer spec.edge.edgeDomain
                 edge:
                   type: object
                   properties:
-                    edgeDomain:
+                    hubGateway:
+                      type: boolean
+                      default: false
+                    hubZone:
                       type: string
-                    wildcard:
+                    hubWildcard:
                       type: string
-                    exposureMode:
-                      type: string
-                      enum: [none, port_forward, reverse_proxy, hub_gateway]
-                    defaultExposureMode:
-                      type: string
-                      enum: [none, port_forward, reverse_proxy, hub_gateway]
-                    externalEndpoints:
+                    ingress:
                       type: array
                       items:
                         type: object
-                        required: [id, address]
+                        required: [id, method]
                         properties:
                           id:
                             type: string
+                          method:
+                            type: string
+                            enum: [port_forward, reverse_proxy]
                           address:
-                            type: string
-                          role:
-                            type: string
-                          description:
-                            type: string
-                    domains:
-                      type: array
-                      items:
-                        type: object
-                        required: [id, zone]
-                        properties:
-                          id:
                             type: string
                           zone:
                             type: string
                           wildcard:
                             type: string
-                          tlsPolicy:
+                          description:
                             type: string
-                            enum: [inherit, external, acme_cluster, acme_hub, passthrough]
+                          operatorNotes:
+                            type: string
                           assignedClusters:
                             type: array
                             items:
                               type: string
-                          ingressEndpointId:
-                            type: string
                     wanEgress:
                       type: object
                       description: Site has internet egress (not cluster ingress)

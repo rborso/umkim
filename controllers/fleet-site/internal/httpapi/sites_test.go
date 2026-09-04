@@ -73,6 +73,71 @@ func TestDeleteRegistrySite(t *testing.T) {
 	}
 }
 
+func TestPatchSiteMetadata(t *testing.T) {
+	ns := "fleet-console"
+	site := &fleetv1alpha1.FleetSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			SiteName:         "homelab",
+			SiteId:           "homelab",
+			ProvisioningMode: fleetv1alpha1.ProvisioningModeRegistry,
+		},
+	}
+	s := &Server{
+		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site).Build(),
+		Cfg:    config.Config{Namespace: ns, ManagementSiteID: "umkim", RequireIdentity: false},
+	}
+	body, _ := json.Marshal(map[string]string{
+		"jumphost":       "jump@203.0.113.1:22",
+		"region":         "homelab",
+		"failureDomain":  "rack-a",
+	})
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1alpha1/sites/homelab", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	s.handlePatchSite(context.Background(), rec, req, "homelab")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var updated fleetv1alpha1.FleetSite
+	if err := s.Client.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: "homelab"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Spec.Jumphost != "jump@203.0.113.1:22" {
+		t.Fatalf("jumphost=%q", updated.Spec.Jumphost)
+	}
+	if updated.Spec.Region != "homelab" {
+		t.Fatalf("region=%q", updated.Spec.Region)
+	}
+	if updated.Spec.FailureDomain != "rack-a" {
+		t.Fatalf("failureDomain=%q", updated.Spec.FailureDomain)
+	}
+}
+
+func TestPatchSiteInvalidJumphost(t *testing.T) {
+	ns := "fleet-console"
+	site := &fleetv1alpha1.FleetSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			SiteName:         "homelab",
+			SiteId:           "homelab",
+			ProvisioningMode: fleetv1alpha1.ProvisioningModeRegistry,
+		},
+	}
+	s := &Server{
+		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site).Build(),
+		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
+	}
+	body, _ := json.Marshal(map[string]string{"jumphost": "bad"})
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1alpha1/sites/homelab", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	s.handlePatchSite(context.Background(), rec, req, "homelab")
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d want 400 body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestDeleteManagementSiteForbidden(t *testing.T) {
 	ns := "fleet-console"
 	site := &fleetv1alpha1.FleetSite{
