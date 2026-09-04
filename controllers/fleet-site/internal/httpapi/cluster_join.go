@@ -157,6 +157,7 @@ func applyFleetClusterJoinSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetCl
 		cs.Available = false
 	}
 	applyStorageToSummary(cs, fcj)
+	applyProvidersToSummary(cs, fcj)
 	cs.IngressAuthEnabled = fcj.Spec.IngressAuth.Enabled
 	if fcj.Status.IngressAuth.Phase != "" || fcj.Status.IngressAuth.JobName != "" || fcj.Status.IngressAuth.Message != "" ||
 		fcj.Status.IngressAuth.PortalHost != "" || fcj.Status.IngressAuth.LLDAPWebUIHost != "" || len(fcj.Status.IngressAuth.AccessDomains) > 0 {
@@ -205,6 +206,27 @@ func applyStorageToSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetClusterJo
 	}
 }
 
+func applyProvidersToSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetClusterJoin) {
+	if len(fcj.Status.Providers) == 0 && !fcj.Spec.Providers.Install.Kubevirt {
+		return
+	}
+	out := map[string]clusterProviderStatusJSON{}
+	for kind, st := range fcj.Status.Providers {
+		out[kind] = clusterProviderStatusJSON{
+			Phase:        st.Phase,
+			JobName:      st.JobName,
+			Message:      st.Message,
+			ProviderName: st.ProviderName,
+		}
+	}
+	if _, ok := out[fleetv1alpha1.ProviderKindKubevirt]; !ok && fcj.Spec.Providers.Install.Kubevirt {
+		out[fleetv1alpha1.ProviderKindKubevirt] = clusterProviderStatusJSON{
+			Phase: fleetv1alpha1.ProviderPhaseNotInstalled,
+		}
+	}
+	cs.Providers = out
+}
+
 func clusterSummaryFromJoin(fcj *fleetv1alpha1.FleetClusterJoin) clusterSummary {
 	name := fcj.Spec.EffectiveClusterName(fcj.Name)
 	cs := clusterSummary{
@@ -228,6 +250,7 @@ func clusterSummaryFromJoin(fcj *fleetv1alpha1.FleetClusterJoin) clusterSummary 
 		cs.IngressID = fcj.Spec.Edge.IngressId
 	}
 	applyStorageToSummary(&cs, fcj)
+	applyProvidersToSummary(&cs, fcj)
 	return cs
 }
 

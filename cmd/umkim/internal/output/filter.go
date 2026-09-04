@@ -17,6 +17,10 @@ func NormalizeCapabilityRequirement(s string) (string, error) {
 		return "gpu", nil
 	case "kvm":
 		return "kvm", nil
+	case "kubevirt", "kv":
+		return "kubevirt", nil
+	case "multus", "multus_l2", "network.multus_l2", "lan_l2":
+		return "network.multus_l2", nil
 	case "ha", "ha_topology", "ha_cluster":
 		return "ha_topology", nil
 	case "rwx", "storage.rwx", "storage_rwx":
@@ -27,7 +31,7 @@ func NormalizeCapabilityRequirement(s string) (string, error) {
 		if strings.Contains(s, ".") {
 			return s, nil
 		}
-		return "", fmt.Errorf("unknown capability %q (use gpu, kvm, ha_topology, storage.rwx, storage.rwo)", s)
+		return "", fmt.Errorf("unknown capability %q (use gpu, kvm, kubevirt, network.multus_l2, ha_topology, storage.rwx, storage.rwo)", s)
 	}
 }
 
@@ -68,6 +72,10 @@ func clusterHasCapability(c map[string]interface{}, key string) bool {
 			return strField(labels, "fleet.capability/gpu") == "true"
 		case "kvm":
 			return strField(labels, "fleet.capability/kvm") == "true"
+		case "kubevirt":
+			return strField(labels, "fleet.capability/kubevirt") == "true"
+		case "network.multus_l2":
+			return strField(labels, "fleet.capability/network.multus_l2") == "true"
 		case "ha_topology":
 			return strField(labels, "fleet.topology/ha") == "true" ||
 				strField(labels, "fleet.capability/ha_cluster") == "true"
@@ -124,7 +132,7 @@ func WriteClusterCandidates(raw []byte, format Format) error {
 		return err
 	}
 	printTable(
-		[]string{"NAME", "SITE", "PHASE", "READY", "GPU", "KVM", "HA", "RWX", "RWO"},
+		[]string{"NAME", "SITE", "PHASE", "READY", "GPU", "KVM", "KV", "HA", "RWX"},
 		body.Clusters,
 		func(c map[string]interface{}) []string {
 			return []string{
@@ -134,9 +142,9 @@ func WriteClusterCandidates(raw []byte, format Format) error {
 				yesNo(boolField(c, "available")),
 				yesNo(clusterHasCapability(c, "gpu")),
 				yesNo(clusterHasCapability(c, "kvm")),
+				yesNo(clusterHasCapability(c, "kubevirt")),
 				yesNo(clusterHasCapability(c, "ha_topology")),
 				yesNo(clusterHasCapability(c, "storage.rwx")),
-				yesNo(clusterHasCapability(c, "storage.rwo")),
 			}
 		},
 	)

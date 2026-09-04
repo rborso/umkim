@@ -250,6 +250,12 @@ func registryCapabilitiesFromMC(mc *unstructured.Unstructured) map[string]bool {
 	if labels["fleet.capability/kvm"] == "true" {
 		out["kvm"] = true
 	}
+	if labels["fleet.capability/kubevirt"] == "true" {
+		out["kubevirt"] = true
+	}
+	if labels["fleet.capability/network.multus_l2"] == "true" {
+		out["network.multus_l2"] = true
+	}
 	if labels["fleet.topology/ha"] == "true" {
 		out["ha_topology"] = true
 	}

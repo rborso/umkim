@@ -1,0 +1,23 @@
+---
+# Post-Ready KubeVirt platform install on an existing K3s cluster (hub Ansible Job).
+#
+#   ansible-playbook cluster-configure-kubevirt.yml -e fleet_cluster_name=my-cluster \
+#     -i /inventory/inventory.ini
+#
+# Extra vars (from FCJ inventory / job):
+#   fleet_site_enable_kubevirt=true
+#   fleet_cluster_kubevirt_bridge_enabled=true|false
+#   kubevirt_bridge_host_bridge=... (when LAN Multus NAD is requested)
+
+- name: Fleet cluster kubevirt | Platform stack on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    fleet_site_enable_kubevirt: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: push_site_kubevirt_platform.yml
+      tags: [fleet_site, fleet_site_kubevirt, kubevirt]

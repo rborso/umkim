@@ -152,6 +152,13 @@ export interface FleetClusterStorageStatus {
   message?: string;
 }
 
+export interface FleetClusterProviderStatus {
+  phase?: string;
+  jobName?: string;
+  message?: string;
+  providerName?: string;
+}
+
 export interface FleetClusterConfigureStorage extends FleetClusterStorageSpec {
   force?: boolean;
 }
@@ -357,6 +364,7 @@ export interface FleetCluster {
   capability_discovery?: CapabilityDiscovery;
   storage?: FleetClusterStorageSpec;
   storageStatus?: FleetClusterStorageStatus;
+  providers?: Record<string, FleetClusterProviderStatus>;
   ingress_auth_enabled?: boolean;
   ingressAuthStatus?: FleetClusterIngressAuthStatus;
   acme_enabled?: boolean;

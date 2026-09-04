@@ -63,8 +63,8 @@ Inventory examples live under [../examples/site-profiles/](../examples/site-prof
 5. After local K3s validation, the hub provisions OCM registration and platform
    manifests.
 6. The cluster becomes Ready and can receive Helm charts via `FleetApp`.
-   Optional KubeVirt remains a spoke platform add-on, not a deploy path for
-   charts.
+   Optional KubeVirt is a separate spoke platform operation (not a FleetApp);
+   see [components/fleet-kubevirt.md](components/fleet-kubevirt.md).
 
 The public lifecycle phases are `Pending`, `ScriptIssued`, `Enrolled`,
 `Validated`, `Provisioning`, and `Ready`. Cluster deletion defaults to **detach**:
@@ -90,7 +90,7 @@ After a cluster is Ready, install an OCI chart with `FleetApp`:
 - `spec.route.mode` is `none`, `hub`, or `site`.
 - Charts may be published to the hub library (`FleetChart`) before install.
 
-Match `route.mode` to site exposure: `hub` with `hub_gateway`; `site` with
+Match `route.mode` to site edge: `hub` with `hubGateway`; `site` with
 `port_forward` or `reverse_proxy`; `none` for chart-owned or internal ingress.
 
 See [components/fleet-apps.md](components/fleet-apps.md).
@@ -113,6 +113,8 @@ See [components/fleet-edge.md](components/fleet-edge.md).
 ## Optional services
 
 - **Harbor** hosts fleet-built images and OCI charts.
+- **KubeVirt** is an optional spoke platform add-on (Multus + CDI + KubeVirt),
+  installed after Ready via console/CLI/API — not a FleetApp.
 - **Ingress authentication** protects selected public application routes; it is
   separate from console login.
 - **Backup/restore** is experimental and must be tested for every application.
@@ -126,6 +128,7 @@ See [components/fleet-edge.md](components/fleet-edge.md).
 | Hub install | [install.md](install.md) |
 | FleetSite and FleetClusterJoin | [components/fleet-site.md](components/fleet-site.md) |
 | Helm apps | [components/fleet-apps.md](components/fleet-apps.md) |
+| KubeVirt platform | [components/fleet-kubevirt.md](components/fleet-kubevirt.md) |
 | Edge routes | [components/fleet-edge.md](components/fleet-edge.md) |
 | Site exposure examples | [../examples/site-profiles/](../examples/site-profiles/) |
 | Versions | [../VERSIONS.md](../VERSIONS.md) |

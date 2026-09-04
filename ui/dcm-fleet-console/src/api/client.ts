@@ -561,6 +561,39 @@ export async function configureFleetClusterStorage(
   );
 }
 
+export async function enableFleetClusterKubevirt(
+  name: string,
+  body: {
+    lanBridge?: boolean;
+    bridgeName?: string;
+    slaveNic?: string;
+    keepIp?: boolean;
+    force?: boolean;
+  } = {},
+): Promise<{ phase?: string; message?: string; lanBridge?: boolean }> {
+  return fleetSiteRequest<{ phase?: string; message?: string; lanBridge?: boolean }>(
+    '/clusters/' + encodeURIComponent(name) + '/platform/kubevirt',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export async function getFleetClusterKubevirtStatus(
+  name: string,
+): Promise<{
+  phase?: string;
+  jobName?: string;
+  message?: string;
+  install?: boolean;
+  lanBridge?: boolean;
+  bridgeName?: string;
+}> {
+  return fleetSiteRequest('/clusters/' + encodeURIComponent(name) + '/platform/kubevirt');
+}
+
 export async function validateFleetClusterStorage(
   name: string,
   body: import('./types').FleetClusterConfigureStorage,

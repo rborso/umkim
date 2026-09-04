@@ -1,10 +1,12 @@
 ---
-# KubeVirt platform stack on nested_parents (not VPS hub).
+# Deprecated for managed FleetClusterJoin clusters.
+# Prefer: umkim cluster platform enable-kubevirt / console Operations /
+# POST /clusters/{name}/platform/kubevirt (see docs/components/fleet-kubevirt.md).
 #
-# Usage:
+# Legacy inventory path (nested_parents lab hosts only):
 #   ansible-playbook fleet-platform-kubevirt.yml -l nested_parents
 #
-# Legacy: phase4-kubevirt-parents.yml imports this playbook.
+# phase4-kubevirt-parents.yml imports this playbook.
 
 - name: Fleet platform | KubeVirt on nested parents
   hosts: nested_parents

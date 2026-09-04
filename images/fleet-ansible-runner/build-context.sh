@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DST="$(dirname "$0")"
 for f in site-validate.yml site-provision.yml cluster-validate.yml cluster-provision.yml \
   cluster-provision-local.yml cluster-provision-hub.yml cluster-discover-capabilities.yml \
-  cluster-delete-hub.yml cluster-configure-storage.yml cluster-validate-storage.yml \
+  cluster-delete-hub.yml cluster-configure-storage.yml cluster-configure-kubevirt.yml cluster-validate-storage.yml \
   cluster-overlay-recover.yml \
   ingress-auth-reconcile.yml acme-reconcile.yml llm-reconcile.yml wireguard-install.yml \
   ansible.cfg; do

@@ -77,6 +77,31 @@
       ansible.builtin.set_fact:
         fleet_discover_ha_topology: "{{ fleet_discover_cp_count | default(0) | int >= 3 }}"
 
+    - name: Fleet discover | KubeVirt Available
+      ansible.builtin.command:
+        cmd: >-
+          kubectl -n kubevirt get kubevirt kubevirt
+          -o 'jsonpath={.status.conditions[?(@.type=="Available")].status}'
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      register: fleet_discover_kubevirt_available
+      failed_when: false
+      changed_when: false
+
+    - name: Fleet discover | Multus LAN NAD present
+      ansible.builtin.command:
+        cmd: kubectl get network-attachment-definition mgmt-l2 -n default -o name
+      environment:
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      register: fleet_discover_mgmt_l2
+      failed_when: false
+      changed_when: false
+
+    - name: Fleet discover | KubeVirt / Multus L2 flags
+      ansible.builtin.set_fact:
+        fleet_discover_kubevirt: "{{ (fleet_discover_kubevirt_available.stdout | default('') | trim) == 'True' }}"
+        fleet_discover_multus_l2: "{{ fleet_discover_mgmt_l2.rc | default(1) | int == 0 }}"
+
     - name: Fleet discover | Cluster KVM aggregate
       ansible.builtin.set_fact:
         fleet_discover_cluster_kvm: >-
@@ -180,7 +205,9 @@
                 'gpu': (fleet_discover_cluster_gpu | bool),
                 'storage.rwo': (fleet_discover_storage_rwo | bool),
                 'storage.rwx': (fleet_discover_storage_rwx | bool),
-                'ha_topology': (fleet_discover_ha_topology | bool)
+                'ha_topology': (fleet_discover_ha_topology | bool),
+                'kubevirt': (fleet_discover_kubevirt | default(false) | bool),
+                'network.multus_l2': (fleet_discover_multus_l2 | default(false) | bool)
               },
               'cluster_resources': {
                 'gpu.total': (fleet_discover_cluster_gpu_total | int),
@@ -212,6 +239,8 @@
           fleet.capability/kvm={{ fleet_discover_caps.kvm | bool | lower }}
           fleet.capability/storage.rwo={{ fleet_discover_caps['storage.rwo'] | bool | lower }}
           fleet.capability/storage.rwx={{ fleet_discover_caps['storage.rwx'] | bool | lower }}
+          fleet.capability/kubevirt={{ fleet_discover_caps.kubevirt | default(false) | bool | lower }}
+          fleet.capability/network.multus_l2={{ fleet_discover_caps['network.multus_l2'] | default(false) | bool | lower }}
           fleet.topology/ha={{ fleet_discover_caps.ha_topology | bool | lower }}
           fleet.capability/ha_cluster={{ fleet_discover_caps.ha_topology | bool | lower }}
           fleet.capability/ha_storage={{ (fleet_discover_caps['storage.rwo'] or fleet_discover_caps['storage.rwx']) | bool | lower }}

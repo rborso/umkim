@@ -57,14 +57,13 @@ set `spec.clusterName`; the controller does not choose a cluster. Publish
 charts to the hub library (`FleetChart`) first when you want reuse. See
 [fleet-apps.md](fleet-apps.md).
 
-KubeVirt remains an optional spoke platform add-on (KVM capability), not a
-chart-install provider.
+KubeVirt is an optional spoke **platform** add-on (Multus + CDI + KubeVirt),
+not a chart-install path. See [fleet-kubevirt.md](fleet-kubevirt.md).
 
-## Post-Ready node operations
+## Post-Ready cluster operations
 
-When a cluster is `Ready`, operators can add or remove workers and replace
-control-plane nodes through the console **Operations** panel or the fleet-site
-API:
+When a cluster is `Ready`, operators use the console **Operations** panel,
+`umkim`, or the fleet-site API:
 
 | Operation | API |
 |-----------|-----|
@@ -74,12 +73,20 @@ API:
 | Validate node operation (pre/post) | `POST /clusters/{name}/node-operations/validate?phase=pre\|post` |
 | List operation history | `GET /clusters/{name}/node-operations` |
 | Operation Ansible logs | `GET /clusters/{name}/node-operations/{id}/logs` |
+| Enable local RWX (`nfs_local`) | `POST /clusters/{name}/configure-storage` |
+| Enable KubeVirt platform | `POST /clusters/{name}/platform/kubevirt` |
+| KubeVirt platform status | `GET /clusters/{name}/platform/kubevirt` |
 
-Hub Ansible jobs (provision, storage, node operations) reach cluster nodes through
-`FleetClusterJoin.spec.jumphost`, or `FleetSite.spec.jumphost` for the cluster's
-site when the cluster field is empty. Use `user@host:port` (port optional). When
-set, jobs SSH to management LAN addresses via `ProxyJump` instead of the WireGuard
-overlay — required for sites where only a bastion can reach lab nodes.
+Node lifecycle, storage configure, and KubeVirt install share one job queue
+(mutual exclusion). Completed storage and KubeVirt runs are recorded in
+`nodeOperationHistory` as `configureStorage` / `configureKubevirt`.
+
+Hub Ansible jobs (provision, storage, KubeVirt, node operations) reach cluster
+nodes through `FleetClusterJoin.spec.jumphost`, or `FleetSite.spec.jumphost` for
+the cluster's site when the cluster field is empty. Use `user@host:port` (port
+optional). When set, jobs SSH to management LAN addresses via `ProxyJump`
+instead of the WireGuard overlay — required for sites where only a bastion can
+reach lab nodes.
 
 Edit jumphost (and site region / failure domain) in the console **Sites** detail
 (Edge and DNS → Connectivity) or via `umkim site patch`. Edit **ingress entries**
@@ -128,6 +135,7 @@ examples. Enrollment is a separate, bearer-controlled bootstrap operation.
 ## Related features
 
 - [fleet-apps.md](fleet-apps.md) — Helm install onto a selected cluster
+- [fleet-kubevirt.md](fleet-kubevirt.md) — KubeVirt / Multus platform install path
 - [fleet-cluster-storage.md](../fleet-cluster-storage.md) — storage intent and
   NFS safety
 - [fleet-edge.md](fleet-edge.md) — site exposure and route configuration

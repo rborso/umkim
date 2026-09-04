@@ -29,6 +29,7 @@ func clusterCmd() *cobra.Command {
 	cmd.AddCommand(clusterWaitCmd())
 	cmd.AddCommand(clusterBootstrapCmd())
 	cmd.AddCommand(clusterStorageCmd())
+	cmd.AddCommand(clusterPlatformCmd())
 	return cmd
 }
 
@@ -65,7 +66,7 @@ func clusterListCmd() *cobra.Command {
 			return output.WriteClusters(raw, format)
 		},
 	}
-	c.Flags().StringArrayVar(&require, "require", nil, "Filter by capability (repeatable/comma): gpu, kvm, ha_topology, storage.rwx, storage.rwo")
+	c.Flags().StringArrayVar(&require, "require", nil, "Filter by capability (repeatable/comma): gpu, kvm, kubevirt, network.multus_l2, ha_topology, storage.rwx, storage.rwo")
 	return c
 }
 
@@ -111,7 +112,7 @@ Examples:
 			return output.WriteClusterCandidates(raw, format)
 		},
 	}
-	c.Flags().StringArrayVar(&require, "require", nil, "Required capability (repeatable/comma): gpu, kvm, ha_topology, storage.rwx, storage.rwo")
+	c.Flags().StringArrayVar(&require, "require", nil, "Required capability (repeatable/comma): gpu, kvm, kubevirt, network.multus_l2, ha_topology, storage.rwx, storage.rwo")
 	c.Flags().StringVar(&site, "site", "", "Limit to clusters on this site id")
 	return c
 }

@@ -51,6 +51,8 @@ const (
 	NodeOpTypeReplaceControlPlane = "replaceControlPlane"
 	// NodeOpTypeConfigureStorage is a cluster-level storage configure job (nfs_local / nfs_external).
 	NodeOpTypeConfigureStorage = "configureStorage"
+	// NodeOpTypeConfigureKubevirt is a cluster-level KubeVirt platform install job.
+	NodeOpTypeConfigureKubevirt = "configureKubevirt"
 
 	NodeOpPhasePending   = "Pending"
 	NodeOpPhaseRunning   = "Running"

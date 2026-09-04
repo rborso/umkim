@@ -5,38 +5,18 @@ import (
 	"testing"
 )
 
-func TestProviderJobMountsHubSecrets(t *testing.T) {
-	job := ProviderJob("fleet-console", "fleet-cluster-provider-helm-install-x", "x", "site1", "helm", "install", "img:tag", "ssh", "inv", nil)
-	pod := job.Spec.Template.Spec
-	foundVol := false
-	for _, v := range pod.Volumes {
-		if v.Name == "hub-secrets" && v.Secret != nil && v.Secret.SecretName == HubAnsibleSecretsName {
-			foundVol = true
-			break
-		}
+func TestConfigureKubevirtJobPlaybook(t *testing.T) {
+	job := ConfigureKubevirtJob("fleet-console", "fleet-cluster-kubevirt-x", "x", "site1", "img:tag", "ssh", "inv", nil)
+	cmd := strings.Join(job.Spec.Template.Spec.Containers[0].Command, " ")
+	if !strings.Contains(cmd, "/ansible/cluster-configure-kubevirt.yml") {
+		t.Fatalf("expected configure-kubevirt playbook, got %v", job.Spec.Template.Spec.Containers[0].Command)
 	}
-	if !foundVol {
-		t.Fatal("expected hub-secrets volume")
+	if !strings.Contains(cmd, "fleet_site_enable_kubevirt=true") {
+		t.Fatalf("expected enable_kubevirt extra var, got %v", job.Spec.Template.Spec.Containers[0].Command)
 	}
-	foundMount := false
-	for _, m := range pod.Containers[0].VolumeMounts {
-		if m.Name == "hub-secrets" && m.MountPath == "/secrets/hub" {
-			foundMount = true
-			break
-		}
+	if job.Spec.ActiveDeadlineSeconds == nil || *job.Spec.ActiveDeadlineSeconds != 5400 {
+		t.Fatalf("expected 5400s deadline, got %v", job.Spec.ActiveDeadlineSeconds)
 	}
-	if !foundMount {
-		t.Fatal("expected hub-secrets mount at /secrets/hub")
-	}
-	cmd := job.Spec.Template.Spec.Containers[0].Command
-	want := "-e"
-	wantFile := "@/secrets/hub/ansible_vars.yml"
-	for i := 0; i < len(cmd)-1; i++ {
-		if cmd[i] == want && cmd[i+1] == wantFile {
-			return
-		}
-	}
-	t.Fatalf("expected -e %s in command, got %v", wantFile, cmd)
 }
 
 func TestWgJobShellAddsOverlayRoute(t *testing.T) {

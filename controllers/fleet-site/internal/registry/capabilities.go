@@ -10,6 +10,8 @@ const (
 	CapStorageRWO   = "storage.rwo"
 	CapStorageRWX   = "storage.rwx"
 	CapKVM          = "kvm"
+	CapKubevirt     = "kubevirt"
+	CapMultusL2     = "network.multus_l2"
 	CapHATopology   = "ha_topology"
 	CapHAStorage    = "ha_storage" // deprecated alias
 	CapHACluster    = "ha_cluster" // deprecated alias
@@ -25,6 +27,8 @@ func CapabilitiesFromLabels(labels map[string]string) map[string]bool {
 		CapStorageRWO: labelTrue(labels["fleet.capability/storage.rwo"]),
 		CapStorageRWX: labelTrue(labels["fleet.capability/storage.rwx"]),
 		CapKVM:        labelTrue(labels["fleet.capability/kvm"]),
+		CapKubevirt:   labelTrue(labels["fleet.capability/kubevirt"]),
+		CapMultusL2:   labelTrue(labels["fleet.capability/network.multus_l2"]),
 		CapHATopology: labelTrue(labels["fleet.topology/ha"]),
 	}
 	if !out[CapHATopology] {
@@ -51,13 +55,15 @@ func ApplyCapabilityPatch(labels map[string]string, caps map[string]bool) {
 		switch k {
 		case "external_access", "external_datacenter":
 			continue
-		case CapGPU, CapStorageRWO, CapStorageRWX, CapKVM, CapHAStorage, CapHACluster:
+		case CapGPU, CapStorageRWO, CapStorageRWX, CapKVM, CapKubevirt, CapHAStorage, CapHACluster:
 			labels["fleet.capability/"+k] = boolLabel(v)
+		case CapMultusL2:
+			labels["fleet.capability/network.multus_l2"] = boolLabel(v)
 		case CapHATopology:
 			labels["fleet.topology/ha"] = boolLabel(v)
 			labels["fleet.capability/ha_cluster"] = boolLabel(v)
 		default:
-			if strings.HasPrefix(k, "storage.") || k == "gpu" || k == "kvm" {
+			if strings.HasPrefix(k, "storage.") || k == "gpu" || k == "kvm" || k == "kubevirt" || strings.HasPrefix(k, "network.") {
 				labels["fleet.capability/"+k] = boolLabel(v)
 			}
 		}

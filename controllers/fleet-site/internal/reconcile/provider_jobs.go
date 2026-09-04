@@ -63,33 +63,8 @@ func (r *Reconciler) waitJobAbsent(ctx context.Context, key types.NamespacedName
 	return fmt.Errorf("timed out waiting for job %s deletion", key.Name)
 }
 
-// recoverOrphanedProviderJobs clears Installing/Deleting status when the tracked Job no longer exists.
-func (r *Reconciler) recoverOrphanedProviderJobs(ctx context.Context, ns string, providers map[string]fleetv1alpha1.ClusterProviderStatus) (map[string]fleetv1alpha1.ClusterProviderStatus, bool) {
-	if providers == nil {
-		return providers, false
-	}
-	orphanKinds := map[string]struct{}{}
-	for kind, st := range providers {
-		if st.JobName == "" {
-			continue
-		}
-		if st.Phase != fleetv1alpha1.ProviderPhaseInstalling && st.Phase != fleetv1alpha1.ProviderPhaseDeleting {
-			continue
-		}
-		var job batchv1.Job
-		err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: st.JobName}, &job)
-		if err == nil {
-			continue
-		}
-		if !apierrors.IsNotFound(err) {
-			continue
-		}
-		orphanKinds[kind] = struct{}{}
-	}
-	return recoverOrphanedProviderStatuses(providers, orphanKinds)
-}
-
 // recoverOrphanedProviderStatuses resets provider rows whose Jobs are missing.
+// Retained for status hygiene helpers/tests; DCM service-provider install Jobs are gone.
 func recoverOrphanedProviderStatuses(providers map[string]fleetv1alpha1.ClusterProviderStatus, orphanKinds map[string]struct{}) (map[string]fleetv1alpha1.ClusterProviderStatus, bool) {
 	if len(orphanKinds) == 0 {
 		return providers, false

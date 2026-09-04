@@ -39,7 +39,7 @@ RUN pip install --no-cache-dir \
 COPY ansible.cfg /ansible/ansible.cfg
 COPY site-validate.yml site-provision.yml cluster-validate.yml cluster-provision.yml \
   cluster-provision-local.yml cluster-provision-hub.yml cluster-discover-capabilities.yml cluster-delete-hub.yml \
-  cluster-configure-storage.yml cluster-validate-storage.yml \
+  cluster-configure-storage.yml cluster-configure-kubevirt.yml cluster-validate-storage.yml \
   cluster-add-worker.yml cluster-remove-worker.yml cluster-replace-control.yml \
   cluster-overlay-recover.yml \
   ingress-auth-reconcile.yml acme-reconcile.yml llm-reconcile.yml wireguard-install.yml /ansible/

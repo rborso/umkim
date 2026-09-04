@@ -59,11 +59,12 @@ umkim cluster storage status lab-single-0
 umkim node-op history --cluster lab-single-0
 ```
 
-`--dir` sets the absolute path exported by nfs-server on the node (default
-`/srv/fleet-nfs`). The cluster share is `<dir>/<cluster-path>` (cluster-path
-defaults to the cluster name). Storage configure is mutually exclusive with
-node lifecycle operations and is recorded in operation history as
-`configureStorage`.
+API: `POST /clusters/{name}/configure-storage` (authenticated via
+fleet-console-auth). `--dir` sets the absolute path exported by nfs-server on
+the node (default `/srv/fleet-nfs`). The cluster share is
+`<dir>/<cluster-path>` (cluster-path defaults to the cluster name). Storage
+configure is mutually exclusive with node lifecycle and KubeVirt platform jobs
+and is recorded in operation history as `configureStorage`.
 
 `nfs_local` is a convenience backend for single-node evaluation, not a
 substitute for a managed shared storage service.

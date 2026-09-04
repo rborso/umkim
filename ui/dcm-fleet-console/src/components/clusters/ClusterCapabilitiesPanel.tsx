@@ -10,6 +10,8 @@ const CAP_LABELS: Record<string, string> = {
   'storage.rwo': 'Storage RWO',
   'storage.rwx': 'Storage RWX',
   kvm: 'KVM',
+  kubevirt: 'KubeVirt',
+  'network.multus_l2': 'Multus LAN L2',
   ha_topology: 'HA topology',
 };
 

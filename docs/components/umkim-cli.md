@@ -70,6 +70,8 @@ umkim cluster bootstrap NAME [--ssh-user linux]
 umkim cluster delete NAME [--cleanup-kubernetes]
 umkim cluster storage enable-local NAME [--dir /path] [--cluster-path NAME] [--force] [--wait 10m]
 umkim cluster storage status NAME
+umkim cluster platform enable-kubevirt NAME [--lan-bridge] [--bridge NAME] [--force] [--wait 45m]
+umkim cluster platform status NAME
 
 umkim chart list | get NAME
 umkim chart add --origin oci://… [--version V] [--image-policy external|proxy|copy]
@@ -151,9 +153,24 @@ umkim cluster candidates --require storage.rwx --site homelab
 umkim cluster list --require gpu,kvm
 ```
 
-Supported `--require` tokens: `gpu`, `kvm`, `ha_topology` (alias `ha`),
+Supported `--require` tokens: `gpu`, `kvm`, `kubevirt` (alias `kv`),
+`network.multus_l2` (aliases `multus`, `lan_l2`), `ha_topology` (alias `ha`),
 `storage.rwx` (alias `rwx`), `storage.rwo` (alias `rwo`). This only filters;
 you still pick `FleetApp.spec.clusterName` explicitly.
+
+### KubeVirt platform
+
+KubeVirt is a **cluster operation** (Ansible job), mutual exclusion with node and
+storage ops. History type `configureKubevirt`.
+
+```bash
+umkim cluster platform enable-kubevirt lab-ha-0
+umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --wait 45m
+umkim cluster platform status lab-ha-0
+umkim cluster candidates --require kubevirt
+```
+
+See [fleet-kubevirt.md](fleet-kubevirt.md).
 
 ### Single-node local RWX storage
 

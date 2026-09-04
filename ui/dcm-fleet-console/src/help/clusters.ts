@@ -30,6 +30,11 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'Primary node IP used for initial K3s bootstrap and cluster join token exchange.',
     example: '203.0.113.12',
   },
+  'clusterJoin.kubevirt': {
+    description:
+      'Optional KubeVirt platform add-on after the cluster is Ready (Multus + CDI + KubeVirt). Helm charts still install with FleetApp.',
+    example: 'enabled',
+  },
   'clusterJoin.kubevirtBridgeName': {
     description:
       'Linux bridge device name on each node for Multus L2 KubeVirt VMs. Created during bootstrap when Configure host bridge is enabled.',

@@ -14,6 +14,7 @@ import {
 import {
   addFleetClusterWorker,
   configureFleetClusterStorage,
+  enableFleetClusterKubevirt,
   fetchFleetClusterNodeOperationLogs,
   listFleetClusterNodeOperations,
   removeFleetClusterNode,
@@ -43,6 +44,7 @@ const OP_LABELS: Record<string, string> = {
   removeWorker: 'Remove worker',
   replaceControlPlane: 'Replace control plane',
   configureStorage: 'Configure storage',
+  configureKubevirt: 'Configure KubeVirt',
 };
 
 function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {
@@ -296,7 +298,9 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const nodeOp = cluster.nodeOperation;
   const storagePhase = cluster.storageStatus?.phase || '';
   const storageBusy = storageOpBusy(storagePhase);
-  const busy = nodeOpBusy(nodeOp) || storageBusy;
+  const kubevirtPhaseEarly = cluster.providers?.kubevirt?.phase || '';
+  const kubevirtBusy = kubevirtPhaseEarly === 'Installing' || kubevirtPhaseEarly === 'Pending';
+  const busy = nodeOpBusy(nodeOp) || storageBusy || kubevirtBusy;
   const singleNode = isSingleNodeCluster(cluster);
   const nfsLocalApplied = cluster.storage?.backend === 'nfs_local' && storagePhase === 'Applied';
 
@@ -531,14 +535,32 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
     }
   };
 
+  const kubevirtPhase = cluster.providers?.kubevirt?.phase || '';
+  const kubevirtReady = kubevirtPhase === 'Ready' || !!cluster.capabilities?.kubevirt;
+
+  const enableKubevirt = async () => {
+    setActing(true);
+    setActionError(null);
+    try {
+      await enableFleetClusterKubevirt(clusterName, {
+        force: kubevirtReady || kubevirtPhase === 'Failed' || undefined,
+      });
+      await onUpdated();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setActing(false);
+    }
+  };
+
   return (
     <div style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
       <Title headingLevel="h2" size="lg">
         Cluster operations
       </Title>
       <p style={{ marginTop: '0.5rem', maxWidth: '42rem' }}>
-        Node lifecycle and single-node local RWX storage. Each action runs an Ansible job on the
-        hub; only one cluster operation runs at a time.
+        Node lifecycle, single-node local RWX storage, and optional KubeVirt platform. Each action
+        runs an Ansible job on the hub; only one cluster operation runs at a time.
       </p>
       {nodeOp?.phase && (
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -572,6 +594,17 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           ) : null}
           {cluster.storageStatus?.message ? (
             <span style={{ fontSize: '0.875rem' }}>{cluster.storageStatus.message}</span>
+          ) : null}
+        </div>
+      )}
+      {kubevirtPhase && (kubevirtBusy || kubevirtPhase === 'Failed' || kubevirtReady) && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Label color={phaseColor(kubevirtPhase === 'Ready' ? 'Succeeded' : kubevirtPhase)}>
+            {kubevirtPhase}
+          </Label>
+          <span style={{ fontSize: '0.875rem' }}>{OP_LABELS.configureKubevirt}</span>
+          {cluster.providers?.kubevirt?.message ? (
+            <span style={{ fontSize: '0.875rem' }}>{cluster.providers.kubevirt.message}</span>
           ) : null}
         </div>
       )}
@@ -627,6 +660,30 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           </Button>
         </Form>
       )}
+
+      <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
+        <Title headingLevel="h3" size="md">
+          KubeVirt platform
+        </Title>
+        <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
+          Installs Multus, CDI, and KubeVirt. Same as{' '}
+          <code>umkim cluster platform enable-kubevirt</code>. LAN Multus bridge is configured at
+          cluster create when selected there.
+        </p>
+        <Button
+          variant="secondary"
+          isLoading={acting}
+          isDisabled={!canMutate}
+          onClick={() => void enableKubevirt()}
+          data-testid="op-enable-kubevirt"
+        >
+          {kubevirtPhase === 'Failed'
+            ? 'Retry KubeVirt'
+            : kubevirtReady
+              ? 'Re-apply KubeVirt'
+              : 'Enable KubeVirt'}
+        </Button>
+      </Form>
 
       <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
         <Title headingLevel="h3" size="md">

@@ -149,6 +149,7 @@ export function ClustersPage() {
   const [topology, setTopology] = useState<FleetClusterTopology>('single_node');
   const [filterGpu, setFilterGpu] = useState(false);
   const [filterKvm, setFilterKvm] = useState(false);
+  const [filterKubevirt, setFilterKubevirt] = useState(false);
   const [filterHa, setFilterHa] = useState(false);
   const [filterRwx, setFilterRwx] = useState(false);
 
@@ -157,11 +158,12 @@ export function ClustersPage() {
       const caps = c.capabilities || {};
       if (filterGpu && !caps.gpu) return false;
       if (filterKvm && !caps.kvm) return false;
+      if (filterKubevirt && !caps.kubevirt) return false;
       if (filterHa && !caps.ha_topology) return false;
       if (filterRwx && !caps['storage.rwx']) return false;
       return true;
     });
-  }, [rows, filterGpu, filterKvm, filterHa, filterRwx]);
+  }, [rows, filterGpu, filterKvm, filterKubevirt, filterHa, filterRwx]);
 
   const sitePrefill = searchParams.get('site') || '';
 
@@ -467,6 +469,14 @@ export function ClustersPage() {
             </ToolbarItem>
             <ToolbarItem>
               <Checkbox
+                id="filter-kubevirt"
+                label="KubeVirt"
+                isChecked={filterKubevirt}
+                onChange={(_e, checked) => setFilterKubevirt(checked)}
+              />
+            </ToolbarItem>
+            <ToolbarItem>
+              <Checkbox
                 id="filter-ha"
                 label="HA topology"
                 isChecked={filterHa}
@@ -512,6 +522,7 @@ export function ClustersPage() {
               const capBits = [
                 caps.gpu ? 'GPU' : null,
                 caps.kvm ? 'KVM' : null,
+                caps.kubevirt ? 'KV' : null,
                 caps.ha_topology ? 'HA' : null,
                 caps['storage.rwx'] ? 'RWX' : null,
               ].filter(Boolean);
@@ -945,6 +956,62 @@ export function ClustersPage() {
                 Evaluation only: exports <code>/srv/fleet-nfs</code> on the node and deploys
                 StorageClass <code>nfs-client</code> during bootstrap.
               </p>
+            </LabeledField>
+          )}
+          <LabeledField
+            label="KubeVirt"
+            fieldId="kubevirtEnabled"
+            help={getFieldHelp('clusterJoin.kubevirt')}
+          >
+            <Checkbox
+              id="kubevirtEnabled"
+              label="Install KubeVirt platform after Ready (Multus + CDI + KubeVirt)"
+              isChecked={!!form.providers?.kubevirt}
+              onChange={(_e, checked) =>
+                setForm({
+                  ...form,
+                  providers: {
+                    ...(form.providers || {}),
+                    kubevirt: checked,
+                    kubevirtBridge: {
+                      ...(form.providers?.kubevirtBridge || {
+                        enabled: false,
+                        bridgeName: 'n0p0_mgmt_nw',
+                        keepIp: true,
+                      }),
+                      enabled: checked ? !!form.providers?.kubevirtBridge?.enabled : false,
+                    },
+                  },
+                })
+              }
+            />
+          </LabeledField>
+          {!!form.providers?.kubevirt && (
+            <LabeledField
+              label="LAN Multus bridge"
+              fieldId="kubevirtBridge"
+              help={getFieldHelp('clusterJoin.kubevirtBridgeName')}
+            >
+              <Checkbox
+                id="kubevirtBridge"
+                label="Configure host bridge at bootstrap for VMs on the node LAN"
+                isChecked={!!form.providers?.kubevirtBridge?.enabled}
+                onChange={(_e, checked) =>
+                  setForm({
+                    ...form,
+                    providers: {
+                      ...(form.providers || {}),
+                      kubevirt: true,
+                      kubevirtBridge: {
+                        enabled: checked,
+                        bridgeName: form.providers?.kubevirtBridge?.bridgeName || 'n0p0_mgmt_nw',
+                        slaveNic: form.providers?.kubevirtBridge?.slaveNic,
+                        keepIp: form.providers?.kubevirtBridge?.keepIp !== false,
+                      },
+                    },
+                  })
+                }
+              />
             </LabeledField>
           )}
           <LabeledField label="External NFS (RWX)" fieldId="nfsEnabled" help={getFieldHelp('clusterJoin.nfsEnabled')}>

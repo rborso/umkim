@@ -242,28 +242,17 @@ func KubeconfigSyncJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret,
 	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 300)
 }
 
-func providerJobDeadlineSec(kind, action string) int64 {
-	if action == "delete" {
-		return 1200
-	}
-	// kubevirt_stack (Multus, CDI, operator waits) routinely exceeds 30m on first install.
-	if kind == "kubevirt" {
-		return 5400
-	}
-	return 1800
-}
-
-func ProviderJob(ns, jobName, clusterName, siteID, kind, action, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
-	playbook := fmt.Sprintf("/ansible/cluster-provider-%s-%s.yml", kind, action)
-	args := ansiblePlaybookArgs(playbook, clusterName, siteID)
-	args = append(args, "-e", "@/secrets/hub/ansible_vars.yml")
-	args = append(args, extraArgs...)
-	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, HubAnsibleSecretsName, providerJobDeadlineSec(kind, action))
-}
-
 func ConfigureStorageJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string) *batchv1.Job {
 	args := ansiblePlaybookArgs("/ansible/cluster-configure-storage.yml", clusterName, siteID)
 	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 600)
+}
+
+func ConfigureKubevirtJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
+	args := ansiblePlaybookArgs("/ansible/cluster-configure-kubevirt.yml", clusterName, siteID)
+	args = append(args, "-e", "fleet_site_enable_kubevirt=true")
+	args = append(args, "-e", "fleet_cluster_kvm=true")
+	args = append(args, extraArgs...)
+	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 5400)
 }
 
 func ValidateStorageJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {

@@ -42,6 +42,7 @@ type clusterSummary struct {
 	CapabilityDiscovery     *capabilityDiscoverySummary  `json:"capability_discovery,omitempty"`
 	Storage                 map[string]interface{}       `json:"storage,omitempty"`
 	StorageStatus           *clusterStorageStatusJSON    `json:"storageStatus,omitempty"`
+	Providers               map[string]clusterProviderStatusJSON `json:"providers,omitempty"`
 	IngressAuthStatus       *clusterIngressAuthStatusJSON `json:"ingressAuthStatus,omitempty"`
 	AcmeEnabled             bool                          `json:"acme_enabled,omitempty"`
 	AcmeStatus              *clusterAcmeStatusJSON        `json:"acmeStatus,omitempty"`
@@ -68,6 +69,13 @@ type clusterStorageStatusJSON struct {
 	Phase   string `json:"phase,omitempty"`
 	JobName string `json:"jobName,omitempty"`
 	Message string `json:"message,omitempty"`
+}
+
+type clusterProviderStatusJSON struct {
+	Phase        string `json:"phase,omitempty"`
+	JobName      string `json:"jobName,omitempty"`
+	Message      string `json:"message,omitempty"`
+	ProviderName string `json:"providerName,omitempty"`
 }
 
 type clusterNodeOperationJSON struct {
@@ -153,6 +161,12 @@ func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, nam
 	}
 	if sub == "configure-storage" && r.Method == http.MethodPost {
 		s.handleConfigureStorage(r.Context(), w, r, name)
+		return
+	}
+	if sub == "platform" || strings.HasPrefix(sub, "platform/") {
+		rest := strings.TrimPrefix(sub, "platform")
+		rest = strings.TrimPrefix(rest, "/")
+		s.handleClusterPlatform(w, r, name, rest)
 		return
 	}
 	if sub == "ingress-auth" || strings.HasPrefix(sub, "ingress-auth/") {

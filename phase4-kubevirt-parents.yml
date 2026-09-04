@@ -1,3 +1,5 @@
 ---
-# Deprecated — use fleet-platform-kubevirt.yml
+# Deprecated — use docs/components/fleet-kubevirt.md (platform API/CLI) for
+# managed clusters. This file only re-exports fleet-platform-kubevirt.yml for
+# legacy nested_parents inventory runs.
 - ansible.builtin.import_playbook: fleet-platform-kubevirt.yml
