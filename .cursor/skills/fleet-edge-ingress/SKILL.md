@@ -16,7 +16,8 @@ their roles and inventory inputs define the active behavior.
 
 ## Working guidance
 
-- Site exposure modes: `hub_gateway`, `port_forward`, `reverse_proxy`, `none`.
+- Site ingress: optional `hubGateway`, plus `ingress[]` methods
+  `port_forward` / `reverse_proxy` (clusters bind with `ingressId`).
   Inventory examples: [examples/site-profiles/](../../../examples/site-profiles/).
 - `FleetApp` routing: `none`, `hub`, `site` only. Do not document or add
   `route.mode: dual` (deprecated).

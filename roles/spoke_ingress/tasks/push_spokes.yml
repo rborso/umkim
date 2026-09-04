@@ -14,7 +14,7 @@
          | default(fleet_edge_direct_ingress_default | default(true))
          if item in fleet_edge_clusters else false }}
     phase6_spoke_acme_http_challenge: >-
-      {{ fleet_edge_clusters[item].exposure_mode | default('') == 'port_forward'
+      {{ fleet_edge_clusters[item].method | default('') == 'port_forward'
          if item in fleet_edge_clusters else false }}
   tags: [spoke_ingress, phase6, spoke_ingress_push, phase6_push]
 

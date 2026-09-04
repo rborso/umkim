@@ -1,12 +1,13 @@
 # Port-forward profile
 
-`exposure_mode: port_forward` is an inventory example for direct forwarding
-from an operator-managed router to cluster ingress.
+Inventory example for a site with one or more `ingress[]` rows using
+`method: port_forward` (WAN DNAT to cluster Traefik NodePorts). Bind each
+cluster with `ingressId` set to that row's `id`.
 
 ## Apply
 
 1. Start from [`fleet_sites.yml.snippet`](fleet_sites.yml.snippet).
-2. Replace the site, endpoint, domain, and TLS placeholders in local inventory.
+2. Replace the site, ingress address/zone, and TLS placeholders in local inventory.
 3. Configure the router and public DNS outside this repository, using the
    approved destination and access policy for the deployment.
 4. Validate the ingress configuration before applying the relevant playbook.

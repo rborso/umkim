@@ -26,7 +26,6 @@ echo "=== create ${CLUSTER} ==="
 curl -sf -X POST "${API}/clusters" -H 'Content-Type: application/json' -d "{
   \"clusterName\":\"${CLUSTER}\",\"siteId\":\"homelab\",\"bootstrapHost\":\"${NODE}\",
   \"topology\":\"single_node\",\"networkMode\":\"wireguard\",\"clusterRegion\":\"homelab\",
-  \"edge\":{\"exposureMode\":\"none\"},
   \"nodes\":[{\"address\":\"${NODE}\",\"hostname\":\"${HOST}\",\"role\":\"control\"}]
 }" >/dev/null || true
 sleep 5
@@ -107,4 +106,4 @@ for p in json.load(sys.stdin).get('providers',[]):
   done
 done
 curl -sf -X POST "${API}/clusters/${CLUSTER}/discover-capabilities" >/dev/null
-curl -sf "${API}/clusters/${CLUSTER}" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK', d['provisioning_phase'], d['available'], d.get('exposure_mode'))"
+curl -sf "${API}/clusters/${CLUSTER}" | python3 -c "import json,sys; d=json.load(sys.stdin); print('OK', d['provisioning_phase'], d['available'], d.get('ingress_id'), d.get('method'))"

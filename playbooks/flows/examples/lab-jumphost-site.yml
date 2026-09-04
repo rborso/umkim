@@ -7,17 +7,9 @@ fleet_flow_site_spec:
   displayName: Lab jumphost
   region: lab
   edge:
-    edgeDomain: demo.otthol.hu
-    wildcard: "*.demo.otthol.hu"
-    exposureMode: hub_gateway
-    defaultExposureMode: hub_gateway
-    domains:
-      - id: hub-zone
-        zone: demo.otthol.hu
-        wildcard: "*.demo.otthol.hu"
-        tlsPolicy: acme_hub
-    externalEndpoints:
-      - id: hub-wan
-        address: "159.195.137.119"
-        role: primary
-        description: "Hub WAN — Traefik :80/:443"
+    hubGateway: true
+    hubZone: demo.otthol.hu
+    hubWildcard: "*.demo.otthol.hu"
+    wanEgress:
+      enabled: true
+      dnsTargetNote: "A/AAAA *.demo.otthol.hu → hub WAN (no spoke port-forward)"

@@ -94,12 +94,12 @@ login
 
 log "Create sites"
 create_site homelab-int "$(cat <<'JSON'
-{"apiVersion":"fleet.umkim.com/v1alpha1","kind":"FleetSite","metadata":{"name":"homelab-int"},"spec":{"siteName":"homelab-int","siteId":"homelab-int","provisioningMode":"registry","displayName":"Homelab Internal","region":"homelab","edge":{"exposureMode":"none","wanEgress":{"enabled":false}}}}
+{"apiVersion":"fleet.umkim.com/v1alpha1","kind":"FleetSite","metadata":{"name":"homelab-int"},"spec":{"siteName":"homelab-int","siteId":"homelab-int","provisioningMode":"registry","displayName":"Homelab Internal","region":"homelab","edge":{"wanEgress":{"enabled":false}}}}
 JSON
 )"
 
 create_site homelab-ext "$(cat <<'JSON'
-{"apiVersion":"fleet.umkim.com/v1alpha1","kind":"FleetSite","metadata":{"name":"homelab-ext"},"spec":{"siteName":"homelab-ext","siteId":"homelab-ext","provisioningMode":"registry","displayName":"Homelab External","region":"homelab","edge":{"edgeDomain":"apps.umkim.com","wildcard":"*.apps.umkim.com","exposureMode":"port_forward","defaultExposureMode":"port_forward","externalEndpoints":[{"id":"router-wan","address":"203.0.113.12","role":"primary","description":"Homelab WAN — port-forward to cluster NodePorts"}],"domains":[{"id":"homelab-zone","zone":"apps.umkim.com","wildcard":"*.apps.umkim.com","tlsPolicy":"acme_cluster","ingressEndpointId":"router-wan"}],"wanEgress":{"enabled":true,"expectedWanIp":"203.0.113.12","dnsTargetNote":"A/AAAA *.apps.umkim.com → 203.0.113.12 → node :30080/:30443"}}}}
+{"apiVersion":"fleet.umkim.com/v1alpha1","kind":"FleetSite","metadata":{"name":"homelab-ext"},"spec":{"siteName":"homelab-ext","siteId":"homelab-ext","provisioningMode":"registry","displayName":"Homelab External","region":"homelab","edge":{"ingress":[{"id":"homelab-zone","method":"port_forward","address":"203.0.113.12","zone":"apps.umkim.com","wildcard":"*.apps.umkim.com","description":"Homelab WAN — port-forward to cluster NodePorts"}],"wanEgress":{"enabled":true,"expectedWanIp":"203.0.113.12","dnsTargetNote":"A/AAAA *.apps.umkim.com → 203.0.113.12 → node :30080/:30443"}}}}
 JSON
 )"
 
@@ -113,13 +113,13 @@ done
 
 log "Create homelab-int cluster"
 create_cluster "$(cat <<'JSON'
-{"clusterName":"homelab-int","siteId":"homelab-int","bootstrapHost":"198.51.100.225","topology":"single_node","networkMode":"wireguard","minRootDiskGi":40,"clusterRegion":"homelab","edge":{"exposureMode":"none"},"nodes":[{"address":"198.51.100.225","hostname":"homelab-int","role":"control"}]}
+{"clusterName":"homelab-int","siteId":"homelab-int","bootstrapHost":"198.51.100.225","topology":"single_node","networkMode":"wireguard","minRootDiskGi":40,"clusterRegion":"homelab","nodes":[{"address":"198.51.100.225","hostname":"homelab-int","role":"control"}]}
 JSON
 )"
 
 log "Create homelab-ext cluster"
 create_cluster "$(cat <<'JSON'
-{"clusterName":"homelab-ext","siteId":"homelab-ext","bootstrapHost":"203.0.113.14","topology":"single_node","networkMode":"wireguard","minRootDiskGi":40,"clusterRegion":"homelab","domainBindings":["homelab-zone"],"edge":{"exposureMode":"port_forward","tlsPolicy":"acme_cluster","ingressEndpointId":"router-wan"},"nodes":[{"address":"203.0.113.14","hostname":"homelab-ext","role":"control"}]}
+{"clusterName":"homelab-ext","siteId":"homelab-ext","bootstrapHost":"203.0.113.14","topology":"single_node","networkMode":"wireguard","minRootDiskGi":40,"clusterRegion":"homelab","edge":{"ingressId":"homelab-zone"},"nodes":[{"address":"203.0.113.14","hostname":"homelab-ext","role":"control"}]}
 JSON
 )"
 
@@ -137,7 +137,7 @@ for cluster in homelab-int homelab-ext; do
   if [[ "$cluster" == "homelab-ext" ]]; then
     curl -sf -b "$COOKIE_JAR" -X PATCH "${API}/clusters/${cluster}" \
       -H 'Content-Type: application/json' \
-      -d '{"edge":{"direct_ingress":true,"traefik_http_port":30080}}' >/dev/null || true
+      -d '{"edge":{"ingress_id":"homelab-zone","traefik_http_port":30080}}' >/dev/null || true
   fi
 done
 

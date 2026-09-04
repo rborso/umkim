@@ -70,4 +70,4 @@ independent of hub-gateway failover.
 Deploy and upgrade edge resources through the supported
 [install.md](../install.md) workflow. Use the edge checks in
 [fleet-verify.md](../fleet-verify.md) after configuring DNS and network
-boundaries for each site's exposure mode.
+boundaries for each site ingress entry.

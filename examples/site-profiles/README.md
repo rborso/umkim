@@ -1,22 +1,23 @@
 # Site profiles
 
-These are configuration examples for `FleetSite.spec.edge.exposureMode`
-(inventory: `exposure_mode`). They illustrate inventory inputs only; they do
-not configure DNS, routers, certificates, or controller behavior.
+These are configuration examples for `FleetSite.spec.edge` ingress and optional
+hub gateway settings (inventory under `fleet_sites:`). They illustrate inventory
+inputs only; they do not configure DNS, routers, certificates, or controller
+behavior.
 
 A multi-site fleet can use a **different profile per site**. Outbound-only
-reachability via the hub is one supported pattern (`hub_gateway`), not the
+reachability via the hub is one supported pattern (`hub_gateway: true`), not the
 only topology.
 
-| Profile | `exposure_mode` / `exposureMode` |
-|---------|----------------------------------|
-| [Hub gateway](hub-gateway/) | `hub_gateway` |
-| [Port forward](port-forward/) | `port_forward` |
-| [Reverse proxy](reverse-proxy/) | `reverse_proxy` |
-| [Internal](internal/) | `none` |
+| Profile | Inventory shape |
+|---------|-----------------|
+| [Hub gateway](hub-gateway/) | `hub_gateway: true` (+ `hub_zone` / `hub_wildcard`) |
+| [Port forward](port-forward/) | `ingress[]` with `method: port_forward` |
+| [Reverse proxy](reverse-proxy/) | `ingress[]` with `method: reverse_proxy` (may combine with PF) |
+| [Internal](internal/) | No `ingress` rows; no hub gateway |
 
-Inventory snippets use `exposure_mode` (Ansible → API). The CRD field is
-`exposureMode`. Values are the same.
+Clusters bind to an ingress row with `FleetClusterJoin.spec.edge.ingressId`
+(inventory/API: `ingressId` / `ingress_id`).
 
 ## Use an example safely
 

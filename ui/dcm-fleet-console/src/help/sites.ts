@@ -14,19 +14,19 @@ export const SITES_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'site.exposureMode': {
     description:
-      'Default edge exposure for clusters in this site. Workload sites: none, port_forward, or reverse_proxy. The management (hub) site uses hub_gateway and is not editable here. Working TLS pairs: none/hub_gateway→acme_hub, port_forward→acme_cluster, reverse_proxy→external.',
+      'Site edge pattern: hub gateway catalog, port_forward ingress rows, reverse_proxy ingress rows, or no public ingress. Port-forward derives acme_cluster TLS; reverse-proxy uses external TLS; hub gateway uses hub ACME.',
     example: 'port_forward',
-    examples: ['none', 'port_forward', 'reverse_proxy'],
+    examples: ['hub_gateway', 'port_forward', 'reverse_proxy'],
     whenToUse:
-      'Use port_forward when WAN DNAT hits cluster NodePorts; reverse_proxy when Caddy/nginx terminates TLS; none for WireGuard/hub-only access.',
+      'Use port_forward when WAN DNAT hits cluster NodePorts; reverse_proxy when Caddy/nginx terminates TLS; hub gateway for hub-routed public URLs; omit ingress for WireGuard-only sites.',
     learnMoreUrl: DOCS.createSiteExposure,
   },
   'site.edgeDomain': {
-    description: 'Primary DNS zone for site apps (A/AAAA and wildcard records point to WAN or VIP).',
-    example: 'lab.example.com',
+    description: 'Hub zone FQDN when hub gateway is enabled (A/AAAA and wildcard records point to hub WAN).',
+    example: 'hub.example.com',
   },
   'site.wildcard': {
-    description: 'Wildcard hostname pattern for apps in this zone (usually *. followed by the primary edge domain).',
+    description: 'Wildcard hostname pattern for a zone (usually *. followed by the zone).',
     example: '*.lab.example.com',
   },
   'site.dnsNote': {
@@ -34,31 +34,31 @@ export const SITES_FIELD_HELP: Record<string, FieldHelpContent> = {
     example: 'A/AAAA *.lab.example.com → OpenWrt WAN → cluster NodePorts',
   },
   'site.endpointId': {
-    description: 'Stable ID for an external WAN IP or VIP. Clusters reference this via Ingress endpoint ID for port-forward.',
-    example: 'openwrt-wan',
+    description: 'Legacy name for an ingress row id. Prefer the Ingress ID on each site ingress entry.',
+    example: 'homelab-pf',
   },
   'site.endpointAddress': {
-    description: 'Public IP or VIP where WAN traffic arrives before DNAT to cluster NodePorts.',
+    description: 'Public IP or VIP on a port_forward ingress row where WAN traffic arrives before DNAT to cluster NodePorts.',
     example: '203.0.113.50',
   },
   'site.domainZoneId': {
-    description: 'Identifier for a DNS zone within the site (referenced by cluster domain bindings).',
-    example: 'site-zone',
+    description: 'Stable ingress row id (FleetSite.spec.edge.ingress[].id). Clusters bind with ingressId.',
+    example: 'homelab-pf',
   },
   'site.domainZone': {
-    description: 'FQDN zone served by this site edge (often matches the primary edge domain).',
+    description: 'DNS zone on a port_forward ingress row (required for PF; used for app siteHost defaults).',
     example: 'lab.example.com',
   },
   'site.domainTlsPolicy': {
     description:
-      'TLS handling for routes in this zone. Prefer acme_cluster with port_forward, external with reverse_proxy, acme_hub with none/hub_gateway. passthrough is not a tested profile.',
+      'TLS is derived from ingress method: port_forward → acme_cluster, reverse_proxy → external, hub gateway → acme_hub. Not set per cluster.',
     example: 'acme_cluster',
-    examples: ['inherit', 'acme_hub', 'acme_cluster', 'external', 'passthrough'],
-    learnMoreUrl: DOCS.exposureTlsPairs,
+    examples: ['acme_hub', 'acme_cluster', 'external'],
+    learnMoreUrl: DOCS.fleetEdge,
   },
   'site.wanEgress': {
     description:
-      'Whether this site has an internet egress path for outbound traffic. Independent of public ingress / exposure mode.',
+      'Whether this site has an internet egress path for outbound traffic. Independent of public ingress entries.',
     example: 'true',
   },
   'site.expectedWanIp': {

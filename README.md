@@ -59,16 +59,17 @@ name**. There is no placement engine and no DCM catalog. The hub itself is
 never a workload target. Charts are published into Harbor (whoami is the
 smoke-test chart).
 
-**Site exposure** (`FleetSite` `exposure_mode` — each site may differ):
+**Site ingress** (`FleetSite.spec.edge` — each site may differ):
 
-| Mode | Behavior |
+| Pattern | Behavior |
 | --- | --- |
-| `hub_gateway` | Public HTTP/S on the hub; hub forwards to spokes over WireGuard |
-| `port_forward` | WAN port-forwards to spoke Traefik NodePorts |
-| `reverse_proxy` | External reverse proxy reaches cluster ingress |
-| `none` | No fleet-managed WAN exposure at the site |
+| `hubGateway` | Public HTTP/S on the hub; hub forwards to spokes over WireGuard |
+| `ingress[]` `port_forward` | WAN port-forwards to spoke Traefik NodePorts (one cluster per ingress id) |
+| `ingress[]` `reverse_proxy` | External reverse proxy reaches cluster ingress (TLS off-cluster) |
+| Empty ingress (no hub gateway) | No fleet-managed WAN exposure at the site |
 
-See [examples/site-profiles/](examples/site-profiles/) for inventory snippets.
+Clusters bind with `FleetClusterJoin.spec.edge.ingressId`. See
+[examples/site-profiles/](examples/site-profiles/) for inventory snippets.
 
 **App routing** (`FleetApp` `route.mode` → `FleetAppRoute`):
 

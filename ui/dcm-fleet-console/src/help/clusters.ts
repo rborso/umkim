@@ -119,14 +119,14 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     example: '10.10.0.3',
   },
   'clusterJoin.domainBindings': {
-    description: 'Domain zone IDs from the site registry this cluster serves. Select one or more when the site has multiple zones.',
-    example: 'virt02',
+    description: 'Site ingress row id (FleetSite.spec.edge.ingress[].id) this cluster binds to. Required for public site routes.',
+    example: 'homelab-pf',
   },
   'clusterJoin.exposureMode': {
     description:
-      'Override site edge exposure, or inherit. Working pairs: none/hub_gateway→acme_hub, port_forward→acme_cluster, reverse_proxy→external.',
-    example: 'inherit',
-    examples: ['inherit', 'none', 'port_forward', 'reverse_proxy', 'hub_gateway'],
+      'Legacy name — clusters no longer set exposure mode. Bind an ingressId; method and TLS come from the site ingress row.',
+    example: 'port_forward',
+    examples: ['port_forward', 'reverse_proxy'],
     learnMoreUrl: DOCS.createClusterEdge,
   },
   'clusterDetail.siteId': {
@@ -135,18 +135,18 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'clusterDetail.ingressEnabled': {
     description:
-      'Read-only status: whether spoke Traefik ingress is installed for this cluster (driven by exposure mode and provision, not a direct toggle).',
+      'Read-only status: whether spoke Traefik ingress is installed for this cluster (driven by ingress binding and provision, not a direct toggle).',
     example: 'true',
   },
   'clusterDetail.ingressAuth': {
     description:
-      'Enable Authelia + LLDAP forward-auth on cluster Traefik ingress routes. Requires Ready, ingress (port_forward or reverse_proxy), and site domain bindings.',
+      'Enable Authelia + LLDAP forward-auth on cluster Traefik ingress routes. Requires Ready, a port_forward ingress binding, and site zone.',
     example: 'true',
     learnMoreUrl: DOCS.ingressAuth,
   },
   'clusterDetail.clusterAcme': {
     description:
-      'Install Let\'s Encrypt on this cluster\'s Traefik for site hostnames. Requires tls_policy acme_cluster, direct ingress, cluster Ready, and hub fleet-edge ACME enabled.',
+      'Install Let\'s Encrypt on this cluster\'s Traefik for site hostnames. Requires port_forward ingress (acme_cluster), cluster Ready, and hub fleet-edge ACME enabled.',
     example: 'true',
     learnMoreUrl: DOCS.fleetEdge,
   },
@@ -179,29 +179,29 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'clusterDetail.exposureMode': {
     description:
-      'Cluster edge exposure. Pair with TLS: none/hub_gateway→acme_hub, port_forward→acme_cluster, reverse_proxy→external. Other mixes break WAN TLS or ACME.',
+      'Resolved ingress method for this cluster (from the bound site ingress row): port_forward or reverse_proxy.',
     example: 'port_forward',
-    examples: ['inherit', 'none', 'port_forward', 'reverse_proxy', 'hub_gateway'],
-    learnMoreUrl: DOCS.exposureTlsPairs,
+    examples: ['port_forward', 'reverse_proxy'],
+    learnMoreUrl: DOCS.fleetEdge,
   },
   'clusterDetail.tlsPolicy': {
     description:
-      'Where certificates live. Working pairs: acme_hub (none/hub_gateway), acme_cluster (port_forward), external (reverse_proxy). inherit follows exposure defaults. passthrough is offered but not a tested profile.',
+      'TLS policy derived from the bound ingress method: acme_cluster for port_forward, external for reverse_proxy.',
     example: 'acme_cluster',
-    examples: ['inherit', 'acme_hub', 'acme_cluster', 'external', 'passthrough'],
-    learnMoreUrl: DOCS.exposureTlsPairs,
+    examples: ['acme_cluster', 'external', 'acme_hub'],
+    learnMoreUrl: DOCS.fleetEdge,
   },
   'clusterDetail.ingressEndpointId': {
-    description: 'Site external endpoint ID used for WAN port forwards (from site edge config).',
-    example: 'openwrt-wan',
+    description: 'Legacy name — use site ingress id (ingress_id) instead.',
+    example: 'homelab-pf',
   },
   'clusterDetail.domainBindings': {
-    description: 'Domain zone IDs from the site registry this cluster publishes routes for.',
-    example: 'virt02',
+    description: 'Site ingress row id this cluster is bound to (spec.edge.ingressId / summary ingress_id).',
+    example: 'homelab-pf',
   },
   'clusterDetail.directIngress': {
     description:
-      'Legacy flag: route hub edge directly to the cluster NodePort without a site proxy. Also set automatically when exposure is port_forward or reverse_proxy.',
+      'True when the cluster is bound to a port_forward or reverse_proxy ingress (WAN can reach spoke Traefik).',
     example: 'true',
   },
   'clusterDetail.upstreamHost': {

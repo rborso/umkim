@@ -1,10 +1,11 @@
 # UMKIM agent guide
 
 UMKIM is a hub-centric fleet manager for independent K3s clusters across sites,
-with flexible per-site ingress (`hub_gateway`, `port_forward`, `reverse_proxy`,
-`none`). Read this file, the matching skill, and applicable rules before
-changing a section. Treat `inventory/` as the sole source of deployment-specific
-values; do not copy addresses, host names, domains, or secrets into documentation.
+with flexible per-site ingress (`FleetSite` `hubGateway` and/or `ingress[]`
+methods `port_forward` / `reverse_proxy`; clusters bind via `ingressId`).
+Read this file, the matching skill, and applicable rules before changing a
+section. Treat `inventory/` as the sole source of deployment-specific values;
+do not copy addresses, host names, domains, or secrets into documentation.
 
 ## Documentation boundaries
 

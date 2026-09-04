@@ -490,7 +490,7 @@ export interface HubInfrastructure {
   management_site_id: string;
   wireguard_ip?: string;
   public_endpoint?: string;
-  exposure_mode?: string;
+  hub_gateway?: boolean;
   hub_zone?: string;
   dns_target_note?: string;
   services?: HubInfrastructureService[];

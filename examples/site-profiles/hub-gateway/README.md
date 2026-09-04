@@ -1,12 +1,13 @@
 # Hub gateway profile
 
-`exposure_mode: hub_gateway` is an inventory example for traffic routed through
-the fleet gateway.
+Inventory example for a site with `hub_gateway: true` (public HTTP/S on the hub;
+spokes reached over WireGuard). Typical for the management site. Workload sites
+may also enable hub gateway for `FleetApp` `route.mode: hub`.
 
 ## Apply
 
 1. Start from [`fleet_sites.yml.snippet`](fleet_sites.yml.snippet).
-2. Set the site identity, domain, endpoint, and certificate policy in your
+2. Set the site identity, `hub_zone` / `hub_wildcard`, and WAN notes in your
    local inventory using approved placeholders and deployment values.
 3. Confirm that the external DNS, network, and access-control prerequisites are
    operated outside this repository.

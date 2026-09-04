@@ -206,8 +206,10 @@ export function InfrastructurePage() {
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
-                <DescriptionListTerm>Exposure</DescriptionListTerm>
-                <DescriptionListDescription>{hub.exposure_mode || '—'}</DescriptionListDescription>
+                <DescriptionListTerm>Hub gateway</DescriptionListTerm>
+                <DescriptionListDescription>
+                  {hub.hub_gateway ? 'enabled' : 'disabled'}
+                </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
                 <DescriptionListTerm>Hub zone</DescriptionListTerm>

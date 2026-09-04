@@ -1,26 +1,16 @@
 ---
-# Management site only (hub_gateway). Copy to inventory/group_vars/all/fleet_sites.yml
+# Management site only (hub gateway). Copy to inventory/group_vars/all/fleet_sites.yml
 # or merge the fleet_sites: block — remove homelab/lab-remote sites from the lab inventory.
 
 fleet_sites:
   management:
     display_name: Management DC
     region: management
-    edge_domain: "{{ fleet_edge_domain }}"
-    edge_wildcard: "*.{{ fleet_edge_domain }}"
-    exposure_mode: hub_gateway
+    hub_gateway: true
+    hub_zone: "{{ fleet_edge_domain }}"
+    hub_wildcard: "*.{{ fleet_edge_domain }}"
     management_site: true
-# Use fleet_hub_public_ipv4 (WAN) — not ansible_host (127.0.0.1 when hosts-from-hub.yml is used).
-    external_endpoints:
-      - id: hub-wan
-        address: "{{ hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].fleet_hub_public_ipv4 | default(hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].ansible_host | default('')) }}"
-        role: primary
-        description: "Hub public IP — Traefik :80/:443"
-    domains:
-      - id: hub-zone
-        zone: "{{ fleet_edge_domain }}"
-        wildcard: "*.{{ fleet_edge_domain }}"
-        tls_policy: acme_hub
+    # Use fleet_hub_public_ipv4 (WAN) — not ansible_host (127.0.0.1 when hosts-from-hub.yml is used).
     dns_target_note: "A/AAAA *.{{ fleet_edge_domain }} → hub WAN IP"
     wan_egress:
       enabled: true

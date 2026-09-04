@@ -7,9 +7,9 @@ export const DOCS_BASE = 'https://docs.umkim.com';
 
 export const DOCS = {
   fleetEdge: `${DOCS_BASE}/components/fleet-edge/`,
-  /** Exposure + TLS working pairs (Starlight heading id). */
-  exposureTlsPairs: `${DOCS_BASE}/components/fleet-edge/#supported-working-pairs`,
-  exposureModes: `${DOCS_BASE}/components/fleet-edge/#exposure-modes-and-tls-policies`,
+  /** Site ingress methods + derived TLS (Starlight heading id). */
+  exposureTlsPairs: `${DOCS_BASE}/components/fleet-edge/#site-ingress`,
+  exposureModes: `${DOCS_BASE}/components/fleet-edge/#site-ingress`,
   createCluster: `${DOCS_BASE}/getting-started/create-cluster/`,
   createClusterEdge: `${DOCS_BASE}/getting-started/create-cluster/#edge-exposure-optional`,
   createSite: `${DOCS_BASE}/getting-started/create-site/`,
@@ -27,4 +27,4 @@ export const DOCS = {
 
 /** Repo source for the same content (optional secondary link). */
 export const DOCS_GITHUB_FLEET_EDGE =
-  'https://github.com/rborso/umkim/blob/main/docs/components/fleet-edge.md#exposure-modes-and-tls-policies';
+  'https://github.com/rborso/umkim/blob/main/docs/components/fleet-edge.md#site-ingress';

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify management site, hub infrastructure API, and domain sync model.
+# Verify management site, hub infrastructure API, and ingress assignment sync.
 set -euo pipefail
 
 API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
@@ -7,7 +7,7 @@ MGMT_SITE="${FLEET_MANAGEMENT_SITE_ID:-management}"
 MGMT_CLUSTER="${FLEET_MANAGEMENT_CLUSTER_NAME:-umkim-hub}"
 TEST_CLUSTER="${FLEET_DOMAIN_SYNC_CLUSTER:-lab-ha01}"
 TEST_SITE="${FLEET_DOMAIN_SYNC_SITE:-beta-site}"
-TEST_DOMAIN_BINDING="${FLEET_TEST_DOMAIN_BINDING:-homelab-zone}"
+TEST_INGRESS_ID="${FLEET_TEST_INGRESS_ID:-homelab-pf}"
 
 echo "=== verify-umkim-management-site ==="
 echo "API=${API}"
@@ -32,9 +32,15 @@ echo "OK: GET /clusters does not contain ${MGMT_CLUSTER}"
 
 code="$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "${API}/sites/${MGMT_SITE}" \
   -H 'Content-Type: application/json' \
-  -d '{"exposureMode":"port_forward"}')"
-[[ "${code}" == "403" ]] || { echo "Expected PATCH site exposureMode → 403, got ${code}"; exit 1; }
-echo "OK: PATCH site exposureMode → 403"
+  -d '{"ingress":[{"id":"forbidden","method":"port_forward","address":"203.0.113.1","zone":"forbidden.example.com"}]}')"
+[[ "${code}" == "403" ]] || { echo "Expected PATCH site ingress → 403, got ${code}"; exit 1; }
+echo "OK: PATCH site ingress → 403"
+
+code="$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "${API}/sites/${MGMT_SITE}" \
+  -H 'Content-Type: application/json' \
+  -d '{"hubGateway":false}')"
+[[ "${code}" == "403" ]] || { echo "Expected PATCH site hubGateway → 403, got ${code}"; exit 1; }
+echo "OK: PATCH site hubGateway → 403"
 
 code="$(curl -s -o /dev/null -w '%{http_code}' -X PATCH "${API}/sites/${MGMT_SITE}" \
   -H 'Content-Type: application/json' \
@@ -52,14 +58,14 @@ if curl -sf "${API}/clusters/${TEST_CLUSTER}" >/dev/null 2>&1; then
   before="$(echo "${site_json}" | jq -r '.clusters // [] | join(",")')"
   curl -sf -X PATCH "${API}/clusters/${TEST_CLUSTER}" \
     -H 'Content-Type: application/json' \
-    -d "{\"edge\":{\"domain_bindings\":[\"${TEST_DOMAIN_BINDING}\"]}}" >/dev/null
+    -d "{\"edge\":{\"ingress_id\":\"${TEST_INGRESS_ID}\"}}" >/dev/null
   sleep 1
   site_after="$(curl -sf "${API}/sites/${TEST_SITE}")"
   echo "${site_after}" | jq -e --arg c "${TEST_CLUSTER}" '.clusters | index($c)' >/dev/null \
     || { echo "Site ${TEST_SITE} clusters not updated after cluster PATCH (before: ${before})"; exit 1; }
-  echo "OK: cluster PATCH domain_bindings updates site assignedClusters"
+  echo "OK: cluster PATCH ingress_id updates site assignedClusters"
 else
-  echo "SKIP: cluster ${TEST_CLUSTER} not found — domain sync test skipped"
+  echo "SKIP: cluster ${TEST_CLUSTER} not found — ingress sync test skipped"
 fi
 
 echo "=== verify-umkim-management-site OK ==="
