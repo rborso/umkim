@@ -115,6 +115,10 @@ See [components/fleet-edge.md](components/fleet-edge.md).
 - **Harbor** hosts fleet-built images and OCI charts.
 - **KubeVirt** is an optional spoke platform add-on (Multus + CDI + KubeVirt),
   installed after Ready via console/CLI/API — not a FleetApp.
+- **Provisioner connector** (planned): hub owns a thin site host inventory;
+  YAIDAP / OpenTofu only execute via connectors that share one command
+  contract — see
+  [design-provisioner-connector.md](design-provisioner-connector.md).
 - **Ingress authentication** protects selected public application routes; it is
   separate from console login.
 - **Backup/restore** is experimental and must be tested for every application.
@@ -129,6 +133,7 @@ See [components/fleet-edge.md](components/fleet-edge.md).
 | FleetSite and FleetClusterJoin | [components/fleet-site.md](components/fleet-site.md) |
 | Helm apps | [components/fleet-apps.md](components/fleet-apps.md) |
 | KubeVirt platform | [components/fleet-kubevirt.md](components/fleet-kubevirt.md) |
+| Provisioner connector (planned) | [design-provisioner-connector.md](design-provisioner-connector.md) |
 | Edge routes | [components/fleet-edge.md](components/fleet-edge.md) |
 | Site exposure examples | [../examples/site-profiles/](../examples/site-profiles/) |
 | Versions | [../VERSIONS.md](../VERSIONS.md) |
