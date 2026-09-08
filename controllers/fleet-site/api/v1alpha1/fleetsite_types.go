@@ -47,6 +47,182 @@ type FleetSiteSpec struct {
 	GPU              bool   `json:"gpu,omitempty"`
 	Storage          *ClusterStorageSpec `json:"storage,omitempty"`
 	Edge FleetSiteEdgeSpec `json:"edge,omitempty"`
+	// Provision binds an optional metal/VM provisioner connector (YAIDAP, tofu, …).
+	// Default / empty is equivalent to provider "noop" (hosts already SSH-ready).
+	Provision *SiteProvisionSpec `json:"provision,omitempty"`
+}
+
+// Provision connector providers (FleetSite.spec.provision.provider).
+const (
+	ProvisionProviderNoop       = "noop"
+	ProvisionProviderYaidap     = "yaidap"
+	ProvisionProviderOpenTofu   = "opentofu"
+	ProvisionProviderTerraform  = "terraform"
+)
+
+// Provision connector actions (POST …/provision/actions).
+const (
+	ProvisionActionInstallBM = "install_bm"
+	ProvisionActionCreateVM  = "create_vm"
+	ProvisionActionPlanVM    = "plan_vm"
+	ProvisionActionDestroy   = "destroy"
+	ProvisionActionDiscover  = "discover"
+	ProvisionActionStatus    = "status"
+)
+
+// Provision action phases.
+const (
+	ProvisionPhasePending   = "Pending"
+	ProvisionPhaseRunning   = "Running"
+	ProvisionPhaseSucceeded = "Succeeded"
+	ProvisionPhaseFailed    = "Failed"
+)
+
+// SiteProvisionSpec is the site-scoped provisioner connector binding.
+type SiteProvisionSpec struct {
+	// Provider: noop | yaidap | opentofu | terraform
+	Provider string `json:"provider,omitempty"`
+	// Jumphost is the SSH target that runs YAIDAP / tofu (user@host:port).
+	Jumphost string `json:"jumphost,omitempty"`
+	// SSHSecretRef is a Secret in the controller namespace with an SSH private key for jumphost.
+	SSHSecretRef string `json:"sshSecretRef,omitempty"`
+	// InventoryPath is the absolute path on the jumphost to the YAIDAP inventory root.
+	InventoryPath string `json:"inventoryPath,omitempty"`
+	// YaidaPRoot is an optional path to the YAIDAP checkout on the jumphost.
+	YaidaPRoot string `json:"yaidapRoot,omitempty"`
+	// WorkspacePath is the OpenTofu/Terraform workspace on the jumphost (phase 4).
+	WorkspacePath string `json:"workspacePath,omitempty"`
+	// DefaultExtraVars are safe non-secret extras passed to the connector (no passwords).
+	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
+}
+
+// ProvisionHandoffHost is the minimal SSH-ready host fragment returned on success.
+type ProvisionHandoffHost struct {
+	Hostname    string   `json:"hostname,omitempty"`
+	AnsibleHost string   `json:"ansible_host,omitempty"`
+	AnsibleUser string   `json:"ansible_user,omitempty"`
+	OSFamily    string   `json:"osFamily,omitempty"`
+	MACs        []string `json:"macs,omitempty"`
+	SiteID      string   `json:"siteId,omitempty"`
+}
+
+// SiteProvisionActionRecord is one provision connector action (current or history).
+type SiteProvisionActionRecord struct {
+	ID        string                `json:"id"`
+	Action    string                `json:"action"`
+	Subject   string                `json:"subject,omitempty"`
+	Provider  string                `json:"provider,omitempty"`
+	Phase     string                `json:"phase,omitempty"`
+	Message   string                `json:"message,omitempty"`
+	Confirm   bool                  `json:"confirm,omitempty"`
+	JobName   string                `json:"jobName,omitempty"`
+	Host      *ProvisionHandoffHost `json:"host,omitempty"`
+	ActorKind string                `json:"actorKind,omitempty"`
+	ActorName string                `json:"actorName,omitempty"`
+	LogTail   string                `json:"logTail,omitempty"`
+	StartedAt *metav1.Time          `json:"startedAt,omitempty"`
+	EndedAt   *metav1.Time          `json:"endedAt,omitempty"`
+}
+
+// SiteProvisionStatus tracks the last connector action and recent history.
+type SiteProvisionStatus struct {
+	Phase          string                      `json:"phase,omitempty"`
+	Message        string                      `json:"message,omitempty"`
+	LastActionID   string                      `json:"lastActionID,omitempty"`
+	LastActionType string                      `json:"lastActionType,omitempty"`
+	Current        *SiteProvisionActionRecord  `json:"current,omitempty"`
+	History        []SiteProvisionActionRecord `json:"history,omitempty"`
+}
+
+// Site host inventory kinds.
+const (
+	SiteHostKindVM        = "vm"
+	SiteHostKindBareMetal = "bare_metal"
+)
+
+// Site host inventory phases.
+const (
+	SiteHostPhaseDeclared     = "Declared"
+	SiteHostPhaseProvisioning = "Provisioning"
+	SiteHostPhaseReady        = "Ready"
+	SiteHostPhaseFailed       = "Failed"
+)
+
+// Site host cluster intent modes (applied after SSH-ready provision).
+const (
+	SiteHostClusterModeEnroll          = "enroll"
+	SiteHostClusterModeAddWorker       = "add_worker"
+	SiteHostClusterModeReplaceControl  = "replace_control"
+)
+
+// Site host cluster status phases (observed cluster handoff).
+const (
+	SiteHostClusterPhasePending      = "Pending"
+	SiteHostClusterPhaseWaitingGroup = "WaitingGroup"
+	SiteHostClusterPhaseApplying     = "Applying"
+	SiteHostClusterPhaseReady        = "Ready"
+	SiteHostClusterPhaseFailed       = "Failed"
+)
+
+// SiteHostClusterIntent declares optional post-provision cluster automation.
+type SiteHostClusterIntent struct {
+	Mode            string `json:"mode,omitempty"`
+	ClusterName     string `json:"clusterName,omitempty"`
+	TargetCluster   string `json:"targetCluster,omitempty"`
+	Topology        string `json:"topology,omitempty"`
+	HAGroup         string `json:"haGroup,omitempty"`
+	ReplaceNode     string `json:"replaceNode,omitempty"`
+	ControlPlaneVip string `json:"controlPlaneVip,omitempty"`
+	Jumphost        string `json:"jumphost,omitempty"`
+	IngressId       string `json:"ingressId,omitempty"`
+	AutoApply       *bool  `json:"autoApply,omitempty"`
+}
+
+func (i *SiteHostClusterIntent) EffectiveAutoApply() bool {
+	if i == nil || i.AutoApply == nil {
+		return true
+	}
+	return *i.AutoApply
+}
+
+func (i *SiteHostClusterIntent) EffectiveTopology() string {
+	if i == nil || strings.TrimSpace(i.Topology) == "" {
+		return ClusterTopologySingleNode
+	}
+	return strings.TrimSpace(i.Topology)
+}
+
+// SiteHostClusterStatus tracks cluster handoff progress for a host.
+type SiteHostClusterStatus struct {
+	Phase       string `json:"phase,omitempty"`
+	Message     string `json:"message,omitempty"`
+	ClusterName string `json:"clusterName,omitempty"`
+	FCJName     string `json:"fcjName,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+}
+
+// SiteHostRecord is a thin hub-owned host intent for provisioner connectors.
+type SiteHostRecord struct {
+	Name          string                 `json:"name"`
+	Kind          string                 `json:"kind,omitempty"`
+	DesiredState  string                 `json:"desiredState,omitempty"`
+	AnsibleHost   string                 `json:"ansible_host,omitempty"`
+	AnsibleUser   string                 `json:"ansible_user,omitempty"`
+	OSFamily      string                 `json:"osFamily,omitempty"`
+	VmLocation    string                 `json:"vm_location,omitempty"`
+	Flavor        map[string]string      `json:"flavor,omitempty"`
+	Labels        map[string]string      `json:"labels,omitempty"`
+	ClusterIntent *SiteHostClusterIntent `json:"clusterIntent,omitempty"`
+	Status        SiteHostStatus         `json:"status,omitempty"`
+}
+
+// SiteHostStatus tracks observed provision state on a hub host record.
+type SiteHostStatus struct {
+	Phase           string                 `json:"phase,omitempty"`
+	Message         string                 `json:"message,omitempty"`
+	LastProvisionID string                 `json:"lastProvisionID,omitempty"`
+	AnsibleHost     string                 `json:"ansible_host,omitempty"`
+	Cluster         *SiteHostClusterStatus `json:"cluster,omitempty"`
 }
 
 type FleetSiteEdgeSpec struct {
@@ -257,6 +433,8 @@ type FleetSiteStatus struct {
 	ProvisionJobName        string             `json:"provisionJobName,omitempty"`
 	ManagedClusterAvailable bool               `json:"managedClusterAvailable,omitempty"`
 	Conditions              []metav1.Condition `json:"conditions,omitempty"`
+	// Provision is optional metal/VM connector status (distinct from greenfield ProvisionJobName).
+	Provision *SiteProvisionStatus `json:"provision,omitempty"`
 }
 
 // IngressByID returns a site ingress entry by id.
@@ -355,4 +533,12 @@ func (s *FleetSiteSpec) EffectiveSiteID(fallbackName string) string {
 // IsRegistry returns true when this FleetSite is inventory/datacenter metadata only.
 func (s *FleetSiteSpec) IsRegistry() bool {
 	return s.ProvisioningMode == ProvisioningModeRegistry
+}
+
+// EffectiveProvisionProvider returns the connector provider (default noop).
+func (s *FleetSiteSpec) EffectiveProvisionProvider() string {
+	if s.Provision == nil || strings.TrimSpace(s.Provision.Provider) == "" {
+		return ProvisionProviderNoop
+	}
+	return strings.TrimSpace(s.Provision.Provider)
 }

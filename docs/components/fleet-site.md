@@ -41,6 +41,68 @@ Match per-app `FleetApp` `route.mode` to cluster ingress:
 
 See [fleet-edge.md](fleet-edge.md).
 
+## Optional provisioner connector
+
+`FleetSite.spec.provision` binds an optional metal/VM provisioner
+(`noop` default, `yaidap`, later `opentofu` / `terraform`). The hub starts
+async connector actions; YAIDAP runs on the site jumphost using that site's
+inventory path. On success the action returns a handoff host fragment
+(`ansible_host`, …) for enroll / add-worker.
+
+| API | Purpose |
+|-----|---------|
+| `GET` / `PUT` / `PATCH /sites/{name}/provision` | Connector binding |
+| `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `status` |
+| `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
+| `GET/POST /sites/{name}/hosts` | Hub site host inventory |
+| `GET/PATCH/DELETE /sites/{name}/hosts/{host}` | Host CRUD |
+| `POST /sites/{name}/hosts/{host}/provision` | Provision from inventory row |
+| `GET/PATCH/POST /sites/{name}/hosts/{host}/cluster` | Cluster intent / manual apply |
+
+Host records are stored in ConfigMap `fleet-site-hosts-{site}` (`hosts.json`).
+Provision actions update host phase and `ansible_host` on success. For YAIDAP VM
+hosts, `vm_location` (including `least-utilized`) and optional `flavor` fields
+are synced into YAIDAP `host_vars/{guest}.yml` on the jumphost before
+`create_vm`, `plan_vm`, or `destroy`. After a successful `create_vm`, the hub
+updates `vm_location` from the resolved hypervisor written by YAIDAP.
+
+Optional **`clusterIntent`** on each host automates post-provision cluster work:
+
+| `mode` | When host is Ready |
+|--------|-------------------|
+| `enroll` | Create `FleetClusterJoin` (`single_node` or `ha_3_node` via shared `haGroup`) |
+| `add_worker` | Queue add-worker node operation on `targetCluster` |
+| `replace_control` | Queue control-plane replace on `targetCluster` for `replaceNode` |
+
+Status is mirrored in `status.cluster` (phase, message, cluster name). The
+registry-site reconciler polls running provision jobs and applies cluster intent;
+use `POST …/cluster` to retry manually.
+
+**Site-host → cluster flow (bundle mode):**
+
+1. `POST …/hosts` with `clusterIntent` (or patch later) and `vm_location`.
+2. `POST …/hosts/{host}/provision` — YAIDAP `create_vm`; hub syncs inventory.
+3. Reconciler `cluster-apply` — creates `FleetClusterJoin` when host is Ready.
+4. Download bootstrap bundle; run `bootstrap.sh` on first control (via jumphost).
+5. `POST /clusters/{name}/provision` — hub finalize (OCM, edge, providers).
+
+VM hosts created through the connector use **`minRootDiskGi: 38`** on the FCJ
+(40G vdisk root LV is smaller than 40 GiB after EFI/boot). Bare-metal enroll
+defaults remain 40 GiB.
+
+In bundle mode, hub provision accepts **`Enrolled`** phase (bootstrap enrolls
+before the progress POST marks `Validated`) so `cluster provision` is not
+blocked when local validate/provision-local already ran on the node.
+
+Destructive actions require `confirm=true`. Greenfield
+`POST /sites/{name}/provision` (site bootstrap) is unchanged and separate from
+the connector binding GET/PUT paths.
+
+Plan and operator notes:
+[provisioner-connector-plan.md](../provisioner-connector-plan.md),
+[design-provisioner-connector.md](../design-provisioner-connector.md).
+Flow: [playbooks/flows/site-provision-yaidap.yml](../../playbooks/flows/site-provision-yaidap.yml).
+
 ## Hub independence
 
 Spokes are independent K3s control planes. The hub registers and manages them
@@ -74,8 +136,14 @@ When a cluster is `Ready`, operators use the console **Operations** panel,
 | List operation history | `GET /clusters/{name}/node-operations` |
 | Operation Ansible logs | `GET /clusters/{name}/node-operations/{id}/logs` |
 | Enable local RWX (`nfs_local`) | `POST /clusters/{name}/configure-storage` |
-| Enable KubeVirt platform | `POST /clusters/{name}/platform/kubevirt` |
+| Enable KubeVirt platform (optional `lanBridge`) | `POST /clusters/{name}/platform/kubevirt` |
 | KubeVirt platform status | `GET /clusters/{name}/platform/kubevirt` |
+| Day-2 LAN Multus flow | [playbooks/flows/cluster-enable-kubevirt-lan.yml](../../playbooks/flows/cluster-enable-kubevirt-lan.yml) |
+| Site provisioner binding | `GET`/`PUT`/`PATCH /sites/{name}/provision` |
+| Site provision actions | `POST`/`GET /sites/{name}/provision/actions` |
+| List VirtualMachines | `GET /clusters/{name}/vms` |
+| VM power (start/stop/restart) | `POST /clusters/{name}/vms/{ns}/{vm}/power` |
+| VM serial / VNC console | WebSocket `…/vms/{ns}/{vm}/console` or `…/vnc` |
 
 Node lifecycle, storage configure, and KubeVirt install share one job queue
 (mutual exclusion). Completed storage and KubeVirt runs are recorded in

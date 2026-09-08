@@ -1,0 +1,103 @@
+{{- $vm := include "rocky-10-vm.fullname" . -}}
+{{- $dv := printf "%s-root" $vm -}}
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: {{ $vm }}
+  labels:
+    {{- include "rocky-10-vm.labels" . | nindent 4 }}
+spec:
+  runStrategy: {{ .Values.runStrategy | default "Always" | quote }}
+  dataVolumeTemplates:
+    - metadata:
+        name: {{ $dv }}
+        labels:
+          {{- include "rocky-10-vm.labels" . | nindent 10 }}
+      spec:
+        source:
+          http:
+            url: {{ .Values.image.url | quote }}
+        storage:
+          accessModes:
+            - {{ .Values.disk.accessMode | default "ReadWriteOnce" | quote }}
+          volumeMode: {{ .Values.disk.volumeMode | default "Filesystem" | quote }}
+          resources:
+            requests:
+              storage: {{ .Values.disk.size | quote }}
+          {{- with .Values.disk.storageClass }}
+          storageClassName: {{ . | quote }}
+          {{- end }}
+  template:
+    metadata:
+      labels:
+        kubevirt.io/vm: {{ $vm }}
+        {{- include "rocky-10-vm.labels" . | nindent 8 }}
+      {{- if eq (.Values.network.mode | default "pod") "lan" }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ .Values.network.multusNetwork | quote }}
+      {{- end }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      domain:
+        cpu:
+          cores: {{ int .Values.cpu }}
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            {{- if eq (.Values.network.mode | default "pod") "lan" }}
+            - name: lan
+              bridge: {}
+            {{- else }}
+            - name: default
+              masquerade: {}
+            {{- end }}
+        machine:
+          type: q35
+        resources:
+          requests:
+            memory: {{ .Values.memory | quote }}
+            cpu: {{ .Values.cpu | quote }}
+      networks:
+        {{- if eq (.Values.network.mode | default "pod") "lan" }}
+        - name: lan
+          multus:
+            networkName: {{ .Values.network.multusNetwork | quote }}
+        {{- else }}
+        - name: default
+          pod: {}
+        {{- end }}
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: {{ $dv }}
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: {{ $vm }}
+              users:
+                - name: {{ .Values.cloudInit.user | default "rocky" | quote }}
+                  sudo: ALL=(ALL) NOPASSWD:ALL
+                  shell: /bin/bash
+                  lock_passwd: false
+                  {{- with .Values.cloudInit.sshAuthorizedKeys }}
+                  ssh_authorized_keys:
+                    {{- toYaml . | nindent 20 }}
+                  {{- end }}
+              ssh_pwauth: true
+              chpasswd:
+                expire: false
+                list: |
+                  {{ .Values.cloudInit.user | default "rocky" }}:{{ .Values.cloudInit.password | default "rocky" }}
+              {{- with .Values.cloudInit.extraUserData }}
+              {{ . | nindent 14 }}
+              {{- end }}

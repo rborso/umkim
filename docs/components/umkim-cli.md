@@ -60,6 +60,9 @@ umkim site ingress list SITE
 umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--address A] [--zone Z] [--wildcard W]
 umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--zone …] [--wildcard …]
 umkim site ingress delete SITE ID
+umkim site host list SITE | get SITE NAME | add SITE --name NAME --kind vm|bare_metal
+umkim site host patch SITE NAME | delete SITE NAME | provision SITE NAME [--confirm] [--wait]
+umkim site host cluster-apply SITE NAME
 
 umkim cluster list | get NAME | create -f cluster.yaml
 umkim cluster list --require gpu,kvm
@@ -72,6 +75,11 @@ umkim cluster storage enable-local NAME [--dir /path] [--cluster-path NAME] [--f
 umkim cluster storage status NAME
 umkim cluster platform enable-kubevirt NAME [--lan-bridge] [--bridge NAME] [--force] [--wait 45m]
 umkim cluster platform status NAME
+
+umkim vm list --cluster NAME
+umkim vm get NAME --cluster NAME [-n NS]
+umkim vm start|stop|restart NAME --cluster NAME [--force]
+umkim vm console NAME --cluster NAME [--type serial|vnc]
 
 umkim chart list | get NAME
 umkim chart add --origin oci://… [--version V] [--image-policy external|proxy|copy]
@@ -138,6 +146,48 @@ umkim site ingress delete homelab edge-rp
 umkim cluster patch lab-single-0 --ingress-id site-pf
 ```
 
+### Site provisioner connector
+
+Optional metal/VM provision before enroll / add-worker. Default provider is
+`noop` (caller supplies the SSH-ready host fragment).
+
+```bash
+umkim site provision get homelab
+umkim site provision set homelab --provider yaidap \
+  --jumphost linux@jump.example:22 \
+  --ssh-secret fleet-site-homelab-provision-ssh \
+  --inventory /home/linux/yaidap/inventory/demo \
+  --yaidap-root /home/linux/yaidap
+umkim site provision run homelab --action create_vm --subject vm01 --wait
+umkim site provision run homelab --action plan_vm --subject vm01 --wait
+umkim site provision run homelab --action create_vm --subject vm01 \
+  --ansible-host 203.0.113.10 --wait   # noop handoff
+umkim site provision status homelab ACTION_ID
+umkim site provision actions homelab
+```
+
+### Site host inventory
+
+Hub-owned host intent for provisioner connectors (registry sites):
+
+```bash
+umkim site host list homelab
+umkim site host get homelab vm01
+umkim site host add homelab --name vm01 --kind vm --vm-location least-utilized
+umkim site host add homelab --name vm01 --kind vm --vm-location virt02
+umkim site host add homelab --name vm02 --kind vm --cluster-mode enroll --cluster-name vm02-0 --provision-now
+umkim site host add homelab --name w01 --kind vm --cluster-mode add_worker --target-cluster lab-ha-0
+umkim site host cluster-apply homelab vm01
+umkim site host patch homelab vm01 --ansible-host 203.0.113.10
+umkim site host provision homelab vm01 --action plan_vm --wait
+umkim site host provision homelab vm01 --wait
+umkim site host provision homelab bm01 --confirm --wait
+umkim site host delete homelab vm01
+```
+
+`install_bm` / `destroy` require `--confirm`. See
+[provisioner-connector-plan.md](../provisioner-connector-plan.md).
+
 Mutating commands print `OK: …` on success (and re-list ingress after site changes).
 Failures exit non-zero with an error (including when a patch is accepted but not
 persisted — for example an outdated FleetSite CRD).
@@ -166,11 +216,28 @@ storage ops. History type `configureKubevirt`.
 ```bash
 umkim cluster platform enable-kubevirt lab-ha-0
 umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --wait 45m
+# Day-2 LAN Multus when KubeVirt is already Ready (no --force required)
+umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge
 umkim cluster platform status lab-ha-0
 umkim cluster candidates --require kubevirt
 ```
 
-See [fleet-kubevirt.md](fleet-kubevirt.md).
+### Virtual machines
+
+Once KubeVirt is installed, manage guest VMs through the hub API:
+
+```bash
+umkim vm list --cluster lab-ha-0
+umkim vm stop smoke --cluster lab-ha-0           # soft ACPI shutdown
+umkim vm stop smoke --cluster lab-ha-0 --force   # hard poweroff
+umkim vm start smoke --cluster lab-ha-0
+umkim vm restart smoke --cluster lab-ha-0        # soft reboot
+umkim vm restart smoke --cluster lab-ha-0 --force
+umkim vm console smoke --cluster lab-ha-0        # serial TTY
+```
+
+Console UI: **Clusters → Virtual machines**. Serial is default; VNC opens on
+demand. See [fleet-kubevirt.md](fleet-kubevirt.md).
 
 ### Single-node local RWX storage
 

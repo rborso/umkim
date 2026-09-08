@@ -260,6 +260,34 @@ func WriteSites(raw []byte, format Format) error {
 	return nil
 }
 
+func WriteSiteHosts(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		Items []map[string]interface{} `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	printTable(
+		[]string{"NAME", "KIND", "PHASE", "ANSIBLE_HOST", "VM_LOCATION"},
+		body.Items,
+		func(h map[string]interface{}) []string {
+			status, _ := h["status"].(map[string]interface{})
+			return []string{
+				strField(h, "name"),
+				strField(h, "kind"),
+				strField(status, "phase"),
+				strField(h, "ansible_host"),
+				strField(h, "vm_location"),
+			}
+		},
+	)
+	return nil
+}
+
 func siteIngressSummary(spec map[string]interface{}) string {
 	if spec == nil {
 		return "—"
@@ -333,6 +361,37 @@ func WriteNodes(raw []byte, format Format) error {
 			}
 		},
 	)
+	return nil
+}
+
+func WriteVMs(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		VMs []map[string]interface{} `json:"vms"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	headers := []string{"NAMESPACE", "NAME", "PHASE", "READY", "NODE", "IP"}
+	if format == FormatWide {
+		headers = []string{"NAMESPACE", "NAME", "PHASE", "READY", "STATUS", "NODE", "IP"}
+	}
+	printTable(headers, body.VMs, func(v map[string]interface{}) []string {
+		row := []string{
+			strField(v, "namespace"),
+			strField(v, "name"),
+			strField(v, "phase"),
+			yesNo(boolField(v, "ready")),
+		}
+		if format == FormatWide {
+			row = append(row, strField(v, "printableStatus"))
+		}
+		row = append(row, strField(v, "nodeName"), strField(v, "ip"))
+		return row
+	})
 	return nil
 }
 

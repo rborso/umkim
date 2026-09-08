@@ -139,6 +139,10 @@ func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, nam
 		s.handleClusterNodes(w, r, name, sub)
 		return
 	}
+	if sub == "vms" || strings.HasPrefix(sub, "vms/") {
+		s.handleClusterVMs(w, r, name, sub)
+		return
+	}
 	if sub == "bootstrap-script" && r.Method == http.MethodGet {
 		s.serveClusterBootstrapScript(r.Context(), w, name)
 		return

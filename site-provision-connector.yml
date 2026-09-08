@@ -1,0 +1,263 @@
+---
+# Hub Job playbook: run a YAIDAP action on a site jumphost.
+#
+# Inventory must define group [jumphost] with ansible_host / ansible_user.
+# Extra vars (from fleet-site Job):
+#   fleet_provision_action, fleet_provision_subject, fleet_provision_confirm
+#   fleet_provision_inventory_path, fleet_provision_yaidap_root
+#   fleet_provision_playbook, fleet_provision_tags, fleet_provision_extra (optional)
+#   fleet_provision_sync_host, fleet_provision_vm_location, fleet_provision_memory,
+#   fleet_provision_cores, fleet_provision_os (optional hub→YAIDAP inventory sync)
+
+- name: Fleet site provision connector | YAIDAP on jumphost
+  hosts: jumphost
+  gather_facts: false
+  become: false
+  vars:
+    fleet_provision_yaidap_root: "{{ fleet_provision_yaidap_root | default('~/yaidap') }}"
+    fleet_provision_confirm: "{{ fleet_provision_confirm | default(false) | bool }}"
+    fleet_provision_guest_host_vars: "{{ fleet_provision_inventory_path }}/host_vars/{{ fleet_provision_subject }}.yml"
+  tasks:
+    - name: Require action and subject
+      ansible.builtin.assert:
+        that:
+          - fleet_provision_action | default('') | length > 0
+          - fleet_provision_subject | default('') | length > 0
+          - fleet_provision_inventory_path | default('') | length > 0
+        fail_msg: Set fleet_provision_action, fleet_provision_subject, fleet_provision_inventory_path.
+
+    - name: Resolve YAIDAP playbook defaults
+      ansible.builtin.set_fact:
+        _prov_playbook: "{{ fleet_provision_playbook | default('') }}"
+        _prov_tags: "{{ fleet_provision_tags | default('') }}"
+        _yaidap_extra_argv: >-
+          {{
+            (['-e', 'confirm_destroy=true']
+              if fleet_provision_action == 'destroy' and (fleet_provision_confirm | default(false) | bool)
+              else [])
+            + (['-e', 'tempxe_confirm=true']
+              if fleet_provision_action == 'install_bm' and (fleet_provision_confirm | default(false) | bool)
+              else [])
+          }}
+
+    - name: Fail when playbook mapping missing
+      ansible.builtin.assert:
+        that:
+          - _prov_playbook | length > 0
+        fail_msg: fleet_provision_playbook is required (set by hub connector).
+
+    - name: Check YAIDAP guest host_vars before sync
+      ansible.builtin.stat:
+        path: "{{ fleet_provision_guest_host_vars }}"
+      register: fleet_guest_host_vars
+      when: fleet_provision_sync_host | default(false) | bool
+
+    - name: Create YAIDAP guest host_vars stub for hub sync
+      ansible.builtin.copy:
+        dest: "{{ fleet_provision_guest_host_vars }}"
+        content: |
+          ---
+          # Managed by UMKIM fleet-site provision connector.
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - not fleet_guest_host_vars.stat.exists | default(false)
+
+    - name: Sync vm_location into YAIDAP guest host_vars
+      ansible.builtin.lineinfile:
+        path: "{{ fleet_provision_guest_host_vars }}"
+        regexp: '^vm_location:\s*.*'
+        line: "vm_location: {{ fleet_provision_vm_location }}"
+        create: true
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_vm_location | default('') | length > 0
+
+    - name: Sync memory into YAIDAP guest host_vars
+      ansible.builtin.lineinfile:
+        path: "{{ fleet_provision_guest_host_vars }}"
+        regexp: '^memory:\s*.*'
+        line: "memory: {{ fleet_provision_memory }}"
+        create: true
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_memory | default('') | length > 0
+
+    - name: Sync cores into YAIDAP guest host_vars
+      ansible.builtin.lineinfile:
+        path: "{{ fleet_provision_guest_host_vars }}"
+        regexp: '^cores:\s*.*'
+        line: "cores: {{ fleet_provision_cores }}"
+        create: true
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_cores | default('') | length > 0
+
+    - name: Sync os into YAIDAP guest host_vars
+      ansible.builtin.lineinfile:
+        path: "{{ fleet_provision_guest_host_vars }}"
+        regexp: '^os:\s*.*'
+        line: "os: {{ fleet_provision_os }}"
+        create: true
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_os | default('') | length > 0
+
+    - name: Derive lab MAC from ansible_host when provided
+      ansible.builtin.set_fact:
+        fleet_provision_mac_suffix: "{{ '%02x' | format(fleet_provision_ansible_host.split('.')[-2] | int) }}:{{ '%02x' | format(fleet_provision_ansible_host.split('.')[-1] | int) }}:01"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_ansible_host | default('') | length > 0
+
+    - name: Sync ansible_host into YAIDAP guest host_vars
+      ansible.builtin.lineinfile:
+        path: "{{ fleet_provision_guest_host_vars }}"
+        regexp: '^ansible_host:\s*.*'
+        line: "ansible_host: {{ fleet_provision_ansible_host }}"
+        create: true
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_ansible_host | default('') | length > 0
+
+    - name: Require guest mgmt IP for VM create
+      ansible.builtin.assert:
+        that:
+          - fleet_provision_ansible_host | default('') | length > 0
+        fail_msg: >-
+          fleet_provision_ansible_host is required for create_vm (patch site host ansible_host before provision).
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_action in ['create_vm', 'plan_vm']
+
+    - name: Resolve placed hypervisor for stale guest cleanup
+      ansible.builtin.shell: |
+        set -euo pipefail
+        hv=""
+        if [ -f "{{ fleet_provision_guest_host_vars }}" ]; then
+          hv=$(awk '/^vm_location:/ { sub(/^vm_location:[[:space:]]*/, ""); print; exit }' "{{ fleet_provision_guest_host_vars }}")
+        fi
+        if [ -z "$hv" ] || [ "$hv" = "least-utilized" ] || [ "$hv" = "least_utilized" ]; then
+          hv=$(awk -v n="{{ fleet_provision_subject }}" '$0 ~ "^[[:space:]]*" n ":[[:space:]]*$" { f=1; next } f && /^[[:space:]]+[A-Za-z0-9._-]+:[[:space:]]*$/ { exit } f && /^[[:space:]]+vm_location:[[:space:]]*/ { sub(/^.*vm_location:[[:space:]]*/, ""); print; exit }' "{{ fleet_provision_inventory_path }}/guests.yml" 2>/dev/null || true)
+        fi
+        echo "${hv:-}"
+      args:
+        executable: /bin/bash
+      register: fleet_provision_resolved_hv
+      changed_when: false
+      when:
+        - fleet_provision_action == 'create_vm'
+        - fleet_provision_sync_host | default(false) | bool
+
+    - name: Drop stale libvirt guest before create_vm re-provision
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ROOT="{{ fleet_provision_yaidap_root }}"
+        cd "$ROOT"
+        ansible-playbook "{{ _prov_playbook }}" \
+          -i "{{ fleet_provision_inventory_path }}" \
+          --limit "{{ fleet_provision_subject }}" \
+          --tags destroy \
+          -e confirm_destroy=true
+      args:
+        executable: /bin/bash
+      register: fleet_preclean_destroy
+      failed_when: false
+      changed_when: fleet_preclean_destroy.rc == 0
+      when:
+        - fleet_provision_action == 'create_vm'
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_resolved_hv.stdout | default('') | trim | length > 0
+
+    - name: Ensure YAIDAP libvirt guest profile in host_vars
+      ansible.builtin.blockinfile:
+        path: "{{ fleet_provision_guest_host_vars }}"
+        marker: "# {mark} UMKIM fleet-site VM profile"
+        block: |
+          os: {{ fleet_provision_os | default('rocky-10') }}
+          legacy: false
+          configure_firewalld: false
+          provisioning_provider: libvirt
+          memory: {{ fleet_provision_memory | default(4096) }}
+          cores: {{ fleet_provision_cores | default(2) }}
+          disks:
+            - name: bootdisk
+              disk: vda
+              bootdisk: true
+              device: 0
+              format: qcow2
+              size: {{ fleet_provision_disk_gi | default(40) }}
+              storage: local
+          uplinks:
+            - name: n0p0
+              physical_network: lab_access_l1
+              mac_address: "52:54:00:{{ fleet_provision_mac_suffix | default('01:00:01') }}"
+              networks:
+                - zone: lab
+                  network_name: lab_nw
+                  model: virtio
+                  cloudinit: true
+                  pxe: false
+                  vm_network: false
+                  hypervisor_uplink: n0p0
+                  bridge_name: n0p0_lab_nw
+                  ip: "{{ fleet_provision_ansible_host }}"
+                  default_route: true
+                  tcp_open:
+                    - 22
+                  udp_open: []
+                  services_open: []
+        create: true
+        mode: "0644"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_action in ['create_vm', 'plan_vm']
+
+    - name: Run YAIDAP ansible-playbook on jumphost
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ROOT="{{ fleet_provision_yaidap_root }}"
+        cd "$ROOT"
+        TAGS_ARGS=()
+        if [ -n "{{ _prov_tags }}" ]; then
+          TAGS_ARGS=(--tags "{{ _prov_tags }}")
+        fi
+        ansible-playbook "{{ _prov_playbook }}" \
+          -i "{{ fleet_provision_inventory_path }}" \
+          --limit "{{ fleet_provision_subject }}" \
+          "${TAGS_ARGS[@]}"{%- for arg in _yaidap_extra_argv %} {{ arg | quote }}{%- endfor %}
+      args:
+        executable: /bin/bash
+      register: fleet_provision_remote
+      changed_when: true
+
+    - name: Read resolved vm_location from YAIDAP guest host_vars after create
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if [ -f "{{ fleet_provision_guest_host_vars }}" ]; then
+          awk '/^vm_location:/ { sub(/^vm_location:[[:space:]]*/, ""); print; exit }' "{{ fleet_provision_guest_host_vars }}"
+        fi
+      args:
+        executable: /bin/bash
+      register: fleet_resolved_vm_location
+      changed_when: false
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_action == 'create_vm'
+
+    - name: Emit resolved vm_location marker for hub
+      ansible.builtin.debug:
+        msg: "FLEET_YAIDAP_VM_LOCATION={{ fleet_resolved_vm_location.stdout | default('') | trim }}"
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - fleet_provision_action == 'create_vm'
+        - fleet_resolved_vm_location.stdout | default('') | trim | length > 0
+
+    - name: Show YAIDAP recap
+      ansible.builtin.debug:
+        msg: "{{ fleet_provision_remote.stdout | default('') | trim }}"

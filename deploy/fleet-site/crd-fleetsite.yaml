@@ -108,6 +108,27 @@ spec:
                 jumphost:
                   type: string
                   description: Default SSH bastion (user@host:port) for clusters in this site when the cluster does not set spec.jumphost.
+                provision:
+                  type: object
+                  description: Optional metal/VM provisioner connector binding (YAIDAP, OpenTofu, …).
+                  properties:
+                    provider:
+                      type: string
+                      enum: [noop, yaidap, opentofu, terraform]
+                    jumphost:
+                      type: string
+                    sshSecretRef:
+                      type: string
+                    inventoryPath:
+                      type: string
+                    yaidapRoot:
+                      type: string
+                    workspacePath:
+                      type: string
+                    defaultExtraVars:
+                      type: object
+                      additionalProperties:
+                        type: string
                 mgmtLanIp:
                   type: string
                 rockyVersion:
@@ -170,6 +191,26 @@ spec:
                   type: string
                 managedClusterAvailable:
                   type: boolean
+                provision:
+                  type: object
+                  description: Optional provisioner connector status (not greenfield ProvisionJobName).
+                  properties:
+                    phase:
+                      type: string
+                    message:
+                      type: string
+                    lastActionID:
+                      type: string
+                    lastActionType:
+                      type: string
+                    current:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    history:
+                      type: array
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
                 conditions:
                   type: array
                   items:

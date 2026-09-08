@@ -57,6 +57,7 @@ import {
 } from '../edge/ingressMethod';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { getFieldHelp } from '../help/fieldHelp';
+import { SiteHostsPanel } from '../components/sites/SiteHostsPanel';
 
 export function SiteDetailPage() {
   const { name } = useParams<{ name: string }>();
@@ -833,6 +834,11 @@ export function SiteDetailPage() {
                   </pre>
                 )}
               </Tab>
+              {isRegistry && !isManagement && (
+                <Tab eventKey={2} title={<TabTitleText>Hosts</TabTitleText>}>
+                  <SiteHostsPanel siteName={name} />
+                </Tab>
+              )}
               {!isRegistry && site.status?.validationErrors && site.status.validationErrors.length > 0 && (
                 <Tab eventKey={2} title={<TabTitleText>Validation</TabTitleText>}>
                   <List style={{ marginTop: '1rem' }}>

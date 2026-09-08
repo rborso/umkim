@@ -9,3 +9,10 @@
 - name: Reload systemd for WireGuard DNS-ready
   ansible.builtin.systemd:
     daemon_reload: true
+
+- name: Reload systemd and enable hub wg peer restore
+  ansible.builtin.systemd:
+    name: umkim-restore-hub-wg-peers.service
+    enabled: true
+    daemon_reload: true
+    state: started

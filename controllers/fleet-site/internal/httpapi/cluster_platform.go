@@ -116,7 +116,11 @@ func (s *Server) handleEnableKubevirt(ctx context.Context, w http.ResponseWriter
 			delete(fcj.Annotations, configureKubevirtJobAnnotation)
 		}
 	}
-	if st.Phase == fleetv1alpha1.ProviderPhaseReady && !req.Force {
+
+	// Allow day-2 LAN Multus enable without --force when KubeVirt is already Ready
+	// but the Multus host-bridge / NAD intent was not set yet.
+	lanUpgrade := req.LanBridge && !fcj.Spec.WantsKubevirtBridge()
+	if st.Phase == fleetv1alpha1.ProviderPhaseReady && !req.Force && !lanUpgrade {
 		writeJSON(w, http.StatusAccepted, map[string]string{
 			"phase":   fleetv1alpha1.ProviderPhaseReady,
 			"message": "KubeVirt already installed",
@@ -155,12 +159,18 @@ func (s *Server) handleEnableKubevirt(ctx context.Context, w http.ResponseWriter
 	if fcj.Status.Providers == nil {
 		fcj.Status.Providers = map[string]fleetv1alpha1.ClusterProviderStatus{}
 	}
+	msg := "KubeVirt platform install requested"
+	if lanUpgrade {
+		msg = "LAN Multus (host bridge + NAD) enable requested"
+	} else if req.LanBridge {
+		msg = "KubeVirt platform install with LAN Multus requested"
+	}
 	fcj.Status.Providers[fleetv1alpha1.ProviderKindKubevirt] = fleetv1alpha1.ClusterProviderStatus{
 		Phase:        fleetv1alpha1.ProviderPhaseInstalling,
-		Message:      "KubeVirt platform install requested",
+		Message:      msg,
 		ProviderName: fcj.Spec.KubevirtProviderName(clusterName),
 	}
-	fcj.Status.Message = "KubeVirt platform install requested"
+	fcj.Status.Message = msg
 	if err := s.Client.Status().Update(ctx, fcj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -168,6 +178,6 @@ func (s *Server) handleEnableKubevirt(ctx context.Context, w http.ResponseWriter
 	writeJSON(w, http.StatusAccepted, map[string]interface{}{
 		"phase":     fleetv1alpha1.ProviderPhaseInstalling,
 		"lanBridge": fcj.Spec.WantsKubevirtBridge(),
-		"message":   "KubeVirt platform install requested",
+		"message":   msg,
 	})
 }

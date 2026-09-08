@@ -15,10 +15,12 @@ export default defineConfig({
       '/fleet/api': {
         target: process.env.FLEET_API_PROXY || process.env.DCM_API_PROXY || 'http://127.0.0.1:30912',
         changeOrigin: true,
+        ws: true,
       },
       '/fleet/auth': {
         target: process.env.FLEET_API_PROXY || process.env.DCM_API_PROXY || 'http://127.0.0.1:30912',
         changeOrigin: true,
+        ws: true,
       },
     },
   },

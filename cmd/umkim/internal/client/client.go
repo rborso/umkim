@@ -106,6 +106,10 @@ func (c *Client) Patch(path string, body interface{}) ([]byte, int, error) {
 	return c.do(http.MethodPatch, path, body)
 }
 
+func (c *Client) Put(path string, body interface{}) ([]byte, int, error) {
+	return c.do(http.MethodPut, path, body)
+}
+
 func (c *Client) Post(path string, body interface{}) ([]byte, int, error) {
 	return c.do(http.MethodPost, path, body)
 }
@@ -262,6 +266,51 @@ func (c *Client) applyAuth(req *http.Request) {
 		req.Header.Set("X-Fleet-Subject-Kind", "User")
 		req.Header.Set("X-Fleet-Subject-Name", "umkim-cli")
 		req.Header.Set("X-Fleet-DC-Admin", "true")
+	}
+}
+
+// WebsocketURL converts the fleet API path into a ws/wss URL.
+func (c *Client) WebsocketURL(path string) (string, error) {
+	if c.apiURL == "" {
+		return "", fmt.Errorf("API URL not configured (set UMKIM_API_URL)")
+	}
+	u, err := url.Parse(c.apiURL + path)
+	if err != nil {
+		return "", err
+	}
+	switch u.Scheme {
+	case "https":
+		u.Scheme = "wss"
+	case "http":
+		u.Scheme = "ws"
+	default:
+		return "", fmt.Errorf("unsupported API URL scheme %q", u.Scheme)
+	}
+	return u.String(), nil
+}
+
+// SetAuthHeaders copies bearer/dev headers and session cookies for websocket dials.
+func (c *Client) SetAuthHeaders(h http.Header) {
+	req, _ := http.NewRequest(http.MethodGet, c.apiURL+"/", nil)
+	c.applyAuth(req)
+	for k, vals := range req.Header {
+		for _, v := range vals {
+			h.Add(k, v)
+		}
+	}
+	if c.http != nil && c.http.Jar != nil {
+		if u, err := url.Parse(c.apiURL); err == nil {
+			for _, ck := range c.http.Jar.Cookies(u) {
+				h.Add("Cookie", ck.Name+"="+ck.Value)
+			}
+		}
+		if c.authURL != "" {
+			if u, err := url.Parse(c.authURL); err == nil {
+				for _, ck := range c.http.Jar.Cookies(u) {
+					h.Add("Cookie", ck.Name+"="+ck.Value)
+				}
+			}
+		}
 	}
 }
 

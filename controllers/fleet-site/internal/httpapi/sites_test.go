@@ -10,6 +10,8 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,6 +22,12 @@ func testSiteHTTPScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	if err := fleetv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := batchv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	return scheme

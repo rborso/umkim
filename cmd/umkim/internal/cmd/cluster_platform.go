@@ -30,8 +30,10 @@ func clusterPlatformEnableKubevirtCmd() *cobra.Command {
 		Short: "Install KubeVirt platform (POST /clusters/{name}/platform/kubevirt)",
 		Long: `Cluster operation: install Multus, CDI, and KubeVirt on a Ready cluster.
 
-Optional --lan-bridge applies the Multus NAD for host-bridge LAN VMs (requires the
-Linux bridge already present on nodes, typically created at bootstrap).
+With --lan-bridge, also configures the host Linux bridge on every node and
+applies Multus NAD default/mgmt-l2 so guests can use the node LAN
+(network.multus_l2). Safe to run when KubeVirt is already Ready: LAN Multus
+enable does not require --force; --force re-runs the full platform job.
 
 Runs as an Ansible job on the hub (mutual exclusion with node/storage ops).
 Completed runs appear in umkim node-op history as configureKubevirt.`,
@@ -99,11 +101,11 @@ Completed runs appear in umkim node-op history as configureKubevirt.`,
 			}
 		},
 	}
-	c.Flags().BoolVar(&force, "force", false, "Re-run install even if already Ready")
-	c.Flags().BoolVar(&lanBridge, "lan-bridge", false, "Also apply Multus NAD for host Linux bridge (LAN VMs)")
+	c.Flags().BoolVar(&lanBridge, "lan-bridge", false, "Configure host Linux bridge on all nodes + Multus NAD (LAN VMs)")
 	c.Flags().StringVar(&bridgeName, "bridge", "n0p0_mgmt_nw", "Host bridge device name when --lan-bridge")
-	c.Flags().StringVar(&slaveNic, "slave", "", "Optional physical NIC for create-time bridge (documented; post-Ready NAD only)")
-	c.Flags().BoolVar(&keepIP, "keep-ip", true, "keepIp for bridge intent (bootstrap); NAD path ignores live rewrite")
+	c.Flags().StringVar(&slaveNic, "slave", "", "Optional physical NIC to enslave (default: NIC holding management IP)")
+	c.Flags().BoolVar(&keepIP, "keep-ip", true, "Move management IP onto the bridge (recommended)")
+	c.Flags().BoolVar(&force, "force", false, "Re-run install even if already Ready (LAN Multus upgrade does not need this)")
 	c.Flags().DurationVar(&wait, "wait", 0, "Wait for Ready (e.g. 45m); 0 = return after accept")
 	return c
 }

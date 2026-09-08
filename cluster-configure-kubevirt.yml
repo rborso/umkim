@@ -7,7 +7,22 @@
 # Extra vars (from FCJ inventory / job):
 #   fleet_site_enable_kubevirt=true
 #   fleet_cluster_kubevirt_bridge_enabled=true|false
-#   kubevirt_bridge_host_bridge=... (when LAN Multus NAD is requested)
+#   kubevirt_bridge_host_bridge=... (when LAN Multus is requested)
+#   kubevirt_bridge_slave_nic=... (optional)
+#   kubevirt_bridge_keep_ip=true|false
+
+- name: Fleet cluster kubevirt | Host bridges + bridge CNI on all nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_enable_kubevirt: true
+  tasks:
+    - name: Fleet cluster kubevirt | Configure host Linux bridge for Multus L2
+      ansible.builtin.import_role:
+        name: kubevirt_host_bridge
+      when: fleet_cluster_kubevirt_bridge_enabled | default(false) | bool
+      tags: [fleet_site, fleet_site_kubevirt, kubevirt, kubevirt_host_bridge]
 
 - name: Fleet cluster kubevirt | Platform stack on bootstrap
   hosts: site_bootstrap

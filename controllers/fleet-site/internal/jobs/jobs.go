@@ -83,8 +83,11 @@ func wgJobShell(add, remove []WGPeer) string {
 	return b.String()
 }
 
+const wgJobTTLSecondsAfterFinished int32 = 300
+
 func WgSyncJobMulti(ns, jobName string, peers []WGPeer, removePeers []WGPeer) *batchv1.Job {
 	cmd := wgJobShell(peers, removePeers)
+	ttl := wgJobTTLSecondsAfterFinished
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -92,6 +95,7 @@ func WgSyncJobMulti(ns, jobName string, peers []WGPeer, removePeers []WGPeer) *b
 			Labels:    map[string]string{"app": "fleet-site-wg-sync"},
 		},
 		Spec: batchv1.JobSpec{
+			TTLSecondsAfterFinished: &ttl,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": "fleet-site-wg-sync"},
@@ -201,6 +205,7 @@ func WgRemoveJobMulti(ns, jobName string, peers []WGPeer) *batchv1.Job {
 	}
 	b.WriteString(`wg show "$IFACE"; echo ok`)
 	cmd := b.String()
+	ttl := wgJobTTLSecondsAfterFinished
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -208,6 +213,7 @@ func WgRemoveJobMulti(ns, jobName string, peers []WGPeer) *batchv1.Job {
 			Labels:    map[string]string{"app": "fleet-site-wg-remove"},
 		},
 		Spec: batchv1.JobSpec{
+			TTLSecondsAfterFinished: &ttl,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": "fleet-site-wg-remove"},
@@ -279,7 +285,14 @@ func nodeOperationJob(ns, jobName, clusterName, siteID, playbook, runnerImage, s
 	if limit != "" {
 		args = append(args, "--limit", limit)
 	}
-	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, HubAnsibleSecretsName, timeoutSec)
+	j := ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, HubAnsibleSecretsName, timeoutSec)
+	ttl := int32(3600)
+	j.Spec.TTLSecondsAfterFinished = &ttl
+	if j.Labels == nil {
+		j.Labels = map[string]string{}
+	}
+	j.Labels["fleet-cluster-nodeop"] = clusterName
+	return j
 }
 
 func AddWorkerJob(ns, jobName, clusterName, siteID, targetHost, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
@@ -299,6 +312,20 @@ func RemoveWorkerJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, i
 func ReplaceControlJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
 	return nodeOperationJob(ns, jobName, clusterName, siteID, "/ansible/cluster-replace-control.yml",
 		runnerImage, sshSecret, inventoryCM, "", extraArgs, 5400)
+}
+
+// SiteProvisionConnectorJob runs site-provision-connector.yml against a jumphost inventory.
+func SiteProvisionConnectorJob(ns, jobName, siteName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
+	args := []string{
+		"ansible-playbook", "/ansible/site-provision-connector.yml",
+		"-e", "fleet_site_name=" + siteName,
+		"-e", "fleet_site_id=" + siteID,
+		"-e", "@/ansible/inventory/group_vars/all/common.yml",
+		"-i", "/inventory/inventory.ini",
+		"--limit", "jumphost",
+	}
+	args = append(args, extraArgs...)
+	return ansibleJob(ns, jobName, siteName, runnerImage, args, sshSecret, inventoryCM, "", 5400)
 }
 
 func IngressAuthReconcileJob(ns, jobName, runnerImage, inventoryCM, globalSecretsName string, enabledClusters []string) *batchv1.Job {

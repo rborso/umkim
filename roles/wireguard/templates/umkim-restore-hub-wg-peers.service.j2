@@ -1,0 +1,13 @@
+[Unit]
+Description=Restore UMKIM hub WireGuard peers after boot
+After=network-online.target wg-quick@{{ wireguard_interface | default('wg0') }}.service k3s.service
+Wants=network-online.target wg-quick@{{ wireguard_interface | default('wg0') }}.service k3s.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/umkim-restore-hub-wg-peers.sh --clusters-only
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

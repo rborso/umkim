@@ -382,6 +382,9 @@ export function ClusterDetailPage() {
       <PageSection variant={PageSectionVariants.light}>
         <Link to="/clusters">← Back to clusters</Link>
         <Title headingLevel="h1">{name}</Title>
+        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <Link to={`/clusters/${name}/vms`}>Virtual machines</Link>
+        </div>
         {cluster && (
           <Label style={{ marginTop: '0.5rem' }} color={phaseColor(phase)}>
             {phase}

@@ -42,6 +42,18 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'Optional Helm values YAML merged at install time.',
     example: 'replicaCount: 1',
   },
+  'apps.rockyCpu': {
+    description: 'vCPU cores for the Rocky Linux 10 guest (writes cpu in values).',
+    example: '2',
+  },
+  'apps.rockyMemory': {
+    description: 'Guest memory request (Kubernetes quantity).',
+    example: '2Gi',
+  },
+  'apps.rockyDisk': {
+    description: 'Root disk PVC size for the CDI import. Must cover the Rocky cloud image (~10Gi+).',
+    example: '20Gi',
+  },
   'apps.libraryChart': {
     description:
       'Ready library chart on the hub. Short names still work; they expand to Harbor charts.',

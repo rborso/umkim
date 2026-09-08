@@ -16,6 +16,20 @@
   changed_when: true
   tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
 
+- name: WG operator clients | Persist operator peers for hub reboot restore
+  ansible.builtin.copy:
+    dest: /etc/wireguard/operator-peers.conf
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      # Managed by wireguard-clients.yml — one "pubkey allowed-ip" per line.
+      {% for item in wireguard_operator_dynamic_peers | default([]) %}
+      {{ item.public_key }} {{ item.allowed_ips }}
+      {% endfor %}
+  when: wireguard_operator_dynamic_peers | default([]) | length > 0
+  tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
+
 - name: WG operator clients | Route operator overlay via wg0
   ansible.builtin.command:
     cmd: >-

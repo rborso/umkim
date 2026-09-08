@@ -168,12 +168,7 @@ func (r *ClusterJoinReconciler) resyncHubWGPeer(ctx context.Context, fcj *fleetv
 	if len(peers) == 0 {
 		return nil
 	}
-	jobName := fmt.Sprintf("fleet-overlay-wg-resync-%s-%d", clusterName, time.Now().Unix())
-	j := jobs.WgSyncJobMulti(fcj.Namespace, jobName, peers, nil)
-	if err := controllerutil.SetControllerReference(fcj, j, r.Scheme); err != nil {
-		return err
-	}
-	return r.Create(ctx, j)
+	return r.ensureClusterWgSyncJob(ctx, fcj, clusterName, peers, nil)
 }
 
 func (r *ClusterJoinReconciler) startOverlayRecover(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) error {

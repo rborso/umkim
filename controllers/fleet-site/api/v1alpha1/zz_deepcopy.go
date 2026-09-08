@@ -25,6 +25,20 @@ func (in *FleetSite) DeepCopyInto(out *FleetSite) {
 			(*out).NFS = &nfs
 		}
 	}
+	if in.Spec.Provision != nil {
+		in, out := &in.Spec.Provision, &out.Spec.Provision
+		*out = new(SiteProvisionSpec)
+		**out = **in
+		if (*in).DefaultExtraVars != nil {
+			(*out).DefaultExtraVars = make(map[string]string, len((*in).DefaultExtraVars))
+			for k, v := range (*in).DefaultExtraVars {
+				(*out).DefaultExtraVars[k] = v
+			}
+		}
+	}
+	if in.Spec.Edge.Ingress != nil {
+		out.Spec.Edge.Ingress = append([]FleetSiteIngressSpec(nil), in.Spec.Edge.Ingress...)
+	}
 	in.Status.DeepCopyInto(&out.Status)
 }
 
@@ -56,6 +70,55 @@ func (in *FleetSiteStatus) DeepCopyInto(out *FleetSiteStatus) {
 	if in.Conditions != nil {
 		out.Conditions = make([]metav1.Condition, len(in.Conditions))
 		copy(out.Conditions, in.Conditions)
+	}
+	if in.Provision != nil {
+		out.Provision = in.Provision.DeepCopy()
+	}
+}
+
+func (in *SiteProvisionStatus) DeepCopy() *SiteProvisionStatus {
+	if in == nil {
+		return nil
+	}
+	out := new(SiteProvisionStatus)
+	*out = *in
+	if in.Current != nil {
+		out.Current = in.Current.DeepCopy()
+	}
+	if in.History != nil {
+		out.History = make([]SiteProvisionActionRecord, len(in.History))
+		for i := range in.History {
+			in.History[i].DeepCopyInto(&out.History[i])
+		}
+	}
+	return out
+}
+
+func (in *SiteProvisionActionRecord) DeepCopy() *SiteProvisionActionRecord {
+	if in == nil {
+		return nil
+	}
+	out := new(SiteProvisionActionRecord)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *SiteProvisionActionRecord) DeepCopyInto(out *SiteProvisionActionRecord) {
+	*out = *in
+	if in.Host != nil {
+		h := *in.Host
+		if in.Host.MACs != nil {
+			h.MACs = append([]string(nil), in.Host.MACs...)
+		}
+		out.Host = &h
+	}
+	if in.StartedAt != nil {
+		t := *in.StartedAt
+		out.StartedAt = &t
+	}
+	if in.EndedAt != nil {
+		t := *in.EndedAt
+		out.EndedAt = &t
 	}
 }
 

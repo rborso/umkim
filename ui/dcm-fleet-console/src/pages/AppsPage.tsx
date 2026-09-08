@@ -62,6 +62,27 @@ const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
   route: { mode: 'none' },
 });
 
+function chartBaseName(chart: string): string {
+  const trimmed = chart.trim().toLowerCase();
+  const noScheme = trimmed.replace(/^oci:\/\//, '');
+  const last = noScheme.includes('/') ? noScheme.slice(noScheme.lastIndexOf('/') + 1) : noScheme;
+  return last.replace(/:.*/, '');
+}
+
+function isRocky10VmChart(chart: string): boolean {
+  return chartBaseName(chart) === 'rocky-10-vm';
+}
+
+function rockyVmValuesYaml(cpu: string, memory: string, diskSize: string): string {
+  const cores = Number.parseInt(cpu, 10);
+  return [
+    `cpu: ${Number.isFinite(cores) && cores > 0 ? cores : 2}`,
+    `memory: ${memory.trim() || '2Gi'}`,
+    'disk:',
+    `  size: ${diskSize.trim() || '20Gi'}`,
+  ].join('\n');
+}
+
 function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
   if (!cluster?.site || isReverseProxyMethod(cluster.method)) return '';
   const site = sites.find(
@@ -149,6 +170,9 @@ export function AppsPage() {
   const [deleteTarget, setDeleteTarget] = useState<FleetApp | null>(null);
   const [deleteChartTarget, setDeleteChartTarget] = useState<FleetChart | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [rockyCpu, setRockyCpu] = useState('2');
+  const [rockyMemory, setRockyMemory] = useState('2Gi');
+  const [rockyDisk, setRockyDisk] = useState('20Gi');
 
   const readyClusters = useMemo(
     () =>
@@ -193,9 +217,15 @@ export function AppsPage() {
   const openInstall = () => {
     setActionError(null);
     const first = readyCharts[0]?.name || 'whoami';
+    const rocky = isRocky10VmChart(first);
+    setRockyCpu('2');
+    setRockyMemory('2Gi');
+    setRockyDisk('20Gi');
     setForm({
       ...emptyForm(readyClusters[0]?.name || '', first),
       version: readyCharts[0]?.version || '0.1.0',
+      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : '',
+      route: { mode: 'none' },
     });
     setModalOpen(true);
   };
@@ -313,12 +343,27 @@ export function AppsPage() {
 
   const onLibrarySelect = (name: string) => {
     const c = readyCharts.find((x) => x.name === name);
+    const rocky = isRocky10VmChart(name);
+    if (rocky) {
+      setRockyCpu('2');
+      setRockyMemory('2Gi');
+      setRockyDisk('20Gi');
+    }
     setForm((f) => ({
       ...f,
       chart: name,
       version: c?.version || f.version,
-      releaseName: f.releaseName || name,
+      releaseName: f.releaseName && f.releaseName !== f.chart ? f.releaseName : name,
+      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : f.valuesYaml,
+      route: rocky ? { mode: 'none' } : f.route,
     }));
+  };
+
+  const applyRockySizing = (cpu: string, memory: string, disk: string) => {
+    setRockyCpu(cpu);
+    setRockyMemory(memory);
+    setRockyDisk(disk);
+    setForm((f) => ({ ...f, valuesYaml: rockyVmValuesYaml(cpu, memory, disk) }));
   };
 
   return (
@@ -509,9 +554,44 @@ export function AppsPage() {
             <TextInput
               id="app-chart-custom"
               value={form.chart}
-              onChange={(_e, v) => setForm((f) => ({ ...f, chart: v }))}
+              onChange={(_e, v) => {
+                const rocky = isRocky10VmChart(v);
+                setForm((f) => ({
+                  ...f,
+                  chart: v,
+                  valuesYaml: rocky ? rockyVmValuesYaml(rockyCpu, rockyMemory, rockyDisk) : f.valuesYaml,
+                  route: rocky ? { mode: 'none' } : f.route,
+                }));
+              }}
             />
           </LabeledField>
+          {isRocky10VmChart(form.chart) ? (
+            <>
+              <LabeledField label="vCPU cores" fieldId="app-rocky-cpu" help={getFieldHelp('apps.rockyCpu')}>
+                <TextInput
+                  id="app-rocky-cpu"
+                  type="number"
+                  min={1}
+                  value={rockyCpu}
+                  onChange={(_e, v) => applyRockySizing(v, rockyMemory, rockyDisk)}
+                />
+              </LabeledField>
+              <LabeledField label="Memory" fieldId="app-rocky-memory" help={getFieldHelp('apps.rockyMemory')}>
+                <TextInput
+                  id="app-rocky-memory"
+                  value={rockyMemory}
+                  onChange={(_e, v) => applyRockySizing(rockyCpu, v, rockyDisk)}
+                />
+              </LabeledField>
+              <LabeledField label="Disk size" fieldId="app-rocky-disk" help={getFieldHelp('apps.rockyDisk')}>
+                <TextInput
+                  id="app-rocky-disk"
+                  value={rockyDisk}
+                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, v)}
+                />
+              </LabeledField>
+            </>
+          ) : null}
           <LabeledField label="Version" fieldId="app-version" help={getFieldHelp('apps.version')}>
             <TextInput
               id="app-version"

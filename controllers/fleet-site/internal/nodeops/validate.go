@@ -44,19 +44,21 @@ type NodeInfo struct {
 }
 
 type NewNode struct {
-	Address  string
-	Hostname string
+	Address  string            `json:"address"`
+	Hostname string            `json:"hostname,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty"`
 }
 
 type Request struct {
-	Type     string
-	Node     string
-	Address  string
-	Hostname string
-	Role     string
-	OldNode  string
-	NewNode  *NewNode
-	Force    bool
+	Type     string            `json:"type"`
+	Node     string            `json:"node,omitempty"`
+	Address  string            `json:"address,omitempty"`
+	Hostname string            `json:"hostname,omitempty"`
+	Role     string            `json:"role,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty"`
+	OldNode  string            `json:"oldNode,omitempty"`
+	NewNode  *NewNode          `json:"newNode,omitempty"`
+	Force    bool              `json:"force,omitempty"`
 }
 
 func NodesFromK8s(items []corev1.Node) []NodeInfo {

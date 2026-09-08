@@ -210,35 +210,139 @@ func (r *ClusterJoinReconciler) startNodeOperationJob(ctx context.Context, fcj *
 	if _, err := r.ensureClusterSSHSecret(ctx, fcj, clusterName); err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
-	jobName := fmt.Sprintf("fleet-cluster-nodeop-%s-%d", clusterName, time.Now().Unix())
-	var j *batchv1.Job
-	switch op.Type {
-	case fleetv1alpha1.NodeOpTypeAddWorker:
-		j = jobs.AddWorkerJob(fcj.Namespace, jobName, clusterName, fcj.Spec.SiteId, targetHost,
-			r.Cfg.AnsibleRunnerImage, clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), extraArgs)
-	case fleetv1alpha1.NodeOpTypeRemoveWorker:
-		j = jobs.RemoveWorkerJob(fcj.Namespace, jobName, clusterName, fcj.Spec.SiteId,
-			r.Cfg.AnsibleRunnerImage, clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), extraArgs)
-	case fleetv1alpha1.NodeOpTypeReplaceControlPlane:
-		j = jobs.ReplaceControlJob(fcj.Namespace, jobName, clusterName, fcj.Spec.SiteId,
-			r.Cfg.AnsibleRunnerImage, clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), extraArgs)
-	default:
-		return r.failNodeOperation(ctx, fcj, fmt.Errorf("unsupported node operation %q", op.Type))
+	buildJob := func(jobName string) (*batchv1.Job, error) {
+		switch op.Type {
+		case fleetv1alpha1.NodeOpTypeAddWorker:
+			return jobs.AddWorkerJob(fcj.Namespace, jobName, clusterName, fcj.Spec.SiteId, targetHost,
+				r.Cfg.AnsibleRunnerImage, clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), extraArgs), nil
+		case fleetv1alpha1.NodeOpTypeRemoveWorker:
+			return jobs.RemoveWorkerJob(fcj.Namespace, jobName, clusterName, fcj.Spec.SiteId,
+				r.Cfg.AnsibleRunnerImage, clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), extraArgs), nil
+		case fleetv1alpha1.NodeOpTypeReplaceControlPlane:
+			return jobs.ReplaceControlJob(fcj.Namespace, jobName, clusterName, fcj.Spec.SiteId,
+				r.Cfg.AnsibleRunnerImage, clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), extraArgs), nil
+		default:
+			return nil, fmt.Errorf("unsupported node operation %q", op.Type)
+		}
 	}
-	if err := controllerutil.SetControllerReference(fcj, j, r.Scheme); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := r.Create(ctx, j); err != nil && !apierrors.IsAlreadyExists(err) {
+	jobName, adoptPoll, err := r.ensureClusterNodeOpJob(ctx, fcj, clusterName, op, buildJob)
+	if err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
+	if adoptPoll {
+		if err := r.markNodeOpRunning(ctx, fcj, op); err != nil {
+			return ctrl.Result{}, err
+		}
+		return r.pollNodeOperationJob(ctx, fcj, clusterName)
+	}
+	if err := r.markNodeOpRunning(ctx, fcj, op); err != nil {
+		return ctrl.Result{}, err
+	}
+	_ = jobName
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+func nodeOpIdentity(op *fleetv1alpha1.ClusterNodeOperationStatus) string {
+	if op == nil {
+		return ""
+	}
+	if id := strings.TrimSpace(op.ID); id != "" {
+		return id
+	}
+	if op.StartedAt != nil {
+		return fmt.Sprintf("%s:%s:%d", op.Type, op.Node, op.StartedAt.Unix())
+	}
+	return fmt.Sprintf("%s:%s", op.Type, op.Node)
+}
+
+func (r *ClusterJoinReconciler) ensureClusterNodeOpJob(
+	ctx context.Context,
+	fcj *fleetv1alpha1.FleetClusterJoin,
+	clusterName string,
+	op *fleetv1alpha1.ClusterNodeOperationStatus,
+	buildJob func(jobName string) (*batchv1.Job, error),
+) (jobName string, adoptPoll bool, err error) {
+	jobName = clusterNodeOpJobName(clusterName)
+	opID := nodeOpIdentity(op)
+
+	var existing batchv1.Job
+	getErr := r.Get(ctx, types.NamespacedName{Namespace: fcj.Namespace, Name: jobName}, &existing)
+	if getErr == nil {
+		existingID := ""
+		if existing.Annotations != nil {
+			existingID = existing.Annotations[annNodeOpID]
+		}
+		done, _ := jobIsFinished(&existing)
+		if !done {
+			if existingID == "" || existingID == opID {
+				return jobName, false, nil
+			}
+			return jobName, false, nil
+		}
+		if existingID == opID {
+			return jobName, true, nil
+		}
+		_ = r.Delete(ctx, &existing, client.PropagationPolicy(metav1.DeletePropagationBackground))
+	} else if !apierrors.IsNotFound(getErr) {
+		return "", false, getErr
+	}
+
+	j, err := buildJob(jobName)
+	if err != nil {
+		return "", false, err
+	}
+	if j.Annotations == nil {
+		j.Annotations = map[string]string{}
+	}
+	j.Annotations[annNodeOpID] = opID
+	if err := controllerutil.SetControllerReference(fcj, j, r.Scheme); err != nil {
+		return "", false, err
+	}
+	if err := r.Create(ctx, j); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return "", false, err
+		}
+		if err := r.Get(ctx, types.NamespacedName{Namespace: fcj.Namespace, Name: jobName}, &existing); err != nil {
+			return "", false, err
+		}
+		done, _ := jobIsFinished(&existing)
+		if !done {
+			return jobName, false, nil
+		}
+		existingID := ""
+		if existing.Annotations != nil {
+			existingID = existing.Annotations[annNodeOpID]
+		}
+		if existingID == opID {
+			return jobName, true, nil
+		}
+		_ = r.Delete(ctx, &existing, client.PropagationPolicy(metav1.DeletePropagationBackground))
+		j, err = buildJob(jobName)
+		if err != nil {
+			return "", false, err
+		}
+		if j.Annotations == nil {
+			j.Annotations = map[string]string{}
+		}
+		j.Annotations[annNodeOpID] = opID
+		if err := controllerutil.SetControllerReference(fcj, j, r.Scheme); err != nil {
+			return "", false, err
+		}
+		if err := r.Create(ctx, j); err != nil && !apierrors.IsAlreadyExists(err) {
+			return "", false, err
+		}
+	}
+	return jobName, false, nil
+}
+
+func (r *ClusterJoinReconciler) markNodeOpRunning(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus) error {
+	jobName := clusterNodeOpJobName(fcj.Spec.EffectiveClusterName(fcj.Name))
 	key := client.ObjectKeyFromObject(fcj)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin
 		if err := r.Get(ctx, key, &latest); err != nil {
 			return err
 		}
-		// Keep annotationNodeOperationActive until finish/fail so post-validation
-		// can recover NewNode for replaceControlPlane.
 		if latest.Annotations != nil {
 			if _, ok := latest.Annotations[annotationNodeOperationRequest]; ok {
 				delete(latest.Annotations, annotationNodeOperationRequest)
@@ -259,10 +363,6 @@ func (r *ClusterJoinReconciler) startNodeOperationJob(ctx context.Context, fcj *
 		latest.Status.Message = latest.Status.NodeOperation.Message
 		return r.Status().Update(ctx, &latest)
 	})
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
 func nodeOperationRunningMessage(opType string) string {
@@ -610,11 +710,8 @@ func (r *ClusterJoinReconciler) syncNodeWGForSpec(ctx context.Context, fcj *flee
 		newPubkeys[n.PublicKey] = struct{}{}
 	}
 	removePeers := staleClusterWGPeers(existing, latest.Status.Nodes, newPubkeys)
-	if len(wgPeers) > 0 || len(removePeers) > 0 {
-		jobName := fmt.Sprintf("fleet-cluster-wg-%s-%d", clusterName, time.Now().Unix())
-		wgJob := jobs.WgSyncJobMulti(latest.Namespace, jobName, wgPeers, removePeers)
-		_ = controllerutil.SetControllerReference(&latest, wgJob, r.Scheme)
-		_ = r.Create(ctx, wgJob)
+	if err := r.ensureClusterWgSyncJob(ctx, &latest, clusterName, wgPeers, removePeers); err != nil {
+		return err
 	}
 	latest.Status.Nodes = make([]fleetv1alpha1.FleetClusterJoinNodeStatus, 0, len(nodeWG))
 	for _, n := range nodeWG {
@@ -630,10 +727,14 @@ func (r *ClusterJoinReconciler) syncNodeWGForSpec(ctx context.Context, fcj *flee
 
 func (r *ClusterJoinReconciler) pollNodeOperationJob(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {
 	op := fcj.Status.NodeOperation
-	if op == nil || op.JobName == "" {
+	if op == nil {
 		return ctrl.Result{}, nil
 	}
-	done, ok, msg := r.jobDone(ctx, fcj.Namespace, op.JobName)
+	jobName := strings.TrimSpace(op.JobName)
+	if jobName == "" {
+		jobName = clusterNodeOpJobName(clusterName)
+	}
+	done, ok, msg := r.jobDone(ctx, fcj.Namespace, jobName)
 	if !done {
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}

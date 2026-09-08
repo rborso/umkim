@@ -104,7 +104,7 @@
       vars:
         ocm_spoke_kubeconfig_sync_targets:
           - cluster: "{{ fleet_cluster_name | default(fleet_site_name) }}"
-            api_host: "{{ hostvars[fleet_cluster_name | default(fleet_site_name)].fleet_site_sp_endpoint | default(hostvars[fleet_cluster_name | default(fleet_site_name)].ansible_host) }}"
+            api_host: "{{ hostvars[groups['fleet_cluster_control'][0]].fleet_site_sp_endpoint | default(hostvars[groups['fleet_cluster_control'][0]].wireguard_address | regex_replace('/32$', '') | default(hostvars[groups['fleet_cluster_control'][0]].ansible_host)) }}"
       tags: [ocm, ocm_spoke_kubeconfig, fleet_cluster_provision]
 
     - ansible.builtin.import_role:

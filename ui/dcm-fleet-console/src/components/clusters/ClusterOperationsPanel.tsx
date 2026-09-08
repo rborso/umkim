@@ -537,13 +537,22 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
 
   const kubevirtPhase = cluster.providers?.kubevirt?.phase || '';
   const kubevirtReady = kubevirtPhase === 'Ready' || !!cluster.capabilities?.kubevirt;
+  const multusL2 = !!cluster.capabilities?.['network.multus_l2'];
+  const [lanBridge, setLanBridge] = useState(false);
+  const [bridgeName, setBridgeName] = useState('n0p0_mgmt_nw');
 
-  const enableKubevirt = async () => {
+  const enableKubevirt = async (opts?: { lanBridge?: boolean }) => {
     setActing(true);
     setActionError(null);
     try {
+      const withLan = opts?.lanBridge ?? lanBridge;
+      const lanUpgrade = withLan && !multusL2;
       await enableFleetClusterKubevirt(clusterName, {
-        force: kubevirtReady || kubevirtPhase === 'Failed' || undefined,
+        lanBridge: withLan || undefined,
+        bridgeName: withLan ? bridgeName.trim() || 'n0p0_mgmt_nw' : undefined,
+        keepIp: withLan ? true : undefined,
+        // Re-apply needs force; first-time LAN Multus on Ready KubeVirt does not.
+        force: (!lanUpgrade && (kubevirtReady || kubevirtPhase === 'Failed')) || undefined,
       });
       await onUpdated();
     } catch (e) {
@@ -667,22 +676,61 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
         </Title>
         <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
           Installs Multus, CDI, and KubeVirt. Same as{' '}
-          <code>umkim cluster platform enable-kubevirt</code>. LAN Multus bridge is configured at
-          cluster create when selected there.
+          <code>umkim cluster platform enable-kubevirt</code>. Enable{' '}
+          <strong>LAN Multus</strong> to put guests on the node LAN (host bridge + NAD{' '}
+          <code>mgmt-l2</code> → capability <code>network.multus_l2</code>).
         </p>
-        <Button
-          variant="secondary"
-          isLoading={acting}
-          isDisabled={!canMutate}
-          onClick={() => void enableKubevirt()}
-          data-testid="op-enable-kubevirt"
-        >
-          {kubevirtPhase === 'Failed'
-            ? 'Retry KubeVirt'
-            : kubevirtReady
-              ? 'Re-apply KubeVirt'
-              : 'Enable KubeVirt'}
-        </Button>
+        {multusL2 ? (
+          <Label color="green" style={{ marginTop: '0.5rem' }}>
+            Multus LAN L2 ready
+          </Label>
+        ) : null}
+        <Checkbox
+          id="op-kubevirt-lan"
+          label="LAN Multus (host bridge + mgmt-l2 NAD)"
+          isChecked={lanBridge || multusL2}
+          isDisabled={!canMutate || multusL2}
+          onChange={(_e, checked) => setLanBridge(checked)}
+          style={{ marginTop: '0.75rem' }}
+        />
+        {(lanBridge || multusL2) && (
+          <LabeledField
+            label="Host bridge name"
+            fieldId="opKubevirtBridge"
+            help={getFieldHelp('clusterJoin.kubevirtBridgeName')}
+          >
+            <TextInput
+              id="opKubevirtBridge"
+              value={bridgeName}
+              onChange={(_e, v) => setBridgeName(v)}
+              isDisabled={!canMutate || multusL2}
+            />
+          </LabeledField>
+        )}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <Button
+            variant="secondary"
+            isLoading={acting}
+            isDisabled={!canMutate}
+            onClick={() => void enableKubevirt({ lanBridge: false })}
+            data-testid="op-enable-kubevirt"
+          >
+            {kubevirtPhase === 'Failed'
+              ? 'Retry KubeVirt'
+              : kubevirtReady
+                ? 'Re-apply KubeVirt'
+                : 'Enable KubeVirt'}
+          </Button>
+          <Button
+            variant="primary"
+            isLoading={acting}
+            isDisabled={!canMutate || multusL2}
+            onClick={() => void enableKubevirt({ lanBridge: true })}
+            data-testid="op-enable-kubevirt-lan"
+          >
+            {kubevirtReady ? 'Enable LAN Multus' : 'Enable KubeVirt + LAN Multus'}
+          </Button>
+        </div>
       </Form>
 
       <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>

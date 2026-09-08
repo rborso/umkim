@@ -164,6 +164,14 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				fcj.Status.Message = "Retrying provision"
 				_ = r.Status().Update(ctx, &fcj)
 			}
+			// Bundle bootstrap enrolls before local validate/progress POST; hub provision
+			// must not require Validated when the bundle already ran validate+provision-local.
+			if fcj.Status.Phase == fleetv1alpha1.JoinPhaseEnrolled && r.clusterJoinBundleMode(&fcj) {
+				fcj.Status.Phase = fleetv1alpha1.JoinPhaseValidated
+				fcj.Status.Message = "Bundle enrolled; starting hub provision"
+				_ = r.Status().Update(ctx, &fcj)
+				return ctrl.Result{Requeue: true}, nil
+			}
 			if fcj.Status.Phase == fleetv1alpha1.JoinPhaseValidated {
 				delete(fcj.Annotations, "fleet.umkim.com/provision")
 				_ = r.Update(ctx, &fcj)
@@ -458,11 +466,8 @@ func (r *ClusterJoinReconciler) issueClusterScript(ctx context.Context, fcj *fle
 		newPubkeys[n.PublicKey] = struct{}{}
 	}
 	removePeers := staleClusterWGPeers(existingNodes, fcj.Status.Nodes, newPubkeys)
-	if len(wgPeers) > 0 || len(removePeers) > 0 {
-		jobName := fmt.Sprintf("fleet-cluster-wg-%s-%d", clusterName, time.Now().Unix())
-		wgJob := jobs.WgSyncJobMulti(fcj.Namespace, jobName, wgPeers, removePeers)
-		_ = controllerutil.SetControllerReference(fcj, wgJob, r.Scheme)
-		_ = r.Create(ctx, wgJob)
+	if err := r.ensureClusterWgSyncJob(ctx, fcj, clusterName, wgPeers, removePeers); err != nil {
+		return err
 	}
 
 	if fcj.Status.Phase == "" || fcj.Status.Phase == fleetv1alpha1.JoinPhasePending {
@@ -1372,7 +1377,12 @@ func (r *ClusterJoinReconciler) failClusterJoin(ctx context.Context, fcj *fleetv
 
 func (r *ClusterJoinReconciler) clusterProvisionRecoverable(ctx context.Context, clusterName string) bool {
 	avail, err := r.managedClusterAvailable(ctx, clusterName)
-	return err == nil && avail
+	if err != nil || !avail {
+		return false
+	}
+	// Do not mark Ready until spoke kubeconfig is synced (console node list needs it).
+	ready, err := r.spokeKubeconfigSecretReady(ctx, clusterName)
+	return err == nil && ready
 }
 
 func lanEnrollmentBaseURL(hubLanAPI, fallback string) string {

@@ -111,14 +111,13 @@ func (r *ClusterJoinReconciler) reconcileClusterKubevirt(ctx context.Context, fc
 		jobName := "fleet-cluster-kubevirt-" + clusterName
 		var existing batchv1.Job
 		if err := r.Get(ctx, client.ObjectKey{Namespace: fcj.Namespace, Name: jobName}, &existing); err == nil {
-			if done, ok := jobIsFinished(&existing); done {
-				if ok {
-					return r.finishKubevirtJob(ctx, fcj, true, "")
-				}
+			if done, _ := jobIsFinished(&existing); done {
+				// Prior run finished. Delete so day-2 LAN Multus / --force can re-run
+				// with fresh inventory and runner image (do not treat old success as done).
 				_ = r.Delete(ctx, &existing, client.PropagationPolicy(metav1.DeletePropagationForeground))
-			} else {
-				return r.markKubevirtJobInstalling(ctx, fcj, jobName)
+				return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 			}
+			return r.markKubevirtJobInstalling(ctx, fcj, jobName)
 		} else if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
@@ -149,7 +148,11 @@ func kubevirtJobExtraVars(fcj *fleetv1alpha1.FleetClusterJoin) []string {
 			"-e", "kubevirt_bridge_host_bridge="+hb.EffectiveBridgeName(),
 			"-e", "kubevirt_bridge_nad_name=mgmt-l2",
 			"-e", "kubevirt_bridge_nad_namespace=default",
+			"-e", fmt.Sprintf("kubevirt_bridge_keep_ip=%t", hb.EffectiveKeepIP()),
 		)
+		if nic := strings.TrimSpace(hb.SlaveNic); nic != "" {
+			out = append(out, "-e", "kubevirt_bridge_slave_nic="+nic)
+		}
 	} else {
 		out = append(out, "-e", "fleet_cluster_kubevirt_bridge_enabled=false")
 	}

@@ -53,6 +53,7 @@ func init() {
 	rootCmd.AddCommand(chartCmd())
 	rootCmd.AddCommand(nodeCmd())
 	rootCmd.AddCommand(nodeOpCmd())
+	rootCmd.AddCommand(vmCmd())
 }
 
 func printJSON(raw []byte) {

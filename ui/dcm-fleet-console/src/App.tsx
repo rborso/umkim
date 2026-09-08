@@ -8,6 +8,7 @@ import { SitesPage } from './pages/SitesPage';
 import { SiteDetailPage } from './pages/SiteDetailPage';
 import { ClustersPage } from './pages/ClustersPage';
 import { ClusterDetailPage } from './pages/ClusterDetailPage';
+import { ClusterVMsPage } from './pages/ClusterVMsPage';
 import { InfrastructurePage } from './pages/InfrastructurePage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
@@ -38,6 +39,7 @@ export function App() {
             <Route path="clusters/umkim-hub" element={<Navigate to="/infrastructure" replace />} />
             <Route path="clusters" element={<ClustersPage />} />
             <Route path="clusters/:name" element={<ClusterDetailPage />} />
+            <Route path="clusters/:name/vms" element={<ClusterVMsPage />} />
             <Route path="apps" element={<AppsPage />} />
             <Route path="admin/users" element={<UsersPage />} />
             <Route path="admin/groups" element={<GroupsPage />} />

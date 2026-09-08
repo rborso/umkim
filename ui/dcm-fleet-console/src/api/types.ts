@@ -118,6 +118,110 @@ export interface FleetSitePatch {
   provisioningMode?: 'greenfield' | 'registry';
 }
 
+export type SiteHostKind = 'vm' | 'bare_metal';
+export type SiteHostPhase = 'Declared' | 'Provisioning' | 'Ready' | 'Failed';
+
+export type SiteHostClusterMode = 'enroll' | 'add_worker' | 'replace_control';
+
+export type SiteHostClusterPhase =
+  | 'Pending'
+  | 'WaitingGroup'
+  | 'Applying'
+  | 'Ready'
+  | 'Failed';
+
+export interface SiteHostClusterIntent {
+  mode?: SiteHostClusterMode;
+  clusterName?: string;
+  targetCluster?: string;
+  topology?: FleetClusterTopology;
+  haGroup?: string;
+  replaceNode?: string;
+  controlPlaneVip?: string;
+  jumphost?: string;
+  ingressId?: string;
+  autoApply?: boolean;
+}
+
+export interface SiteHostClusterStatus {
+  phase?: SiteHostClusterPhase;
+  message?: string;
+  clusterName?: string;
+  fcjName?: string;
+  mode?: SiteHostClusterMode;
+}
+
+export interface SiteHostStatus {
+  phase?: SiteHostPhase;
+  message?: string;
+  lastProvisionID?: string;
+  ansible_host?: string;
+  cluster?: SiteHostClusterStatus;
+}
+
+export interface SiteHostRecord {
+  name: string;
+  kind?: SiteHostKind;
+  desiredState?: string;
+  ansible_host?: string;
+  ansible_user?: string;
+  osFamily?: string;
+  vm_location?: string;
+  flavor?: Record<string, string>;
+  labels?: Record<string, string>;
+  clusterIntent?: SiteHostClusterIntent;
+  status?: SiteHostStatus;
+}
+
+export interface SiteHostCreate {
+  name: string;
+  kind: SiteHostKind;
+  desiredState?: string;
+  ansible_host?: string;
+  ansible_user?: string;
+  osFamily?: string;
+  vm_location?: string;
+  flavor?: Record<string, string>;
+  labels?: Record<string, string>;
+  clusterIntent?: SiteHostClusterIntent;
+  provisionNow?: boolean;
+}
+
+export interface SiteHostPatch {
+  kind?: SiteHostKind;
+  desiredState?: string;
+  ansible_host?: string;
+  ansible_user?: string;
+  osFamily?: string;
+  vm_location?: string;
+  flavor?: Record<string, string>;
+  labels?: Record<string, string>;
+  clusterIntent?: SiteHostClusterIntent;
+}
+
+export interface SiteProvisionHistoryItem {
+  id: string;
+  action?: string;
+  subject?: string;
+  provider?: string;
+  phase?: string;
+  message?: string;
+  confirm?: boolean;
+  jobName?: string;
+  actorKind?: string;
+  actorName?: string;
+  startedAt?: string;
+  endedAt?: string;
+  hasLogs?: boolean;
+}
+
+export interface SiteProvisionLogs {
+  id: string;
+  jobName?: string;
+  logs: string;
+  source?: string;
+}
+
 export type FleetClusterStorageBackend = 'local_path' | 'nfs_external' | 'nfs_local' | 'longhorn';
 
 export interface FleetClusterNFSSpec {
@@ -608,4 +712,19 @@ export interface FleetClusterCreate {
     };
   };
 }
+
+export interface FleetVM {
+  namespace: string;
+  name: string;
+  ready?: boolean;
+  runnable?: boolean;
+  running?: boolean;
+  printableStatus?: string;
+  phase?: string;
+  nodeName?: string;
+  ip?: string;
+  creationTimestamp?: string;
+}
+
+export type FleetVMPowerAction = 'start' | 'stop' | 'restart';
 

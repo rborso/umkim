@@ -49,10 +49,22 @@ Helm installs use the console **Apps** page (`FleetApp`). Publish charts on
 See [fleet-apps.md](../../docs/components/fleet-apps.md) and
 [examples/site-profiles/](../../examples/site-profiles/) for site exposure.
 
+**Rocky Linux 10 VMs:** install library chart `rocky-10-vm` from **Apps** with
+configurable vCPU, memory, and disk (KubeVirt platform required on the target
+cluster).
+
 **Site connectivity:** registry sites expose jumphost, region, and failure domain
-on **Sites → detail → Edge and DNS** (and on create). Cluster jumphost overrides
-are on **Clusters → detail → Edge and ingress**. CLI equivalents: `umkim site patch`
-and `umkim cluster patch` ([umkim-cli.md](../../docs/components/umkim-cli.md)).
+on **Sites → detail → Edge and DNS** (and on create). **Sites → detail → Hosts**
+manages hub site host inventory, provision actions, and optional cluster automation
+(enroll single-node or HA group, add worker, replace control plane) for registry sites. Cluster
+jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equivalents:
+`umkim site patch`, `umkim site host`, and `umkim cluster patch`
+([umkim-cli.md](../../docs/components/umkim-cli.md)).
+
+**Virtual machines:** **Clusters → detail → Virtual machines** lists KubeVirt VMs
+on a managed cluster, with serial console by default and on-demand VNC. Power
+controls (start, soft/hard stop, soft/hard restart) match `umkim vm`
+([fleet-kubevirt.md](../../docs/components/fleet-kubevirt.md)).
 
 Deploy through the console playbooks and `roles/fleet_webui/`; build and image
 publication are controlled by the Harbor role. Resolve all hosts, registries,

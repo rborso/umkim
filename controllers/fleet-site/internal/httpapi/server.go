@@ -226,40 +226,44 @@ func (s *Server) handleSites(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSiteByName(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/sites/")
 	path = strings.Trim(path, "/")
-	parts := strings.SplitN(path, "/", 2)
+	parts := strings.Split(path, "/")
 	name := parts[0]
-	action := ""
-	if len(parts) == 2 {
-		action = parts[1]
+	rest := ""
+	if len(parts) > 1 {
+		rest = strings.Join(parts[1:], "/")
 	}
 
 	ctx := r.Context()
 	switch {
-	case action == "bootstrap-script" && r.Method == http.MethodGet:
+	case rest == "bootstrap-script" && r.Method == http.MethodGet:
 		if s.siteIsManagement(ctx, name) {
 			http.Error(w, "management site does not support bootstrap actions", http.StatusForbidden)
 			return
 		}
 		s.serveBootstrapScript(ctx, w, name)
-	case action == "validate" && r.Method == http.MethodPost:
+	case rest == "validate" && r.Method == http.MethodPost:
 		if s.siteIsManagement(ctx, name) {
 			http.Error(w, "management site does not support greenfield actions", http.StatusForbidden)
 			return
 		}
 		s.triggerAction(ctx, w, name, "validate")
-	case action == "provision" && r.Method == http.MethodPost:
+	case rest == "provision" && r.Method == http.MethodPost:
 		if s.siteIsManagement(ctx, name) {
 			http.Error(w, "management site does not support greenfield actions", http.StatusForbidden)
 			return
 		}
 		s.triggerAction(ctx, w, name, "provision")
-	case action == "issue-script" && r.Method == http.MethodPost:
+	case rest == "provision" || strings.HasPrefix(rest, "provision/"):
+		s.handleSiteProvisionRoutes(ctx, w, r, name, rest)
+	case rest == "hosts" || strings.HasPrefix(rest, "hosts/"):
+		s.handleSiteHostRoutes(ctx, w, r, name, rest)
+	case rest == "issue-script" && r.Method == http.MethodPost:
 		if s.siteIsManagement(ctx, name) {
 			http.Error(w, "management site does not support greenfield actions", http.StatusForbidden)
 			return
 		}
 		s.triggerAction(ctx, w, name, "issue-script")
-	case action == "":
+	case rest == "":
 		s.handleOneSite(ctx, w, r, name)
 	default:
 		http.Error(w, "not found", http.StatusNotFound)

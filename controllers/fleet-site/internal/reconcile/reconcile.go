@@ -58,6 +58,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if fs.Spec.IsRegistry() {
+		if res, err := r.reconcileRegistrySiteProvision(ctx, &fs); err != nil {
+			return ctrl.Result{}, err
+		} else if res.Requeue || res.RequeueAfter > 0 {
+			return res, nil
+		}
 		if fs.Status.Phase == "" || fs.Status.Phase == phaseDraft {
 			fs.Status.Phase = phaseReady
 			fs.Status.Message = "Registry site (datacenter metadata)"
@@ -253,8 +258,6 @@ func (r *Reconciler) issueScript(ctx context.Context, fs *fleetv1alpha1.FleetSit
 		}
 	}
 
-	// WG sync job on hub
-	jobName := fmt.Sprintf("fleet-site-wg-%s-%d", siteName, time.Now().Unix())
 	removePeers := []jobs.WGPeer{}
 	oldPub := strings.TrimSpace(string(prior.Data["wg-public-key"]))
 	if oldPub == "" {
@@ -263,11 +266,9 @@ func (r *Reconciler) issueScript(ctx context.Context, fs *fleetv1alpha1.FleetSit
 	if oldPub != "" && oldPub != pub {
 		removePeers = append(removePeers, jobs.WGPeer{PublicKey: oldPub})
 	}
-	wgJob := jobs.WgSyncJob(fs.Namespace, jobName, pub, wg.HostIP(addr), removePeers)
-	if err := controllerutil.SetControllerReference(fs, wgJob, r.Scheme); err != nil {
+	if err := r.ensureSiteWgSyncJob(ctx, fs, siteName, pub, wg.HostIP(addr), removePeers); err != nil {
 		return err
 	}
-	_ = r.Create(ctx, wgJob)
 
 	if err := r.ensureInventoryCM(ctx, fs, siteName, addr); err != nil {
 		return err

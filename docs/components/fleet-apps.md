@@ -28,8 +28,9 @@ into Harbor `mirror`, original chart name unchanged). Copied images keep their
 upstream path under the `mirror` project; they are not renamed with a `-local`
 suffix.
 
-Seeded hub charts (`whoami`, `pet-clinic-helm`, `llama-cpp-helm`) appear in the
-library after Harbor publish and a Harbor import by fleet-site-controller.
+Seeded hub charts (`whoami`, `pet-clinic-helm`, `llama-cpp-helm`, `rocky-10-vm`)
+appear in the library after Harbor publish and a Harbor import by
+fleet-site-controller.
 
 Deleting a library row removes the `FleetChart` record only. Harbor artifacts
 stay until an operator prunes them.
@@ -49,6 +50,26 @@ Required fields:
 
 Optional: `version`, `releaseName`, `namespace`, `values` / `valuesYaml`, and
 `route.mode` (`none`, `hub`, `site`).
+
+### Rocky Linux 10 guest (`rocky-10-vm`)
+
+Install a KubeVirt VM from **Apps → Install chart** (chart `rocky-10-vm`) onto a
+cluster that already has the KubeVirt platform. The console exposes **vCPU**,
+**memory**, and **disk** fields; they write Helm values. Use `route.mode: none`.
+
+```yaml
+cpu: 2
+memory: 2Gi
+disk:
+  size: 20Gi
+  storageClass: longhorn
+  volumeMode: Filesystem
+```
+
+The chart imports Rocky 10 GenericCloud via CDI (`volumeMode: Filesystem` is
+required for Longhorn in this lab) and applies cloud-init (default serial
+login `rocky` / `rocky`). See [fleet-kubevirt.md](fleet-kubevirt.md) and
+[charts/rocky-10-vm/README.md](../../charts/rocky-10-vm/README.md).
 
 Short chart names expand to the hub Harbor prefix, for example `whoami` →
 `oci://<hub-overlay-ip>:30443/charts/whoami`. Charts must match the

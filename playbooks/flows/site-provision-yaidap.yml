@@ -1,0 +1,109 @@
+---
+# Operator flow: bind site provisioner and/or run a connector action via hub API.
+#
+#   ansible-playbook $INV playbooks/flows/site-provision-yaidap.yml -l hub \
+#     -e fleet_flow_site_name=homelab \
+#     -e fleet_flow_provision_action=create_vm \
+#     -e fleet_flow_provision_subject=vm01 \
+#     -e fleet_flow_wait=true
+#
+# Optional binding (when set):
+#   fleet_flow_provision_provider=yaidap
+#   fleet_flow_provision_jumphost=linux@jump.example:22
+#   fleet_flow_provision_ssh_secret=fleet-site-homelab-provision-ssh
+#   fleet_flow_provision_inventory_path=/home/linux/yaidap/inventory/demo
+#   fleet_flow_provision_yaidap_root=/home/linux/yaidap
+
+- name: Fleet flow | Site provision connector
+  hosts: hub
+  gather_facts: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+    _flow_poll_interval_default: 15
+    _flow_poll_retries_default: 120
+  tasks:
+    - name: Require site name
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_site_name | default('') | length > 0
+        fail_msg: Set fleet_flow_site_name.
+
+    - name: Initialize flow defaults
+      ansible.builtin.set_fact:
+        fleet_flow_identity_headers:
+          X-Fleet-Subject-Kind: User
+          X-Fleet-Subject-Name: fleet-flow
+          X-Fleet-DC-Admin: "true"
+        fleet_flow_wait: "{{ fleet_flow_wait | default(true) | bool }}"
+        fleet_flow_provision_confirm: "{{ fleet_flow_provision_confirm | default(false) | bool }}"
+
+    - name: PATCH site provision binding when provider set
+      when: fleet_flow_provision_provider | default('') | length > 0
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/sites/{{ fleet_flow_site_name }}/provision"
+        method: PUT
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers }}"
+        body:
+          provider: "{{ fleet_flow_provision_provider }}"
+          jumphost: "{{ fleet_flow_provision_jumphost | default(omit) }}"
+          sshSecretRef: "{{ fleet_flow_provision_ssh_secret | default(omit) }}"
+          inventoryPath: "{{ fleet_flow_provision_inventory_path | default(omit) }}"
+          yaidapRoot: "{{ fleet_flow_provision_yaidap_root | default(omit) }}"
+        status_code: [200]
+      register: fleet_flow_prov_bind
+
+    - name: Require action when running provision
+      when: fleet_flow_provision_action | default('') | length > 0
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_provision_subject | default('') | length > 0
+        fail_msg: Set fleet_flow_provision_subject with fleet_flow_provision_action.
+
+    - name: POST provision action
+      when: fleet_flow_provision_action | default('') | length > 0
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/sites/{{ fleet_flow_site_name }}/provision/actions"
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers }}"
+        body:
+          action: "{{ fleet_flow_provision_action }}"
+          subject: "{{ fleet_flow_provision_subject }}"
+          confirm: "{{ fleet_flow_provision_confirm | bool }}"
+          host: "{{ fleet_flow_provision_host | default(omit) }}"
+          params: "{{ fleet_flow_provision_params | default({}) }}"
+        status_code: [200, 202]
+      register: fleet_flow_prov_post
+
+    - name: Wait for provision action
+      when:
+        - fleet_flow_wait | bool
+        - fleet_flow_provision_action | default('') | length > 0
+      ansible.builtin.uri:
+        url: >-
+          {{ fleet_flow_api_url | default(_flow_api_default) }}/sites/{{ fleet_flow_site_name }}/provision/actions/{{ fleet_flow_prov_post.json.id }}
+        method: GET
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: [200]
+      register: fleet_flow_prov_status
+      until: fleet_flow_prov_status.json.phase in ['Succeeded', 'Failed']
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) | int }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) | int }}"
+
+    - name: Fail when provision action failed
+      when:
+        - fleet_flow_wait | bool
+        - fleet_flow_provision_action | default('') | length > 0
+        - fleet_flow_prov_status is defined
+        - fleet_flow_prov_status.json.phase | default('') == 'Failed'
+      ansible.builtin.fail:
+        msg: "{{ fleet_flow_prov_status.json.message | default('provision action failed') }}"
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: >-
+          site={{ fleet_flow_site_name }}
+          action={{ fleet_flow_provision_action | default('bind-only') }}
+          phase={{ fleet_flow_prov_status.json.phase | default(fleet_flow_prov_post.json.phase | default('n/a')) }}
+          host={{ fleet_flow_prov_status.json.host | default(fleet_flow_prov_post.json.host | default({})) }}

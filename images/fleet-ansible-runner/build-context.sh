@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DST="$(dirname "$0")"
-for f in site-validate.yml site-provision.yml cluster-validate.yml cluster-provision.yml \
+for f in site-validate.yml site-provision.yml site-provision-connector.yml cluster-validate.yml cluster-provision.yml \
   cluster-provision-local.yml cluster-provision-hub.yml cluster-discover-capabilities.yml \
   cluster-delete-hub.yml cluster-configure-storage.yml cluster-configure-kubevirt.yml cluster-validate-storage.yml \
   cluster-overlay-recover.yml \
@@ -11,7 +11,7 @@ for f in site-validate.yml site-provision.yml cluster-validate.yml cluster-provi
   ansible.cfg; do
   cp -f "${ROOT}/${f}" "${DST}/${f}"
 done
-for f in cluster-add-worker.yml cluster-remove-worker.yml cluster-replace-control.yml; do
+for f in cluster-add-worker.yml cluster-remove-worker.yml cluster-replace-control.yml cluster-kubeconfig-sync.yml; do
   if [[ -f "${ROOT}/${f}" ]]; then
     cp -f "${ROOT}/${f}" "${DST}/${f}"
   fi
@@ -26,7 +26,7 @@ cp -a "${ROOT}/roles/fleet_site_validate" "${ROOT}/roles/fleet_site" "${ROOT}/ro
   "${ROOT}/roles/k3s" "${ROOT}/roles/calico" "${ROOT}/roles/ocm" "${ROOT}/roles/harbor" \
   "${ROOT}/roles/host_prepare" "${ROOT}/roles/hub_ingress" \
   "${ROOT}/roles/olm" "${ROOT}/roles/kubevirt_stack" \
-  "${ROOT}/roles/kubevirt_bridge_nad" \
+  "${ROOT}/roles/kubevirt_bridge_nad" "${ROOT}/roles/kubevirt_host_bridge" \
   "${ROOT}/roles/spoke_ingress" "${ROOT}/roles/fleet_ingress_auth" "${ROOT}/roles/fleet_acme" "${ROOT}/roles/fleet_llm" "${ROOT}/roles/fleet_hub_firewall" "${ROOT}/roles/fleet_edge" \
   "${ROOT}/roles/fleet_edge_controller" "${DST}/roles/"
 cp -a "${ROOT}/charts/fleet-ingress-auth" "${DST}/charts/"

@@ -2,6 +2,12 @@ import type {
   FleetSite,
   FleetSiteCreate,
   FleetSitePatch,
+  SiteHostCreate,
+  SiteHostClusterIntent,
+  SiteHostPatch,
+  SiteHostRecord,
+  SiteProvisionHistoryItem,
+  SiteProvisionLogs,
   FleetCluster,
   FleetClusterAddWorkerBody,
   FleetClusterCreate,
@@ -14,6 +20,8 @@ import type {
   FleetNode,
   FleetNodePatch,
   HubInfrastructure,
+  FleetVM,
+  FleetVMPowerAction,
 } from './types';
 import { fleetSitePortForwardZone } from '../edge/ingressMethod';
 
@@ -706,6 +714,106 @@ export async function provisionFleetSite(name: string): Promise<void> {
   });
 }
 
+export async function listSiteHosts(site: string): Promise<SiteHostRecord[]> {
+  const data = await fleetSiteRequest<{ items?: SiteHostRecord[] }>(
+    '/sites/' + encodeURIComponent(site) + '/hosts',
+  );
+  return data.items ?? [];
+}
+
+export async function getSiteHost(site: string, name: string): Promise<SiteHostRecord> {
+  return fleetSiteRequest<SiteHostRecord>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name),
+  );
+}
+
+export async function createSiteHost(site: string, body: SiteHostCreate): Promise<SiteHostRecord> {
+  return fleetSiteRequest<SiteHostRecord>('/sites/' + encodeURIComponent(site) + '/hosts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchSiteHost(
+  site: string,
+  name: string,
+  patch: SiteHostPatch,
+): Promise<SiteHostRecord> {
+  return fleetSiteRequest<SiteHostRecord>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name),
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    },
+  );
+}
+
+export async function deleteSiteHost(site: string, name: string): Promise<void> {
+  await fleetSiteRequest<void>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name),
+    { method: 'DELETE' },
+  );
+}
+
+export async function provisionSiteHost(
+  site: string,
+  name: string,
+  body?: { action?: string; confirm?: boolean },
+): Promise<Record<string, unknown>> {
+  return fleetSiteRequest<Record<string, unknown>>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name) + '/provision',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    },
+  );
+}
+
+export async function applySiteHostCluster(site: string, name: string): Promise<SiteHostRecord> {
+  return fleetSiteRequest<SiteHostRecord>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name) + '/cluster',
+    { method: 'POST' },
+  );
+}
+
+export async function patchSiteHostClusterIntent(
+  site: string,
+  name: string,
+  clusterIntent: SiteHostClusterIntent,
+): Promise<SiteHostRecord> {
+  return fleetSiteRequest<SiteHostRecord>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name) + '/cluster',
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clusterIntent }),
+    },
+  );
+}
+
+export async function listSiteProvisionActions(site: string): Promise<SiteProvisionHistoryItem[]> {
+  const data = await fleetSiteRequest<{ items?: SiteProvisionHistoryItem[] }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/actions',
+  );
+  return data.items ?? [];
+}
+
+export async function fetchSiteProvisionActionLogs(
+  site: string,
+  actionId: string,
+): Promise<SiteProvisionLogs> {
+  return fleetSiteRequest<SiteProvisionLogs>(
+    '/sites/' +
+      encodeURIComponent(site) +
+      '/provision/actions/' +
+      encodeURIComponent(actionId) +
+      '/logs',
+  );
+}
+
 export function fleetSiteDisplayName(s: FleetSite): string {
   return s.spec?.displayName || s.spec?.siteName || s.metadata?.name || '—';
 }
@@ -732,4 +840,71 @@ export async function validateEdgeDNS(
   const q = new URLSearchParams({ host });
   if (expectedIp) q.set('expected_ip', expectedIp);
   return fleetSiteRequest<Record<string, unknown>>(`/edge/dns/validate?${q.toString()}`);
+}
+
+export async function listFleetClusterVMs(clusterName: string): Promise<FleetVM[]> {
+  const data = await fleetSiteRequest<{ vms?: FleetVM[] }>(
+    '/clusters/' + encodeURIComponent(clusterName) + '/vms',
+  );
+  return listKey<FleetVM>(data, ['vms']);
+}
+
+export async function getFleetClusterVM(
+  clusterName: string,
+  namespace: string,
+  name: string,
+): Promise<FleetVM> {
+  return fleetSiteRequest<FleetVM>(
+    '/clusters/' +
+      encodeURIComponent(clusterName) +
+      '/vms/' +
+      encodeURIComponent(namespace) +
+      '/' +
+      encodeURIComponent(name),
+  );
+}
+
+export async function powerFleetClusterVM(
+  clusterName: string,
+  namespace: string,
+  name: string,
+  action: FleetVMPowerAction,
+  force = false,
+): Promise<{ status?: string; action?: string }> {
+  return fleetSiteRequest(
+    '/clusters/' +
+      encodeURIComponent(clusterName) +
+      '/vms/' +
+      encodeURIComponent(namespace) +
+      '/' +
+      encodeURIComponent(name) +
+      '/power',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, force }),
+    },
+  );
+}
+
+/** Browser websocket URL for serial (console) or VNC. */
+export function fleetClusterVMConsoleWSURL(
+  clusterName: string,
+  namespace: string,
+  name: string,
+  kind: 'serial' | 'vnc' = 'serial',
+): string {
+  const sub = kind === 'vnc' ? 'vnc' : 'console';
+  const path =
+    FLEET_SITE_API_BASE +
+    '/clusters/' +
+    encodeURIComponent(clusterName) +
+    '/vms/' +
+    encodeURIComponent(namespace) +
+    '/' +
+    encodeURIComponent(name) +
+    '/' +
+    sub;
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return proto + '//' + window.location.host + path;
 }

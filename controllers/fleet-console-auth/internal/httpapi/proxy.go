@@ -48,6 +48,8 @@ func (s *Server) proxy(w http.ResponseWriter, r *http.Request, backend, upstream
 		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	// Negative flush interval keeps streaming and websocket upgrades responsive.
+	proxy.FlushInterval = -1
 	origPath := r.URL.Path
 	r.URL.Path = strings.TrimPrefix(origPath, "/proxy/fleet")
 	if !strings.HasPrefix(r.URL.Path, "/api/") {
