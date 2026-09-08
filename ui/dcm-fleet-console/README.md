@@ -56,7 +56,10 @@ cluster).
 **Site connectivity:** registry sites expose jumphost, region, and failure domain
 on **Sites → detail → Edge and DNS** (and on create). **Sites → detail → Hosts**
 manages hub site host inventory, provision actions, and optional cluster automation
-(enroll single-node or HA group, add worker, replace control plane) for registry sites. Cluster
+(enroll single-node or HA group, add worker, replace control plane) for registry sites.
+**Sites → detail → Provisioner inventory** (YAIDAP sites) edits the native YAML tree;
+use **Add VM guest** to seed `guests.yml` + `host_vars/` templates, **Sync to jumphost**,
+then provision on **Site hosts**. Cluster
 jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equivalents:
 `umkim site patch`, `umkim site host`, and `umkim cluster patch`
 ([umkim-cli.md](../../docs/components/umkim-cli.md)).

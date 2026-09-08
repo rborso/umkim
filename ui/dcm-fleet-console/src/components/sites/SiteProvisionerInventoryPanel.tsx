@@ -3,6 +3,8 @@ import {
   Button,
   Checkbox,
   Form,
+  FormGroup,
+  FormHelperText,
   Label,
   Modal,
   TextArea,
@@ -25,6 +27,12 @@ import {
 } from '../../api/client';
 import type { SiteInventoryFileInfo, SiteInventoryImportChange, SiteInventoryRevision } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
+import {
+  guestHostVarsTemplate,
+  guestNameFromHostVarsPath,
+  mergeGuestIntoGuestsYaml,
+  templateForNewInventoryFile,
+} from './inventoryVmTemplates';
 
 type Props = {
   siteName: string;
@@ -164,6 +172,11 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [busy, setBusy] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
+  const [addVmOpen, setAddVmOpen] = useState(false);
+  const [vmGuestName, setVmGuestName] = useState('');
+  const [vmLocation, setVmLocation] = useState('least-utilized');
+  const [vmIp, setVmIp] = useState('');
+  const [vmMessage, setVmMessage] = useState('');
 
   const filePaths = useMemo(() => {
     const seen = new Set<string>();
@@ -274,9 +287,53 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
     setNewFileOpen(false);
     setNewFilePath('');
     setSelectedPath(path);
-    setEditorContent('');
+    const guestFromPath = guestNameFromHostVarsPath(path);
+    setEditorContent(
+      templateForNewInventoryFile(path) ||
+        (guestFromPath ? guestHostVarsTemplate({ guestName: guestFromPath }) : ''),
+    );
     setFileMissing(true);
     setEditorDirty(true);
+  };
+
+  const addVmGuest = async () => {
+    const name = vmGuestName.trim();
+    if (!name) {
+      setError(new Error('Guest name is required'));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setVmMessage('');
+    try {
+      const guestsResult = await getSiteInventoryFileOptional(siteName, 'guests.yml');
+      const guestsYaml = mergeGuestIntoGuestsYaml(guestsResult.content, name, {
+        vm_location: vmLocation.trim() || 'least-utilized',
+        ansible_host: vmIp.trim() || undefined,
+      });
+      const hostVarsPath = `host_vars/${name}.yml`;
+      const hostVarsYaml = guestHostVarsTemplate({
+        guestName: name,
+        vmLocation: vmLocation.trim() || 'least-utilized',
+        ip: vmIp.trim() || undefined,
+      });
+      await putSiteInventoryFile(siteName, 'guests.yml', guestsYaml);
+      await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
+      setAddVmOpen(false);
+      setVmGuestName('');
+      setVmLocation('least-utilized');
+      setVmIp('');
+      setVmMessage(`Saved guests.yml and ${hostVarsPath}. Sync to jumphost, then provision on the Site hosts tab.`);
+      await load();
+      setSelectedPath(hostVarsPath);
+      setEditorContent(hostVarsYaml);
+      setFileMissing(false);
+      setEditorDirty(false);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const runSync = async () => {
@@ -374,9 +431,15 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
           {metaPhase || 'pending'}
         </Label>
       </p>
+      {vmMessage ? (
+        <p style={{ fontSize: '0.9rem', color: 'var(--pf-v6-global--Color--200)' }}>{vmMessage}</p>
+      ) : null}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <Button variant="primary" isLoading={busy} onClick={() => void runSync()}>
           Sync to jumphost
+        </Button>
+        <Button variant="secondary" onClick={() => setAddVmOpen(true)}>
+          Add VM guest
         </Button>
         <Button variant="secondary" isLoading={busy} onClick={() => void runImportPreview()}>
           Import preview
@@ -468,12 +531,59 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
             onChange={(_e, v) => setNewFilePath(v)}
             placeholder="e.g. host_vars/my-guest.yml, lab-ha01.yml, or group_vars/lab-ha01.yml"
           />
+          <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <code>host_vars/*.yml</code> and cluster paths open with a starter template.
+          </p>
         </Form>
         <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
           <Button variant="primary" onClick={() => void createFile()}>
             Create
           </Button>
           <Button variant="link" onClick={() => setNewFileOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal title="Add VM guest" isOpen={addVmOpen} onClose={() => setAddVmOpen(false)}>
+        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+          Creates or updates <code>guests.yml</code> and <code>host_vars/&lt;name&gt;.yml</code> with a basic
+          lab VM profile. Edit uplinks/MAC in the saved file if needed, then sync and provision on Site hosts.
+        </p>
+        <Form>
+          <FormGroup label="Guest name" isRequired fieldId="vmGuestName">
+            <TextInput
+              id="vmGuestName"
+              value={vmGuestName}
+              onChange={(_e, v) => setVmGuestName(v)}
+              placeholder="e.g. lab-single-1-0"
+            />
+          </FormGroup>
+          <FormGroup label="VM location (hypervisor)" fieldId="vmLocation">
+            <TextInput
+              id="vmLocation"
+              value={vmLocation}
+              onChange={(_e, v) => setVmLocation(v)}
+              placeholder="least-utilized or virt01"
+            />
+          </FormGroup>
+          <FormGroup label="ansible_host / static IP (optional)" fieldId="vmIp">
+            <TextInput
+              id="vmIp"
+              value={vmIp}
+              onChange={(_e, v) => setVmIp(v)}
+              placeholder="172.16.10.161"
+            />
+            <FormHelperText>
+              Leave empty for DHCP in host_vars; set if the address is already known.
+            </FormHelperText>
+          </FormGroup>
+        </Form>
+        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <Button variant="primary" isLoading={busy} onClick={() => void addVmGuest()}>
+            Save guest files
+          </Button>
+          <Button variant="link" onClick={() => setAddVmOpen(false)}>
             Cancel
           </Button>
         </div>
