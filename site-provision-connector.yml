@@ -22,9 +22,145 @@
       ansible.builtin.assert:
         that:
           - fleet_provision_action | default('') | length > 0
-          - fleet_provision_subject | default('') | length > 0
           - fleet_provision_inventory_path | default('') | length > 0
-        fail_msg: Set fleet_provision_action, fleet_provision_subject, fleet_provision_inventory_path.
+        fail_msg: Set fleet_provision_action and fleet_provision_inventory_path.
+      when: fleet_provision_action != 'sync_inventory'
+
+    - name: Require subject for non-inventory actions
+      ansible.builtin.assert:
+        that:
+          - fleet_provision_subject | default('') | length > 0
+        fail_msg: Set fleet_provision_subject.
+      when: fleet_provision_action not in ['sync_inventory', 'import_inventory']
+
+    - name: Push connector inventory bundle to jumphost
+      when: >-
+        fleet_provision_action == 'sync_inventory'
+        or (fleet_provision_sync_from_store | default(false) | bool)
+      block:
+        - name: Require inventory bundle
+          ansible.builtin.assert:
+            that:
+              - fleet_provision_inventory_bundle_b64 | default('') | length > 0
+            fail_msg: fleet_provision_inventory_bundle_b64 is required for inventory sync.
+
+        - name: Write projected inventory atomically
+          ansible.builtin.shell: |
+            set -euo pipefail
+            ROOT="{{ fleet_provision_inventory_path }}"
+            TMP="$(mktemp -d)"
+            python3 - <<'PY' > "$TMP/manifest.json"
+            import base64, json, os, sys
+            raw = os.environ.get("BUNDLE_B64", "")
+            data = json.loads(base64.b64decode(raw).decode())
+            json.dump(data.get("files", {}), sys.stdout)
+            PY
+            cd "$TMP"
+            python3 - <<'PY'
+            import json, os, pathlib
+            files = json.load(open("manifest.json"))
+            for rel, content in files.items():
+                path = pathlib.Path(rel)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content if content.endswith("\n") else content + "\n")
+            PY
+            rsync -a "$TMP"/*.yml "$ROOT/" 2>/dev/null || true
+            mkdir -p "$ROOT/group_vars/all" "$ROOT/host_vars"
+            if [ -d "$TMP/group_vars" ]; then
+              rsync -a --delete "$TMP/group_vars/" "$ROOT/group_vars/"
+            fi
+            if [ -d "$TMP/host_vars" ]; then
+              rsync -a --delete "$TMP/host_vars/" "$ROOT/host_vars/"
+            fi
+            rm -rf "$TMP"
+            echo "FLEET_INVENTORY_SYNCED=1"
+          environment:
+            BUNDLE_B64: "{{ fleet_provision_inventory_bundle_b64 }}"
+          args:
+            executable: /bin/bash
+          register: fleet_inventory_sync
+
+        - name: Emit inventory sync marker
+          ansible.builtin.debug:
+            msg: "{{ fleet_inventory_sync.stdout | default('') | trim }}"
+
+    - name: Import YAIDAP inventory from jumphost
+      when: fleet_provision_action == 'import_inventory'
+      block:
+        - name: Collect jumphost inventory as JSON
+          ansible.builtin.shell: |
+            set -euo pipefail
+            ROOT="{{ fleet_provision_inventory_path }}"
+            python3 - <<'PY'
+            import json, pathlib, yaml, sys
+            root = pathlib.Path("{{ fleet_provision_inventory_path }}")
+            out = {"guests": {}, "catalog": {}}
+            guests_yml = root / "guests.yml"
+            if guests_yml.exists():
+                doc = yaml.safe_load(guests_yml.read_text()) or {}
+                for name, entry in (doc.get("guests", {}).get("hosts") or {}).items():
+                    out["guests"][name] = entry or {}
+            hv = root / "host_vars"
+            if hv.is_dir():
+                for p in hv.glob("*.yml"):
+                    name = p.stem
+                    spec = yaml.safe_load(p.read_text()) or {}
+                    out["guests"].setdefault(name, {})
+                    out["guests"][name].update(spec)
+            print(json.dumps(out))
+            PY
+          args:
+            executable: /bin/bash
+          register: fleet_import_payload
+
+        - name: Emit import JSON for hub
+          ansible.builtin.debug:
+            msg: "FLEET_INVENTORY_IMPORT={{ fleet_import_payload.stdout | trim }}"
+
+    - name: Stop after standalone inventory sync
+      ansible.builtin.meta: end_play
+      when: fleet_provision_action == 'sync_inventory'
+
+    - name: Stop after standalone inventory import
+      ansible.builtin.meta: end_play
+      when: fleet_provision_action == 'import_inventory'
+
+    - name: Import YAIDAP inventory preview from jumphost
+      when: fleet_provision_action == 'import_inventory_preview'
+      block:
+        - name: Collect inventory files as JSON
+          ansible.builtin.shell: |
+            set -euo pipefail
+            ROOT="{{ fleet_provision_inventory_path }}"
+            python3 - <<'PY'
+            import json, pathlib
+            root = pathlib.Path("{{ fleet_provision_inventory_path }}")
+            out = {}
+            for p in sorted(root.glob("*.yml")):
+                if p.name in ("guests.yml", "hypervisors.yml") or p.name.endswith(".yml"):
+                    out[p.name] = p.read_text()
+            gv = root / "group_vars"
+            if gv.is_dir():
+                for p in sorted(gv.rglob("*.yml")):
+                    rel = str(p.relative_to(root))
+                    out[rel] = p.read_text()
+            hv = root / "host_vars"
+            if hv.is_dir():
+                for p in sorted(hv.glob("*.yml")):
+                    out[f"host_vars/{p.name}"] = p.read_text()
+            print(json.dumps(out))
+            PY
+          args:
+            executable: /bin/bash
+          register: fleet_import_files_payload
+
+        - name: Emit import files JSON for hub
+          ansible.builtin.debug:
+            msg: "FLEET_INVENTORY_FILES={{ fleet_import_files_payload.stdout | trim }}"
+
+    - name: Stop after standalone inventory import preview
+      ansible.builtin.meta: end_play
+      when: fleet_provision_action == 'import_inventory_preview'
 
     - name: Resolve YAIDAP playbook defaults
       ansible.builtin.set_fact:
@@ -46,13 +182,15 @@
           - _prov_playbook | length > 0
         fail_msg: fleet_provision_playbook is required (set by hub connector).
 
-    - name: Check YAIDAP guest host_vars before sync
+    - name: Check YAIDAP guest host_vars before legacy sync
       ansible.builtin.stat:
         path: "{{ fleet_provision_guest_host_vars }}"
       register: fleet_guest_host_vars
-      when: fleet_provision_sync_host | default(false) | bool
+      when:
+        - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
 
-    - name: Create YAIDAP guest host_vars stub for hub sync
+    - name: Create YAIDAP guest host_vars stub for legacy hub sync
       ansible.builtin.copy:
         dest: "{{ fleet_provision_guest_host_vars }}"
         content: |
@@ -61,6 +199,7 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - not fleet_guest_host_vars.stat.exists | default(false)
 
     - name: Sync vm_location into YAIDAP guest host_vars
@@ -72,6 +211,7 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_vm_location | default('') | length > 0
 
     - name: Sync memory into YAIDAP guest host_vars
@@ -83,6 +223,7 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_memory | default('') | length > 0
 
     - name: Sync cores into YAIDAP guest host_vars
@@ -94,6 +235,7 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_cores | default('') | length > 0
 
     - name: Sync os into YAIDAP guest host_vars
@@ -105,6 +247,7 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_os | default('') | length > 0
 
     - name: Derive lab MAC from ansible_host when provided
@@ -112,6 +255,7 @@
         fleet_provision_mac_suffix: "{{ '%02x' | format(fleet_provision_ansible_host.split('.')[-2] | int) }}:{{ '%02x' | format(fleet_provision_ansible_host.split('.')[-1] | int) }}:01"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_ansible_host | default('') | length > 0
 
     - name: Sync ansible_host into YAIDAP guest host_vars
@@ -123,9 +267,10 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_ansible_host | default('') | length > 0
 
-    - name: Require guest mgmt IP for VM create
+    - name: Require guest mgmt IP for VM create (legacy sync)
       ansible.builtin.assert:
         that:
           - fleet_provision_ansible_host | default('') | length > 0
@@ -133,6 +278,21 @@
           fleet_provision_ansible_host is required for create_vm (patch site host ansible_host before provision).
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
+        - fleet_provision_action in ['create_vm', 'plan_vm']
+
+    - name: Require guest mgmt IP for VM create (connector store)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ip=""
+        if [ -f "{{ fleet_provision_guest_host_vars }}" ]; then
+          ip=$(awk '/^ansible_host:/ { sub(/^ansible_host:[[:space:]]*/, ""); print; exit }' "{{ fleet_provision_guest_host_vars }}")
+        fi
+        test -n "$ip"
+      args:
+        executable: /bin/bash
+      when:
+        - fleet_provision_sync_from_store | default(false) | bool
         - fleet_provision_action in ['create_vm', 'plan_vm']
 
     - name: Resolve placed hypervisor for stale guest cleanup
@@ -152,7 +312,9 @@
       changed_when: false
       when:
         - fleet_provision_action == 'create_vm'
-        - fleet_provision_sync_host | default(false) | bool
+        - >-
+          (fleet_provision_sync_host | default(false) | bool)
+          or (fleet_provision_sync_from_store | default(false) | bool)
 
     - name: Drop stale libvirt guest before create_vm re-provision
       ansible.builtin.shell: |
@@ -171,7 +333,9 @@
       changed_when: fleet_preclean_destroy.rc == 0
       when:
         - fleet_provision_action == 'create_vm'
-        - fleet_provision_sync_host | default(false) | bool
+        - >-
+          (fleet_provision_sync_host | default(false) | bool)
+          or (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_resolved_hv.stdout | default('') | trim | length > 0
 
     - name: Ensure YAIDAP libvirt guest profile in host_vars
@@ -216,6 +380,7 @@
         mode: "0644"
       when:
         - fleet_provision_sync_host | default(false) | bool
+        - not (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_action in ['create_vm', 'plan_vm']
 
     - name: Run YAIDAP ansible-playbook on jumphost
@@ -247,14 +412,18 @@
       register: fleet_resolved_vm_location
       changed_when: false
       when:
-        - fleet_provision_sync_host | default(false) | bool
+        - >-
+          (fleet_provision_sync_host | default(false) | bool)
+          or (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_action == 'create_vm'
 
     - name: Emit resolved vm_location marker for hub
       ansible.builtin.debug:
         msg: "FLEET_YAIDAP_VM_LOCATION={{ fleet_resolved_vm_location.stdout | default('') | trim }}"
       when:
-        - fleet_provision_sync_host | default(false) | bool
+        - >-
+          (fleet_provision_sync_host | default(false) | bool)
+          or (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_action == 'create_vm'
         - fleet_resolved_vm_location.stdout | default('') | trim | length > 0
 

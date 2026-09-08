@@ -107,140 +107,39 @@ func siteHostGetCmd() *cobra.Command {
 }
 
 func siteHostAddCmd() *cobra.Command {
-	var kind, desiredState, ansibleHost, ansibleUser, osFamily, vmLocation string
-	var file string
 	c := &cobra.Command{
-		Use:   "add [site]",
-		Short: "Add a site host (POST /sites/{site}/hosts)",
-		Args:  cobra.ExactArgs(1),
+		Use:        "add [site]",
+		Short:      "Add a site host (deprecated)",
+		Deprecated: "use `umkim site inventory files put` for guests.yml and host_vars/*.yml",
+		Args:       cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			body := map[string]interface{}{}
-			if file != "" {
-				if err := readFileJSON(file, &body); err != nil {
-					return err
-				}
-			}
-			if cmd.Flags().Changed("name") {
-				body["name"] = cmd.Flag("name").Value.String()
-			}
-			if kind != "" {
-				body["kind"] = kind
-			}
-			if cmd.Flags().Changed("desired-state") {
-				body["desiredState"] = desiredState
-			}
-			if cmd.Flags().Changed("ansible-host") {
-				body["ansible_host"] = ansibleHost
-			}
-			if cmd.Flags().Changed("ansible-user") {
-				body["ansible_user"] = ansibleUser
-			}
-			if cmd.Flags().Changed("os-family") {
-				body["osFamily"] = osFamily
-			}
-			if cmd.Flags().Changed("vm-location") {
-				body["vm_location"] = vmLocation
-			}
-			mergeSiteHostClusterIntent(cmd, body)
-			if body["name"] == nil || body["name"] == "" {
-				return fmt.Errorf("--name required")
-			}
-			if body["kind"] == nil || body["kind"] == "" {
-				return fmt.Errorf("--kind required (vm or bare_metal)")
-			}
-			raw, code, err := api.Post("/sites/"+args[0]+"/hosts", body)
-			if err != nil {
-				return err
-			}
-			if err := mustOK(raw, code, 201); err != nil {
-				return err
-			}
-			printJSON(raw)
-			return nil
+			return fmt.Errorf("site host add is deprecated; use `umkim site inventory files put` for guests.yml, host_vars/*.yml, {cluster}.yml, and group_vars/{cluster}.yml")
 		},
 	}
-	c.Flags().String("name", "", "Host name (DNS label)")
-	c.Flags().StringVar(&kind, "kind", "", "vm or bare_metal")
-	c.Flags().StringVar(&desiredState, "desired-state", "", "Desired state label")
-	c.Flags().StringVar(&ansibleHost, "ansible-host", "", "Known ansible_host")
-	c.Flags().StringVar(&ansibleUser, "ansible-user", "", "SSH user")
-	c.Flags().StringVar(&osFamily, "os-family", "", "OS family (rocky, …)")
-	c.Flags().StringVar(&vmLocation, "vm-location", "", "VM hypervisor/location")
-	c.Flags().StringVarP(&file, "file", "f", "", "Host JSON body")
-	siteHostClusterIntentFlags(c)
 	return c
 }
 
 func siteHostPatchCmd() *cobra.Command {
-	var file string
-	var kind, desiredState, ansibleHost, ansibleUser, osFamily, vmLocation string
 	c := &cobra.Command{
-		Use:   "patch [site] [name]",
-		Short: "Patch a site host",
-		Args:  cobra.ExactArgs(2),
+		Use:        "patch [site] [name]",
+		Short:      "Patch a site host (deprecated)",
+		Deprecated: "use `umkim site inventory files put`",
+		Args:       cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			body := map[string]interface{}{}
-			if file != "" {
-				if err := readFileJSON(file, &body); err != nil {
-					return err
-				}
-			}
-			if cmd.Flags().Changed("kind") {
-				body["kind"] = kind
-			}
-			if cmd.Flags().Changed("desired-state") {
-				body["desiredState"] = desiredState
-			}
-			if cmd.Flags().Changed("ansible-host") {
-				body["ansible_host"] = ansibleHost
-			}
-			if cmd.Flags().Changed("ansible-user") {
-				body["ansible_user"] = ansibleUser
-			}
-			if cmd.Flags().Changed("os-family") {
-				body["osFamily"] = osFamily
-			}
-			if cmd.Flags().Changed("vm-location") {
-				body["vm_location"] = vmLocation
-			}
-			if len(body) == 0 {
-				return fmt.Errorf("no patch fields: use --file or flags")
-			}
-			raw, code, err := api.Patch("/sites/"+args[0]+"/hosts/"+args[1], body)
-			if err != nil {
-				return err
-			}
-			if err := mustOK(raw, code); err != nil {
-				return err
-			}
-			printJSON(raw)
-			return nil
+			return fmt.Errorf("site host patch is deprecated; edit guests.yml or host_vars/*.yml via `umkim site inventory files put`")
 		},
 	}
-	c.Flags().StringVarP(&file, "file", "f", "", "Patch JSON body")
-	c.Flags().StringVar(&kind, "kind", "", "vm or bare_metal")
-	c.Flags().StringVar(&desiredState, "desired-state", "", "Desired state label")
-	c.Flags().StringVar(&ansibleHost, "ansible-host", "", "ansible_host")
-	c.Flags().StringVar(&ansibleUser, "ansible-user", "", "SSH user")
-	c.Flags().StringVar(&osFamily, "os-family", "", "OS family")
-	c.Flags().StringVar(&vmLocation, "vm-location", "", "VM location")
 	return c
 }
 
 func siteHostDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete [site] [name]",
-		Short: "Delete a site host",
-		Args:  cobra.ExactArgs(2),
+		Use:        "delete [site] [name]",
+		Short:      "Delete a site host (deprecated)",
+		Deprecated: "use `umkim site inventory files delete` for host_vars and edit guests.yml",
+		Args:       cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			raw, code, err := api.Delete("/sites/" + args[0] + "/hosts/" + args[1])
-			if err != nil {
-				return err
-			}
-			if code != 204 {
-				return mustOK(raw, code)
-			}
-			return nil
+			return fmt.Errorf("site host delete is deprecated; remove entries from guests.yml and delete host_vars/*.yml via inventory files API")
 		},
 	}
 }

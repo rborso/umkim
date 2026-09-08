@@ -52,39 +52,65 @@ inventory path. On success the action returns a handoff host fragment
 | API | Purpose |
 |-----|---------|
 | `GET` / `PUT` / `PATCH /sites/{name}/provision` | Connector binding |
+| `GET /sites/{name}/provision/inventory` | Meta, file index, legacy read-only guest/catalog projection |
+| `GET/PUT/DELETE /sites/{name}/provision/inventory/files/{path}` | Native Ansible/YAIDAP YAML tree (see layout below) |
+| `GET /sites/{name}/provision/inventory/hosts` | Derived host rows (`guests.yml` + `_meta/status.json`) |
+| `GET /sites/{name}/provision/inventory/clusters` | Aggregated cluster intent from root `{cluster}.yml` + `group_vars/{cluster}.yml` |
+| `POST /sites/{name}/provision/inventory/migrate` | One-shot legacy JSON / site-hosts → YAML migration |
+| `POST/GET /sites/{name}/provision/inventory/import/preview` | Pull jumphost tree; per-file diff (no write) |
+| `POST /sites/{name}/provision/inventory/import/apply` | Merge selected preview paths into hub store |
+| `GET /sites/{name}/provision/inventory/revisions[/{id}]` | Timestamped revision log + diff |
+| `POST /sites/{name}/provision/inventory/sync` | Push synced YAML files to jumphost |
 | `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `status` |
 | `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
-| `GET/POST /sites/{name}/hosts` | Hub site host inventory |
-| `GET/PATCH/DELETE /sites/{name}/hosts/{host}` | Host CRUD |
-| `POST /sites/{name}/hosts/{host}/provision` | Provision from inventory row |
-| `GET/PATCH/POST /sites/{name}/hosts/{host}/cluster` | Cluster intent / manual apply |
+| `GET /sites/{name}/hosts` | Derived host list (same source as `/provision/inventory/hosts`) |
+| `POST/PATCH/DELETE /sites/{name}/hosts/{host}` | **Deprecated** — use inventory file API |
+| `POST /sites/{name}/hosts/{host}/provision` | Provision by guest name |
+| `GET/POST /sites/{name}/hosts/{host}/cluster` | Cluster status / manual apply from cluster group files |
 
-Host records are stored in ConfigMap `fleet-site-hosts-{site}` (`hosts.json`).
-Provision actions update host phase and `ansible_host` on success. For YAIDAP VM
-hosts, `vm_location` (including `least-utilized`) and optional `flavor` fields
-are synced into YAIDAP `host_vars/{guest}.yml` on the jumphost before
-`create_vm`, `plan_vm`, or `destroy`. After a successful `create_vm`, the hub
-updates `vm_location` from the resolved hypervisor written by YAIDAP.
+Hub inventory is stored in ConfigMap `fleet-site-{site}-yaidap-inventory` as
+`file.*` YAML keys plus hub-only `_meta/*` (`meta.json`, `status.json`,
+`revisions.json`).
 
-Optional **`clusterIntent`** on each host automates post-provision cluster work:
+**Native Ansible/YAIDAP tree**
 
-| `mode` | When host is Ready |
-|--------|-------------------|
-| `enroll` | Create `FleetClusterJoin` (`single_node` or `ha_3_node` via shared `haGroup`) |
-| `add_worker` | Queue add-worker node operation on `targetCluster` |
-| `replace_control` | Queue control-plane replace on `targetCluster` for `replaceNode` |
+| Path | Synced to jumphost |
+|------|-------------------|
+| `guests.yml` | Yes — thin guest index (`ansible_host`, `vm_location`) |
+| `hypervisors.yml` | Yes — YAIDAP hypervisor group |
+| `{cluster}.yml` | Yes — Ansible group membership (hosts under the group key) |
+| `group_vars/all/all.yml` (+ optional `group_vars/all/*.yml`) | Yes — site storages, networks, defaults |
+| `group_vars/{group}.yml` | Yes — group-level vars; Fleet cluster intent for cluster groups |
+| `host_vars/{guest}.yml` | Yes — per-guest YAIDAP profile |
+| `_meta/*` | **No** — runtime sync phase, status, revisions |
 
-Status is mirrored in `status.cluster` (phase, message, cluster name). The
-registry-site reconciler polls running provision jobs and applies cluster intent;
-use `POST …/cluster` to retry manually.
+Sync pushes only synced paths; jumphost-only files (`controllers.yml`, `routers.yml`, `generated/`) are preserved. Run `POST …/provision/inventory/migrate` to seed the native skeleton, split legacy `clusters.yml` / `clusters/*.yml` into root + `group_vars/`, and convert deprecated `catalog.yml` into `group_vars/all/all.yml`.
 
-**Site-host → cluster flow (bundle mode):**
+Provision status and cluster-apply progress are recorded in `_meta/status.json` keyed by guest name.
 
-1. `POST …/hosts` with `clusterIntent` (or patch later) and `vm_location`.
-2. `POST …/hosts/{host}/provision` — YAIDAP `create_vm`; hub syncs inventory.
-3. Reconciler `cluster-apply` — creates `FleetClusterJoin` when host is Ready.
-4. Download bootstrap bundle; run `bootstrap.sh` on first control (via jumphost).
-5. `POST /clusters/{name}/provision` — hub finalize (OCM, edge, providers).
+Optional **cluster membership and intent** use the native Ansible layout:
+
+- **`{cluster}.yml`** (inventory root) — group with `hosts:` listing member guest names.
+- **`group_vars/{cluster}.yml`** — Fleet `ClusterSpec` fields (`topology`, `autoApply`, `controlPlaneVip`, `haGroup`, `mode`, …). Members are taken from the root group file, not duplicated here.
+
+| Field (in `group_vars/{cluster}.yml`) | Purpose |
+|-------|---------|
+| `topology` | `single_node` or `ha_3_node` |
+| `autoApply` | Reconciler creates FCJ when guests are Ready |
+| `controlPlaneVip` / `haGroup` | HA enroll |
+
+Status is mirrored in `_meta/status.json` under each guest's `cluster` field.
+The registry-site reconciler polls running provision jobs and applies cluster
+intent from root + `group_vars/` cluster files; use `POST …/cluster` to retry manually.
+
+**Inventory → cluster flow (bundle mode):**
+
+1. Edit `guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/{guest}.yml`, `{cluster}.yml`, and `group_vars/{cluster}.yml` (console, CLI, or API).
+2. `POST …/provision/inventory/sync` — push synced YAML to jumphost.
+3. `POST …/hosts/{guest}/provision` — YAIDAP `create_vm`; hub marks guest status in `_meta/status.json`.
+4. Reconciler **cluster-apply** — creates `FleetClusterJoin` from cluster group files when members are Ready.
+5. Download bootstrap bundle; run `bootstrap.sh` on first control (via jumphost).
+6. `POST /clusters/{name}/provision` — hub finalize (OCM, edge, providers).
 
 VM hosts created through the connector use **`minRootDiskGi: 38`** on the FCJ
 (40G vdisk root LV is smaller than 40 GiB after EFI/boot). Bare-metal enroll

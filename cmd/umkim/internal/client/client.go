@@ -110,6 +110,11 @@ func (c *Client) Put(path string, body interface{}) ([]byte, int, error) {
 	return c.do(http.MethodPut, path, body)
 }
 
+// PutBytes sends a raw request body (for inventory YAML file PUT).
+func (c *Client) PutBytes(path, contentType string, body []byte) ([]byte, int, error) {
+	return c.doRaw(http.MethodPut, path, contentType, body)
+}
+
 func (c *Client) Post(path string, body interface{}) ([]byte, int, error) {
 	return c.do(http.MethodPost, path, body)
 }
@@ -200,14 +205,33 @@ func (c *Client) do(method, path string, body interface{}) ([]byte, int, error) 
 		}
 		r = bytes.NewReader(raw)
 	}
+	return c.doRaw(method, path, "application/json", readAll(r))
+}
+
+func readAll(r io.Reader) []byte {
+	if r == nil {
+		return nil
+	}
+	raw, _ := io.ReadAll(r)
+	return raw
+}
+
+func (c *Client) doRaw(method, path, contentType string, body []byte) ([]byte, int, error) {
+	if c.apiURL == "" {
+		return nil, 0, fmt.Errorf("API URL not configured (set UMKIM_API_URL)")
+	}
+	var r io.Reader
+	if len(body) > 0 {
+		r = bytes.NewReader(body)
+	}
 	u := c.apiURL + path
 	req, err := http.NewRequest(method, u, r)
 	if err != nil {
 		return nil, 0, err
 	}
 	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if len(body) > 0 && contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	c.applyAuth(req)
 	resp, err := c.http.Do(req)

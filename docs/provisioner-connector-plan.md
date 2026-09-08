@@ -1,6 +1,6 @@
 # Provisioner connector — implementation plan
 
-> Status: **Phase 1–3 implemented** (noop + YAIDAP job skeleton + CLI).
+> Status: **Phase 1–3 implemented**; **native Ansible/YAIDAP inventory tree** (root group files, `group_vars/`, `host_vars/`, scoped sync) landed in v0.2.
 > OpenTofu/Terraform (phase 4) and hardening (phase 5) not done.
 > Console Provision panel not shipped yet.
 >
@@ -207,8 +207,8 @@ umkim site provision status SITE ACTION_ID
 
 **Acceptance**
 
-- Operator can bind YAIDAP, run install/create, and enroll without leaving the
-  console/CLI except for YAIDAP inventory edits on the jumphost.
+- Operator can bind YAIDAP, manage connector inventory from console/CLI, sync to
+  jumphost, run install/create, and enroll without manual jumphost file edits.
 
 ---
 

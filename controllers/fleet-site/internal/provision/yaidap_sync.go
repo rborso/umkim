@@ -11,12 +11,13 @@ const yaidapVmLocationMarker = "FLEET_YAIDAP_VM_LOCATION="
 
 var yaidapResolvedVmLocationRE = regexp.MustCompile(`FLEET_YAIDAP_VM_LOCATION=([a-z0-9](?:[-a-z0-9]*[a-z0-9])?)`)
 
-// ActionSyncsYaidapInventory reports actions that push hub host intent into YAIDAP host_vars.
+// ActionSyncsYaidapInventory reports actions that push connector inventory to the jumphost before YAIDAP runs.
 func ActionSyncsYaidapInventory(action string) bool {
 	switch strings.TrimSpace(action) {
 	case fleetv1alpha1.ProvisionActionCreateVM,
 		fleetv1alpha1.ProvisionActionPlanVM,
-		fleetv1alpha1.ProvisionActionDestroy:
+		fleetv1alpha1.ProvisionActionDestroy,
+		fleetv1alpha1.ProvisionActionInstallBM:
 		return true
 	default:
 		return false

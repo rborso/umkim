@@ -58,6 +58,9 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { getFieldHelp } from '../help/fieldHelp';
 import { SiteHostsPanel } from '../components/sites/SiteHostsPanel';
+import { SiteProvisionerInventoryPanel } from '../components/sites/SiteProvisionerInventoryPanel';
+import { getSiteProvisionBinding } from '../api/client';
+import type { SiteProvisionBinding } from '../api/types';
 
 export function SiteDetailPage() {
   const { name } = useParams<{ name: string }>();
@@ -74,6 +77,7 @@ export function SiteDetailPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<unknown>(null);
+  const [provisionBinding, setProvisionBinding] = useState<SiteProvisionBinding | null>(null);
 
   const [displayName, setDisplayName] = useState('');
   const [region, setRegion] = useState('');
@@ -136,6 +140,16 @@ export function SiteDetailPage() {
       try {
         const s = await getFleetSite(name);
         setSite(s);
+        if (fleetSiteIsRegistry(s)) {
+          try {
+            const binding = await getSiteProvisionBinding(name);
+            setProvisionBinding(binding);
+          } catch {
+            setProvisionBinding(null);
+          }
+        } else {
+          setProvisionBinding(null);
+        }
         if (refreshForm) {
           applySiteToEdgeForm(s);
           setEdgeFormDirty(false);
@@ -839,6 +853,13 @@ export function SiteDetailPage() {
                   <SiteHostsPanel siteName={name} />
                 </Tab>
               )}
+              {isRegistry &&
+                !isManagement &&
+                provisionBinding?.provider === 'yaidap' && (
+                  <Tab eventKey={3} title={<TabTitleText>Provisioner inventory</TabTitleText>}>
+                    <SiteProvisionerInventoryPanel siteName={name} />
+                  </Tab>
+                )}
               {!isRegistry && site.status?.validationErrors && site.status.validationErrors.length > 0 && (
                 <Tab eventKey={2} title={<TabTitleText>Validation</TabTitleText>}>
                   <List style={{ marginTop: '1rem' }}>

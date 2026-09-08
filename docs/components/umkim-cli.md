@@ -60,8 +60,7 @@ umkim site ingress list SITE
 umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--address A] [--zone Z] [--wildcard W]
 umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--zone …] [--wildcard …]
 umkim site ingress delete SITE ID
-umkim site host list SITE | get SITE NAME | add SITE --name NAME --kind vm|bare_metal
-umkim site host patch SITE NAME | delete SITE NAME | provision SITE NAME [--confirm] [--wait]
+umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME
 
 umkim cluster list | get NAME | create -f cluster.yaml
@@ -166,24 +165,41 @@ umkim site provision status homelab ACTION_ID
 umkim site provision actions homelab
 ```
 
-### Site host inventory
+### Connector inventory (YAIDAP YAML)
 
-Hub-owned host intent for provisioner connectors (registry sites):
+```bash
+umkim site inventory get SITE
+umkim site inventory files list SITE
+umkim site inventory files list SITE --tree
+umkim site inventory files get SITE --path guests.yml
+umkim site inventory files get SITE --path group_vars/all/all.yml --missing-ok
+umkim site inventory files put SITE --path host_vars/lab-single-1-0.yml --file profile.yml
+umkim site inventory files put SITE --path lab-single-1.yml --file group-membership.yml
+umkim site inventory files put SITE --path group_vars/lab-single-1.yml --file cluster-intent.yml
+umkim site inventory files delete SITE --path host_vars/old-guest.yml
+umkim site inventory migrate SITE
+umkim site inventory revisions SITE [--limit 20] [--id REV]
+umkim site inventory sync SITE [--wait]
+umkim site inventory import preview SITE [--wait]
+umkim site inventory import apply SITE --confirm [--paths guests.yml,host_vars/foo.yml]
+```
+
+Legacy JSON guest/catalog mutations (`inventory set`, `inventory patch`, `import pull`) are deprecated; use `files put` instead.
+
+### Site hosts (derived view)
+
+List and provision guests defined in inventory YAML. Host CRUD is deprecated:
 
 ```bash
 umkim site host list homelab
 umkim site host get homelab vm01
-umkim site host add homelab --name vm01 --kind vm --vm-location least-utilized
-umkim site host add homelab --name vm01 --kind vm --vm-location virt02
-umkim site host add homelab --name vm02 --kind vm --cluster-mode enroll --cluster-name vm02-0 --provision-now
-umkim site host add homelab --name w01 --kind vm --cluster-mode add_worker --target-cluster lab-ha-0
 umkim site host cluster-apply homelab vm01
-umkim site host patch homelab vm01 --ansible-host 203.0.113.10
 umkim site host provision homelab vm01 --action plan_vm --wait
 umkim site host provision homelab vm01 --wait
 umkim site host provision homelab bm01 --confirm --wait
-umkim site host delete homelab vm01
 ```
+
+Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`).
 
 `install_bm` / `destroy` require `--confirm`. See
 [provisioner-connector-plan.md](../provisioner-connector-plan.md).

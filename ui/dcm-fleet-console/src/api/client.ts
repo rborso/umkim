@@ -8,6 +8,13 @@ import type {
   SiteHostRecord,
   SiteProvisionHistoryItem,
   SiteProvisionLogs,
+  SiteProvisionBinding,
+  SiteInventoryEnvelope,
+  SiteInventoryFileInfo,
+  SiteInventoryGuestRow,
+  SiteInventoryImportChange,
+  SiteInventoryRevision,
+  YaidapGuestSpec,
   FleetCluster,
   FleetClusterAddWorkerBody,
   FleetClusterCreate,
@@ -811,6 +818,180 @@ export async function fetchSiteProvisionActionLogs(
       '/provision/actions/' +
       encodeURIComponent(actionId) +
       '/logs',
+  );
+}
+
+export async function getSiteProvisionBinding(site: string): Promise<SiteProvisionBinding> {
+  return fleetSiteRequest<SiteProvisionBinding>('/sites/' + encodeURIComponent(site) + '/provision');
+}
+
+export async function getSiteInventory(site: string): Promise<SiteInventoryEnvelope> {
+  return fleetSiteRequest<SiteInventoryEnvelope>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory',
+  );
+}
+
+function inventoryFileURL(site: string, path: string): string {
+  const segments = path.split('/').map((p) => encodeURIComponent(p)).join('/');
+  return '/sites/' + encodeURIComponent(site) + '/provision/inventory/files/' + segments;
+}
+
+async function fleetSiteRequestText(path: string, init?: RequestInit): Promise<string> {
+  const r = await fetch(FLEET_SITE_API_BASE + path, {
+    credentials: 'include',
+    ...init,
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    onUnauthorized(r.status);
+    throw new ApiError(
+      path + ' → HTTP ' + r.status + (text ? ': ' + text.slice(0, 200) : ''),
+      r.status,
+      text,
+    );
+  }
+  return text;
+}
+
+export async function listSiteInventoryFiles(site: string): Promise<SiteInventoryFileInfo[]> {
+  const data = await fleetSiteRequest<{ items?: SiteInventoryFileInfo[] }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/files',
+  );
+  return data.items ?? [];
+}
+
+export async function getSiteInventoryFile(site: string, path: string): Promise<string> {
+  return fleetSiteRequestText(inventoryFileURL(site, path));
+}
+
+export async function getSiteInventoryFileOptional(
+  site: string,
+  path: string,
+): Promise<{ content: string; missing: boolean }> {
+  try {
+    const content = await getSiteInventoryFile(site, path);
+    return { content, missing: false };
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      return { content: '', missing: true };
+    }
+    throw e;
+  }
+}
+
+export async function putSiteInventoryFile(site: string, path: string, content: string): Promise<{ path?: string; syncPhase?: string }> {
+  return fleetSiteRequest<{ path?: string; syncPhase?: string }>(inventoryFileURL(site, path), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'text/yaml; charset=utf-8' },
+    body: content,
+  });
+}
+
+export async function deleteSiteInventoryFile(site: string, path: string): Promise<void> {
+  await fleetSiteRequestText(inventoryFileURL(site, path), { method: 'DELETE' });
+}
+
+export async function previewSiteInventoryImport(site: string): Promise<{ jobName?: string; phase?: string }> {
+  return fleetSiteRequest<{ jobName?: string; phase?: string }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/import/preview',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
+export async function getSiteInventoryImportPreview(site: string): Promise<SiteInventoryImportChange[]> {
+  const data = await fleetSiteRequest<{ items?: SiteInventoryImportChange[] }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/import/preview',
+  );
+  return data.items ?? [];
+}
+
+export async function applySiteInventoryImport(
+  site: string,
+  paths: string[],
+  confirm = true,
+): Promise<{ applied?: number; status?: string }> {
+  return fleetSiteRequest<{ applied?: number; status?: string }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/import/apply',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm, paths }),
+    },
+  );
+}
+
+export async function listSiteInventoryGuests(site: string): Promise<SiteInventoryGuestRow[]> {
+  const data = await fleetSiteRequest<{ items?: SiteInventoryGuestRow[] }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/guests',
+  );
+  return data.items ?? [];
+}
+
+export async function patchSiteInventoryGuest(
+  site: string,
+  name: string,
+  spec: YaidapGuestSpec,
+  sync?: boolean,
+): Promise<SiteInventoryGuestRow> {
+  const q = sync ? '?sync=true' : '';
+  return fleetSiteRequest<SiteInventoryGuestRow>(
+    '/sites/' +
+      encodeURIComponent(site) +
+      '/provision/inventory/guests/' +
+      encodeURIComponent(name) +
+      q,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec),
+    },
+  );
+}
+
+export async function putSiteInventoryCatalog(site: string, catalog: unknown): Promise<unknown> {
+  return fleetSiteRequest<unknown>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/catalog',
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(catalog),
+    },
+  );
+}
+
+export async function listSiteInventoryRevisions(
+  site: string,
+  limit = 20,
+): Promise<SiteInventoryRevision[]> {
+  const data = await fleetSiteRequest<{ items?: SiteInventoryRevision[] }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/revisions?limit=' + limit,
+  );
+  return data.items ?? [];
+}
+
+export async function getSiteInventoryRevision(
+  site: string,
+  id: string,
+): Promise<SiteInventoryRevision> {
+  return fleetSiteRequest<SiteInventoryRevision>(
+    '/sites/' +
+      encodeURIComponent(site) +
+      '/provision/inventory/revisions/' +
+      encodeURIComponent(id),
+  );
+}
+
+export async function syncSiteInventory(site: string): Promise<{ jobName?: string; phase?: string }> {
+  return fleetSiteRequest<{ jobName?: string; phase?: string }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/sync',
+    { method: 'POST' },
+  );
+}
+
+export async function importSiteInventory(site: string): Promise<{ jobName?: string; phase?: string }> {
+  return fleetSiteRequest<{ jobName?: string; phase?: string }>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/import',
+    { method: 'POST' },
   );
 }
 

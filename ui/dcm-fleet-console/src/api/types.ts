@@ -171,6 +171,8 @@ export interface SiteHostRecord {
   labels?: Record<string, string>;
   clusterIntent?: SiteHostClusterIntent;
   status?: SiteHostStatus;
+  clusters?: string[];
+  external?: boolean;
 }
 
 export interface SiteHostCreate {
@@ -220,6 +222,78 @@ export interface SiteProvisionLogs {
   jobName?: string;
   logs: string;
   source?: string;
+}
+
+export interface SiteInventoryMeta {
+  provider?: string;
+  schemaVersion?: number;
+  lastSyncedAt?: string;
+  syncPhase?: string;
+  inventoryPath?: string;
+  revisionHead?: string;
+  lastImportAt?: string;
+  lastImportNote?: string;
+}
+
+export interface SiteInventoryRevision {
+  id: string;
+  ts?: string;
+  actor?: string;
+  scope?: string;
+  summary?: string;
+  before?: unknown;
+  after?: unknown;
+}
+
+export interface YaidapGuestSpec {
+  ansible_host?: string;
+  vm_location?: string;
+  os?: string;
+  memory?: number;
+  cores?: number;
+  disks?: Array<{
+    name: string;
+    disk?: string;
+    bootdisk?: boolean;
+    size?: number;
+    storage?: string;
+  }>;
+  uplinks?: unknown[];
+  absent?: boolean;
+}
+
+export interface SiteInventoryGuestRow {
+  name: string;
+  spec: YaidapGuestSpec;
+}
+
+export interface SiteInventoryFileInfo {
+  path: string;
+  synced?: boolean;
+  size?: number;
+}
+
+export interface SiteInventoryImportChange {
+  path: string;
+  status: string;
+  diff?: string;
+  remote?: string;
+  local?: string;
+}
+
+export interface SiteInventoryEnvelope {
+  meta: SiteInventoryMeta;
+  catalog?: unknown;
+  guests?: Record<string, YaidapGuestSpec>;
+  files?: SiteInventoryFileInfo[];
+  revisions?: SiteInventoryRevision[];
+}
+
+export interface SiteProvisionBinding {
+  provider?: string;
+  jumphost?: string;
+  inventoryPath?: string;
+  yaidapRoot?: string;
 }
 
 export type FleetClusterStorageBackend = 'local_path' | 'nfs_external' | 'nfs_local' | 'longhorn';

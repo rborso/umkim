@@ -155,7 +155,7 @@ output: ProvisionResult   (identical for all providers)
 | Provider | Translation responsibility |
 | --- | --- |
 | `noop` | Host already reachable; copy `ansible_host` from record or fail. |
-| `yaidap` | Render ephemeral inventory from hub host + site defaults; run playbooks/tags/limit; parse outcome. |
+| `yaidap` | Project connector inventory from hub CM to jumphost; run playbooks/tags/limit; parse outcome. |
 | `tofu` / `terraform` | Render vars / select workspace; apply or destroy; map outputs → `observed`. |
 
 Adding OpenTofu means a **new connector implementation**, not a new console
@@ -181,20 +181,30 @@ random ansible tags from the UI; the connector owns the flow table.
 Playbook/tag names live in connector code + `siteDefaults`, not in the core
 hub schema.
 
-### Ephemeral inventory
+### Connector-persistent inventory (hub YAML CM + sync to jumphost)
 
-For each job the YAIDAP connector typically:
+YAIDAP inventory for hub-managed sites is **connector-owned and hub-persisted** as editable YAML:
 
-1. Load hub host record + site defaults.  
-2. **Generate** a temporary YAIDAP-compatible inventory (or overlay) on the
-   jumphost / runner.  
-3. Run ansible with `-i <generated> --limit <name> …`.  
-4. Probe SSH; return `ProvisionResult`.  
-5. Discard or cache generated files per policy (hub remains SoT).
+1. Store per-site files in hub ConfigMap `fleet-site-{site}-yaidap-inventory`
+   (native Ansible tree: root `file.guests.yml`, `file.hypervisors.yml`,
+   `file.{cluster}.yml`, `file.group_vars.*.yml`, `file.host_vars.*.yml`, plus
+   `_meta/*` for sync phase, status, revisions).
+2. **Sync** pushes synced paths to the jumphost inventory tree (scoped rsync; jumphost-only files preserved).
+3. Run provision actions against the synced tree (`--limit <name>`).
+4. **Import preview + apply** merges selected jumphost files back into the hub store
+   (hub-only paths such as `_meta/*` are never overwritten).
 
-Out-of-band edits to generated YAIDAP files are unsupported for hub-managed
-hosts. Optional lab escape hatch: import existing YAIDAP inventory **once**
-into hub records.
+| Stance | Owner |
+|--------|--------|
+| Guest index + YAIDAP profiles | `guests.yml` + `host_vars/*.yml` (synced) |
+| Site base (HV list + group defaults) | `hypervisors.yml` + `group_vars/all/*.yml` (synced) |
+| Cluster membership | `{cluster}.yml` at inventory root (synced) |
+| Cluster Fleet intent | `group_vars/{cluster}.yml` (synced) |
+| Provision/cluster runtime phase | `_meta/status.json` (hub-only) |
+| Execution | YAIDAP on jumphost |
+
+Out-of-band jumphost edits are supported via **import preview/apply**; hub-managed flows should
+use console/CLI inventory file API + sync instead of hand-editing files on the jumphost only.
 
 ### Safety
 

@@ -1,42 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Button,
   Checkbox,
-  Form,
-  FormSelect,
-  FormSelectOption,
   Label,
   Modal,
-  TextInput,
   Title,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import {
   applySiteHostCluster,
-  createSiteHost,
-  deleteSiteHost,
-  listFleetClusters,
   listSiteHosts,
-  patchSiteHost,
   provisionSiteHost,
 } from '../../api/client';
-import type {
-  FleetCluster,
-  SiteHostClusterIntent,
-  SiteHostClusterMode,
-  SiteHostKind,
-  SiteHostRecord,
-} from '../../api/types';
+import type { SiteHostRecord } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
-import { LabeledField } from '../forms/LabeledField';
 import { SiteProvisionHistory } from './SiteProvisionHistory';
 
 type Props = {
   siteName: string;
 };
-
-type ClusterFormMode = '' | SiteHostClusterMode;
 
 function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {
   switch (phase) {
@@ -55,81 +38,11 @@ function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey
   }
 }
 
-const emptyForm = () => ({
-  name: '',
-  kind: 'vm' as SiteHostKind,
-  ansible_host: '',
-  ansible_user: 'linux',
-  osFamily: 'rocky',
-  vm_location: 'least-utilized',
-  clusterMode: '' as ClusterFormMode,
-  clusterName: '',
-  targetCluster: '',
-  topology: 'single_node' as 'single_node' | 'ha_3_node',
-  haGroup: '',
-  replaceNode: '',
-  controlPlaneVip: '',
-  provisionNow: false,
-});
-
-function defaultClusterName(hostName: string): string {
-  const base = hostName.trim();
-  return base ? `${base}-0` : '';
-}
-
-function buildClusterIntent(form: ReturnType<typeof emptyForm>): SiteHostClusterIntent | undefined {
-  if (!form.clusterMode) return undefined;
-  return {
-    mode: form.clusterMode,
-    clusterName: form.clusterMode === 'enroll' ? form.clusterName.trim() || undefined : undefined,
-    targetCluster:
-      form.clusterMode === 'add_worker' || form.clusterMode === 'replace_control'
-        ? form.targetCluster.trim() || undefined
-        : undefined,
-    topology: form.clusterMode === 'enroll' ? form.topology : undefined,
-    haGroup: form.clusterMode === 'enroll' && form.topology === 'ha_3_node' ? form.haGroup.trim() || undefined : undefined,
-    replaceNode: form.clusterMode === 'replace_control' ? form.replaceNode.trim() || undefined : undefined,
-    controlPlaneVip:
-      form.clusterMode === 'enroll' && form.topology === 'ha_3_node'
-        ? form.controlPlaneVip.trim() || undefined
-        : undefined,
-    autoApply: true,
-  };
-}
-
-function formFromHost(host: SiteHostRecord): ReturnType<typeof emptyForm> {
-  const intent = host.clusterIntent;
-  return {
-    name: host.name,
-    kind: host.kind || 'vm',
-    ansible_host: host.ansible_host || '',
-    ansible_user: host.ansible_user || 'linux',
-    osFamily: host.osFamily || 'rocky',
-    vm_location: host.vm_location || '',
-    clusterMode: (intent?.mode as ClusterFormMode) || '',
-    clusterName: intent?.clusterName || '',
-    targetCluster: intent?.targetCluster || '',
-    topology: intent?.topology || 'single_node',
-    haGroup: intent?.haGroup || '',
-    replaceNode: intent?.replaceNode || '',
-    controlPlaneVip: intent?.controlPlaneVip || '',
-    provisionNow: false,
-  };
-}
-
 export function SiteHostsPanel({ siteName }: Props) {
   const [hosts, setHosts] = useState<SiteHostRecord[]>([]);
-  const [clusters, setClusters] = useState<FleetCluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [actionError, setActionError] = useState<unknown>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editing, setEditing] = useState<SiteHostRecord | null>(null);
-  const [form, setForm] = useState(emptyForm());
-  const [saving, setSaving] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<SiteHostRecord | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [provisionOpen, setProvisionOpen] = useState(false);
   const [provisionTarget, setProvisionTarget] = useState<SiteHostRecord | null>(null);
   const [provisionAction, setProvisionAction] = useState<'create_vm' | 'plan_vm'>('create_vm');
@@ -138,18 +51,12 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [applyingCluster, setApplyingCluster] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState('0');
 
-  const siteClusters = useMemo(
-    () => clusters.filter((c) => (c.site || '') === siteName && c.console_managed),
-    [clusters, siteName],
-  );
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [hostList, clusterList] = await Promise.all([listSiteHosts(siteName), listFleetClusters()]);
+      const hostList = await listSiteHosts(siteName);
       setHosts(hostList);
-      setClusters(clusterList);
       setHistoryRefreshKey(String(Date.now()));
     } catch (e) {
       setError(e);
@@ -174,71 +81,6 @@ export function SiteHostsPanel({ siteName }: Props) {
     const t = setInterval(() => void load(), 5000);
     return () => clearInterval(t);
   }, [hosts, load]);
-
-  const openAdd = () => {
-    setEditing(null);
-    setForm(emptyForm());
-    setActionError(null);
-    setEditorOpen(true);
-  };
-
-  const openEdit = (host: SiteHostRecord) => {
-    setEditing(host);
-    setForm(formFromHost(host));
-    setActionError(null);
-    setEditorOpen(true);
-  };
-
-  const saveHost = async () => {
-    setSaving(true);
-    setActionError(null);
-    try {
-      const clusterIntent = buildClusterIntent(form);
-      if (editing) {
-        await patchSiteHost(siteName, editing.name, {
-          kind: form.kind,
-          ansible_host: form.ansible_host.trim() || undefined,
-          ansible_user: form.ansible_user.trim() || undefined,
-          osFamily: form.osFamily.trim() || undefined,
-          vm_location: form.vm_location.trim() || undefined,
-          clusterIntent: clusterIntent ?? (form.clusterMode ? clusterIntent : undefined),
-        });
-      } else {
-        await createSiteHost(siteName, {
-          name: form.name.trim(),
-          kind: form.kind,
-          ansible_host: form.ansible_host.trim() || undefined,
-          ansible_user: form.ansible_user.trim() || undefined,
-          osFamily: form.osFamily.trim() || undefined,
-          vm_location: form.vm_location.trim() || undefined,
-          clusterIntent,
-          provisionNow: form.provisionNow,
-        });
-      }
-      setEditorOpen(false);
-      await load();
-    } catch (e) {
-      setActionError(e);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    setActionError(null);
-    try {
-      await deleteSiteHost(siteName, deleteTarget.name);
-      setDeleteOpen(false);
-      setDeleteTarget(null);
-      await load();
-    } catch (e) {
-      setActionError(e);
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const runProvision = async () => {
     if (!provisionTarget) return;
@@ -298,20 +140,19 @@ export function SiteHostsPanel({ siteName }: Props) {
       <ErrorAlert error={actionError} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
         <Title headingLevel="h3" style={{ margin: 0 }}>
-          Site host inventory
+          Site hosts (from inventory)
         </Title>
-        <Button variant="primary" onClick={openAdd} data-testid="site-hosts-add">
-          Add host
-        </Button>
       </div>
       <p style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-        Hub-owned host intent for provisioner connectors. Optionally enroll as a cluster, add to an
-        existing cluster, or replace a control-plane node after provision completes.
+        Derived from <code>guests.yml</code>, <code>host_vars/*.yml</code>, and{' '}
+        root cluster groups (<code>lab-ha01.yml</code>) and matching{' '}
+        <code>group_vars/lab-ha01.yml</code>. Add or edit guests in the Provisioner inventory tab; run
+        provision and cluster apply actions here.
       </p>
       {loading ? (
         <p>Loading hosts…</p>
       ) : hosts.length === 0 ? (
-        <p>No hosts yet. Add a VM or bare-metal host to track provisioning intent.</p>
+        <p>No hosts in inventory yet. Add guests under Provisioner inventory.</p>
       ) : (
         <Table aria-label="Site hosts" variant="compact">
           <Thead>
@@ -333,20 +174,17 @@ export function SiteHostsPanel({ siteName }: Props) {
                 </Td>
                 <Td>{host.kind || '—'}</Td>
                 <Td>
-                  <Label color={phaseColor(host.status?.phase)}>{host.status?.phase || 'Declared'}</Label>
+                  <Label color={phaseColor(host.status?.phase)}>{host.status?.phase || '—'}</Label>
                 </Td>
                 <Td>
-                  {host.status?.cluster?.clusterName || host.clusterIntent?.clusterName || host.clusterIntent?.targetCluster ? (
+                  {host.clusters?.length ? (
+                    <code>{host.clusters.join(', ')}</code>
+                  ) : host.status?.cluster?.clusterName ? (
                     <div>
-                      {host.status?.cluster?.clusterName || host.clusterIntent?.clusterName || host.clusterIntent?.targetCluster}
-                      {host.status?.cluster?.phase && (
-                        <>
-                          {' '}
-                          <Label color={phaseColor(host.status.cluster.phase)} isCompact>
-                            {host.status.cluster.phase}
-                          </Label>
-                        </>
-                      )}
+                      <code>{host.status.cluster.clusterName}</code>{' '}
+                      <Label color={phaseColor(host.status.cluster.phase)}>
+                        {host.status.cluster.phase || '—'}
+                      </Label>
                       {host.status?.cluster?.phase === 'Ready' && host.status.cluster.clusterName && (
                         <>
                           {' '}
@@ -364,9 +202,6 @@ export function SiteHostsPanel({ siteName }: Props) {
                 <Td>{host.vm_location || '—'}</Td>
                 <Td>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <Button variant="link" isInline onClick={() => openEdit(host)}>
-                      Edit
-                    </Button>
                     <Button
                       variant="link"
                       isInline
@@ -379,40 +214,16 @@ export function SiteHostsPanel({ siteName }: Props) {
                         Plan placement
                       </Button>
                     )}
-                    {canEnrollNow(host) && (
+                    {canEnrollNow(host) && (host.clusters?.length || host.clusterIntent) && (
                       <Button
                         variant="link"
                         isInline
                         isLoading={applyingCluster === host.name}
-                        onClick={() => {
-                          if (host.clusterIntent) {
-                            void runClusterApply(host);
-                          } else {
-                            setEditing(host);
-                            setForm({
-                              ...formFromHost(host),
-                              clusterMode: 'enroll',
-                              clusterName: defaultClusterName(host.name),
-                            });
-                            setActionError(null);
-                            setEditorOpen(true);
-                          }
-                        }}
+                        onClick={() => void runClusterApply(host)}
                       >
-                        {host.clusterIntent ? 'Apply cluster' : 'Enroll cluster…'}
+                        Apply cluster
                       </Button>
                     )}
-                    <Button
-                      variant="link"
-                      isInline
-                      isDanger
-                      onClick={() => {
-                        setDeleteTarget(host);
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      Delete
-                    </Button>
                   </div>
                 </Td>
               </Tr>
@@ -422,208 +233,6 @@ export function SiteHostsPanel({ siteName }: Props) {
       )}
 
       <SiteProvisionHistory siteName={siteName} refreshKey={historyRefreshKey} />
-
-      <Modal
-        title={editing ? 'Edit host' : 'Add host'}
-        isOpen={editorOpen}
-        onClose={() => setEditorOpen(false)}
-        variant="medium"
-        actions={[
-          <Button
-            key="save"
-            variant="primary"
-            onClick={() => void saveHost()}
-            isLoading={saving}
-            isDisabled={!editing && !form.name.trim()}
-          >
-            Save
-          </Button>,
-          <Button key="cancel" variant="link" onClick={() => setEditorOpen(false)}>
-            Cancel
-          </Button>,
-        ]}
-      >
-        <Form>
-          {!editing && (
-            <LabeledField label="Name" fieldId="hostName" isRequired>
-              <TextInput
-                id="hostName"
-                value={form.name}
-                onChange={(_e, v) =>
-                  setForm({
-                    ...form,
-                    name: v,
-                    clusterName: form.clusterName || defaultClusterName(v),
-                  })
-                }
-                placeholder="vm01"
-              />
-            </LabeledField>
-          )}
-          <LabeledField label="Kind" fieldId="hostKind" isRequired>
-            <FormSelect
-              id="hostKind"
-              value={form.kind}
-              onChange={(_e, v) => setForm({ ...form, kind: v as SiteHostKind })}
-            >
-              <FormSelectOption value="vm" label="VM" />
-              <FormSelectOption value="bare_metal" label="Bare metal" />
-            </FormSelect>
-          </LabeledField>
-          <LabeledField label="VM location" fieldId="hostVmLocation">
-            <TextInput
-              id="hostVmLocation"
-              value={form.vm_location}
-              onChange={(_e, v) => setForm({ ...form, vm_location: v })}
-              placeholder="least-utilized or hypervisor hostname"
-            />
-          </LabeledField>
-          <LabeledField label="ansible_host" fieldId="hostAnsibleHost">
-            <TextInput
-              id="hostAnsibleHost"
-              value={form.ansible_host}
-              onChange={(_e, v) => setForm({ ...form, ansible_host: v })}
-              placeholder="optional until provision completes"
-            />
-          </LabeledField>
-          <LabeledField label="ansible_user" fieldId="hostAnsibleUser">
-            <TextInput
-              id="hostAnsibleUser"
-              value={form.ansible_user}
-              onChange={(_e, v) => setForm({ ...form, ansible_user: v })}
-            />
-          </LabeledField>
-          <LabeledField label="OS family" fieldId="hostOsFamily">
-            <TextInput
-              id="hostOsFamily"
-              value={form.osFamily}
-              onChange={(_e, v) => setForm({ ...form, osFamily: v })}
-            />
-          </LabeledField>
-
-          <Title headingLevel="h4" style={{ marginTop: '1rem' }}>
-            Cluster automation
-          </Title>
-          <LabeledField label="After provision" fieldId="hostClusterMode">
-            <FormSelect
-              id="hostClusterMode"
-              value={form.clusterMode}
-              onChange={(_e, v) => {
-                const mode = v as ClusterFormMode;
-                setForm({
-                  ...form,
-                  clusterMode: mode,
-                  clusterName:
-                    mode === 'enroll' && !form.clusterName
-                      ? defaultClusterName(form.name)
-                      : form.clusterName,
-                });
-              }}
-            >
-              <FormSelectOption value="" label="None (SSH-ready host only)" />
-              <FormSelectOption value="enroll" label="Enroll new cluster" />
-              <FormSelectOption value="add_worker" label="Add worker to existing cluster" />
-              <FormSelectOption value="replace_control" label="Replace control-plane node" />
-            </FormSelect>
-          </LabeledField>
-
-          {form.clusterMode === 'enroll' && (
-            <>
-              <LabeledField label="Topology" fieldId="hostClusterTopology">
-                <FormSelect
-                  id="hostClusterTopology"
-                  value={form.topology}
-                  onChange={(_e, v) =>
-                    setForm({ ...form, topology: v as 'single_node' | 'ha_3_node' })
-                  }
-                >
-                  <FormSelectOption value="single_node" label="Single node" />
-                  <FormSelectOption value="ha_3_node" label="HA 3-node (requires 3 hosts in group)" />
-                </FormSelect>
-              </LabeledField>
-              <LabeledField label="Cluster name" fieldId="hostClusterName" isRequired>
-                <TextInput
-                  id="hostClusterName"
-                  value={form.clusterName}
-                  onChange={(_e, v) => setForm({ ...form, clusterName: v })}
-                />
-              </LabeledField>
-              {form.topology === 'ha_3_node' && (
-                <>
-                  <LabeledField label="HA group" fieldId="hostHaGroup">
-                    <TextInput
-                      id="hostHaGroup"
-                      value={form.haGroup}
-                      onChange={(_e, v) => setForm({ ...form, haGroup: v })}
-                      placeholder={form.clusterName || 'ha-group-id'}
-                    />
-                  </LabeledField>
-                  <LabeledField label="Control-plane VIP" fieldId="hostCpVip" isRequired>
-                    <TextInput
-                      id="hostCpVip"
-                      value={form.controlPlaneVip}
-                      onChange={(_e, v) => setForm({ ...form, controlPlaneVip: v })}
-                    />
-                  </LabeledField>
-                </>
-              )}
-            </>
-          )}
-
-          {(form.clusterMode === 'add_worker' || form.clusterMode === 'replace_control') && (
-            <LabeledField label="Target cluster" fieldId="hostTargetCluster" isRequired>
-              <FormSelect
-                id="hostTargetCluster"
-                value={form.targetCluster}
-                onChange={(_e, v) => setForm({ ...form, targetCluster: v })}
-              >
-                <FormSelectOption value="" label="Select cluster…" />
-                {siteClusters.map((c) => (
-                  <FormSelectOption key={c.name} value={c.name} label={c.name} />
-                ))}
-              </FormSelect>
-            </LabeledField>
-          )}
-
-          {form.clusterMode === 'replace_control' && (
-            <LabeledField label="Replace node" fieldId="hostReplaceNode" isRequired>
-              <TextInput
-                id="hostReplaceNode"
-                value={form.replaceNode}
-                onChange={(_e, v) => setForm({ ...form, replaceNode: v })}
-                placeholder="existing control-plane hostname"
-              />
-            </LabeledField>
-          )}
-
-          {!editing && (
-            <div style={{ marginTop: '0.75rem' }}>
-              <Checkbox
-                id="hostProvisionNow"
-                isChecked={form.provisionNow}
-                onChange={(_e, c) => setForm({ ...form, provisionNow: c })}
-                label="Provision immediately after save"
-              />
-            </div>
-          )}
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Delete host"
-        isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        actions={[
-          <Button key="del" variant="danger" onClick={() => void confirmDelete()} isLoading={deleting}>
-            Delete
-          </Button>,
-          <Button key="cancel" variant="link" onClick={() => setDeleteOpen(false)}>
-            Cancel
-          </Button>,
-        ]}
-      >
-        Delete host <code>{deleteTarget?.name}</code> from site inventory?
-      </Modal>
 
       <Modal
         title={provisionAction === 'plan_vm' ? 'Plan VM placement' : 'Provision host'}

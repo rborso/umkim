@@ -2,10 +2,11 @@ package siteprovision
 
 import (
 	"context"
-	"strings"
+	"encoding/json"
 	"testing"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,17 +42,25 @@ func TestRefreshRunningJobSuccess(t *testing.T) {
 			},
 		},
 	}
-	hostsCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "fleet-site-hosts-homelab", Namespace: ns},
+	invCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      connectors.InventoryCMName("homelab", fleetv1alpha1.ProvisionProviderYaidap),
+			Namespace: ns,
+		},
 		Data: map[string]string{
-			"hosts.json": `[{"name":"vm01","kind":"vm","ansible_host":"203.0.113.10","status":{"phase":"Provisioning"}}]`,
+			"file.guests.yml": `guests:
+  hosts:
+    vm01:
+      ansible_host: 203.0.113.10
+`,
+			"_meta.status.json": `{"guests":{"vm01":{"phase":"Provisioning"}}}`,
 		},
 	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: "fleet-site-prov-abc123", Namespace: ns},
 		Status:     batchv1.JobStatus{Succeeded: 1},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, hostsCM, job).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, invCM, job).Build()
 
 	if err := RefreshRunningJob(context.Background(), c, ns, site, nil); err != nil {
 		t.Fatal(err)
@@ -64,10 +73,21 @@ func TestRefreshRunningJobSuccess(t *testing.T) {
 	}
 
 	var updatedCM corev1.ConfigMap
-	if err := c.Get(context.Background(), types.NamespacedName{Namespace: ns, Name: "fleet-site-hosts-homelab"}, &updatedCM); err != nil {
+	if err := c.Get(context.Background(), types.NamespacedName{
+		Namespace: ns,
+		Name:      connectors.InventoryCMName("homelab", fleetv1alpha1.ProvisionProviderYaidap),
+	}, &updatedCM); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(updatedCM.Data["hosts.json"], `"phase":"Ready"`) {
-		t.Fatalf("hosts=%s", updatedCM.Data["hosts.json"])
+	var status struct {
+		Guests map[string]struct {
+			Phase string `json:"phase"`
+		} `json:"guests"`
+	}
+	if err := json.Unmarshal([]byte(updatedCM.Data["_meta.status.json"]), &status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Guests["vm01"].Phase != fleetv1alpha1.SiteHostPhaseReady {
+		t.Fatalf("status=%+v", status.Guests["vm01"])
 	}
 }

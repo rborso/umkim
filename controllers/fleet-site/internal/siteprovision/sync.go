@@ -7,8 +7,8 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ansiblelogs"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,9 +61,16 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 				cur.LogTail = ansiblelogs.Tail(logs, maxProvisionLogTail)
 				if cur.Action == fleetv1alpha1.ProvisionActionCreateVM {
 					if loc := provision.ParseResolvedVmLocation(logs); loc != "" {
-						_ = sitehosts.UpdateVmLocation(ctx, c, ns, fs.Name, cur.Subject, loc)
+						_ = yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, cur.Subject, yaidap.GuestStatus{
+							Message: "vm_location=" + loc,
+						})
 					}
 				}
+				inventoryPath := ""
+				if fs.Spec.Provision != nil {
+					inventoryPath = fs.Spec.Provision.InventoryPath
+				}
+				_ = yaidap.FinalizeSyncFromJobLogs(ctx, c, ns, fs.Name, inventoryPath, logs)
 			}
 		}
 		if err := CommitAction(ctx, c, fs, *cur, true); err != nil {
@@ -102,19 +109,13 @@ func enrichHandoffHost(ctx context.Context, c client.Client, ns, siteName string
 	if cur.Host.AnsibleHost != "" {
 		return
 	}
-	rec, ok, err := sitehosts.Get(ctx, c, ns, siteName, cur.Subject)
-	if err != nil || !ok {
+	addr, err := yaidap.GuestAddress(ctx, c, ns, siteName, cur.Subject)
+	if err != nil || addr == "" {
 		return
 	}
-	if rec.AnsibleHost != "" {
-		cur.Host.AnsibleHost = rec.AnsibleHost
-	}
-	if cur.Host.AnsibleUser == "" && rec.AnsibleUser != "" {
-		cur.Host.AnsibleUser = rec.AnsibleUser
-	}
-	if cur.Host.OSFamily == "" && rec.OSFamily != "" {
-		cur.Host.OSFamily = rec.OSFamily
-	}
+	cur.Host.AnsibleHost = addr
+	cur.Host.AnsibleUser = "linux"
+	cur.Host.OSFamily = "rocky"
 }
 
 // CommitAction updates FleetSite provision status and syncs host inventory.
@@ -155,40 +156,27 @@ func CommitAction(ctx context.Context, c client.Client, fs *fleetv1alpha1.FleetS
 	return nil
 }
 
-// SyncHostInventory patches hub host inventory from a provision action record.
+// SyncHostInventory patches guest status from a provision action record.
 func SyncHostInventory(ctx context.Context, c client.Client, ns, siteName string, rec fleetv1alpha1.SiteProvisionActionRecord) {
 	hostName := rec.Subject
 	if hostName == "" {
 		return
 	}
-	_, found, err := sitehosts.Get(ctx, c, ns, siteName, hostName)
-	if err != nil || !found {
-		return
-	}
+	st := yaidap.GuestStatus{LastProvisionID: rec.ID, Message: rec.Message}
 	switch rec.Phase {
 	case fleetv1alpha1.ProvisionPhasePending, fleetv1alpha1.ProvisionPhaseRunning:
-		_ = sitehosts.UpdateStatus(ctx, c, ns, siteName, hostName, fleetv1alpha1.SiteHostStatus{
-			Phase:           fleetv1alpha1.SiteHostPhaseProvisioning,
-			Message:         rec.Message,
-			LastProvisionID: rec.ID,
-		})
+		st.Phase = fleetv1alpha1.SiteHostPhaseProvisioning
 	case fleetv1alpha1.ProvisionPhaseSucceeded:
-		st := fleetv1alpha1.SiteHostStatus{
-			Phase:           fleetv1alpha1.SiteHostPhaseReady,
-			Message:         rec.Message,
-			LastProvisionID: rec.ID,
-		}
+		st.Phase = fleetv1alpha1.SiteHostPhaseReady
 		if rec.Host != nil && rec.Host.AnsibleHost != "" {
 			st.AnsibleHost = rec.Host.AnsibleHost
 		}
-		_ = sitehosts.UpdateStatus(ctx, c, ns, siteName, hostName, st)
 	case fleetv1alpha1.ProvisionPhaseFailed:
-		_ = sitehosts.UpdateStatus(ctx, c, ns, siteName, hostName, fleetv1alpha1.SiteHostStatus{
-			Phase:           fleetv1alpha1.SiteHostPhaseFailed,
-			Message:         rec.Message,
-			LastProvisionID: rec.ID,
-		})
+		st.Phase = fleetv1alpha1.SiteHostPhaseFailed
+	default:
+		return
 	}
+	_ = yaidap.UpdateGuestStatus(ctx, c, ns, siteName, hostName, st)
 }
 
 func prependHistory(history []fleetv1alpha1.SiteProvisionActionRecord, rec fleetv1alpha1.SiteProvisionActionRecord) []fleetv1alpha1.SiteProvisionActionRecord {

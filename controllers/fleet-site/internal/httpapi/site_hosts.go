@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -119,167 +119,91 @@ func (s *Server) siteExists(ctx context.Context, siteName string) bool {
 }
 
 func (s *Server) listSiteHosts(ctx context.Context, w http.ResponseWriter, siteName string) {
-	hosts, err := sitehosts.List(ctx, s.Client, s.Cfg.Namespace, siteName)
+	_ = yaidap.MigrateLegacyStore(ctx, s.Client, s.Cfg.Namespace, siteName, "system/migrate")
+	views, err := yaidap.ListInventoryHosts(ctx, s.Client, s.Cfg.Namespace, siteName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if hosts == nil {
-		hosts = []fleetv1alpha1.SiteHostRecord{}
-	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"items": hosts})
-}
-
-func (s *Server) getSiteHost(ctx context.Context, w http.ResponseWriter, siteName, hostName string) {
-	rec, ok, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	writeJSON(w, http.StatusOK, rec)
-}
-
-func (s *Server) createSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName string) {
-	_, ok := s.requireMutatingActor(w, r)
-	if !ok {
-		return
-	}
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	var req siteHostBody
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	rec := req.toRecord("")
-	if err := sitehosts.ValidateRecord(rec, false); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if _, exists, _ := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, rec.Name); exists {
-		http.Error(w, "host already exists", http.StatusConflict)
-		return
-	}
-	if err := sitehosts.Put(ctx, s.Client, s.Cfg.Namespace, siteName, rec); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if req.ProvisionNow {
-		actionBody := siteProvisionActionBody{
-			Action:  defaultProvisionActionForHost(rec),
-			Subject: rec.Name,
-			Confirm: rec.Kind == fleetv1alpha1.SiteHostKindBareMetal || rec.Status.Phase == fleetv1alpha1.SiteHostPhaseReady,
+	items := make([]map[string]interface{}, 0, len(views))
+	for _, v := range views {
+		rec := inventoryViewsToHostRecords([]yaidap.InventoryHostView{v})[0]
+		row := map[string]interface{}{
+			"name":          rec.Name,
+			"kind":          rec.Kind,
+			"ansible_host":  rec.AnsibleHost,
+			"vm_location":   rec.VmLocation,
+			"status":        rec.Status,
+			"external":      v.External,
+			"clusters":      v.Clusters,
 		}
-		if rec.AnsibleHost != "" {
-			actionBody.Host = hostRecordToHandoff(rec, siteName)
+		items = append(items, row)
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func inventoryViewsToHostRecords(views []yaidap.InventoryHostView) []fleetv1alpha1.SiteHostRecord {
+	out := make([]fleetv1alpha1.SiteHostRecord, 0, len(views))
+	for _, v := range views {
+		rec := fleetv1alpha1.SiteHostRecord{
+			Name:        v.Name,
+			Kind:        v.Kind,
+			AnsibleHost: v.AnsibleHost,
+			VmLocation:  v.VmLocation,
+			Status: fleetv1alpha1.SiteHostStatus{
+				Phase:       v.Status.Phase,
+				Message:     v.Status.Message,
+				AnsibleHost: v.AnsibleHost,
+				Cluster:     v.Status.Cluster,
+			},
 		}
-		s.runSiteProvisionAction(ctx, w, r, siteName, actionBody)
-		return
-	}
-	writeJSON(w, http.StatusCreated, rec)
-}
-
-func (s *Server) patchSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	_, ok := s.requireMutatingActor(w, r)
-	if !ok {
-		return
-	}
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	var req siteHostBody
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	existing, found, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !found {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	merged := mergeSiteHostRecord(existing, req)
-	if err := sitehosts.ValidateRecord(merged, false); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := sitehosts.Put(ctx, s.Client, s.Cfg.Namespace, siteName, merged); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, merged)
-}
-
-func mergeSiteHostRecord(existing fleetv1alpha1.SiteHostRecord, patch siteHostBody) fleetv1alpha1.SiteHostRecord {
-	out := existing
-	if k := strings.TrimSpace(patch.Kind); k != "" {
-		out.Kind = k
-	}
-	if d := strings.TrimSpace(patch.DesiredState); d != "" {
-		out.DesiredState = d
-	}
-	if v := strings.TrimSpace(patch.AnsibleHost); v != "" {
-		out.AnsibleHost = v
-	}
-	if v := strings.TrimSpace(patch.AnsibleUser); v != "" {
-		out.AnsibleUser = v
-	}
-	if v := strings.TrimSpace(patch.OSFamily); v != "" {
-		out.OSFamily = v
-	}
-	if v := strings.TrimSpace(patch.VmLocation); v != "" {
-		out.VmLocation = v
-	}
-	if patch.Flavor != nil {
-		out.Flavor = patch.Flavor
-	}
-	if patch.Labels != nil {
-		out.Labels = patch.Labels
-	}
-	if patch.ClusterIntent != nil {
-		out.ClusterIntent = patch.ClusterIntent
+		if rec.Kind == "" && !v.External {
+			rec.Kind = fleetv1alpha1.SiteHostKindVM
+		}
+		out = append(out, rec)
 	}
 	return out
 }
 
-func (s *Server) deleteSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	_, ok := s.requireMutatingActor(w, r)
-	if !ok {
-		return
-	}
-	if err := sitehosts.Delete(ctx, s.Client, s.Cfg.Namespace, siteName, hostName); err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	rec, found, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
+func (s *Server) getSiteHost(ctx context.Context, w http.ResponseWriter, siteName, hostName string) {
+	views, err := yaidap.ListInventoryHosts(ctx, s.Client, s.Cfg.Namespace, siteName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "not found", http.StatusNotFound)
+	for _, v := range views {
+		if v.Name == hostName {
+			items := inventoryViewsToHostRecords([]yaidap.InventoryHostView{v})
+			writeJSON(w, http.StatusOK, items[0])
+			return
+		}
+	}
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+func (s *Server) createSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName string) {
+	http.Error(w, "site host CRUD is deprecated; edit inventory YAML via /provision/inventory/files", http.StatusGone)
+}
+
+func (s *Server) patchSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
+	http.Error(w, "site host CRUD is deprecated; edit inventory YAML via /provision/inventory/files", http.StatusGone)
+}
+
+func (s *Server) deleteSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
+	http.Error(w, "site host CRUD is deprecated; edit inventory YAML via /provision/inventory/files", http.StatusGone)
+}
+
+func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
+	exists, err := yaidap.GuestExists(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if !exists {
+		http.Error(w, "guest not found in inventory", http.StatusNotFound)
+		return
+	}
+	addr, _ := yaidap.GuestAddress(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -294,7 +218,7 @@ func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r
 	}
 	action := strings.TrimSpace(req.Action)
 	if action == "" {
-		action = defaultProvisionActionForHost(rec)
+		action = "create_vm"
 	}
 	if err := provision.ValidateAction(action); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -309,35 +233,14 @@ func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r
 		Subject: hostName,
 		Confirm: req.Confirm,
 	}
-	if rec.AnsibleHost != "" {
-		actionBody.Host = hostRecordToHandoff(rec, siteName)
+	if addr != "" {
+		actionBody.Host = &fleetv1alpha1.ProvisionHandoffHost{
+			Hostname:    hostName,
+			AnsibleHost: addr,
+			AnsibleUser: "linux",
+			OSFamily:    "rocky",
+			SiteID:      siteName,
+		}
 	}
 	s.runSiteProvisionAction(ctx, w, r, siteName, actionBody)
-}
-
-func defaultProvisionActionForHost(rec fleetv1alpha1.SiteHostRecord) string {
-	switch rec.Kind {
-	case fleetv1alpha1.SiteHostKindBareMetal:
-		return "install_bm"
-	default:
-		return "create_vm"
-	}
-}
-
-func hostRecordToHandoff(rec fleetv1alpha1.SiteHostRecord, siteName string) *fleetv1alpha1.ProvisionHandoffHost {
-	user := rec.AnsibleUser
-	if user == "" {
-		user = "linux"
-	}
-	osFamily := rec.OSFamily
-	if osFamily == "" {
-		osFamily = "rocky"
-	}
-	return &fleetv1alpha1.ProvisionHandoffHost{
-		Hostname:    rec.Name,
-		AnsibleHost: rec.AnsibleHost,
-		AnsibleUser: user,
-		OSFamily:    osFamily,
-		SiteID:      siteName,
-	}
 }

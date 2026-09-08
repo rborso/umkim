@@ -41,6 +41,7 @@ func siteCmd() *cobra.Command {
 	cmd.AddCommand(siteIngressCmd())
 	cmd.AddCommand(siteHostCmd())
 	cmd.AddCommand(siteProvisionCmd())
+	cmd.AddCommand(siteInventoryCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List sites",

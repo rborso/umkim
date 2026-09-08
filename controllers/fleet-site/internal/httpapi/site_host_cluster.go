@@ -2,18 +2,12 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 
-	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/sitecluster"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
 )
-
-type siteHostClusterBody struct {
-	ClusterIntent *fleetv1alpha1.SiteHostClusterIntent `json:"clusterIntent,omitempty"`
-}
 
 func (s *Server) handleSiteHostCluster(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
 	switch r.Method {
@@ -29,78 +23,46 @@ func (s *Server) handleSiteHostCluster(ctx context.Context, w http.ResponseWrite
 }
 
 func (s *Server) getSiteHostCluster(ctx context.Context, w http.ResponseWriter, siteName, hostName string) {
-	rec, ok, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
+	views, err := yaidap.ListInventoryHosts(ctx, s.Client, s.Cfg.Namespace, siteName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !ok {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
+	for _, v := range views {
+		if v.Name == hostName {
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"clusters": v.Clusters,
+				"cluster":  v.Status.Cluster,
+			})
+			return
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"clusterIntent": rec.ClusterIntent,
-		"cluster":       rec.Status.Cluster,
-	})
+	http.Error(w, "not found", http.StatusNotFound)
 }
 
 func (s *Server) patchSiteHostCluster(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	_, ok := s.requireMutatingActor(w, r)
-	if !ok {
-		return
-	}
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	var req siteHostClusterBody
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if req.ClusterIntent == nil {
-		http.Error(w, "clusterIntent required", http.StatusBadRequest)
-		return
-	}
-	existing, found, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !found {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	if err := sitehosts.ValidateClusterIntent(req.ClusterIntent); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	existing.ClusterIntent = req.ClusterIntent
-	if err := sitehosts.Put(ctx, s.Client, s.Cfg.Namespace, siteName, existing); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, existing)
+	_, _ = io.ReadAll(r.Body)
+	http.Error(w, "cluster intent is edited in root {cluster}.yml and group_vars/{cluster}.yml", http.StatusGone)
 }
 
 func (s *Server) applySiteHostCluster(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	_, ok := s.requireMutatingActor(w, r)
-	if !ok {
+	if _, ok := s.requireMutatingActor(w, r); !ok {
 		return
 	}
-	if err := sitecluster.ApplyHostNow(ctx, s.Client, s.Cfg, siteName, hostName); err != nil {
+	if err := sitecluster.ApplyInventoryGuestCluster(ctx, s.Client, s.Cfg, siteName, hostName); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	rec, found, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
+	views, err := yaidap.ListInventoryHosts(ctx, s.Client, s.Cfg.Namespace, siteName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
+	for _, v := range views {
+		if v.Name == hostName {
+			writeJSON(w, http.StatusAccepted, v)
+			return
+		}
 	}
-	writeJSON(w, http.StatusAccepted, rec)
+	http.Error(w, "not found", http.StatusNotFound)
 }

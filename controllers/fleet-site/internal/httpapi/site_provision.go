@@ -12,6 +12,8 @@ import (
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
@@ -61,6 +63,10 @@ type siteProvisionActionBody struct {
 }
 
 func (s *Server) handleSiteProvisionRoutes(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, rest string) {
+	if strings.HasPrefix(rest, "provision/inventory") {
+		s.handleSiteInventoryRoutes(ctx, w, r, siteName, rest)
+		return
+	}
 	switch {
 	case rest == "provision":
 		switch r.Method {
@@ -272,20 +278,30 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 		http.Error(w, "confirm=true is required for "+action, http.StatusBadRequest)
 		return
 	}
-	hostRec, hostFound, hostErr := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, subject)
-	if hostErr != nil {
-		http.Error(w, hostErr.Error(), http.StatusInternalServerError)
+	invHost, guestFound, guestErr := yaidap.LookupInventoryHost(ctx, s.Client, s.Cfg.Namespace, siteName, subject)
+	if guestErr != nil {
+		http.Error(w, guestErr.Error(), http.StatusInternalServerError)
 		return
 	}
 	if action == fleetv1alpha1.ProvisionActionPlanVM {
-		if !hostFound || hostRec.Kind != fleetv1alpha1.SiteHostKindVM {
-			http.Error(w, "plan_vm requires an existing VM host subject", http.StatusBadRequest)
+		if !guestFound || invHost.External {
+			http.Error(w, "plan_vm requires an existing provisioned VM guest in guests.yml", http.StatusBadRequest)
 			return
 		}
 	}
-	if req.Host == nil {
-		if hostFound {
-			req.Host = hostRecordToHandoff(hostRec, siteName)
+	if req.Host == nil && guestFound {
+		kind := strings.TrimSpace(invHost.Kind)
+		if kind == "" && !invHost.External {
+			kind = fleetv1alpha1.SiteHostKindVM
+		}
+		if addr := strings.TrimSpace(invHost.AnsibleHost); addr != "" {
+			req.Host = &fleetv1alpha1.ProvisionHandoffHost{
+				Hostname:    subject,
+				AnsibleHost:   addr,
+				AnsibleUser:   "linux",
+				OSFamily:      "rocky",
+				SiteID:        siteName,
+			}
 		}
 	}
 
@@ -349,13 +365,25 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if hostFound && provision.ActionSyncsYaidapInventory(action) {
-			if err := sitehosts.ValidateVmLocation(hostRec.Kind, hostRec.VmLocation); err != nil {
+		if err := yaidap.EnsureReadyForProvision(ctx, s.Client, s.Cfg.Namespace, siteName, connectors.FormatActor(actor.Kind, actor.Name)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if guestFound && provision.ActionSyncsYaidapInventory(action) {
+			kind := strings.TrimSpace(invHost.Kind)
+			if kind == "" && !invHost.External {
+				kind = fleetv1alpha1.SiteHostKindVM
+			}
+			vmLoc := strings.TrimSpace(invHost.VmLocation)
+			if vmLoc == "" {
+				vmLoc = strings.TrimSpace(invHost.Status.VmLocation)
+			}
+			if err := sitehosts.ValidateVmLocation(kind, vmLoc); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 		}
-		jobName, err := s.startYaidapProvisionJob(ctx, &fs, &rec, req, hostRec, hostFound)
+		jobName, err := s.startYaidapProvisionJob(ctx, &fs, &rec, req, guestFound)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -427,7 +455,7 @@ func stringParam(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.FleetSite, rec *fleetv1alpha1.SiteProvisionActionRecord, req siteProvisionActionBody, hostRec fleetv1alpha1.SiteHostRecord, hostFound bool) (string, error) {
+func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.FleetSite, rec *fleetv1alpha1.SiteProvisionActionRecord, req siteProvisionActionBody, guestFound bool) (string, error) {
 	spec := fs.Spec.Provision
 	inv, err := provision.DefaultYaidapInvocation(rec.Action, req.Confirm)
 	if err != nil {
@@ -499,8 +527,12 @@ func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.
 		}
 		extra = append(extra, "-e", k+"="+v)
 	}
-	if hostFound && provision.ActionSyncsYaidapInventory(rec.Action) {
-		extra = append(extra, provision.YaidapSyncExtraVars(hostRec)...)
+	if guestFound && provision.ActionSyncsYaidapInventory(rec.Action) {
+		syncExtra, err := s.yaidapProvisionInventoryExtra(ctx, fs, rec.Subject, rec.ActorKind, rec.ActorName)
+		if err != nil {
+			return "", err
+		}
+		extra = append(extra, syncExtra...)
 	}
 
 	jobName := siteProvisionJobPrefix + rec.ID

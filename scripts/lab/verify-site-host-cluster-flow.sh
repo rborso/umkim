@@ -73,7 +73,6 @@ cleanup() {
   wait_cluster_gone "$HA_CLUSTER" 600 || true
   for h in "$SINGLE_HOST" "$HA_CP0" "$HA_CP1" "$HA_CP2"; do
     run_optional "$UMKIM site host provision $SITE $h --action destroy --confirm --wait"
-    run_optional "$UMKIM site host delete $SITE $h"
   done
 }
 
@@ -83,24 +82,12 @@ JUMPHOST_HOST="${JUMPHOST_HOSTPORT%%:*}"
 JUMPHOST_PORT="${JUMPHOST_HOSTPORT##*:}"
 [ "$JUMPHOST_HOST" = "$JUMPHOST_HOSTPORT" ] && JUMPHOST_PORT=22
 
-register_yaidap_guests() {
-  run "ssh -p ${JUMPHOST_PORT} ${JUMPHOST_USER}@${JUMPHOST_HOST} python3 - <<'PY'
-import yaml
-from pathlib import Path
-p = Path('/home/linux/yaidap/inventory/lab/guests.yml')
-data = yaml.safe_load(p.read_text()) if p.exists() else {'guests': {'hosts': {}}, 'external': {'hosts': {}}}
-hosts = data.setdefault('guests', {}).setdefault('hosts', {})
-for name, ip in [
-    ('${SINGLE_HOST}', '${SINGLE_IP}'),
-    ('${HA_CP0}', '${HA_IP0}'),
-    ('${HA_CP1}', '${HA_IP1}'),
-    ('${HA_CP2}', '${HA_IP2}'),
-]:
-    hosts[name] = {'ansible_host': ip, 'vm_location': 'least-utilized'}
-p.write_text(yaml.dump(data, sort_keys=False, default_flow_style=False))
-print('registered', list(hosts.keys()))
-PY"
+patch_inventory_guest() {
+  log "patch_inventory_guest is deprecated; inventory YAML is seeded via seed_inventory_yaml"
 }
+
+# shellcheck source=scripts/lab/seed-inventory-yaml.sh
+source "$(dirname "$0")/seed-inventory-yaml.sh"
 
 seed_ha_bootstrap_ssh_from_jumphost() {
   local cluster="$1"
@@ -174,22 +161,11 @@ wait_cluster_validated() {
 trap cleanup EXIT
 cleanup
 
-log "register site hosts"
-run "$UMKIM site host add $SITE --name $SINGLE_HOST --kind vm --vm-location least-utilized \
-  --cluster-mode enroll --cluster-name $SINGLE --cluster-topology single_node"
-run "$UMKIM site host add $SITE --name $HA_CP0 --kind vm --vm-location least-utilized \
-  --cluster-mode enroll --cluster-name $HA_CLUSTER --cluster-topology ha_3_node --ha-group $HA_CLUSTER --control-plane-vip $HA_VIP"
-run "$UMKIM site host add $SITE --name $HA_CP1 --kind vm --vm-location least-utilized \
-  --cluster-mode enroll --cluster-name $HA_CLUSTER --cluster-topology ha_3_node --ha-group $HA_CLUSTER --control-plane-vip $HA_VIP"
-run "$UMKIM site host add $SITE --name $HA_CP2 --kind vm --vm-location least-utilized \
-  --cluster-mode enroll --cluster-name $HA_CLUSTER --cluster-topology ha_3_node --ha-group $HA_CLUSTER --control-plane-vip $HA_VIP"
+log "seed hub YAIDAP inventory YAML"
+seed_inventory_yaml
 
-log "register YAIDAP guests and hub ansible_host before create_vm"
-register_yaidap_guests
-run "$UMKIM site host patch $SITE $SINGLE_HOST --ansible-host $SINGLE_IP"
-run "$UMKIM site host patch $SITE $HA_CP0 --ansible-host $HA_IP0"
-run "$UMKIM site host patch $SITE $HA_CP1 --ansible-host $HA_IP1"
-run "$UMKIM site host patch $SITE $HA_CP2 --ansible-host $HA_IP2"
+log "sync connector inventory to jumphost"
+run "$UMKIM site inventory sync $SITE --wait"
 
 log "provision VMs (YAIDAP create_vm)"
 for h in "$SINGLE_HOST" "$HA_CP0" "$HA_CP1" "$HA_CP2"; do
