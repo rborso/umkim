@@ -7,8 +7,10 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ansiblelogs"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/siteinventory"
 	batchv1 "k8s.io/api/batch/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +27,8 @@ const (
 // RefreshRunningJob polls the connector Job for a site with a running provision action,
 // finalizes FleetSite status, and syncs hub host inventory.
 // cs is optional; when set, create_vm success may read resolved vm_location from job logs.
-func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, cs kubernetes.Interface) error {
+// cfg is optional; when set, resolved vm_location triggers an inventory sync job.
+func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, cs kubernetes.Interface, cfg *config.Config) error {
 	if fs.Status.Provision == nil || fs.Status.Provision.Current == nil {
 		return nil
 	}
@@ -61,9 +64,14 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 				cur.LogTail = ansiblelogs.Tail(logs, maxProvisionLogTail)
 				if cur.Action == fleetv1alpha1.ProvisionActionCreateVM {
 					if loc := provision.ParseResolvedVmLocation(logs); loc != "" {
+						_, _ = yaidap.PersistResolvedVmLocation(ctx, c, ns, fs.Name, cur.Subject, loc, "system/provision")
 						_ = yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, cur.Subject, yaidap.GuestStatus{
-							Message: "vm_location=" + loc,
+							VmLocation: loc,
+							Message:    "vm_location=" + loc,
 						})
+						if cfg != nil {
+							_, _ = siteinventory.EnqueueInventorySync(ctx, c, *cfg, fs)
+						}
 					}
 				}
 				inventoryPath := ""

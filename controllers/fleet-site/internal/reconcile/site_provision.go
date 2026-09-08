@@ -20,7 +20,7 @@ func (r *Reconciler) reconcileRegistrySiteProvision(ctx context.Context, fs *fle
 	if phase != fleetv1alpha1.ProvisionPhaseRunning && phase != fleetv1alpha1.ProvisionPhasePending {
 		return r.reconcileRegistrySiteHostClusters(ctx, fs)
 	}
-	if err := siteprovision.RefreshRunningJob(ctx, r.Client, r.Cfg.Namespace, fs, r.Clientset); err != nil {
+	if err := siteprovision.RefreshRunningJob(ctx, r.Client, r.Cfg.Namespace, fs, r.Clientset, &r.Cfg); err != nil {
 		return ctrl.Result{}, err
 	}
 	if res, err := r.reconcileRegistrySiteHostClusters(ctx, fs); err != nil || res.Requeue || res.RequeueAfter > 0 {

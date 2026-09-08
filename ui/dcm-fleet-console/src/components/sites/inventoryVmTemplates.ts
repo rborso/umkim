@@ -47,23 +47,23 @@ disks:
     storage: local
 uplinks:
   - name: n0p0
-    physicalnetwork: lab_access_l1
-    macaddress: "${mac}"
+    physical_network: lab_access_l1
+    mac_address: "${mac}"
     networks:
       - zone: lab
-        networkname: lab_nw
+        network_name: lab_nw
         model: virtio
         cloudinit: true
         pxe: false
-        vmnetwork: false
-        hypervisoruplink: n0p0
-        bridgename: n0p0_lab_nw
+        vm_network: false
+        hypervisor_uplink: n0p0
+        bridge_name: n0p0_lab_nw
         ip: ${ip ? `"${ip}"` : '""'}
-        defaultroute: true
-        tcpopen:
+        default_route: true
+        tcp_open:
           - 22
-        udpopen: []
-        servicesopen: []
+        udp_open: []
+        services_open: []
 `;
 }
 

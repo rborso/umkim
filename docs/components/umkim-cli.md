@@ -199,7 +199,7 @@ umkim site host provision homelab vm01 --wait
 umkim site host provision homelab bm01 --confirm --wait
 ```
 
-Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`).
+Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`). Put `ansible_host` in both `guests.yml` and `host_vars/{guest}.yml` when the guest needs a static address. Use `vm_location: least-utilized` (or `auto`) only before first placement; after a successful `create_vm`, the hub rewrites inventory to the resolved hypervisor and auto-syncs to the jumphost — `umkim site host get` then shows the concrete name (for example `virt02`). Reset to `least-utilized` explicitly to re-run placement.
 
 `install_bm` / `destroy` require `--confirm`. See
 [provisioner-connector-plan.md](../provisioner-connector-plan.md).

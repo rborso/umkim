@@ -62,7 +62,7 @@ func TestRefreshRunningJobSuccess(t *testing.T) {
 	}
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, invCM, job).Build()
 
-	if err := RefreshRunningJob(context.Background(), c, ns, site, nil); err != nil {
+	if err := RefreshRunningJob(context.Background(), c, ns, site, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if site.Status.Provision.Current != nil {

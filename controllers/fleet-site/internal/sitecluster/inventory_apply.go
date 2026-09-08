@@ -11,7 +11,6 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/nodeops"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -268,7 +267,12 @@ func syncInventoryGuestClusterStatus(ctx context.Context, c client.Client, ns, s
 	}
 	fcj, err := nodeops.FindFleetClusterJoin(ctx, c, ns, fcjName)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
+		if nodeops.IsClusterNotFound(err) {
+			if h.Status.Cluster != nil {
+				return yaidap.UpdateGuestStatus(ctx, c, ns, siteName, h.Name, yaidap.GuestStatus{
+					Cluster: &fleetv1alpha1.SiteHostClusterStatus{},
+				})
+			}
 			return nil
 		}
 		return err

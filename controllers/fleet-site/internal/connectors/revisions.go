@@ -18,8 +18,9 @@ const (
 	RevisionScopeCatalog RevisionScope = "catalog"
 	RevisionScopeGuest   RevisionScope = "guest"
 	RevisionScopeFile    RevisionScope = "file"
-	RevisionScopeImport  RevisionScope = "import"
-	RevisionScopeSync    RevisionScope = "sync"
+	RevisionScopeImport    RevisionScope = "import"
+	RevisionScopeSync      RevisionScope = "sync"
+	RevisionScopeProvision RevisionScope = "provision"
 )
 
 // Revision is one append-only inventory change record.

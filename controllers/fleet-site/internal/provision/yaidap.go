@@ -67,7 +67,7 @@ func DefaultYaidapInvocation(action string, confirm bool) (YaidapInvocation, err
 	case fleetv1alpha1.ProvisionActionCreateVM:
 		return YaidapInvocation{
 			Playbook: "playbooks/provision-vms.yml",
-			Tags:     []string{"create"},
+			Tags:     []string{"create", "never"},
 		}, nil
 	case fleetv1alpha1.ProvisionActionPlanVM:
 		return YaidapInvocation{

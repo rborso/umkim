@@ -34,6 +34,15 @@ type jump struct {
 	user, host, port string
 }
 
+// ParseJumphost splits user@host:port (defaultUser when user omitted).
+func ParseJumphost(raw, defaultUser string) (user, host, port string, ok bool) {
+	j, ok := parseJumphost(raw, defaultUser)
+	if !ok {
+		return "", "", "", false
+	}
+	return j.user, j.host, j.port, true
+}
+
 func parseJumphost(raw, defaultUser string) (jump, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

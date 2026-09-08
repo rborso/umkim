@@ -392,9 +392,13 @@
         if [ -n "{{ _prov_tags }}" ]; then
           TAGS_ARGS=(--tags "{{ _prov_tags }}")
         fi
+        LIMIT="{{ fleet_provision_subject }}"
+        if [ "{{ fleet_provision_action }}" = "create_vm" ]; then
+          LIMIT="${LIMIT},hypervisors"
+        fi
         ansible-playbook "{{ _prov_playbook }}" \
           -i "{{ fleet_provision_inventory_path }}" \
-          --limit "{{ fleet_provision_subject }}" \
+          --limit "${LIMIT}" \
           "${TAGS_ARGS[@]}"{%- for arg in _yaidap_extra_argv %} {{ arg | quote }}{%- endfor %}
       args:
         executable: /bin/bash
@@ -416,6 +420,32 @@
           (fleet_provision_sync_host | default(false) | bool)
           or (fleet_provision_sync_from_store | default(false) | bool)
         - fleet_provision_action == 'create_vm'
+
+    - name: Sync resolved vm_location into jumphost guests.yml
+      ansible.builtin.shell: |
+        set -euo pipefail
+        GUESTS="{{ fleet_provision_inventory_path }}/guests.yml"
+        SUBJ="{{ fleet_provision_subject }}"
+        LOC="{{ fleet_resolved_vm_location.stdout | default('') | trim }}"
+        [ -n "$LOC" ] || exit 0
+        [ -f "$GUESTS" ] || exit 0
+        awk -v n="$SUBJ" -v loc="$LOC" '
+          $0 ~ "^[[:space:]]*" n ":[[:space:]]*$" { f=1; print; next }
+          f && /^[[:space:]]+[A-Za-z0-9._-]+:[[:space:]]*$/ { f=0 }
+          f && /^[[:space:]]+vm_location:[[:space:]]*/ {
+            sub(/^.*vm_location:[[:space:]]*/, "  vm_location: " loc); print; next
+          }
+          { print }
+        ' "$GUESTS" > "$GUESTS.tmp" && mv "$GUESTS.tmp" "$GUESTS"
+      args:
+        executable: /bin/bash
+      changed_when: true
+      when:
+        - >-
+          (fleet_provision_sync_host | default(false) | bool)
+          or (fleet_provision_sync_from_store | default(false) | bool)
+        - fleet_provision_action == 'create_vm'
+        - fleet_resolved_vm_location.stdout | default('') | trim | length > 0
 
     - name: Emit resolved vm_location marker for hub
       ansible.builtin.debug:

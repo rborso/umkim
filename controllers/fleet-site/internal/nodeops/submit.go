@@ -3,12 +3,21 @@ package nodeops
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// ErrClusterNotFound indicates no FleetClusterJoin matches the cluster name.
+var ErrClusterNotFound = fmt.Errorf("cluster not found")
+
+// IsClusterNotFound reports whether err indicates a missing FleetClusterJoin.
+func IsClusterNotFound(err error) bool {
+	return err != nil && (errors.Is(err, ErrClusterNotFound) || apierrors.IsNotFound(err))
+}
 
 const AnnotationNodeOperationRequest = "fleet.umkim.com/node-operation-request"
 
@@ -20,7 +29,7 @@ func SubmitRequest(ctx context.Context, c client.Client, ns, clusterName string,
 	var fcj fleetv1alpha1.FleetClusterJoin
 	if err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: clusterName}, &fcj); err != nil {
 		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("cluster not found")
+			return ErrClusterNotFound
 		}
 		return err
 	}
@@ -68,5 +77,5 @@ func FindFleetClusterJoin(ctx context.Context, c client.Client, ns, clusterName 
 			return &list.Items[i], nil
 		}
 	}
-	return nil, fmt.Errorf("cluster %q not found", clusterName)
+	return nil, fmt.Errorf("%w: %q", ErrClusterNotFound, clusterName)
 }

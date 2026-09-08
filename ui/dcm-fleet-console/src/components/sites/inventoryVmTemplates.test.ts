@@ -16,7 +16,7 @@ describe('inventoryVmTemplates', () => {
   it('templates host_vars for a guest path', () => {
     const body = templateForNewInventoryFile('host_vars/my-guest.yml');
     expect(body).toContain('provisioning_provider: libvirt');
-    expect(body).toContain('networkname: lab_nw');
+    expect(body).toContain('network_name: lab_nw');
   });
 
   it('renders host_vars with static IP when provided', () => {

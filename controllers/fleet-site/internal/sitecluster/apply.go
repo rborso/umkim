@@ -372,7 +372,10 @@ func syncClusterStatus(ctx context.Context, c client.Client, ns, siteName string
 	}
 	fcj, err := nodeops.FindFleetClusterJoin(ctx, c, ns, fcjName)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
+		if nodeops.IsClusterNotFound(err) {
+			if rec.Status.Cluster != nil {
+				return sitehosts.UpdateClusterStatus(ctx, c, ns, siteName, rec.Name, fleetv1alpha1.SiteHostClusterStatus{})
+			}
 			return nil
 		}
 		return err

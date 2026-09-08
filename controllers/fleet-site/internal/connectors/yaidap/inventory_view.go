@@ -8,6 +8,7 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -79,6 +80,18 @@ func UpdateGuestStatus(ctx context.Context, c client.Client, ns, siteName string
 		if st.Cluster == nil {
 			st.Cluster = existing.Cluster
 		}
+		if st.VmLocation == "" {
+			st.VmLocation = existing.VmLocation
+		}
+		if st.LastProvisionID == "" {
+			st.LastProvisionID = existing.LastProvisionID
+		}
+		if st.AnsibleHost == "" {
+			st.AnsibleHost = existing.AnsibleHost
+		}
+		if st.Kind == "" {
+			st.Kind = existing.Kind
+		}
 	}
 	doc.Guests[guestName] = st
 	raw, err := json.Marshal(doc)
@@ -121,11 +134,17 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 		if ip == "" {
 			ip = strings.TrimSpace(st.AnsibleHost)
 		}
+		vmLoc := strings.TrimSpace(entry.VmLocation)
+		if sitehosts.VmLocationIsScheduleToken(vmLoc) {
+			if concrete := strings.TrimSpace(st.VmLocation); concrete != "" && !sitehosts.VmLocationIsScheduleToken(concrete) {
+				vmLoc = concrete
+			}
+		}
 		out = append(out, InventoryHostView{
 			Name:        name,
 			External:    external,
 			AnsibleHost: ip,
-			VmLocation:  strings.TrimSpace(entry.VmLocation),
+			VmLocation:  vmLoc,
 			Kind:        st.Kind,
 			Status:      st,
 			Clusters:    memberClusters[name],

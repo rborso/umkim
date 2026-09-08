@@ -76,7 +76,7 @@ Hub inventory is stored in ConfigMap `fleet-site-{site}-yaidap-inventory` as
 
 | Path | Synced to jumphost |
 |------|-------------------|
-| `guests.yml` | Yes — thin guest index (`ansible_host`, `vm_location`) |
+| `guests.yml` | Yes — thin guest index (`ansible_host`, `vm_location`; schedule tokens until first successful `create_vm`) |
 | `hypervisors.yml` | Yes — YAIDAP hypervisor group |
 | `{cluster}.yml` | Yes — Ansible group membership (hosts under the group key) |
 | `group_vars/all/all.yml` (+ optional `group_vars/all/*.yml`) | Yes — site storages, networks, defaults |
@@ -108,6 +108,10 @@ intent from root + `group_vars/` cluster files; use `POST …/cluster` to retry 
 1. Edit `guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/{guest}.yml`, `{cluster}.yml`, and `group_vars/{cluster}.yml` (console, CLI, or API).
 2. `POST …/provision/inventory/sync` — push synced YAML to jumphost.
 3. `POST …/hosts/{guest}/provision` — YAIDAP `create_vm`; hub marks guest status in `_meta/status.json`.
+   After successful placement, the controller rewrites `guests.yml` and
+   `host_vars/{guest}.yml` from schedule tokens (`least-utilized`, `auto`, or
+   empty) to the concrete hypervisor, marks inventory `dirty`, and enqueues an
+   inventory sync so the jumphost matches the hub.
 4. Reconciler **cluster-apply** — creates `FleetClusterJoin` from cluster group files when members are Ready.
 5. Download bootstrap bundle; run `bootstrap.sh` on first control (via jumphost).
 6. `POST /clusters/{name}/provision` — hub finalize (OCM, edge, providers).

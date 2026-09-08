@@ -620,7 +620,7 @@ func findProvisionAction(fs *fleetv1alpha1.FleetSite, id string) (fleetv1alpha1.
 
 func (s *Server) refreshProvisionJobIfNeeded(ctx context.Context, fs *fleetv1alpha1.FleetSite) {
 	cs, _ := s.localClientset()
-	_ = siteprovision.RefreshRunningJob(ctx, s.Client, s.Cfg.Namespace, fs, cs)
+	_ = siteprovision.RefreshRunningJob(ctx, s.Client, s.Cfg.Namespace, fs, cs, &s.Cfg)
 }
 
 func newProvisionActionID() string {

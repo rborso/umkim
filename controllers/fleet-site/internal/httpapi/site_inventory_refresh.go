@@ -9,6 +9,7 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/siteinventory"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,7 +29,7 @@ func (s *Server) refreshInventoryJobs(ctx context.Context, fs *fleetv1alpha1.Fle
 	}
 	for i := range list.Items {
 		job := &list.Items[i]
-		if !strings.HasPrefix(job.Name, siteInventoryJobPrefix) {
+		if !strings.HasPrefix(job.Name, siteinventory.JobPrefix) {
 			continue
 		}
 		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
