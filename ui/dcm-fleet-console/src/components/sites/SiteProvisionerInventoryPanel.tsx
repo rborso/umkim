@@ -7,6 +7,7 @@ import {
   FormHelperText,
   Label,
   Modal,
+  NumberInput,
   TextArea,
   TextInput,
   Title,
@@ -173,10 +174,29 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
   const [addVmOpen, setAddVmOpen] = useState(false);
+  const [addVmStep, setAddVmStep] = useState(1);
   const [vmGuestName, setVmGuestName] = useState('');
   const [vmLocation, setVmLocation] = useState('least-utilized');
   const [vmIp, setVmIp] = useState('');
+  const [vmCores, setVmCores] = useState(2);
+  const [vmMemory, setVmMemory] = useState(4096);
+  const [vmDiskSize, setVmDiskSize] = useState(40);
   const [vmMessage, setVmMessage] = useState('');
+
+  const resetAddVmForm = () => {
+    setAddVmStep(1);
+    setVmGuestName('');
+    setVmLocation('least-utilized');
+    setVmIp('');
+    setVmCores(2);
+    setVmMemory(4096);
+    setVmDiskSize(40);
+  };
+
+  const openAddVmModal = () => {
+    resetAddVmForm();
+    setAddVmOpen(true);
+  };
 
   const filePaths = useMemo(() => {
     const seen = new Set<string>();
@@ -316,13 +336,14 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         guestName: name,
         vmLocation: vmLocation.trim() || 'least-utilized',
         ip: vmIp.trim() || undefined,
+        cores: vmCores,
+        memory: vmMemory,
+        diskSizeGi: vmDiskSize,
       });
       await putSiteInventoryFile(siteName, 'guests.yml', guestsYaml);
       await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
       setAddVmOpen(false);
-      setVmGuestName('');
-      setVmLocation('least-utilized');
-      setVmIp('');
+      resetAddVmForm();
       setVmMessage(`Saved guests.yml and ${hostVarsPath}. Sync to jumphost, then provision on the Site hosts tab.`);
       await load();
       setSelectedPath(hostVarsPath);
@@ -438,7 +459,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         <Button variant="primary" isLoading={busy} onClick={() => void runSync()}>
           Sync to jumphost
         </Button>
-        <Button variant="secondary" onClick={() => setAddVmOpen(true)}>
+        <Button variant="secondary" onClick={openAddVmModal}>
           Add VM guest
         </Button>
         <Button variant="secondary" isLoading={busy} onClick={() => void runImportPreview()}>
@@ -545,48 +566,155 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         </div>
       </Modal>
 
-      <Modal title="Add VM guest" isOpen={addVmOpen} onClose={() => setAddVmOpen(false)}>
-        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-          Creates or updates <code>guests.yml</code> and <code>host_vars/&lt;name&gt;.yml</code> with a basic
-          lab VM profile. Edit uplinks/MAC in the saved file if needed, then sync and provision on Site hosts.
-        </p>
-        <Form>
-          <FormGroup label="Guest name" isRequired fieldId="vmGuestName">
-            <TextInput
-              id="vmGuestName"
-              value={vmGuestName}
-              onChange={(_e, v) => setVmGuestName(v)}
-              placeholder="e.g. lab-single-1-0"
-            />
-          </FormGroup>
-          <FormGroup label="VM location (hypervisor)" fieldId="vmLocation">
-            <TextInput
-              id="vmLocation"
-              value={vmLocation}
-              onChange={(_e, v) => setVmLocation(v)}
-              placeholder="least-utilized or virt01"
-            />
-          </FormGroup>
-          <FormGroup label="ansible_host / static IP (optional)" fieldId="vmIp">
-            <TextInput
-              id="vmIp"
-              value={vmIp}
-              onChange={(_e, v) => setVmIp(v)}
-              placeholder="172.16.10.161"
-            />
-            <FormHelperText>
-              Leave empty for DHCP in host_vars; set if the address is already known.
-            </FormHelperText>
-          </FormGroup>
-        </Form>
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-          <Button variant="primary" isLoading={busy} onClick={() => void addVmGuest()}>
-            Save guest files
-          </Button>
-          <Button variant="link" onClick={() => setAddVmOpen(false)}>
-            Cancel
-          </Button>
-        </div>
+      <Modal
+        title={`Add VM guest — step ${addVmStep} of 2`}
+        isOpen={addVmOpen}
+        onClose={() => {
+          setAddVmOpen(false);
+          resetAddVmForm();
+        }}
+      >
+        {addVmStep === 1 ? (
+          <>
+            <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+              Guest identity and placement. VM sizing is on the next step.
+            </p>
+            <Form>
+              <FormGroup label="Guest name" isRequired fieldId="vmGuestName">
+                <TextInput
+                  id="vmGuestName"
+                  value={vmGuestName}
+                  onChange={(_e, v) => setVmGuestName(v)}
+                  placeholder="e.g. lab-single-1-0"
+                />
+              </FormGroup>
+              <FormGroup label="VM location (hypervisor)" fieldId="vmLocation">
+                <TextInput
+                  id="vmLocation"
+                  value={vmLocation}
+                  onChange={(_e, v) => setVmLocation(v)}
+                  placeholder="least-utilized or virt01"
+                />
+              </FormGroup>
+              <FormGroup label="ansible_host / static IP (optional)" fieldId="vmIp">
+                <TextInput
+                  id="vmIp"
+                  value={vmIp}
+                  onChange={(_e, v) => setVmIp(v)}
+                  placeholder="172.16.10.161"
+                />
+                <FormHelperText>
+                  Leave empty for DHCP in host_vars; set if the address is already known.
+                </FormHelperText>
+              </FormGroup>
+            </Form>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (!vmGuestName.trim()) {
+                    setError(new Error('Guest name is required'));
+                    return;
+                  }
+                  setError(null);
+                  setAddVmStep(2);
+                }}
+              >
+                Next
+              </Button>
+              <Button
+                variant="link"
+                onClick={() => {
+                  setAddVmOpen(false);
+                  resetAddVmForm();
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+              Common VM settings for <code>{vmGuestName.trim()}</code>. Uplink network defaults stay in the
+              generated <code>host_vars</code> file — edit there if your site uses different zones or bridges.
+            </p>
+            <Form>
+              <FormGroup label="CPU cores" fieldId="vmCores">
+                <NumberInput
+                  inputName="vmCores"
+                  inputAriaLabel="CPU cores"
+                  value={vmCores}
+                  min={1}
+                  max={64}
+                  onChange={(event) => {
+                    const n = Number((event.target as HTMLInputElement).value);
+                    if (!Number.isNaN(n)) {
+                      setVmCores(Math.max(1, Math.min(64, n)));
+                    }
+                  }}
+                  onMinus={() => setVmCores((v) => Math.max(1, v - 1))}
+                  onPlus={() => setVmCores((v) => Math.min(64, v + 1))}
+                  style={{ maxWidth: '10rem' }}
+                />
+              </FormGroup>
+              <FormGroup label="Memory (MiB)" fieldId="vmMemory">
+                <NumberInput
+                  inputName="vmMemory"
+                  inputAriaLabel="Memory in MiB"
+                  value={vmMemory}
+                  min={512}
+                  step={512}
+                  onChange={(event) => {
+                    const n = Number((event.target as HTMLInputElement).value);
+                    if (!Number.isNaN(n)) {
+                      setVmMemory(Math.max(512, n));
+                    }
+                  }}
+                  onMinus={() => setVmMemory((v) => Math.max(512, v - 512))}
+                  onPlus={() => setVmMemory((v) => v + 512)}
+                  style={{ maxWidth: '10rem' }}
+                />
+                <FormHelperText>4096 MiB ≈ 4 GiB.</FormHelperText>
+              </FormGroup>
+              <FormGroup label="Boot disk size (GiB)" fieldId="vmDiskSize">
+                <NumberInput
+                  inputName="vmDiskSize"
+                  inputAriaLabel="Boot disk size in GiB"
+                  value={vmDiskSize}
+                  min={10}
+                  step={10}
+                  onChange={(event) => {
+                    const n = Number((event.target as HTMLInputElement).value);
+                    if (!Number.isNaN(n)) {
+                      setVmDiskSize(Math.max(10, n));
+                    }
+                  }}
+                  onMinus={() => setVmDiskSize((v) => Math.max(10, v - 10))}
+                  onPlus={() => setVmDiskSize((v) => v + 10)}
+                  style={{ maxWidth: '10rem' }}
+                />
+              </FormGroup>
+            </Form>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <Button variant="primary" isLoading={busy} onClick={() => void addVmGuest()}>
+                Save guest files
+              </Button>
+              <Button variant="secondary" onClick={() => setAddVmStep(1)}>
+                Back
+              </Button>
+              <Button
+                variant="link"
+                onClick={() => {
+                  setAddVmOpen(false);
+                  resetAddVmForm();
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
 
       <Modal title="Import preview" isOpen={importOpen} onClose={() => setImportOpen(false)} variant="large">

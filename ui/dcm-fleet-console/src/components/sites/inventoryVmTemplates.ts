@@ -6,6 +6,7 @@ export type VmGuestTemplateOptions = {
   ansibleHost?: string;
   memory?: number;
   cores?: number;
+  diskSizeGi?: number;
   os?: string;
   ip?: string;
   macaddress?: string;
@@ -25,6 +26,7 @@ external:
 export function guestHostVarsTemplate(opts: VmGuestTemplateOptions): string {
   const memory = opts.memory ?? 4096;
   const cores = opts.cores ?? 2;
+  const diskSize = opts.diskSizeGi ?? 40;
   const os = opts.os?.trim() || 'rocky-10';
   const ip = opts.ip?.trim() ?? '';
   const mac = opts.macaddress?.trim() || '52:54:00:00:00:01';
@@ -41,7 +43,7 @@ disks:
     bootdisk: true
     device: 0
     format: qcow2
-    size: 40
+    size: ${diskSize}
     storage: local
 uplinks:
   - name: n0p0

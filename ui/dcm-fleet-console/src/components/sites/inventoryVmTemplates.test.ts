@@ -26,4 +26,18 @@ describe('inventoryVmTemplates', () => {
     });
     expect(body).toContain('ip: "172.16.10.99"');
   });
+
+  it('renders host_vars with custom sizing', () => {
+    const body = guestHostVarsTemplate({
+      guestName: 'g1',
+      cores: 4,
+      memory: 8192,
+      diskSizeGi: 80,
+      os: 'fedora',
+    });
+    expect(body).toContain('cores: 4');
+    expect(body).toContain('memory: 8192');
+    expect(body).toContain('size: 80');
+    expect(body).toContain('os: fedora');
+  });
 });
