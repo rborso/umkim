@@ -200,6 +200,16 @@ provision job times out or fails later, a dedicated kubeconfig-sync Ansible job
 is retried automatically so node list APIs keep working. HA bundle hub provision
 jobs use a 90-minute deadline (single-node bundle jobs remain 30 minutes).
 
+Hub finalize inventory for HA sets **`fleet_site_sp_endpoint`** (WireGuard IP of
+the bootstrap control plane) in **`[site_bootstrap:vars]`**. Spoke ingress
+verification curls that overlay address for Traefik `/ping`, not the management
+LAN `ansible_host` used for jumphost SSH. Custom inventory must preserve this
+when `site_bootstrap` nodes use ProxyJump to lab addresses.
+
+The HA bootstrap bundle parallelizes peer kernel-module setup, skips redundant
+local kernel package installs when modules are already loaded, and uses shorter
+SSH wait loops before K3s install.
+
 Workers join during initial provision when listed in the FCJ `spec.nodes` at
 create time. Post-Ready add uses the same Ansible agent-join path without
 re-running full cluster provision.

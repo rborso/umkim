@@ -165,6 +165,14 @@ After the hub is ready and your WireGuard client can reach the overlay:
    an independent K3s cluster. Helm installs use FleetApp onto that Ready
    cluster; do not enable leftover provider playbooks.
 
+**HA clusters** (`ha_3_node`): bootstrap on three nodes often takes ~20 minutes;
+hub finalize can run up to **90 minutes** (Ansible Job deadline). Console and
+CLI flows default to **30-minute** polls — use `umkim cluster wait --timeout 90m`
+or raise `fleet_flow_poll_retries` in
+[cluster-create.yml](../playbooks/flows/cluster-create.yml) (default 90 × 20s).
+See [components/fleet-site.md](components/fleet-site.md) for hub inventory and
+spoke ingress probe details.
+
 To remove a cluster from the hub without wiping workloads, delete it with the
 default **detach** mode. Full K3s reset is opt-in (`cleanupKubernetes=true`).
 See [playbooks/flows/cluster-delete.yml](../playbooks/flows/cluster-delete.yml).

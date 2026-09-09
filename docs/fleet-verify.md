@@ -53,6 +53,11 @@ For example:
 Use `--cluster-spec` only with a reviewed flow file. A reinstall can delete
 cluster state, so confirm the target and recovery plan before running it.
 
+For **HA** presets (`lab-ha01`, `lab-3n01`), hub finalize Jobs allow up to
+**90 minutes**. Default flow polling in [cluster-create.yml](../playbooks/flows/cluster-create.yml)
+is 90 retries × 20s (30 minutes). Override `fleet_flow_poll_retries` (for example
+`270` for 90 minutes) when driving HA reinstall flows.
+
 Reports are written under `reports/verify-<layer>-<timestamp>/`. Protect
 reports if they contain operational identifiers or failure output.
 

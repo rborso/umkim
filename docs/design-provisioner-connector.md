@@ -1,7 +1,11 @@
 # Provisioner connector (implementation plan)
 
-> Status: **planned** (not implemented). Optional path to make hosts SSH-ready
-> before FleetClusterJoin / add-worker. Topology-neutral; no lab endpoints.
+> Status: **implemented** (YAIDAP connector, hub inventory API, CLI, partial
+> console). Optional path to make hosts SSH-ready before FleetClusterJoin /
+> add-worker. For rollout status and remaining work, see
+> [provisioner-connector-plan.md](provisioner-connector-plan.md) and
+> [components/fleet-site.md](components/fleet-site.md). Topology-neutral; no
+> lab endpoints.
 
 ## Intent (product)
 

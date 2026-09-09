@@ -67,7 +67,7 @@ umkim cluster list | get NAME | create -f cluster.yaml
 umkim cluster list --require gpu,kvm
 umkim cluster candidates [--require gpu|kvm|ha_topology|storage.rwx|…] [--site SITE]
 umkim cluster patch NAME [--jumphost user@host:port] [--ingress-id ID] [-f patch.json]
-umkim cluster provision NAME | wait NAME [--phase Ready]
+umkim cluster provision NAME | wait NAME [--phase Ready] [--timeout 30m]
 umkim cluster bootstrap NAME [--ssh-user linux]
 umkim cluster delete NAME [--cleanup-kubernetes]
 umkim cluster storage enable-local NAME [--dir /path] [--cluster-path NAME] [--force] [--wait 10m]
@@ -89,6 +89,7 @@ umkim chart delete NAME
 umkim node list --cluster NAME
 umkim node add --cluster NAME --address IP [--hostname HN]
 umkim node remove --cluster NAME NODE [--force]
+umkim node replace --cluster NAME --old-node NODE --address IP [--force]
 
 umkim node-op history --cluster NAME
 umkim node-op logs --cluster NAME --id ID
@@ -100,7 +101,10 @@ JSON or multipart `.tgz` upload. Example:
 
 `cluster create` + `bootstrap` + `provision` + `wait` mirrors
 [playbooks/flows/cluster-create.yml](../../playbooks/flows/cluster-create.yml).
-`node add/remove` mirrors [cluster-node-op.yml](../../playbooks/flows/cluster-node-op.yml).
+For **HA** (`ha_3_node`), hub finalize Jobs allow up to **90 minutes**; use
+`umkim cluster wait --timeout 90m` (default `--timeout` is 30m). Bootstrap on
+three nodes can take ~20 minutes before hub provision starts.
+`node add/remove/replace` mirrors [cluster-node-op.yml](../../playbooks/flows/cluster-node-op.yml).
 
 ## Output
 

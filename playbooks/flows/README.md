@@ -8,7 +8,9 @@ for the supported installation path.
 
 - [site-create.yml](site-create.yml) creates site records.
 - [cluster-create.yml](cluster-create.yml) drives cluster creation and
-  provisioning steps.
+  provisioning steps. For **HA** topologies, raise `fleet_flow_poll_retries`
+  (default 90 × 20s = 30m) to match the 90-minute hub provision Job deadline;
+  see [fleet-site.md](../../docs/components/fleet-site.md).
 - [cluster-delete.yml](cluster-delete.yml) drives cluster removal. Default:
   **detach** from hub (preserves K3s and workloads). Opt-in full K3s reset:
   `fleet_flow_cleanup_kubernetes=true`.

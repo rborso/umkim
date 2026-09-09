@@ -2,7 +2,8 @@
 
 > Status: **Phase 1–3 implemented**; **native Ansible/YAIDAP inventory tree** (root group files, `group_vars/`, `host_vars/`, scoped sync) landed in v0.2.
 > OpenTofu/Terraform (phase 4) and hardening (phase 5) not done.
-> Console Provision panel not shipped yet.
+> Console ships Sites → **Provisioner inventory** and **Site hosts** panels; a
+> unified “Provision” wizard step remains optional.
 >
 > Related: [design.md](design.md), [fleet-site.md](components/fleet-site.md),
 > [design-provisioner-connector.md](design-provisioner-connector.md),
@@ -193,17 +194,18 @@ umkim site provision status SITE ACTION_ID
 
 ## Phase 3 — Product surfaces
 
-**Status: CLI done; console panel not started**
+**Status: CLI and partial console shipped** (`SiteProvisionerInventoryPanel`,
+`SiteHostsPanel`). Unified Provision wizard / cluster-create integration optional.
 
 **Deliverables**
 
-1. `umkim site provision …` CLI (list/get/set/run/wait).
-2. Console Site → Provision panel + link into cluster create / add-worker.
+1. `umkim site provision …` CLI (list/get/set/run/wait). **Done**
+2. Console Site → provisioner inventory + site hosts. **Done**
 3. Optional: cluster create wizard step “Provision nodes first” when site has
    non-noop provider.
 4. History UX aligned with node-op / KubeVirt history (log tail).
 5. Update [umkim-cli.md](components/umkim-cli.md), console README, [install.md](install.md)
-   (“optional metal provision”).
+   (“optional metal provision”). **Done**
 
 **Acceptance**
 
