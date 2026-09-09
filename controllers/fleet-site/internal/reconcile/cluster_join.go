@@ -849,6 +849,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString(fmt.Sprintf("fleet_cluster_name=%s\n", clusterName))
 		b.WriteString(fmt.Sprintf("fleet_site_id=%s\n", fcj.Spec.SiteId))
 		b.WriteString(fmt.Sprintf("fleet_site_wg_ip=%s/32\n", bootstrapWG))
+		b.WriteString(fmt.Sprintf("fleet_site_sp_endpoint=%s\n", bootstrapWG))
 		writeFleetClusterK3sNetworkVars(&b)
 		writeFleetClusterStorageVars(&b, fcj, clusterName)
 		writeFleetClusterEdgeVars(&b, fcj, site)

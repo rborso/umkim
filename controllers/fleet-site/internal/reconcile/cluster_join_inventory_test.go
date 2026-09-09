@@ -88,6 +88,13 @@ func TestBuildClusterInventoryINI_haUsesMgmtLANPerNode(t *testing.T) {
 	if !strings.Contains(ini, "[site_bootstrap:vars]") || !strings.Contains(ini, "calico_ip_autodetection_method=auto") {
 		t.Fatal("site_bootstrap:vars must include calico autodetection for bootstrap playbooks")
 	}
+	siteBootstrapVars := ini[strings.Index(ini, "[site_bootstrap:vars]"):]
+	if idx := strings.Index(siteBootstrapVars, "\n[ocm_spoke_join:children]"); idx >= 0 {
+		siteBootstrapVars = siteBootstrapVars[:idx]
+	}
+	if !strings.Contains(siteBootstrapVars, "fleet_site_sp_endpoint=10.10.0.10") {
+		t.Fatalf("site_bootstrap:vars must include overlay endpoint, got:\n%s", siteBootstrapVars)
+	}
 }
 
 func TestBuildClusterInventoryINI_haHubRunnerKeepsMgmtOnNodes(t *testing.T) {

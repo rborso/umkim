@@ -112,7 +112,7 @@
 - name: Fleet site | Probe spoke Traefik /ping via overlay
   ansible.builtin.command:
     cmd: >-
-      curl -sf -o /dev/null -w "%{http_code}"
+      curl -sf --connect-timeout 5 -o /dev/null -w "%{http_code}"
       http://{{ fleet_site_spoke_endpoint }}:{{ fleet_site_spoke_http_port }}/ping
   register: fleet_site_spoke_ping
   until: fleet_site_spoke_ping.stdout | trim == '200'
