@@ -207,11 +207,6 @@ install_kernel_modules_on_host() {
     persist_kernel_modules
     return 0
   fi
-  if command -v dnf >/dev/null 2>&1; then
-    dnf install -y kernel 2>/dev/null || true
-  else
-    yum install -y kernel 2>/dev/null || true
-  fi
   return 1
 }
 
@@ -261,7 +256,7 @@ ensure_kernel_modules_local() {
 wait_for_ssh_host() {
   local host="$1" i
   local ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes)
-  for i in $(seq 1 120); do
+  for i in $(seq 1 60); do
     if ssh "${ssh_opts[@]}" "linux@${host}" "true" 2>/dev/null; then
       return 0
     fi
@@ -291,7 +286,6 @@ if modprobe br_netfilter 2>/dev/null && modprobe overlay 2>/dev/null; then
   printf '%s\n' br_netfilter overlay > /etc/modules-load.d/fleet-k8s.conf
   exit 0
 fi
-dnf install -y kernel 2>/dev/null || yum install -y kernel
 if [[ ! -f /var/lib/fleet/peer-kmod-rebooted ]]; then
   mkdir -p /var/lib/fleet
   touch /var/lib/fleet/peer-kmod-rebooted
@@ -316,6 +310,7 @@ PEEREOF
 ensure_kernel_modules_peers() {
   local key_file="${BUNDLE_DIR}/ssh/id_rsa"
   local host
+  local -a pids=()
   [[ -f "${key_file}" ]] || return 0
   chmod 600 "${key_file}"
   while IFS= read -r host; do
@@ -324,8 +319,12 @@ ensure_kernel_modules_peers() {
       continue
     fi
     log "Ensuring kernel modules on peer ${host}"
-    ensure_kernel_modules_peer "${host}" || exit 1
+    ensure_kernel_modules_peer "${host}" &
+    pids+=("$!")
   done < <(inventory_mgmt_ips)
+  for pid in "${pids[@]}"; do
+    wait "${pid}" || exit 1
+  done
 }
 
 bundle_ssh_pubkey() {

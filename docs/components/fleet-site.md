@@ -197,7 +197,8 @@ When a cluster reaches **Ready**, the controller ensures a hub secret
 `fleet-system/fleet-kubeconfig-<cluster>` exists (SSH to the spoke API over the
 overlay). Provision playbooks sync it immediately after CSR approval; if a
 provision job times out or fails later, a dedicated kubeconfig-sync Ansible job
-is retried automatically so node list APIs keep working.
+is retried automatically so node list APIs keep working. HA bundle hub provision
+jobs use a 90-minute deadline (single-node bundle jobs remain 30 minutes).
 
 Workers join during initial provision when listed in the FCJ `spec.nodes` at
 create time. Post-Ready add uses the same Ansible agent-join path without

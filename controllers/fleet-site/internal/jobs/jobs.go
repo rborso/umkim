@@ -40,6 +40,10 @@ func ProvisionJob(ns, name, clusterName, siteID, topology string, bundleMode boo
 	if bundleMode {
 		playbook = "/ansible/cluster-provision-hub.yml"
 		deadline = 1800
+		if topology == "ha_3_node" {
+			// HA hub finalize (OCM join, CSR, ManifestWorks on 3 nodes) routinely exceeds 30m.
+			deadline = 5400
+		}
 	} else if topology == "ha_3_node" {
 		playbook = "/ansible/cluster-provision.yml"
 		deadline = 5400

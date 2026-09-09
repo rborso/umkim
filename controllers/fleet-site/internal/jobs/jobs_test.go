@@ -139,3 +139,14 @@ func TestValidateJobNoHubSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestProvisionJobHABundleDeadline(t *testing.T) {
+	job := ProvisionJob("fleet-console", "lab-ha-0", "lab-ha-0", "homelab", "ha_3_node", true, "img:tag", "ssh", "inv")
+	if job.Spec.ActiveDeadlineSeconds == nil || *job.Spec.ActiveDeadlineSeconds != 5400 {
+		t.Fatalf("expected HA bundle provision deadline 5400s, got %v", job.Spec.ActiveDeadlineSeconds)
+	}
+	cmd := strings.Join(job.Spec.Template.Spec.Containers[0].Command, " ")
+	if !strings.Contains(cmd, "cluster-provision-hub.yml") {
+		t.Fatalf("expected hub bundle playbook, got %v", job.Spec.Template.Spec.Containers[0].Command)
+	}
+}
