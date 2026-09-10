@@ -29,7 +29,7 @@ func ValidateInventoryFile(path, content string) error {
 		return connectors.ErrInvalidInventoryPath
 	default:
 		if connectors.IsRootInventoryGroupFile(path) {
-			return validateRootInventoryGroupFile(path, content, "")
+			return validateRootInventoryGroupFile(path, content, "", "")
 		}
 		if strings.HasPrefix(path, "group_vars/") && strings.HasSuffix(path, ".yml") {
 			return validateGroupVarsYAML(path, content)
@@ -193,6 +193,22 @@ func guestInIndex(name string, doc GuestsYAML) bool {
 	return false
 }
 
+func inventoryHostListed(name, guestsYAML, hypervisorsYAML string) bool {
+	if guestsYAML != "" {
+		guests, err := ParseGuestsYAML(guestsYAML)
+		if err == nil && guestInIndex(name, guests) {
+			return true
+		}
+	}
+	if hypervisorsYAML != "" {
+		hvs, err := ParseHypervisorsYAML(hypervisorsYAML)
+		if err == nil && hypervisorInIndex(name, hvs) {
+			return true
+		}
+	}
+	return false
+}
+
 // ParseGuestsYAML parses guests.yml content.
 func ParseGuestsYAML(content string) (GuestsYAML, error) {
 	var doc GuestsYAML
@@ -230,7 +246,7 @@ func ValidateInventoryFileWithContext(path, content, guestsYAML, hypervisorsYAML
 		return validateHostVarsYAML(path, content, guestsYAML, hypervisorsYAML)
 	}
 	if connectors.IsRootInventoryGroupFile(path) {
-		return validateRootInventoryGroupFile(path, content, guestsYAML)
+		return validateRootInventoryGroupFile(path, content, guestsYAML, hypervisorsYAML)
 	}
 	if strings.HasPrefix(path, "group_vars/") && strings.HasSuffix(path, ".yml") {
 		return validateGroupVarsYAML(path, content)

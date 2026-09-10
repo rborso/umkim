@@ -17,7 +17,9 @@ func ActionSyncsYaidapInventory(action string) bool {
 	case fleetv1alpha1.ProvisionActionCreateVM,
 		fleetv1alpha1.ProvisionActionPlanVM,
 		fleetv1alpha1.ProvisionActionDestroy,
-		fleetv1alpha1.ProvisionActionInstallBM:
+		fleetv1alpha1.ProvisionActionInstallBM,
+		fleetv1alpha1.ProvisionActionDiscover,
+		fleetv1alpha1.ProvisionActionDiscoverPXE:
 		return true
 	default:
 		return false

@@ -179,7 +179,7 @@ random ansible tags from the UI; the connector owns the flow table.
 | Add host + Provision (`kind=vm`) | Render guest inventory fragment → `provision-vms.yml --tags create --limit NAME` |
 | Provision (`kind=bare_metal`) | Render host + TempXE flow → configure / confirm start / wait / disarm |
 | Deprovision | destroy tags / playbooks with confirm |
-| Discover | discovery playbooks; **results written into hub inventory**, not kept only in YAIDAP files |
+| Discover | `discover` (SSH) or `discover_pxe` (TempXE); import preview promotes `generated/` drafts into hub `host_vars/` + `hypervisors.yml` |
 | Status | status tags; map into host `status` |
 
 Playbook/tag names live in connector code + `siteDefaults`, not in the core

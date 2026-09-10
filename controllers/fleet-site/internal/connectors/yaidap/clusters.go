@@ -79,7 +79,7 @@ func ParseClusterFileYAML(content string) (ClusterSpec, error) {
 	return spec, nil
 }
 
-func validateClusterSpec(name string, spec ClusterSpec, guestsYAML string) error {
+func validateClusterSpec(name string, spec ClusterSpec, guestsYAML, hypervisorsYAML string) error {
 	if err := ValidateGuestName(name); err != nil {
 		return fmt.Errorf("cluster %q: invalid name: %w", name, err)
 	}
@@ -95,20 +95,12 @@ func validateClusterSpec(name string, spec ClusterSpec, guestsYAML string) error
 			return fmt.Errorf("cluster %q: controlPlaneVip required for ha_3_node", name)
 		}
 	}
-	var guests GuestsYAML
-	if guestsYAML != "" {
-		var err error
-		guests, err = ParseGuestsYAML(guestsYAML)
-		if err != nil {
-			return err
-		}
-	}
 	for _, m := range spec.Members {
 		if err := ValidateGuestName(m); err != nil {
 			return fmt.Errorf("cluster %q member %q: %w", name, m, err)
 		}
-		if guestsYAML != "" && !guestInIndex(m, guests) {
-			return fmt.Errorf("cluster %q: member %q not in guests.yml", name, m)
+		if (guestsYAML != "" || hypervisorsYAML != "") && !inventoryHostListed(m, guestsYAML, hypervisorsYAML) {
+			return fmt.Errorf("cluster %q: member %q not listed in guests.yml, external.hosts, or hypervisors.yml", name, m)
 		}
 	}
 	return nil
@@ -120,7 +112,7 @@ func validateClustersYAML(content, guestsYAML string) error {
 		return err
 	}
 	for name, spec := range doc.Clusters {
-		if err := validateClusterSpec(name, spec, guestsYAML); err != nil {
+		if err := validateClusterSpec(name, spec, guestsYAML, ""); err != nil {
 			return err
 		}
 	}
@@ -137,7 +129,7 @@ func validateLegacyClusterFile(path, content, guestsYAML string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	return validateClusterSpec(name, spec, guestsYAML)
+	return validateClusterSpec(name, spec, guestsYAML, "")
 }
 
 func validateClusterGroupVars(path, content, guestsYAML string, members []string) error {
@@ -151,7 +143,7 @@ func validateClusterGroupVars(path, content, guestsYAML string, members []string
 		return fmt.Errorf("%s: %w", path, err)
 	}
 	spec.Members = members
-	return validateClusterSpec(name, spec, guestsYAML)
+	return validateClusterSpec(name, spec, guestsYAML, "")
 }
 
 // ParseInventoryGroupMembers reads host names from a root Ansible group file.
@@ -193,7 +185,7 @@ type inventoryGroupBody struct {
 	Children map[string]interface{} `yaml:"children"`
 }
 
-func validateRootInventoryGroupFile(path, content, guestsYAML string) error {
+func validateRootInventoryGroupFile(path, content, guestsYAML, hypervisorsYAML string) error {
 	groupName := connectors.RootInventoryGroupName(path)
 	if groupName == "" {
 		return fmt.Errorf("invalid root group file %q", path)
@@ -202,14 +194,10 @@ func validateRootInventoryGroupFile(path, content, guestsYAML string) error {
 	if err != nil {
 		return err
 	}
-	if guestsYAML != "" {
-		guests, err := ParseGuestsYAML(guestsYAML)
-		if err != nil {
-			return err
-		}
+	if guestsYAML != "" || hypervisorsYAML != "" {
 		for _, m := range members {
-			if !guestInIndex(m, guests) {
-				return fmt.Errorf("%s: member %q not listed in guests.yml or external.hosts", path, m)
+			if !inventoryHostListed(m, guestsYAML, hypervisorsYAML) {
+				return fmt.Errorf("%s: member %q not listed in guests.yml, external.hosts, or hypervisors.yml", path, m)
 			}
 		}
 	}
@@ -232,6 +220,7 @@ func LoadClustersFile(ctx context.Context, c client.Client, ns, siteName string)
 func LoadClustersFromData(data map[string]string) ClustersDoc {
 	doc := ClustersDoc{Clusters: map[string]ClusterSpec{}}
 	guestsYAML, _ := connectors.GetInventoryFile(data, "guests.yml")
+	hypervisorsYAML, _ := connectors.GetInventoryFile(data, "hypervisors.yml")
 	for _, info := range connectors.ListInventoryFiles(data) {
 		if !connectors.IsRootInventoryGroupFile(info.Path) {
 			continue
@@ -252,7 +241,7 @@ func LoadClustersFromData(data map[string]string) ClustersDoc {
 			continue
 		}
 		spec.Members = members
-		if err := validateClusterSpec(name, spec, guestsYAML); err != nil {
+		if err := validateClusterSpec(name, spec, guestsYAML, hypervisorsYAML); err != nil {
 			continue
 		}
 		doc.Clusters[name] = spec
@@ -278,7 +267,7 @@ func loadLegacyClustersFromData(data map[string]string, guestsYAML string) Clust
 		if err != nil {
 			continue
 		}
-		if err := validateClusterSpec(name, spec, guestsYAML); err != nil {
+		if err := validateClusterSpec(name, spec, guestsYAML, ""); err != nil {
 			continue
 		}
 		doc.Clusters[name] = spec

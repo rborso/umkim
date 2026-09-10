@@ -279,6 +279,7 @@ export interface SiteInventoryImportChange {
   diff?: string;
   remote?: string;
   local?: string;
+  warnings?: string[];
 }
 
 export interface SiteInventoryEnvelope {

@@ -54,14 +54,14 @@ inventory path. On success the action returns a handoff host fragment
 | `GET` / `PUT` / `PATCH /sites/{name}/provision` | Connector binding |
 | `GET /sites/{name}/provision/inventory` | Meta, file index, legacy read-only guest/catalog projection |
 | `GET/PUT/DELETE /sites/{name}/provision/inventory/files/{path}` | Native Ansible/YAIDAP YAML tree (see layout below) |
-| `GET /sites/{name}/provision/inventory/hosts` | Derived host rows (`guests.yml` + `_meta/status.json`) |
+| `GET /sites/{name}/provision/inventory/hosts` | Derived host rows (`guests.yml`, `hypervisors.yml`, `_meta/status.json`) |
 | `GET /sites/{name}/provision/inventory/clusters` | Aggregated cluster intent from root `{cluster}.yml` + `group_vars/{cluster}.yml` |
 | `POST /sites/{name}/provision/inventory/migrate` | One-shot legacy JSON / site-hosts → YAML migration |
 | `POST/GET /sites/{name}/provision/inventory/import/preview` | Pull jumphost tree; per-file diff (no write) |
 | `POST /sites/{name}/provision/inventory/import/apply` | Merge selected preview paths into hub store |
 | `GET /sites/{name}/provision/inventory/revisions[/{id}]` | Timestamped revision log + diff |
 | `POST /sites/{name}/provision/inventory/sync` | Push synced YAML files to jumphost |
-| `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `status` |
+| `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `discover_pxe`, `status` |
 | `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
 | `GET /sites/{name}/hosts` | Derived host list (same source as `/provision/inventory/hosts`) |
 | `POST/PATCH/DELETE /sites/{name}/hosts/{host}` | **Deprecated** — use inventory file API |
@@ -124,9 +124,28 @@ In bundle mode, hub provision accepts **`Enrolled`** phase (bootstrap enrolls
 before the progress POST marks `Validated`) so `cluster provision` is not
 blocked when local validate/provision-local already ran on the node.
 
-Destructive actions require `confirm=true`. Greenfield
+Destructive actions require `confirm=true`. **`install_bm`** runs a composite
+TempXE flow on the jumphost: arm kickstart (`install_os=true`), start PXE,
+UEFI network boot on the target hypervisor, wait for kickstart completion
+(non-empty `/root/ks-post.log` + new `boot_id`), then `tempxe_stop`. Hypervisors listed in
+`hypervisors.yml` appear in host APIs as `kind: bare_metal`. Greenfield
 `POST /sites/{name}/provision` (site bootstrap) is unchanged and separate from
 the connector binding GET/PUT paths.
+
+**Hardware discovery (`discover`, `discover_pxe`)** collects NIC/disk drafts via
+YAIDAP on the jumphost. Both actions auto-sync hub inventory before running.
+
+| Action | Requires | YAIDAP sketch |
+|--------|----------|---------------|
+| `discover` | Host in inventory with reachable `ansible_host` | `discover-hosts.yml --tags check_host_details` |
+| `discover_pxe` | `confirm=true`; host in `hypervisors.yml`; `host_vars` with `tempxe_discovery.enabled: true` and uplink `mac_address` | TempXE arm → optional PXE reboot → wait for discovery tarball → `collect_discovery` → `tempxe_stop` |
+
+Discovery output lands under jumphost `generated/` (`host_vars/`, `hosts/`,
+`pxe-discovery/`). **Import preview** reads those drafts and promotes them into
+canonical hub paths (`host_vars/{name}.yml`, merged `hypervisors.yml`). Discovery
+drafts often include `CHANGE_ME` placeholders; **import preview** surfaces
+`warnings` on affected paths. Resolve them before sync or the next provision
+action. When `ansible_host` is unknown, PXE discovery waits for a manual reboot.
 
 Plan and operator notes:
 [provisioner-connector-plan.md](../provisioner-connector-plan.md),

@@ -231,9 +231,22 @@ func (s *Server) applySiteInventoryImport(ctx context.Context, w http.ResponseWr
 		writeJSON(w, http.StatusOK, map[string]string{"status": "no changes"})
 		return
 	}
+	warnings := importApplyWarnings(put)
 	if err := connectors.PutInventoryFiles(ctx, s.Client, s.Cfg.Namespace, siteName, fleetv1alpha1.ProvisionProviderYaidap, connectors.FormatActor(actor.Kind, actor.Name), put, yaidap.ValidateInventoryFile); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"applied": len(put), "paths": req.Paths})
+	resp := map[string]interface{}{"applied": len(put), "paths": req.Paths}
+	if len(warnings) > 0 {
+		resp["warnings"] = warnings
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func importApplyWarnings(put map[string]string) []string {
+	var out []string
+	for path, content := range put {
+		out = append(out, yaidap.InventoryPlaceholderWarnings(path, content)...)
+	}
+	return out
 }

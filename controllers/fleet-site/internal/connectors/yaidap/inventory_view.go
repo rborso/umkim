@@ -116,6 +116,11 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 	if err != nil {
 		return nil, err
 	}
+	hypervisorsRaw, _ := connectors.GetInventoryFile(data, "hypervisors.yml")
+	hypervisors, err := ParseHypervisorsYAML(hypervisorsRaw)
+	if err != nil {
+		return nil, err
+	}
 	clustersDoc := LoadClustersFromData(data)
 	statusDoc := loadStatusDoc(data)
 	memberClusters := map[string][]string{}
@@ -156,6 +161,26 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 	for name, entry := range guests.External.Hosts {
 		add(name, entry, true)
 	}
+	for name, entry := range hypervisors.Hypervisors.Hosts {
+		st := statusDoc.Guests[name]
+		if st.Phase == "" {
+			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
+		}
+		if st.Kind == "" {
+			st.Kind = fleetv1alpha1.SiteHostKindBareMetal
+		}
+		ip := strings.TrimSpace(entry.AnsibleHost)
+		if ip == "" {
+			ip = strings.TrimSpace(st.AnsibleHost)
+		}
+		out = append(out, InventoryHostView{
+			Name:        name,
+			AnsibleHost: ip,
+			Kind:        fleetv1alpha1.SiteHostKindBareMetal,
+			Status:      st,
+			Clusters:    memberClusters[name],
+		})
+	}
 	return out, nil
 }
 
@@ -189,7 +214,7 @@ func GuestAddress(ctx context.Context, c client.Client, ns, siteName, guestName 
 	return "", fmt.Errorf("guest %q has no ansible_host", guestName)
 }
 
-// GuestExists reports whether a guest is listed in guests.yml or external.
+// GuestExists reports whether a host is listed in guests.yml, external, or hypervisors.yml.
 func GuestExists(ctx context.Context, c client.Client, ns, siteName, guestName string) (bool, error) {
 	data, err := connectors.Load(ctx, c, ns, siteName, provider)
 	if err != nil {
@@ -198,13 +223,26 @@ func GuestExists(ctx context.Context, c client.Client, ns, siteName, guestName s
 	if data == nil {
 		return false, nil
 	}
-	raw, ok := connectors.GetInventoryFile(connectors.NormalizeMetaKeys(data), "guests.yml")
-	if !ok {
-		return false, nil
+	data = connectors.NormalizeMetaKeys(data)
+	raw, ok := connectors.GetInventoryFile(data, "guests.yml")
+	if ok {
+		guests, err := ParseGuestsYAML(raw)
+		if err != nil {
+			return false, err
+		}
+		if guestInIndex(guestName, guests) {
+			return true, nil
+		}
 	}
-	guests, err := ParseGuestsYAML(raw)
-	if err != nil {
-		return false, err
+	hvRaw, ok := connectors.GetInventoryFile(data, "hypervisors.yml")
+	if ok {
+		hvs, err := ParseHypervisorsYAML(hvRaw)
+		if err != nil {
+			return false, err
+		}
+		if hypervisorInIndex(guestName, hvs) {
+			return true, nil
+		}
 	}
-	return guestInIndex(guestName, guests), nil
+	return false, nil
 }

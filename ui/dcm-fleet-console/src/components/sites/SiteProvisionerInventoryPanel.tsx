@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Button,
   Checkbox,
   Form,
@@ -31,7 +32,9 @@ import { ErrorAlert } from '../ErrorAlert';
 import {
   guestHostVarsTemplate,
   guestNameFromHostVarsPath,
+  hypervisorDiscoveryStubTemplate,
   mergeGuestIntoGuestsYaml,
+  mergeHypervisorIntoHypervisorsYaml,
   templateForNewInventoryFile,
 } from './inventoryVmTemplates';
 
@@ -182,6 +185,11 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [vmMemory, setVmMemory] = useState(4096);
   const [vmDiskSize, setVmDiskSize] = useState(40);
   const [vmMessage, setVmMessage] = useState('');
+  const [addDiscOpen, setAddDiscOpen] = useState(false);
+  const [discHostName, setDiscHostName] = useState('');
+  const [discAnsibleHost, setDiscAnsibleHost] = useState('');
+  const [discMac, setDiscMac] = useState('');
+  const [discPxeEnabled, setDiscPxeEnabled] = useState(true);
 
   const resetAddVmForm = () => {
     setAddVmStep(1);
@@ -196,6 +204,18 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const openAddVmModal = () => {
     resetAddVmForm();
     setAddVmOpen(true);
+  };
+
+  const resetAddDiscForm = () => {
+    setDiscHostName('');
+    setDiscAnsibleHost('');
+    setDiscMac('');
+    setDiscPxeEnabled(true);
+  };
+
+  const openAddDiscModal = () => {
+    resetAddDiscForm();
+    setAddDiscOpen(true);
   };
 
   const filePaths = useMemo(() => {
@@ -370,7 +390,51 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
     }
   };
 
-  const runImportPreview = async () => {
+  const addDiscoveryStub = async () => {
+    const name = discHostName.trim();
+    if (!name) {
+      setError(new Error('Host name is required'));
+      return;
+    }
+    if (discPxeEnabled && !discMac.trim()) {
+      setError(new Error('MAC address is required for PXE discovery profile'));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setVmMessage('');
+    try {
+      const hvResult = await getSiteInventoryFileOptional(siteName, 'hypervisors.yml');
+      const hypervisorsYaml = mergeHypervisorIntoHypervisorsYaml(hvResult.content, name, {
+        ansible_host: discAnsibleHost.trim() || undefined,
+      });
+      const hostVarsPath = `host_vars/${name}.yml`;
+      const hostVarsYaml = hypervisorDiscoveryStubTemplate({
+        name,
+        ansibleHost: discAnsibleHost.trim() || undefined,
+        macAddress: discMac.trim() || undefined,
+        pxeDiscovery: discPxeEnabled,
+      });
+      await putSiteInventoryFile(siteName, 'hypervisors.yml', hypervisorsYaml);
+      await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
+      setAddDiscOpen(false);
+      resetAddDiscForm();
+      setVmMessage(
+        `Saved hypervisors.yml and ${hostVarsPath}. Sync to jumphost, then run Discover on the Site hosts tab.`,
+      );
+      await load();
+      setSelectedPath(hostVarsPath);
+      setEditorContent(hostVarsYaml);
+      setFileMissing(false);
+      setEditorDirty(false);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runImportPreview = async (filterHost?: string) => {
     setBusy(true);
     setError(null);
     try {
@@ -379,9 +443,17 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         await new Promise((r) => setTimeout(r, 2000));
         const items = await getSiteInventoryImportPreview(siteName);
         if (items.length > 0) {
-          setImportItems(items);
+          const filtered =
+            filterHost?.trim()
+              ? items.filter(
+                  (item) =>
+                    item.path === 'hypervisors.yml' ||
+                    item.path === `host_vars/${filterHost.trim()}.yml`,
+                )
+              : items;
+          setImportItems(filtered.length > 0 ? filtered : items);
           const sel: Record<string, boolean> = {};
-          for (const item of items) {
+          for (const item of filtered.length > 0 ? filtered : items) {
             if (item.status !== 'unchanged') {
               sel[item.path] = true;
             }
@@ -462,6 +534,9 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         <Button variant="secondary" onClick={openAddVmModal}>
           Add VM guest
         </Button>
+        <Button variant="secondary" onClick={openAddDiscModal}>
+          Add discovery stub
+        </Button>
         <Button variant="secondary" isLoading={busy} onClick={() => void runImportPreview()}>
           Import preview
         </Button>
@@ -495,6 +570,11 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
               File not created yet — edit and save to create.
             </p>
           )}
+          {editorContent.includes('CHANGE_ME') ? (
+            <Alert variant="warning" title="CHANGE_ME placeholders present" isInline style={{ marginBottom: '0.75rem' }}>
+              Replace placeholder values before syncing to the jumphost or running provision actions.
+            </Alert>
+          ) : null}
           <Form style={{ maxWidth: '56rem' }}>
             <TextArea
               value={editorContent}
@@ -717,14 +797,70 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         )}
       </Modal>
 
+      <Modal title="Add discovery stub" isOpen={addDiscOpen} onClose={() => setAddDiscOpen(false)}>
+        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+          Creates a minimal hypervisor entry for YAIDAP hardware discovery (SSH or TempXE PXE).
+        </p>
+        <Form>
+          <FormGroup label="Host name" isRequired fieldId="discHostName">
+            <TextInput
+              id="discHostName"
+              value={discHostName}
+              onChange={(_e, v) => setDiscHostName(v)}
+              placeholder="e.g. new-hv01"
+            />
+          </FormGroup>
+          <FormGroup label="ansible_host (optional for PXE-only)" fieldId="discAnsibleHost">
+            <TextInput
+              id="discAnsibleHost"
+              value={discAnsibleHost}
+              onChange={(_e, v) => setDiscAnsibleHost(v)}
+              placeholder="172.16.10.99"
+            />
+            <FormHelperText>Required for SSH discovery; optional when using PXE-only workflow.</FormHelperText>
+          </FormGroup>
+          <FormGroup label="MAC address" fieldId="discMac">
+            <TextInput
+              id="discMac"
+              value={discMac}
+              onChange={(_e, v) => setDiscMac(v)}
+              placeholder="aa:bb:cc:dd:ee:ff"
+            />
+            <FormHelperText>Required for PXE discovery archive matching.</FormHelperText>
+          </FormGroup>
+          <FormGroup label="PXE discovery profile" fieldId="discPxeEnabled">
+            <Checkbox
+              id="discPxeEnabled"
+              isChecked={discPxeEnabled}
+              onChange={(_e, c) => setDiscPxeEnabled(c)}
+              label="Enable tempxe_discovery in host_vars (required for Discover PXE)"
+            />
+          </FormGroup>
+        </Form>
+        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <Button variant="primary" isLoading={busy} onClick={() => void addDiscoveryStub()}>
+            Save stub files
+          </Button>
+          <Button variant="link" onClick={() => setAddDiscOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </Modal>
+
       <Modal title="Import preview" isOpen={importOpen} onClose={() => setImportOpen(false)} variant="large">
         <p>Select jumphost files to merge into the hub store. Hub-only files are never overwritten.</p>
+        {importItems.some((item) => (item.warnings?.length ?? 0) > 0) ? (
+          <Alert variant="warning" title="CHANGE_ME placeholders detected" isInline style={{ marginBottom: '1rem' }}>
+            Resolve placeholder fields before sync or the next YAIDAP/ansible run.
+          </Alert>
+        ) : null}
         <Table variant="compact">
           <Thead>
             <Tr>
               <Th>Apply</Th>
               <Th>Path</Th>
               <Th>Status</Th>
+              <Th>Warnings</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -742,6 +878,17 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
                 </Td>
                 <Td>{item.path}</Td>
                 <Td>{item.status}</Td>
+                <Td>
+                  {(item.warnings ?? []).length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem' }}>
+                      {(item.warnings ?? []).map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    '—'
+                  )}
+                </Td>
               </Tr>
             ))}
           </Tbody>

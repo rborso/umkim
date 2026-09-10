@@ -66,8 +66,9 @@ const (
 	ProvisionActionCreateVM  = "create_vm"
 	ProvisionActionPlanVM    = "plan_vm"
 	ProvisionActionDestroy   = "destroy"
-	ProvisionActionDiscover  = "discover"
-	ProvisionActionStatus    = "status"
+	ProvisionActionDiscover    = "discover"
+	ProvisionActionDiscoverPXE = "discover_pxe"
+	ProvisionActionStatus      = "status"
 )
 
 // Provision action phases.

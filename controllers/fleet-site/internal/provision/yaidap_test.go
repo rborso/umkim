@@ -18,6 +18,9 @@ func TestRequiresConfirm(t *testing.T) {
 	if RequiresConfirm("discover") {
 		t.Fatal("discover should not require confirm")
 	}
+	if !RequiresConfirm("discover_pxe") {
+		t.Fatal("discover_pxe should require confirm")
+	}
 }
 
 func TestDefaultYaidapInvocation(t *testing.T) {
@@ -41,5 +44,8 @@ func TestDefaultYaidapInvocation(t *testing.T) {
 	}
 	if bm.ConfirmE == "" {
 		t.Fatal("expected tempxe_confirm extra")
+	}
+	if len(bm.ExtraArgs) != 2 || bm.ExtraArgs[0] != "-e" || bm.ExtraArgs[1] != "install_os=true" {
+		t.Fatalf("expected install_os extra, got %+v", bm.ExtraArgs)
 	}
 }

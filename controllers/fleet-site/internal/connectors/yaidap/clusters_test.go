@@ -64,6 +64,27 @@ external:
 	}
 }
 
+func TestLoadClustersFromDataHypervisorMember(t *testing.T) {
+	data := map[string]string{
+		connectors.FileKey("lab-single-0.yml"):            "lab-single-0:\n  hosts:\n    virt03:\n",
+		connectors.FileKey("group_vars/lab-single-0.yml"): "topology: single_node\nautoApply: true\n",
+		connectors.FileKey("guests.yml"):                  "guests:\n  hosts: {}\nexternal:\n  hosts: {}\n",
+		connectors.FileKey("hypervisors.yml"): `hypervisors:
+  hosts:
+    virt03:
+      ansible_host: 172.16.10.4
+`,
+	}
+	doc := LoadClustersFromData(data)
+	spec, ok := doc.Clusters["lab-single-0"]
+	if !ok {
+		t.Fatalf("clusters=%v", doc.Clusters)
+	}
+	if len(spec.Members) != 1 || spec.Members[0] != "virt03" {
+		t.Fatalf("spec=%+v", spec)
+	}
+}
+
 func TestValidateHypervisorHostVars(t *testing.T) {
 	hvs := `hypervisors:
   hosts:

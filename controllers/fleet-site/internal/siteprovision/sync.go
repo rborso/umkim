@@ -57,6 +57,9 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 		if cur.Action == fleetv1alpha1.ProvisionActionPlanVM {
 			cur.Message = "YAIDAP placement plan succeeded (see job logs for assignments)"
 		}
+		if msg := yaidap.DiscoverySuccessMessage(cur.Action); msg != "" {
+			cur.Message = msg
+		}
 		cur.EndedAt = &end
 		enrichHandoffHost(ctx, c, ns, fs.Name, cur)
 		if cs != nil && strings.TrimSpace(cur.JobName) != "" {

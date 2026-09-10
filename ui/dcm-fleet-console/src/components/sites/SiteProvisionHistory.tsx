@@ -10,7 +10,8 @@ const ACTION_LABELS: Record<string, string> = {
   plan_vm: 'Plan VM placement',
   destroy: 'Destroy VM',
   install_bm: 'Install bare metal',
-  discover: 'Discover',
+  discover: 'Discover (SSH)',
+  discover_pxe: 'Discover (PXE)',
   status: 'Status',
 };
 
@@ -38,9 +39,10 @@ function formatWhen(iso?: string): string {
 type Props = {
   siteName: string;
   refreshKey: string;
+  onReviewDiscovery?: (hostName: string) => void;
 };
 
-export function SiteProvisionHistory({ siteName, refreshKey }: Props) {
+export function SiteProvisionHistory({ siteName, refreshKey, onReviewDiscovery }: Props) {
   const [items, setItems] = useState<SiteProvisionHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyError, setHistoryError] = useState<unknown>(null);
@@ -113,6 +115,7 @@ export function SiteProvisionHistory({ siteName, refreshKey }: Props) {
               <Th>Phase</Th>
               <Th>Message</Th>
               <Th>Logs</Th>
+              <Th>Review</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -133,6 +136,18 @@ export function SiteProvisionHistory({ siteName, refreshKey }: Props) {
                   {item.hasLogs || item.jobName ? (
                     <Button variant="link" isInline onClick={() => void openLogs(item)}>
                       View
+                    </Button>
+                  ) : (
+                    '—'
+                  )}
+                </Td>
+                <Td dataLabel="Review">
+                  {(item.action === 'discover' || item.action === 'discover_pxe') &&
+                  item.phase === 'Succeeded' &&
+                  item.subject &&
+                  onReviewDiscovery ? (
+                    <Button variant="link" isInline onClick={() => onReviewDiscovery(item.subject!)}>
+                      Review discovery
                     </Button>
                   ) : (
                     '—'

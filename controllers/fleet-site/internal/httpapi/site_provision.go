@@ -289,6 +289,18 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 			return
 		}
 	}
+	if action == fleetv1alpha1.ProvisionActionDiscover {
+		if err := yaidap.ValidateDiscoverAction(ctx, s.Client, s.Cfg.Namespace, siteName, subject, invHost, guestFound); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	if action == fleetv1alpha1.ProvisionActionDiscoverPXE {
+		if err := yaidap.ValidateDiscoverPXEAction(ctx, s.Client, s.Cfg.Namespace, siteName, subject); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	if req.Host == nil && guestFound {
 		kind := strings.TrimSpace(invHost.Kind)
 		if kind == "" && !invHost.External {
@@ -527,7 +539,7 @@ func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.
 		}
 		extra = append(extra, "-e", k+"="+v)
 	}
-	if guestFound && provision.ActionSyncsYaidapInventory(rec.Action) {
+	if provision.ActionSyncsYaidapInventory(rec.Action) && (guestFound || rec.Action == fleetv1alpha1.ProvisionActionInstallBM) {
 		syncExtra, err := s.yaidapProvisionInventoryExtra(ctx, fs, rec.Subject, rec.ActorKind, rec.ActorName)
 		if err != nil {
 			return "", err

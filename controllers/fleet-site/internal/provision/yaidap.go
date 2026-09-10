@@ -28,6 +28,7 @@ func ValidateAction(action string) error {
 		fleetv1alpha1.ProvisionActionPlanVM,
 		fleetv1alpha1.ProvisionActionDestroy,
 		fleetv1alpha1.ProvisionActionDiscover,
+		fleetv1alpha1.ProvisionActionDiscoverPXE,
 		fleetv1alpha1.ProvisionActionStatus:
 		return nil
 	default:
@@ -38,7 +39,9 @@ func ValidateAction(action string) error {
 // RequiresConfirm reports whether the action is destructive / PXE-arming class.
 func RequiresConfirm(action string) bool {
 	switch strings.TrimSpace(action) {
-	case fleetv1alpha1.ProvisionActionInstallBM, fleetv1alpha1.ProvisionActionDestroy:
+	case fleetv1alpha1.ProvisionActionInstallBM,
+		fleetv1alpha1.ProvisionActionDiscoverPXE,
+		fleetv1alpha1.ProvisionActionDestroy:
 		return true
 	default:
 		return false
@@ -64,6 +67,16 @@ func DefaultYaidapInvocation(action string, confirm bool) (YaidapInvocation, err
 			Playbook: "playbooks/discover-hosts.yml",
 			Tags:     []string{"check_host_details"},
 		}, nil
+	case fleetv1alpha1.ProvisionActionDiscoverPXE:
+		inv := YaidapInvocation{
+			Playbook: "playbooks/configure-tempxe.yml",
+			Tags:     []string{"configure_tempxe", "tempxe_start"},
+		}
+		if confirm {
+			inv.ConfirmE = "tempxe_confirm=true"
+			inv.ExtraArgs = []string{"-e", "install_os=true"}
+		}
+		return inv, nil
 	case fleetv1alpha1.ProvisionActionCreateVM:
 		return YaidapInvocation{
 			Playbook: "playbooks/provision-vms.yml",
@@ -90,6 +103,7 @@ func DefaultYaidapInvocation(action string, confirm bool) (YaidapInvocation, err
 		}
 		if confirm {
 			inv.ConfirmE = "tempxe_confirm=true"
+			inv.ExtraArgs = []string{"-e", "install_os=true"}
 		}
 		return inv, nil
 	case fleetv1alpha1.ProvisionActionStatus:

@@ -170,8 +170,8 @@ func siteHostProvisionCmd() *cobra.Command {
 			return waitProvisionActionFromHostResponse(raw, args[0])
 		},
 	}
-	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | status (default from kind)")
-	c.Flags().BoolVar(&confirm, "confirm", false, "Required for install_bm / destroy")
+	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status (default from kind)")
+	c.Flags().BoolVar(&confirm, "confirm", false, "Required for install_bm / discover_pxe / destroy")
 	c.Flags().BoolVar(&wait, "wait", false, "Poll until Succeeded or Failed")
 	return c
 }

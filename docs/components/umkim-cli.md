@@ -205,8 +205,31 @@ umkim site host provision homelab bm01 --confirm --wait
 
 Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`). Put `ansible_host` in both `guests.yml` and `host_vars/{guest}.yml` when the guest needs a static address. Use `vm_location: least-utilized` (or `auto`) only before first placement; after a successful `create_vm`, the hub rewrites inventory to the resolved hypervisor and auto-syncs to the jumphost — `umkim site host get` then shows the concrete name (for example `virt02`). Reset to `least-utilized` explicitly to re-run placement.
 
-`install_bm` / `destroy` require `--confirm`. See
-[provisioner-connector-plan.md](../provisioner-connector-plan.md).
+`install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`install_bm`** is for
+hypervisors in `hypervisors.yml` (bare metal); it PXE-reinstalls the OS via
+TempXE on the site jumphost. Example:
+
+```bash
+umkim site host provision homelab virt03 --action install_bm --confirm --wait
+```
+
+**Hardware discovery** — stub a hypervisor in `hypervisors.yml` +
+`host_vars/{name}.yml` (console: *Add discovery stub*), sync, discover, then
+import promoted drafts:
+
+```bash
+umkim site inventory sync homelab --wait
+umkim site host provision homelab new-hv01 --action discover --wait
+# or PXE (TempXE; requires tempxe_discovery.enabled + MAC in host_vars):
+umkim site host provision homelab new-hv01 --action discover_pxe --confirm --wait
+umkim site inventory import preview homelab --wait
+umkim site inventory import apply homelab --confirm --paths host_vars/new-hv01.yml,hypervisors.yml
+```
+
+Import preview promotes jumphost `generated/host_vars/` and `generated/hosts/`
+into canonical hub paths; `notes.json` stays on the jumphost for reference.
+
+See [provisioner-connector-plan.md](../provisioner-connector-plan.md).
 
 Mutating commands print `OK: …` on success (and re-list ingress after site changes).
 Failures exit non-zero with an error (including when a patch is accepted but not

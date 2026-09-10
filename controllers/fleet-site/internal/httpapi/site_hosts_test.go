@@ -33,6 +33,11 @@ external:
     bm01:
       ansible_host: 203.0.113.11
 `,
+			"file.hypervisors.yml": `hypervisors:
+  hosts:
+    bm-hv01:
+      ansible_host: 203.0.113.12
+`,
 			"_meta.status.json": `{"guests":{"vm01":{"phase":"Declared"},"bm01":{"phase":"Declared"}}}`,
 		},
 	}
@@ -76,7 +81,7 @@ func TestSiteHostCRUDDeprecated(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Items) != 2 {
+	if len(listed.Items) != 3 {
 		t.Fatalf("items=%+v", listed.Items)
 	}
 }

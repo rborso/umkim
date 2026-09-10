@@ -10,16 +10,18 @@ import (
 
 // ImportFileChange describes one file difference between hub and jumphost.
 type ImportFileChange struct {
-	Path   string `json:"path"`
-	Status string `json:"status"` // unchanged, added, modified, deleted
-	Diff   string `json:"diff,omitempty"`
-	Remote string `json:"remote,omitempty"`
-	Local  string `json:"local,omitempty"`
+	Path     string   `json:"path"`
+	Status   string   `json:"status"` // unchanged, added, modified, deleted
+	Diff     string   `json:"diff,omitempty"`
+	Remote   string   `json:"remote,omitempty"`
+	Local    string   `json:"local,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // CompareImportFiles diffs remote (jumphost) files against hub store.
 func CompareImportFiles(localData map[string]string, remoteFiles map[string]string) []ImportFileChange {
 	localData = connectors.NormalizeMetaKeys(localData)
+	remoteFiles = PromoteDiscoveryFiles(localData, remoteFiles)
 	var paths []string
 	seen := map[string]bool{}
 	for p := range remoteFiles {
@@ -47,29 +49,29 @@ func CompareImportFiles(localData map[string]string, remoteFiles map[string]stri
 		remote, rok := remoteFiles[p]
 		switch {
 		case lok && rok && strings.TrimSpace(local) == strings.TrimSpace(remote):
-			out = append(out, ImportFileChange{Path: p, Status: "unchanged"})
+			out = append(out, attachImportWarnings(ImportFileChange{Path: p, Status: "unchanged", Local: local}))
 		case !lok && rok:
-			out = append(out, ImportFileChange{
+			out = append(out, attachImportWarnings(ImportFileChange{
 				Path:   p,
 				Status: "added",
 				Diff:   unifiedDiff("", remote, p),
 				Remote: remote,
-			})
+			}))
 		case lok && !rok:
-			out = append(out, ImportFileChange{
+			out = append(out, attachImportWarnings(ImportFileChange{
 				Path:  p,
 				Status: "deleted",
 				Diff:  unifiedDiff(local, "", p),
 				Local: local,
-			})
+			}))
 		default:
-			out = append(out, ImportFileChange{
+			out = append(out, attachImportWarnings(ImportFileChange{
 				Path:   p,
 				Status: "modified",
 				Diff:   unifiedDiff(local, remote, p),
 				Local:  local,
 				Remote: remote,
-			})
+			}))
 		}
 	}
 	return out
@@ -95,11 +97,23 @@ func ApplyImportFiles(localData map[string]string, remoteFiles map[string]string
 }
 
 func unifiedDiff(before, after, path string) string {
-	dmp := diffmatchpatch.New()
-	diffs := dmp.DiffMain(before, after, true)
-	diffs = dmp.DiffCleanupSemantic(diffs)
-	patch := dmp.PatchMake(before, diffs)
-	text := dmp.PatchToText(patch)
+	const maxDiffBytes = 256 << 10
+	if len(before)+len(after) > maxDiffBytes {
+		return fmt.Sprintf("--- %s\n+++ %s\n(content changed; diff omitted for size)", path, path)
+	}
+	var text string
+	func() {
+		defer func() {
+			if recover() != nil {
+				text = fmt.Sprintf("--- %s\n+++ %s\n(content changed)", path, path)
+			}
+		}()
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(before, after, true)
+		diffs = dmp.DiffCleanupSemantic(diffs)
+		patch := dmp.PatchMake(before, diffs)
+		text = dmp.PatchToText(patch)
+	}()
 	if strings.TrimSpace(text) == "" {
 		return fmt.Sprintf("--- %s\n+++ %s\n(content changed)", path, path)
 	}

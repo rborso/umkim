@@ -51,7 +51,10 @@ func TestActionSyncsYaidapInventory(t *testing.T) {
 	if !ActionSyncsYaidapInventory("install_bm") {
 		t.Fatal("install_bm should sync inventory")
 	}
-	if ActionSyncsYaidapInventory("discover") {
-		t.Fatal("discover should not sync inventory")
+	if !ActionSyncsYaidapInventory("discover") {
+		t.Fatal("discover should sync inventory")
+	}
+	if !ActionSyncsYaidapInventory("discover_pxe") {
+		t.Fatal("discover_pxe should sync inventory")
 	}
 }
