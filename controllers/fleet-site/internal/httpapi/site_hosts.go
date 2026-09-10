@@ -13,43 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-type siteHostBody struct {
-	Name          string                         `json:"name"`
-	Kind          string                         `json:"kind"`
-	DesiredState  string                         `json:"desiredState,omitempty"`
-	AnsibleHost   string                         `json:"ansible_host,omitempty"`
-	AnsibleUser   string                         `json:"ansible_user,omitempty"`
-	OSFamily      string                         `json:"osFamily,omitempty"`
-	VmLocation    string                         `json:"vm_location,omitempty"`
-	Flavor        map[string]string              `json:"flavor,omitempty"`
-	Labels        map[string]string              `json:"labels,omitempty"`
-	ClusterIntent *fleetv1alpha1.SiteHostClusterIntent `json:"clusterIntent,omitempty"`
-	ProvisionNow  bool                           `json:"provisionNow,omitempty"`
-}
-
 type siteHostProvisionBody struct {
 	Action  string `json:"action,omitempty"`
 	Confirm bool   `json:"confirm"`
-}
-
-func (b siteHostBody) toRecord(nameOverride string) fleetv1alpha1.SiteHostRecord {
-	name := strings.TrimSpace(b.Name)
-	if nameOverride != "" {
-		name = nameOverride
-	}
-	return fleetv1alpha1.SiteHostRecord{
-		Name:          name,
-		Kind:          strings.TrimSpace(b.Kind),
-		DesiredState:  strings.TrimSpace(b.DesiredState),
-		AnsibleHost:   strings.TrimSpace(b.AnsibleHost),
-		AnsibleUser:   strings.TrimSpace(b.AnsibleUser),
-		OSFamily:      strings.TrimSpace(b.OSFamily),
-		VmLocation:    strings.TrimSpace(b.VmLocation),
-		Flavor:        b.Flavor,
-		Labels:        b.Labels,
-		ClusterIntent: b.ClusterIntent,
-		Status:        fleetv1alpha1.SiteHostStatus{Phase: fleetv1alpha1.SiteHostPhaseDeclared},
-	}
 }
 
 func (s *Server) handleSiteHostRoutes(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, rest string) {
@@ -63,14 +29,11 @@ func (s *Server) handleSiteHostRoutes(ctx context.Context, w http.ResponseWriter
 	}
 	switch {
 	case rest == "hosts":
-		switch r.Method {
-		case http.MethodGet:
-			s.listSiteHosts(ctx, w, siteName)
-		case http.MethodPost:
-			s.createSiteHost(ctx, w, r, siteName)
-		default:
+		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
+		s.listSiteHosts(ctx, w, siteName)
 	case strings.HasPrefix(rest, "hosts/"):
 		sub := strings.TrimPrefix(rest, "hosts/")
 		sub = strings.Trim(sub, "/")
@@ -86,16 +49,11 @@ func (s *Server) handleSiteHostRoutes(ctx context.Context, w http.ResponseWriter
 		}
 		switch hostSub {
 		case "":
-			switch r.Method {
-			case http.MethodGet:
-				s.getSiteHost(ctx, w, siteName, hostName)
-			case http.MethodPatch, http.MethodPut:
-				s.patchSiteHost(ctx, w, r, siteName, hostName)
-			case http.MethodDelete:
-				s.deleteSiteHost(ctx, w, r, siteName, hostName)
-			default:
+			if r.Method != http.MethodGet {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
 			}
+			s.getSiteHost(ctx, w, siteName, hostName)
 		case "provision":
 			if r.Method != http.MethodPost {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -179,18 +137,6 @@ func (s *Server) getSiteHost(ctx context.Context, w http.ResponseWriter, siteNam
 		}
 	}
 	http.Error(w, "not found", http.StatusNotFound)
-}
-
-func (s *Server) createSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName string) {
-	http.Error(w, "site host CRUD is deprecated; edit inventory YAML via /provision/inventory/files", http.StatusGone)
-}
-
-func (s *Server) patchSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	http.Error(w, "site host CRUD is deprecated; edit inventory YAML via /provision/inventory/files", http.StatusGone)
-}
-
-func (s *Server) deleteSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {
-	http.Error(w, "site host CRUD is deprecated; edit inventory YAML via /provision/inventory/files", http.StatusGone)
 }
 
 func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, hostName string) {

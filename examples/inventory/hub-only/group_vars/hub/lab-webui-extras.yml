@@ -5,4 +5,4 @@
 
 fleet_lab_webui_extras: false
 ocm_lab_enabled: false
-dcm_fleet_gateway_path: false
+umkim_console_gateway_path: false

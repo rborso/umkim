@@ -38,12 +38,12 @@ auth:
     redirectUrl: {{ fleet_auth_oidc_redirect_url | quote }}
 
 dashboard:
-  enabled: {{ dcm_fleet_dashboard_enabled | default(true) | bool }}
+  enabled: {{ umkim_console_enabled | default(true) | bool }}
   image:
-    repository: {{ dcm_fleet_console_image_name }}
-    tag: {{ dcm_fleet_console_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.1.0'))) }}
-    pullPolicy: {{ dcm_fleet_image_pull_policy | default('Always') }}
-  nodePort: {{ dcm_fleet_dashboard_nodeport }}
+    repository: {{ umkim_console_image_name }}
+    tag: {{ umkim_console_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.1.0'))) }}
+    pullPolicy: {{ umkim_console_image_pull_policy | default('Always') }}
+  nodePort: {{ umkim_console_nodeport }}
   buildId: {{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) | quote }}
   fleetAuthHost: "fleet-console-auth.{{ fleet_console_helm_namespace }}.svc.cluster.local:{{ fleet_console_auth_http_port }}"
   fleetSiteHost: "fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080"

@@ -150,13 +150,13 @@ Treat the config as a secret. Details and peer lifecycle are in
 
 After the hub is ready and your WireGuard client can reach the overlay:
 
-1. Sign in to the console through the private management path.
+1. Sign in to the UMKIM console through the private management path.
 2. Create a registry site other than the management site. Choose an exposure
    mode (`hub_gateway`, `port_forward`, `reverse_proxy`, or `none`) that
    matches how that location reaches the WAN. See
    [examples/site-profiles/](../examples/site-profiles/).
 3. Create a FleetClusterJoin cluster for that site.
-4. Download its bootstrap bundle through the authenticated console and treat
+4. Download its bootstrap bundle through the authenticated UMKIM console and treat
    the archive as a secret.
 5. Copy the bundle to a Rocky Linux 10 control node, run `sudo ./bootstrap.sh`,
    wait for **Validated**, then select **Provision**.

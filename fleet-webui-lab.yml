@@ -17,4 +17,4 @@
   roles:
     - role: fleet_webui
       tasks_from: lab_extras.yml
-      tags: [fleet_webui_lab, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]
+      tags: [fleet_webui_lab, ocm_webui, ocm_lab, umkim_console, fleet_console]

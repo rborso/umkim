@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UI_DIR="${ROOT}/ui/dcm-fleet-console"
+UI_DIR="${ROOT}/ui/umkim-console"
 
 export FLEET_CONSOLE_URL="${FLEET_CONSOLE_URL:-http://10.10.0.1:30912}"
 export FLEET_API_URL="${FLEET_API_URL:-${FLEET_CONSOLE_URL}/fleet/api/v1alpha1}"

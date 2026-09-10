@@ -3,5 +3,5 @@
   ansible.builtin.import_role:
     name: hub_ingress
     tasks_from: update_routes.yml
-  when: dcm_fleet_gateway_path | default(false) | bool
+  when: umkim_console_gateway_path | default(false) | bool
   tags: [fleet_console_auth, fleet_console_helm, fleet_console_gateway_routes]

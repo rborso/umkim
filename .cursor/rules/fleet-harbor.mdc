@@ -1,6 +1,6 @@
 ---
 description: Harbor registry, OLM ManifestWorks, FleetApp charts
-globs: roles/harbor/**,roles/olm/**,phase4.yml,harbor.yml,fleet-platform.yml
+globs: roles/harbor/**,roles/olm/**,harbor.yml,fleet-platform.yml
 alwaysApply: false
 ---
 

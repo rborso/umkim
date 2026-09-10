@@ -27,7 +27,7 @@ inventory/*.local.yml
 .umkim-vault-pass
 tmp/
 reports/
-ui/dcm-fleet-console/tsconfig.tsbuildinfo
+ui/umkim-console/tsconfig.tsbuildinfo
 controllers/fleet-edge/controller
 controllers/fleet-site/controller
 controllers/fleet-bootstrap/controller

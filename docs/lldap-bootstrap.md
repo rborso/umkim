@@ -14,7 +14,7 @@ The ingress stack can be configured to use the console directory. Otherwise it
 uses a separate directory. Treat them as separate identity stores unless shared
 operation is explicitly configured.
 
-## Console access model
+## UMKIM console access model
 
 Fleet roles are assigned through Fleet role bindings. The standard roles are
 `dc-admin`, `viewer`, `site-admin`, and `cluster-admin`.
@@ -25,7 +25,7 @@ Directory membership alone is not a substitute for reviewing the associated
 Fleet role binding.
 
 The LLDAP directory administrator is a directory-management identity. It does
-not automatically receive platform-administrator access to the fleet console.
+not automatically receive platform-administrator access to the UMKIM console.
 Create named human users and grant the minimum required group membership and
 role binding.
 

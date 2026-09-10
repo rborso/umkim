@@ -3,7 +3,7 @@
 # (same users/passwords as console login) — not a second LLDAP in fleet-ingress-auth.
 - name: Fleet ingress auth | Detect fleet-console LLDAP deployment
   ansible.builtin.command:
-    cmd: kubectl -n {{ fleet_webui_namespace | default('fleet-console') }} get deployment lldap -o json
+    cmd: kubectl -n {{ fleet_console_namespace | default('fleet-console') }} get deployment lldap -o json
   register: fia_console_lldap_deploy
   failed_when: false
   changed_when: false
@@ -14,7 +14,7 @@
 - name: Fleet ingress auth | Read console LLDAP bind password
   ansible.builtin.command:
     cmd: >-
-      kubectl -n {{ fleet_webui_namespace | default('fleet-console') }}
+      kubectl -n {{ fleet_console_namespace | default('fleet-console') }}
       get secret lldap-credentials -o jsonpath='{.data.LLDAP_LDAP_USER_PASS}'
   register: fia_console_lldap_pass_b64
   failed_when: false
@@ -29,7 +29,7 @@
     fleet_ingress_auth_use_console_lldap: true
     fleet_ingress_auth_lldap_deploy: false
     fleet_ingress_auth_lldap_external_url: >-
-      ldap://lldap.{{ fleet_webui_namespace | default('fleet-console') }}.svc.cluster.local:{{
+      ldap://lldap.{{ fleet_console_namespace | default('fleet-console') }}.svc.cluster.local:{{
       fleet_auth_lldap_ldap_port | default(fleet_ingress_auth_lldap_ldap_port) | default(3890) }}
     fleet_ingress_auth_lldap_base_dn: "{{ _base_dn }}"
     fleet_ingress_auth_lldap_admin_password: "{{ fia_console_lldap_pass_b64.stdout | b64decode | trim }}"

@@ -54,10 +54,8 @@ type FleetSiteSpec struct {
 
 // Provision connector providers (FleetSite.spec.provision.provider).
 const (
-	ProvisionProviderNoop       = "noop"
-	ProvisionProviderYaidap     = "yaidap"
-	ProvisionProviderOpenTofu   = "opentofu"
-	ProvisionProviderTerraform  = "terraform"
+	ProvisionProviderNoop   = "noop"
+	ProvisionProviderYaidap = "yaidap"
 )
 
 // Provision connector actions (POST …/provision/actions).
@@ -81,7 +79,7 @@ const (
 
 // SiteProvisionSpec is the site-scoped provisioner connector binding.
 type SiteProvisionSpec struct {
-	// Provider: noop | yaidap | opentofu | terraform
+	// Provider: noop | yaidap
 	Provider string `json:"provider,omitempty"`
 	// Jumphost is the SSH target that runs YAIDAP / tofu (user@host:port).
 	Jumphost string `json:"jumphost,omitempty"`
@@ -91,8 +89,6 @@ type SiteProvisionSpec struct {
 	InventoryPath string `json:"inventoryPath,omitempty"`
 	// YaidaPRoot is an optional path to the YAIDAP checkout on the jumphost.
 	YaidaPRoot string `json:"yaidapRoot,omitempty"`
-	// WorkspacePath is the OpenTofu/Terraform workspace on the jumphost (phase 4).
-	WorkspacePath string `json:"workspacePath,omitempty"`
 	// DefaultExtraVars are safe non-secret extras passed to the connector (no passwords).
 	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
 }

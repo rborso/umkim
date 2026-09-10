@@ -133,7 +133,7 @@
     - /tmp/ocm-dashboard-values.yaml
     - /tmp/ocm-lab-dashboard
     - /tmp/fleet-webui-dcm.yaml
-    - /tmp/fleet-webui-dcm-fleet.yaml
+    - /tmp/fleet-webui-umkim-console.yaml
     - /tmp/fleet-webui-namespace.yaml
     - /tmp/dcm-gateway-rollout-patch.yaml
     - /tmp/manifestwork-phase4-virt01.yaml

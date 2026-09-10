@@ -268,7 +268,7 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 		"k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"fleet_ingress_auth_chart_src: /ansible/charts/fleet-ingress-auth",
 		"fleet_edge_controller_playbook_dir: /ansible",
-		"fleet_webui_namespace: fleet-console",
+		"fleet_console_namespace: fleet-console",
 		"fleet_auth_lldap_ldap_port: \"3890\"",
 		"fleet_ingress_auth_lldap_base_dn: \""+yamlQuote(cfg.HubIngressAuthLDAPBaseDN)+"\"",
 		"fleet_ingress_auth_lldap_admin_email: \"admin@"+yamlQuote(cfg.HubEdgeDomain)+"\"",

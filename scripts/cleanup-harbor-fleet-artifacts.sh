@@ -9,7 +9,7 @@ PROJECT="${HARBOR_PROJECT:-fleet}"
 
 export HARBOR_URL="$HARBOR" HARBOR_USER="$USER" HARBOR_PASS="$PASS" HARBOR_PROJECT="$PROJECT"
 
-repos="${*:-fleet-site-controller dcm-fleet-console fleet-console-auth fleet-ansible-runner}"
+repos="${*:-fleet-site-controller umkim-console fleet-console-auth fleet-ansible-runner}"
 
 for repo in $repos; do
   echo "[harbor-cleanup] $PROJECT/$repo"

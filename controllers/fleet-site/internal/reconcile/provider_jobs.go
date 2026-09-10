@@ -64,7 +64,7 @@ func (r *Reconciler) waitJobAbsent(ctx context.Context, key types.NamespacedName
 }
 
 // recoverOrphanedProviderStatuses resets provider rows whose Jobs are missing.
-// Retained for status hygiene helpers/tests; DCM service-provider install Jobs are gone.
+// Retained for status hygiene helpers/tests; legacy service-provider install Jobs are gone.
 func recoverOrphanedProviderStatuses(providers map[string]fleetv1alpha1.ClusterProviderStatus, orphanKinds map[string]struct{}) (map[string]fleetv1alpha1.ClusterProviderStatus, bool) {
 	if len(orphanKinds) == 0 {
 		return providers, false

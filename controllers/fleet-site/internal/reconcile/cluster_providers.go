@@ -7,7 +7,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// reconcileClusterProviders is intentionally a no-op: v0.2 removed DCM
+// reconcileClusterProviders is intentionally a no-op: v0.2 removed legacy
 // k8s/helm/kubevirt service-provider Jobs. Ready clusters install Helm with
 // FleetApp; KubeVirt uses reconcileClusterKubevirt / platform API.
 func (r *ClusterJoinReconciler) reconcileClusterProviders(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {

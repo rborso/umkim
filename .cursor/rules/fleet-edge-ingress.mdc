@@ -1,6 +1,6 @@
 ---
-description: Fleet edge Traefik, spoke ingress ManifestWorks, phase6
-globs: roles/fleet_edge/**,roles/spoke_ingress/**,roles/openwrt_edge/**,fleet-edge*.yml,phase6*.yml
+description: Fleet edge Traefik, spoke ingress ManifestWorks
+globs: roles/fleet_edge/**,roles/spoke_ingress/**,roles/openwrt_edge/**,fleet-edge*.yml,fleet-spoke-ingress*.yml
 alwaysApply: false
 ---
 
@@ -8,6 +8,6 @@ alwaysApply: false
 
 - Hub routes: `fleet-edge.yml` + `inventory/group_vars/fleet_edge.yml` upstreams.
 - Nested virt01-t2: upstream WG worker IP `10.10.51.2` + DCM NodePort (30186), not nested Traefik by default.
-- Spoke ingress: `phase6.yml` / ManifestWork `phase6-spoke-ingress`.
+- Spoke ingress: `fleet-spoke-ingress.yml` / ManifestWork `phase6-spoke-ingress`.
 - OpenWrt: `roles/openwrt_edge` (ProxyJump via `openwrt_ssh_proxy_jump`, default `linux@umkim-hub`).
 - Skill: `.cursor/skills/fleet-edge-ingress/SKILL.md`.

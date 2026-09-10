@@ -44,7 +44,7 @@ See [fleet-edge.md](fleet-edge.md).
 ## Optional provisioner connector
 
 `FleetSite.spec.provision` binds an optional metal/VM provisioner
-(`noop` default, `yaidap`, later `opentofu` / `terraform`). The hub starts
+(`noop` default, `yaidap`). The hub starts
 async connector actions; YAIDAP runs on the site jumphost using that site's
 inventory path. On success the action returns a handoff host fragment
 (`ansible_host`, …) for enroll / add-worker.
@@ -147,10 +147,8 @@ drafts often include `CHANGE_ME` placeholders; **import preview** surfaces
 `warnings` on affected paths. Resolve them before sync or the next provision
 action. When `ansible_host` is unknown, PXE discovery waits for a manual reboot.
 
-Plan and operator notes:
-[provisioner-connector-plan.md](../provisioner-connector-plan.md),
-[design-provisioner-connector.md](../design-provisioner-connector.md).
 Flow: [playbooks/flows/site-provision-yaidap.yml](../../playbooks/flows/site-provision-yaidap.yml).
+Historical design notes: [archive/design-provisioner-connector.md](../archive/design-provisioner-connector.md).
 
 ## Hub independence
 

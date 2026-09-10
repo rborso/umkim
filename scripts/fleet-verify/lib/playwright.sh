@@ -52,11 +52,11 @@ fv_playwright_test() {
   shift
   local bin rc=0
   bin="$(fv_playwright_bin "$ui_dir")" || {
-    echo "FAIL: playwright not found (install ui deps: cd ui/dcm-fleet-console && npm ci)" >&2
+    echo "FAIL: playwright not found (install ui deps: cd ui/umkim-console && npm ci)" >&2
     return 127
   }
   fv_playwright_ensure_chromium "$ui_dir" || {
-    echo "SKIP: playwright chromium unavailable (run: cd ui/dcm-fleet-console && npx playwright install chromium)" >&2
+    echo "SKIP: playwright chromium unavailable (run: cd ui/umkim-console && npx playwright install chromium)" >&2
     return 0
   }
   fv_playwright_runtime_ok "$ui_dir" || rc=$?

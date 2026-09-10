@@ -37,13 +37,13 @@ rsync -a --delete \
   --exclude 'output/' \
   --exclude 'inventory_backup/' \
   --exclude '.harbor-staging/' \
-  --exclude 'ui/dcm-fleet-console/node_modules/' \
-  --exclude 'ui/dcm-fleet-console/e2e/.auth/' \
+  --exclude 'ui/umkim-console/node_modules/' \
+  --exclude 'ui/umkim-console/e2e/.auth/' \
   "$TMP"/ "$DEST"/
 
 # Drop stale paths that must not ship in a public tip (removed on umkim main).
 rm -rf "$DEST/.github" \
-  "$DEST/ui/dcm-fleet-console/e2e/.auth"
+  "$DEST/ui/umkim-console/e2e/.auth"
 
 echo "Synced $DEST from umkim@$(git rev-parse --short HEAD)"
 echo "Next: cd $DEST && ./scripts/preflight-oss-scrub.sh && git status"

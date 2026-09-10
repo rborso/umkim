@@ -40,7 +40,7 @@ fi
 
 if command -v ansible-lint >/dev/null 2>&1; then
   note "ansible-lint"
-  ansible-lint fleet-deploy.yml hub-firewall.yml phase5.yml fleet-webui.yml playbooks/preflight.yml || fail "ansible-lint"
+  ansible-lint fleet-deploy.yml hub-firewall.yml phase5.yml fleet-console-auth.yml playbooks/preflight.yml || fail "ansible-lint"
 else
   note "WARN ansible-lint not installed"
 fi
@@ -48,7 +48,7 @@ fi
 if [[ "$SKIP_IMAGES" == "0" ]] && command -v trivy >/dev/null 2>&1; then
   TAG="${HARBOR_FLEET_TAG:-main}"
   REG="${HARBOR_REGISTRY:-10.10.0.1:30443/fleet}"
-  for img in fleet-console-auth dcm-fleet-console fleet-site-controller; do
+  for img in fleet-console-auth umkim-console fleet-site-controller; do
     note "trivy $REG/$img:$TAG"
     trivy image --severity CRITICAL --exit-code 1 "$REG/$img:$TAG" || fail "trivy $img"
   done

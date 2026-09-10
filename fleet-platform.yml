@@ -7,7 +7,7 @@
 #   ansible-playbook fleet-platform.yml --tags platform_hub -l hub
 #   ansible-playbook fleet-platform.yml --tags platform_push_spokes -l hub
 #
-# Legacy: phase4.yml imports this playbook.
+# Hub platform ManifestWorks (OLM, cert-manager, …).
 
 - name: Fleet platform on hub
   hosts: hub

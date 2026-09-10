@@ -10,5 +10,5 @@ paths = [
   '''(^|/)controllers/fleet-site/internal/bundle/static/roles/harbor/tasks/configure_proxy\.yml$''',
   '''^docs/vault\.example\.yml$''',
   '''^docs/install\.md$''',
-  '''^ui/dcm-fleet-console/src/catalog/fieldUtils\.test\.ts$''',
+  '''^ui/umkim-console/src/catalog/fieldUtils\.test\.ts$''',
 ]

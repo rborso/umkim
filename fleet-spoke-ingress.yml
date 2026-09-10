@@ -6,7 +6,7 @@
 #   ansible-playbook fleet-spoke-ingress.yml --tags spoke_ingress_push -l hub
 #   ansible-playbook fleet-spoke-ingress.yml --tags spoke_ingress_verify -l hub
 #
-# Legacy: phase6.yml imports this playbook.
+# Spoke ingress ManifestWorks and OpenWrt edge automation.
 
 - name: Spoke ingress | Bootstrap IngressClass on spokes
   hosts: spokes

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,12 +17,8 @@ const cmLabelApp = "fleet-site-provision-inventory"
 
 // InventoryCMName returns the hub ConfigMap name for a provider inventory store.
 func InventoryCMName(siteName, provider string) string {
-	switch strings.TrimSpace(provider) {
-	case fleetv1alpha1.ProvisionProviderOpenTofu, fleetv1alpha1.ProvisionProviderTerraform:
-		return "fleet-site-" + siteName + "-tofu-inventory"
-	default:
-		return "fleet-site-" + siteName + "-yaidap-inventory"
-	}
+	_ = provider
+	return "fleet-site-" + siteName + "-yaidap-inventory"
 }
 
 // InventoryKeys are the standard ConfigMap data keys.

@@ -43,7 +43,7 @@ external:
 	}
 }
 
-func TestSiteHostCRUDDeprecated(t *testing.T) {
+func TestSiteHostCRUDRemoved(t *testing.T) {
 	ns := "fleet-console"
 	site := registrySite(ns, "homelab")
 	s := &Server{
@@ -56,16 +56,19 @@ func TestSiteHostCRUDDeprecated(t *testing.T) {
 		"kind":        "vm",
 		"vm_location": "virt02",
 	})
-	for _, method := range []string{http.MethodPost, http.MethodPatch, http.MethodDelete} {
-		path := "/api/v1alpha1/sites/homelab/hosts"
-		if method != http.MethodPost {
-			path += "/vm01"
-		}
-		req := httptest.NewRequest(method, path, bytes.NewReader(body))
+	for _, tc := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPost, "/api/v1alpha1/sites/homelab/hosts"},
+		{http.MethodPatch, "/api/v1alpha1/sites/homelab/hosts/vm01"},
+		{http.MethodDelete, "/api/v1alpha1/sites/homelab/hosts/vm01"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(body))
 		rec := httptest.NewRecorder()
 		s.handleSiteByName(rec, req)
-		if rec.Code != http.StatusGone {
-			t.Fatalf("%s status=%d body=%s", method, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("%s status=%d body=%s", tc.method, rec.Code, rec.Body.String())
 		}
 	}
 

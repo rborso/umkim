@@ -17,11 +17,12 @@ func TestInventoryPlaceholderWarningsHostVars(t *testing.T) {
 	if len(warnings) != 2 {
 		t.Fatalf("warnings=%v", warnings)
 	}
-	if !strings.Contains(warnings[0], "physical_network") {
-		t.Fatalf("expected physical_network warning, got %q", warnings[0])
+	joined := strings.Join(warnings, "\n")
+	if !strings.Contains(joined, "physical_network") {
+		t.Fatalf("expected physical_network warning, got %v", warnings)
 	}
-	if !strings.Contains(warnings[1], "network_name") {
-		t.Fatalf("expected network_name warning, got %q", warnings[1])
+	if !strings.Contains(joined, "network_name") {
+		t.Fatalf("expected network_name warning, got %v", warnings)
 	}
 }
 

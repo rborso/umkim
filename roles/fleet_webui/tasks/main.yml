@@ -4,7 +4,7 @@
     msg: >-
       Prefer fleet-console-auth-crd.yml + fleet-console-auth.yml (+ fleet-webui-lab.yml for OCM Lab).
       This role main.yml remains for direct role invocation only.
-  tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]
+  tags: [fleet_webui, ocm_webui, ocm_lab, umkim_console, fleet_console]
 
 - name: Fleet WebUI | Ensure fleet-console namespace
   ansible.builtin.import_tasks: ensure_namespace.yml
@@ -19,10 +19,10 @@
   when: ocm_console_enabled | bool
   tags: [fleet_webui, ocm_webui]
 
-- name: Fleet WebUI | Deploy fleet console (Helm)
-  ansible.builtin.import_tasks: dcm_fleet.yml
-  when: dcm_fleet_dashboard_enabled | bool
-  tags: [fleet_webui, dcm_webui, dcm_fleet]
+- name: Fleet WebUI | Deploy UMKIM console (Helm)
+  ansible.builtin.import_tasks: umkim_console.yml
+  when: umkim_console_enabled | bool
+  tags: [fleet_webui, umkim_console, fleet_console]
 
 - name: Fleet WebUI | Access URLs
   ansible.builtin.debug:
@@ -32,7 +32,7 @@
       {{
         ([] if not (ocm_lab_enabled | default(false) | bool) else
           ['OCM Lab Dashboard: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ ocm_lab_nodeport ~ '/'])
-        + (['Fleet console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ dcm_fleet_dashboard_nodeport ~ '/fleet/login']
-           if dcm_fleet_dashboard_enabled | default(true) | bool else [])
+        + (['UMKIM console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ umkim_console_nodeport ~ '/fleet/login']
+           if umkim_console_enabled | default(true) | bool else [])
       }}
-  tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet, fleet_webui_verify]
+  tags: [fleet_webui, ocm_webui, ocm_lab, umkim_console, fleet_console, fleet_webui_verify]

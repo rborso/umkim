@@ -48,7 +48,7 @@
 
 - name: Fleet WebUI | Remove legacy OCM console (frees NodePort {{ ocm_lab_nodeport }})
   ansible.builtin.command:
-    cmd: kubectl delete deployment,service ocm-console -n {{ fleet_webui_namespace }} --ignore-not-found
+    cmd: kubectl delete deployment,service ocm-console -n {{ fleet_console_namespace }} --ignore-not-found
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
@@ -77,7 +77,7 @@
     cmd: >-
       helm upgrade --install {{ ocm_lab_helm_release }}
       /tmp/ocm-lab-dashboard/dashboard/charts/ocm-dashboard
-      --namespace {{ fleet_webui_namespace }}
+      --namespace {{ fleet_console_namespace }}
       --create-namespace
       -f /tmp/ocm-dashboard-values.yaml
       --wait --timeout 10m
@@ -113,7 +113,7 @@
 - name: Fleet WebUI | Wait for OCM Lab Dashboard deployment
   ansible.builtin.command:
     cmd: >-
-      kubectl -n {{ fleet_webui_namespace }} wait
+      kubectl -n {{ fleet_console_namespace }} wait
       --for=condition=Available deployment/{{ ocm_lab_helm_release }}
       --timeout=600s
   environment:

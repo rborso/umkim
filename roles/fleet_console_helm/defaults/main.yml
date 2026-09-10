@@ -2,14 +2,14 @@
 fleet_console_helm_enabled: true
 fleet_console_helm_release: fleet-console
 fleet_console_helm_chart_path: "{{ playbook_dir }}/charts/fleet-console"
-fleet_console_helm_namespace: "{{ fleet_webui_namespace | default('fleet-console') }}"
+fleet_console_helm_namespace: "{{ fleet_console_namespace | default('fleet-console') }}"
 
 # Passed through to charts/fleet-console/values.yaml
 fleet_console_helm_registry_prefix: "{{ harbor_fleet_image_prefix }}"
 fleet_console_auth_tag: "{{ harbor_fleet_image_tag }}"
 fleet_console_auth_image_name: fleet-console-auth
-dcm_fleet_console_tag: "{{ harbor_fleet_image_tag }}"
-dcm_fleet_console_image_name: dcm-fleet-console
+umkim_console_tag: "{{ harbor_fleet_image_tag }}"
+umkim_console_image_name: umkim-console
 
 fleet_console_auth_session_secret: "{{ fleet_console_auth_session_secret_vault | default('change-me-fleet-console-auth') }}"
 fleet_console_auth_session_ttl: 8h
@@ -23,7 +23,7 @@ fleet_console_auth_bootstrap_admin: true
 fleet_console_auth_bootstrap_install_token: "{{ fleet_console_auth_bootstrap_install_token_vault | default('') }}"
 fleet_console_auth_fleet_upstream: "http://fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080"
 
-fleet_auth_ldap_url: "ldap://lldap.{{ fleet_webui_namespace | default('fleet-console') }}.svc.cluster.local:{{ fleet_auth_lldap_ldap_port | default(3890) }}"
+fleet_auth_ldap_url: "ldap://lldap.{{ fleet_console_namespace | default('fleet-console') }}.svc.cluster.local:{{ fleet_auth_lldap_ldap_port | default(3890) }}"
 fleet_auth_ldap_base_dn: "dc=umkim,dc=com"
 # LDAP service bind for fleet-console-auth (LLDAP requires authenticated search).
 fleet_auth_ldap_bind_dn: "{{ ('uid=admin,ou=people,' + fleet_auth_ldap_base_dn) if (fleet_auth_lldap_enabled | default(false) | bool) else '' }}"
@@ -37,5 +37,13 @@ fleet_auth_oidc_client_id: ""
 fleet_auth_oidc_client_secret: ""
 fleet_auth_oidc_redirect_url: ""
 
-dcm_fleet_dashboard_nodeport: 30912
+umkim_console_nodeport: 30912
+umkim_console_enabled: true
 fleet_console_auth_http_port: 18090
+
+# Deprecated aliases (remove next release)
+fleet_webui_namespace: "{{ fleet_console_namespace | default('fleet-console') }}"
+dcm_fleet_console_tag: "{{ umkim_console_tag }}"
+dcm_fleet_console_image_name: "{{ umkim_console_image_name }}"
+dcm_fleet_dashboard_nodeport: "{{ umkim_console_nodeport }}"
+dcm_fleet_dashboard_enabled: "{{ umkim_console_enabled }}"

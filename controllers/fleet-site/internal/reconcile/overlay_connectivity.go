@@ -51,7 +51,7 @@ func (r *ClusterJoinReconciler) reconcileOverlayConnectivity(ctx context.Context
 		if ok {
 			fcj.Annotations[annOverlayFailCount] = "0"
 			fcj.Annotations[annOverlayReachable] = "true"
-			fcj.Status.Message = "Overlay reachable; DCM provider health refreshing"
+			fcj.Status.Message = "Overlay reachable; provider health refreshing"
 		} else {
 			fcj.Status.Message = fmt.Sprintf("Overlay recovery failed: %s", msg)
 		}

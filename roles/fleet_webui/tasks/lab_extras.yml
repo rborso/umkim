@@ -15,8 +15,8 @@
   ansible.builtin.import_role:
     name: fleet_console_helm
     tasks_from: gateway_routes.yml
-  when: dcm_fleet_gateway_path | default(false) | bool
-  tags: [fleet_webui_lab, dcm_webui, dcm_fleet, fleet_console_gateway_routes]
+  when: umkim_console_gateway_path | default(false) | bool
+  tags: [fleet_webui_lab, umkim_console, fleet_console, fleet_console_gateway_routes]
 
 - name: Fleet WebUI lab | Access URLs
   ansible.builtin.debug:
@@ -26,7 +26,7 @@
       {{
         ([] if not (ocm_lab_enabled | default(false) | bool) else
           ['OCM Lab Dashboard: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ ocm_lab_nodeport ~ '/'])
-        + (['Fleet console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ dcm_fleet_dashboard_nodeport ~ '/fleet/login']
-           if dcm_fleet_dashboard_enabled | default(true) | bool else [])
+        + (['UMKIM console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ umkim_console_nodeport ~ '/fleet/login']
+           if umkim_console_enabled | default(true) | bool else [])
       }}
   tags: [fleet_webui_lab, fleet_webui_verify]

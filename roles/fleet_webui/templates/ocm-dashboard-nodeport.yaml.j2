@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ ocm_lab_helm_release }}-nodeport
-  namespace: {{ fleet_webui_namespace }}
+  namespace: {{ fleet_console_namespace }}
   labels:
     app.kubernetes.io/name: ocm-dashboard
     app.kubernetes.io/instance: {{ ocm_lab_helm_release }}

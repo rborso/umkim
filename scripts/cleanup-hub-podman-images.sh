@@ -18,7 +18,7 @@ while read -r img; do
   log "rmi ${img}"
   podman rmi "${img}" 2>/dev/null || true
 done < <(podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-  | grep -E '^localhost/(fleet-|dcm-fleet)' \
+  | grep -E '^localhost/(fleet-|umkim-console)' \
   | grep -v ':main$' || true)
 
 log "prune dangling layers"

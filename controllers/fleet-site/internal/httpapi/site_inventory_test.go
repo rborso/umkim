@@ -67,7 +67,7 @@ external:
 	}
 }
 
-func TestSiteInventoryGuestCRUDDeprecated(t *testing.T) {
+func TestSiteInventoryGuestMutationsRemoved(t *testing.T) {
 	ns := "fleet-console"
 	site := &fleetv1alpha1.FleetSite{
 		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
@@ -88,7 +88,7 @@ func TestSiteInventoryGuestCRUDDeprecated(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1alpha1/sites/homelab/provision/inventory/guests", bytes.NewReader([]byte(`{"name":"x","spec":{}}`)))
 	rec := httptest.NewRecorder()
 	s.handleSiteByName(rec, req)
-	if rec.Code != http.StatusGone {
+	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("create status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }

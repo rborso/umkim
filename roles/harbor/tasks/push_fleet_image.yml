@@ -23,13 +23,18 @@
 - name: Harbor | Resolve local source for fleet image
   ansible.builtin.set_fact:
     harbor_fleet_this_local_src: >-
-      {{ fleet_image.local_src
-         | default(harbor_fleet_edge_controller_local_src if fleet_image.repository == 'fleet-edge-controller' else '')
-         | default(harbor_fleet_failover_controller_local_src if fleet_image.repository == 'fleet-failover-controller' else '')
-         | default(harbor_fleet_dcm_console_local_src if fleet_image.repository == 'dcm-fleet-console' else '')
-         | default(harbor_fleet_site_controller_local_src if fleet_image.repository == 'fleet-site-controller' else '')
-         | default(harbor_fleet_console_auth_local_src if fleet_image.repository == 'fleet-console-auth' else '')
-         | default(harbor_fleet_ansible_runner_local_src if fleet_image.repository == 'fleet-ansible-runner' else '') }}
+      {{
+        (fleet_image.local_src | default(''))
+        if (fleet_image.local_src | default('') | length > 0)
+        else ({
+          'fleet-edge-controller': harbor_fleet_edge_controller_local_src,
+          'fleet-failover-controller': harbor_fleet_failover_controller_local_src,
+          'umkim-console': harbor_fleet_umkim_console_local_src,
+          'fleet-site-controller': harbor_fleet_site_controller_local_src,
+          'fleet-console-auth': harbor_fleet_console_auth_local_src,
+          'fleet-ansible-runner': harbor_fleet_ansible_runner_local_src,
+        }.get(fleet_image.repository, ''))
+      }}
     harbor_fleet_archive_name: "{{ fleet_image.repository }}-src.tar.gz"
     harbor_fleet_local_archive: "{{ harbor_fleet_local_staging_dir }}/{{ fleet_image.repository }}-src.tar.gz"
   when: not harbor_fleet_skip_push | bool
@@ -47,7 +52,7 @@
 
 - name: Harbor | Ensure clone directory on hub
   ansible.builtin.file:
-    path: "{{ fleet_image.clone_dir }}"
+    path: "{{ fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository) }}"
     state: directory
     mode: "0755"
   when: not harbor_fleet_skip_push | bool
@@ -142,7 +147,7 @@
 - name: Harbor | Clone fleet image source from GitHub (fallback, optional)
   ansible.builtin.git:
     repo: "{{ fleet_image.git_repo }}"
-    dest: "{{ fleet_image.clone_dir }}"
+    dest: "{{ fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository) }}"
     version: "{{ fleet_image.git_version | default('v0.1.0') }}"
     force: true
   when:
@@ -153,7 +158,7 @@
 
 - name: Harbor | Assert fleet image source present
   ansible.builtin.stat:
-    path: "{{ fleet_image.clone_dir }}/{{ fleet_image.containerfile | default('Containerfile') }}"
+    path: "{{ (fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository)) }}/{{ fleet_image.containerfile | default('Containerfile') }}"
   register: harbor_fleet_src_containerfile
   when: not harbor_fleet_skip_push | bool
   failed_when: not harbor_fleet_src_containerfile.stat.exists
@@ -162,7 +167,7 @@
 - name: Harbor | Stage LICENSE and NOTICE for image build
   ansible.builtin.copy:
     src: "{{ harbor_umkim_root }}/{{ item }}"
-    dest: "{{ fleet_image.clone_dir }}/{{ item }}"
+    dest: "{{ (fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository)) }}/{{ item }}"
     mode: "0644"
   loop:
     - LICENSE
@@ -178,12 +183,12 @@
       podman build
       {% if harbor_fleet_push_force | default(false) | bool %}--no-cache{% endif %}
       --build-arg CACHEBUST={{ lookup('pipe', 'date +%s') }}
-      {% if fleet_image.repository == 'dcm-fleet-console' %}
+      {% if fleet_image.repository == 'umkim-console' %}
       --build-arg VITE_BUILD_ID={{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) }}
       {% endif %}
       -t localhost/{{ fleet_image.repository }}:{{ fleet_image.tag }}
       -f {{ fleet_image.containerfile | default('Containerfile') }}
-      {{ fleet_image.clone_dir }}
+      {{ fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository) }}
   when: not harbor_fleet_skip_push | bool
   register: harbor_fleet_podman_build
   changed_when: true

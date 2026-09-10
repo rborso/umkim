@@ -38,7 +38,6 @@ type siteProvisionBindingView struct {
 	SSHSecretRef     string            `json:"sshSecretRef,omitempty"`
 	InventoryPath    string            `json:"inventoryPath,omitempty"`
 	YaidaPRoot       string            `json:"yaidapRoot,omitempty"`
-	WorkspacePath    string            `json:"workspacePath,omitempty"`
 	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
 	Status           *fleetv1alpha1.SiteProvisionStatus `json:"status,omitempty"`
 }
@@ -49,7 +48,6 @@ type siteProvisionBindingBody struct {
 	SSHSecretRef     string            `json:"sshSecretRef,omitempty"`
 	InventoryPath    string            `json:"inventoryPath,omitempty"`
 	YaidaPRoot       string            `json:"yaidapRoot,omitempty"`
-	WorkspacePath    string            `json:"workspacePath,omitempty"`
 	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
 }
 
@@ -155,7 +153,6 @@ func (s *Server) putSiteProvisionBinding(ctx context.Context, w http.ResponseWri
 		SSHSecretRef:     strings.TrimSpace(req.SSHSecretRef),
 		InventoryPath:    strings.TrimSpace(req.InventoryPath),
 		YaidaPRoot:       strings.TrimSpace(req.YaidaPRoot),
-		WorkspacePath:    strings.TrimSpace(req.WorkspacePath),
 		DefaultExtraVars: req.DefaultExtraVars,
 	}
 
@@ -196,9 +193,6 @@ func mergeProvisionSpec(dst, src *fleetv1alpha1.SiteProvisionSpec) {
 	if src.YaidaPRoot != "" {
 		dst.YaidaPRoot = src.YaidaPRoot
 	}
-	if src.WorkspacePath != "" {
-		dst.WorkspacePath = src.WorkspacePath
-	}
 	if src.DefaultExtraVars != nil {
 		dst.DefaultExtraVars = src.DefaultExtraVars
 	}
@@ -214,7 +208,6 @@ func siteProvisionBindingFromSite(fs *fleetv1alpha1.FleetSite) siteProvisionBind
 		v.SSHSecretRef = fs.Spec.Provision.SSHSecretRef
 		v.InventoryPath = fs.Spec.Provision.InventoryPath
 		v.YaidaPRoot = fs.Spec.Provision.YaidaPRoot
-		v.WorkspacePath = fs.Spec.Provision.WorkspacePath
 		v.DefaultExtraVars = fs.Spec.Provision.DefaultExtraVars
 	}
 	return v
@@ -408,9 +401,6 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 			return
 		}
 		writeJSON(w, http.StatusAccepted, rec)
-
-	case fleetv1alpha1.ProvisionProviderOpenTofu, fleetv1alpha1.ProvisionProviderTerraform:
-		http.Error(w, "provider "+provider+" is not implemented yet", http.StatusNotImplemented)
 
 	default:
 		http.Error(w, "unknown provider", http.StatusBadRequest)

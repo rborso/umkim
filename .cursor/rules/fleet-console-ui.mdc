@@ -1,13 +1,13 @@
 ---
-description: Fleet console React UI and fleet-webui role
-globs: ui/dcm-fleet-console/**,roles/fleet_webui/**
+description: UMKIM console React UI and fleet-webui role
+globs: ui/umkim-console/**,roles/fleet_webui/**
 alwaysApply: false
 ---
 
-# Fleet console UI (S6)
+# UMKIM console (S6)
 
-- App: `ui/dcm-fleet-console/` (Vite/React). Browser API is `/fleet/api/v1alpha1` (sites, clusters, FleetApp).
+- App: `ui/umkim-console/` (Vite/React). Browser API is `/fleet/api/v1alpha1` (sites, clusters, FleetApp).
 - Nginx in the console image proxies `/fleet/api/` through fleet-console-auth to fleet-site-controller.
-- Deploy: `fleet-console-auth.yml`; Harbor image `fleet/dcm-fleet-console` (historical repository name).
-- Dev details: `ui/dcm-fleet-console/README.md`.
+- Deploy: `fleet-console-auth.yml`; Harbor image `fleet/umkim-console`.
+- Dev details: `ui/umkim-console/README.md`.
 - Skill: `.cursor/skills/fleet-console-ui/SKILL.md`.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${FV_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
-UI="${ROOT}/ui/dcm-fleet-console"
+UI="${ROOT}/ui/umkim-console"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/fleet-verify/lib/playwright.sh
 source "${SCRIPT_DIR}/lib/playwright.sh"

@@ -4,7 +4,7 @@
     src: namespace.yaml.j2
     dest: /tmp/fleet-webui-namespace.yaml
     mode: "0600"
-  tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]
+  tags: [fleet_webui, ocm_webui, ocm_lab, umkim_console, fleet_console]
 
 - name: Fleet WebUI | Apply namespace
   ansible.builtin.command:
@@ -14,4 +14,4 @@
     PATH: "{{ k3s_command_path }}"
   register: fleet_webui_ns_apply
   changed_when: "'created' in fleet_webui_ns_apply.stdout"
-  tags: [fleet_webui, ocm_webui, ocm_lab, dcm_webui, dcm_fleet]
+  tags: [fleet_webui, ocm_webui, ocm_lab, umkim_console, fleet_console]

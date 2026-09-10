@@ -49,12 +49,12 @@
 
 - name: Fleet console Helm | Restart dashboard after upgrade (same image tag, new digest)
   ansible.builtin.command:
-    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout restart deployment/dcm-fleet-dashboard
+    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout restart deployment/umkim-console
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
   changed_when: true
-  when: dcm_fleet_dashboard_enabled | default(true) | bool
+  when: umkim_console_enabled | default(true) | bool
 
 - name: Fleet console Helm | Wait for LLDAP bootstrap job
   ansible.builtin.command:
@@ -79,9 +79,9 @@
 
 - name: Fleet console Helm | Wait for dashboard deployment
   ansible.builtin.command:
-    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout status deployment/dcm-fleet-dashboard --timeout=300s
+    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout status deployment/umkim-console --timeout=300s
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
   changed_when: false
-  when: dcm_fleet_dashboard_enabled | default(true) | bool
+  when: umkim_console_enabled | default(true) | bool

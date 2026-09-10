@@ -11,9 +11,7 @@ import (
 func ValidateProvider(provider string) error {
 	switch strings.TrimSpace(provider) {
 	case "", fleetv1alpha1.ProvisionProviderNoop,
-		fleetv1alpha1.ProvisionProviderYaidap,
-		fleetv1alpha1.ProvisionProviderOpenTofu,
-		fleetv1alpha1.ProvisionProviderTerraform:
+		fleetv1alpha1.ProvisionProviderYaidap:
 		return nil
 	default:
 		return fmt.Errorf("unknown provision provider %q", provider)

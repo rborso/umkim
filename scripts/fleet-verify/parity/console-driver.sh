@@ -4,7 +4,7 @@ set -euo pipefail
 
 OP="${1:-}"
 ROOT="${FV_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
-UI="${ROOT}/ui/dcm-fleet-console"
+UI="${ROOT}/ui/umkim-console"
 CONSOLE="${FLEET_CONSOLE_URL:-http://127.0.0.1:30912}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

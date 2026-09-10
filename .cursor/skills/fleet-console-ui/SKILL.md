@@ -1,23 +1,23 @@
 ---
 name: fleet-console-ui
 description: >-
-  Builds and maintains the UMKIM fleet console React UI and its deployment.
-  Use for ui/dcm-fleet-console, its API client, fleet-console-auth.yml, nginx
+  Builds and maintains the UMKIM console React UI and its deployment.
+  Use for ui/umkim-console, its API client, fleet-console-auth.yml, nginx
   proxying, or console image workflows.
 ---
 
-# Fleet console UI (S6)
+# UMKIM console (S6)
 
 ## Scope
 
-The console source is `ui/dcm-fleet-console/`. Its API client uses
+The console source is `ui/umkim-console/`. Its API client uses
 `/fleet/api/` for fleet-site (including FleetApp) and `/fleet/auth/` for
 login. Deployed proxy behavior is defined by the UI nginx template
 and `roles/fleet_webui/`.
 
 ## Working guidance
 
-- Use the package scripts in `ui/dcm-fleet-console/package.json` for local
+- Use the package scripts in `ui/umkim-console/package.json` for local
   development, builds, and tests.
 - Keep route handling, API client types, UI behavior, and the OpenAPI source in
   sync when an API contract changes.
@@ -30,7 +30,7 @@ and `roles/fleet_webui/`.
 
 ## References
 
-- [Console README](../../../ui/dcm-fleet-console/README.md)
+- [Console README](../../../ui/umkim-console/README.md)
 - [Console authentication guide](../../../docs/fleet-console-auth.md)
 - [FleetApp Helm installs](../../../docs/components/fleet-apps.md)
 - [Design guide](../../../docs/design.md)

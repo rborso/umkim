@@ -94,6 +94,45 @@ func guestSpecFromMap(fields map[string]interface{}) (GuestSpec, error) {
 	return spec, nil
 }
 
+func mergeGuestSpec(existing, patch GuestSpec) GuestSpec {
+	out := existing
+	if v := strings.TrimSpace(patch.Kind); v != "" {
+		out.Kind = v
+	}
+	if v := strings.TrimSpace(patch.AnsibleHost); v != "" {
+		out.AnsibleHost = v
+	}
+	if v := strings.TrimSpace(patch.VmLocation); v != "" {
+		out.VmLocation = v
+	}
+	if v := strings.TrimSpace(patch.OS); v != "" {
+		out.OS = v
+	}
+	if patch.Memory > 0 {
+		out.Memory = patch.Memory
+	}
+	if patch.Cores > 0 {
+		out.Cores = patch.Cores
+	}
+	if patch.Disks != nil {
+		out.Disks = patch.Disks
+	}
+	if patch.Uplinks != nil {
+		out.Uplinks = patch.Uplinks
+	}
+	if patch.Legacy != nil {
+		out.Legacy = patch.Legacy
+	}
+	if patch.ConfigureFirewalld != nil {
+		out.ConfigureFirewalld = patch.ConfigureFirewalld
+	}
+	if patch.ProvisioningProvider != "" {
+		out.ProvisioningProvider = patch.ProvisioningProvider
+	}
+	out.Absent = patch.Absent
+	return out
+}
+
 // HandoffFromGuest builds upward provision handoff from imported guest fields.
 func HandoffFromGuest(name string, spec GuestSpec, siteID string) fleetv1alpha1.ProvisionHandoffHost {
 	osFamily := strings.TrimSpace(spec.OS)

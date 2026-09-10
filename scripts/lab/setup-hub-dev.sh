@@ -54,8 +54,8 @@ for d in controllers/fleet-site controllers/fleet-console-auth controllers/fleet
 done
 
 echo "=== Console UI ==="
-if [ -f ui/dcm-fleet-console/package.json ]; then
-  (cd ui/dcm-fleet-console && npm ci && npm run build)
+if [ -f ui/umkim-console/package.json ]; then
+  (cd ui/umkim-console && npm ci && npm run build)
 fi
 
 cat <<EOF

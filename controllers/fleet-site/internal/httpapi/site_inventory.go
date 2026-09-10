@@ -8,10 +8,8 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/tofu"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -33,42 +31,26 @@ func (s *Server) handleSiteInventoryRoutes(ctx context.Context, w http.ResponseW
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	case rest == "provision/inventory/catalog":
-		switch r.Method {
-		case http.MethodGet:
-			s.getSiteInventoryCatalog(ctx, w, siteName, provider)
-		case http.MethodPut, http.MethodPatch:
-			s.patchSiteInventoryCatalog(ctx, w, r, siteName, provider)
-		default:
+		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
+		s.getSiteInventoryCatalog(ctx, w, siteName, provider)
 	case rest == "provision/inventory/guests":
-		switch r.Method {
-		case http.MethodGet:
-			s.listSiteInventoryGuests(ctx, w, siteName, provider)
-		case http.MethodPost:
-			s.createSiteInventoryGuest(ctx, w, r, siteName, provider)
-		default:
+		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
+		s.listSiteInventoryGuests(ctx, w, siteName, provider)
 	case strings.HasPrefix(rest, "provision/inventory/guests/"):
 		sub := strings.TrimPrefix(rest, "provision/inventory/guests/")
 		sub = strings.Trim(sub, "/")
-		parts := strings.SplitN(sub, "/", 2)
-		guestName := parts[0]
-		if guestName == "" {
+		guestName := strings.SplitN(sub, "/", 2)[0]
+		if guestName == "" || r.Method != http.MethodGet {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
-		switch r.Method {
-		case http.MethodGet:
-			s.getSiteInventoryGuest(ctx, w, siteName, provider, guestName)
-		case http.MethodPut, http.MethodPatch:
-			s.patchSiteInventoryGuest(ctx, w, r, siteName, provider, guestName)
-		case http.MethodDelete:
-			s.deleteSiteInventoryGuest(ctx, w, r, siteName, provider, guestName)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
+		s.getSiteInventoryGuest(ctx, w, siteName, provider, guestName)
 	case rest == "provision/inventory/revisions":
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -147,14 +129,6 @@ func (s *Server) getSiteInventory(ctx context.Context, w http.ResponseWriter, si
 		}
 		env.Catalog = catalog
 		env.Guests = guests
-	} else if provider == fleetv1alpha1.ProvisionProviderOpenTofu || provider == fleetv1alpha1.ProvisionProviderTerraform {
-		catalog, guests, _, err := tofu.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		env.Catalog = catalog
-		env.Guests = guests
 	}
 	revisions, err := connectors.ListRevisions(ctx, s.Client, s.Cfg.Namespace, siteName, provider, 20)
 	if err != nil {
@@ -166,140 +140,48 @@ func (s *Server) getSiteInventory(ctx context.Context, w http.ResponseWriter, si
 }
 
 func (s *Server) getSiteInventoryCatalog(ctx context.Context, w http.ResponseWriter, siteName, provider string) {
-	if s.rejectWrongProvider(w, provider, provider) {
+	if s.rejectWrongProvider(w, provider, fleetv1alpha1.ProvisionProviderYaidap) {
 		return
 	}
-	switch provider {
-	case fleetv1alpha1.ProvisionProviderYaidap:
-		catalog, _, _, err := yaidap.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, http.StatusOK, catalog)
-	case fleetv1alpha1.ProvisionProviderOpenTofu, fleetv1alpha1.ProvisionProviderTerraform:
-		catalog, _, _, err := tofu.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, http.StatusOK, catalog)
-	default:
-		http.Error(w, "inventory API not available for provider "+provider, http.StatusConflict)
-	}
-}
-
-func (s *Server) patchSiteInventoryCatalog(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, provider string) {
-	if provider == fleetv1alpha1.ProvisionProviderYaidap {
-		http.Error(w, inventoryJSONDeprecated, http.StatusGone)
-		return
-	}
-	if s.rejectWrongProvider(w, provider, provider) {
-		return
-	}
-	http.Error(w, "tofu catalog write not implemented yet", http.StatusNotImplemented)
-}
-
-func mergeYaidapCatalog(dst, patch yaidap.Catalog) yaidap.Catalog {
-	if len(patch.Networks) > 0 {
-		dst.Networks = patch.Networks
-	}
-	if len(patch.Storages) > 0 {
-		dst.Storages = patch.Storages
-	}
-	if len(patch.Hypervisors) > 0 {
-		dst.Hypervisors = patch.Hypervisors
-	}
-	if patch.Defaults != (yaidap.GuestDefaults{}) {
-		dst.Defaults = patch.Defaults
-	}
-	return dst
-}
-
-func (s *Server) listSiteInventoryGuests(ctx context.Context, w http.ResponseWriter, siteName, provider string) {
-	store, err := s.loadGuestStore(ctx, siteName, provider)
+	catalog, _, _, err := yaidap.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"items": guestList(store)})
+	writeJSON(w, http.StatusOK, catalog)
 }
 
-func guestList(store interface{}) []interface{} {
-	switch s := store.(type) {
-	case yaidap.GuestStore:
-		out := make([]interface{}, 0, len(s))
-		for name, spec := range s {
-			out = append(out, map[string]interface{}{"name": name, "spec": spec})
-		}
-		return out
-	case tofu.GuestStore:
-		out := make([]interface{}, 0, len(s))
-		for name, spec := range s {
-			out = append(out, map[string]interface{}{"name": name, "spec": spec})
-		}
-		return out
-	default:
-		return nil
+func (s *Server) listSiteInventoryGuests(ctx context.Context, w http.ResponseWriter, siteName, provider string) {
+	if s.rejectWrongProvider(w, provider, fleetv1alpha1.ProvisionProviderYaidap) {
+		return
 	}
-}
-
-func (s *Server) loadGuestStore(ctx context.Context, siteName, provider string) (interface{}, error) {
-	switch provider {
-	case fleetv1alpha1.ProvisionProviderYaidap:
-		_, guests, _, err := yaidap.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		return guests, err
-	case fleetv1alpha1.ProvisionProviderOpenTofu, fleetv1alpha1.ProvisionProviderTerraform:
-		_, guests, _, err := tofu.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		return guests, err
-	default:
-		return nil, nil
+	_, guests, _, err := yaidap.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-}
-
-const inventoryJSONDeprecated = "JSON guest/catalog mutations are deprecated; edit YAML via /provision/inventory/files"
-
-func (s *Server) createSiteInventoryGuest(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, provider string) {
-	http.Error(w, inventoryJSONDeprecated, http.StatusGone)
+	out := make([]interface{}, 0, len(guests))
+	for name, spec := range guests {
+		out = append(out, map[string]interface{}{"name": name, "spec": spec})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"items": out})
 }
 
 func (s *Server) getSiteInventoryGuest(ctx context.Context, w http.ResponseWriter, siteName, provider, guestName string) {
-	switch provider {
-	case fleetv1alpha1.ProvisionProviderYaidap:
-		_, guests, _, err := yaidap.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		spec, ok := guests[guestName]
-		if !ok {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"name": guestName, "spec": spec})
-	case fleetv1alpha1.ProvisionProviderOpenTofu, fleetv1alpha1.ProvisionProviderTerraform:
-		_, guests, _, err := tofu.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		spec, ok := guests[guestName]
-		if !ok {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"name": guestName, "spec": spec})
-	default:
-		http.Error(w, "not found", http.StatusNotFound)
+	if s.rejectWrongProvider(w, provider, fleetv1alpha1.ProvisionProviderYaidap) {
+		return
 	}
-}
-
-func (s *Server) patchSiteInventoryGuest(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, provider, guestName string) {
-	http.Error(w, inventoryJSONDeprecated, http.StatusGone)
-}
-
-func (s *Server) deleteSiteInventoryGuest(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, provider, guestName string) {
-	http.Error(w, inventoryJSONDeprecated, http.StatusGone)
+	_, guests, _, err := yaidap.LoadBundle(ctx, s.Client, s.Cfg.Namespace, siteName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	spec, ok := guests[guestName]
+	if !ok {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"name": guestName, "spec": spec})
 }
 
 func (s *Server) listSiteInventoryRevisions(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName, provider string) {
@@ -354,9 +236,6 @@ func (s *Server) syncSiteInventory(ctx context.Context, w http.ResponseWriter, r
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-	case fleetv1alpha1.ProvisionProviderOpenTofu, fleetv1alpha1.ProvisionProviderTerraform:
-		http.Error(w, "tofu inventory sync not implemented yet", http.StatusNotImplemented)
-		return
 	default:
 		http.Error(w, "inventory sync not available for provider "+provider, http.StatusConflict)
 		return
@@ -396,31 +275,4 @@ func (s *Server) importSiteInventory(ctx context.Context, w http.ResponseWriter,
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]string{"jobName": jobName, "phase": "running"})
-}
-
-// mergeImportHandoff updates hub site hosts from imported guest specs without clobbering clusterIntent.
-func (s *Server) mergeImportHandoff(ctx context.Context, siteName string, guests yaidap.GuestStore) error {
-	for name, spec := range guests {
-		if spec.Absent {
-			continue
-		}
-		rec, found, err := sitehosts.Get(ctx, s.Client, s.Cfg.Namespace, siteName, name)
-		if err != nil {
-			return err
-		}
-		if !found {
-			continue
-		}
-		patch := rec
-		if ip := strings.TrimSpace(spec.AnsibleHost); ip != "" {
-			patch.AnsibleHost = ip
-		}
-		if loc := strings.TrimSpace(spec.VmLocation); loc != "" {
-			patch.VmLocation = loc
-		}
-		if err := sitehosts.Put(ctx, s.Client, s.Cfg.Namespace, siteName, patch); err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -11,7 +11,7 @@ import (
 func siteProvisionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "provision",
-		Short: "Site metal/VM provisioner connector (YAIDAP / noop / tofu)",
+		Short: "Site metal/VM provisioner connector (YAIDAP / noop)",
 	}
 	cmd.AddCommand(siteProvisionGetCmd())
 	cmd.AddCommand(siteProvisionSetCmd())
@@ -41,7 +41,7 @@ func siteProvisionGetCmd() *cobra.Command {
 }
 
 func siteProvisionSetCmd() *cobra.Command {
-	var provider, jumphost, sshSecret, inventory, yaidapRoot, workspace string
+	var provider, jumphost, sshSecret, inventory, yaidapRoot string
 	c := &cobra.Command{
 		Use:   "set [site]",
 		Short: "Set site provisioner binding (PUT /sites/{site}/provision)",
@@ -64,9 +64,6 @@ func siteProvisionSetCmd() *cobra.Command {
 			if cmd.Flags().Changed("yaidap-root") {
 				body["yaidapRoot"] = yaidapRoot
 			}
-			if cmd.Flags().Changed("workspace") {
-				body["workspacePath"] = workspace
-			}
 			raw, code, err := api.Put("/sites/"+args[0]+"/provision", body)
 			if err != nil {
 				return err
@@ -78,12 +75,11 @@ func siteProvisionSetCmd() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&provider, "provider", "", "noop | yaidap | opentofu | terraform")
+	c.Flags().StringVar(&provider, "provider", "", "noop | yaidap")
 	c.Flags().StringVar(&jumphost, "jumphost", "", "SSH jumphost (user@host:port)")
 	c.Flags().StringVar(&sshSecret, "ssh-secret", "", "Hub Secret name for jumphost SSH key")
 	c.Flags().StringVar(&inventory, "inventory", "", "YAIDAP inventory path on jumphost")
 	c.Flags().StringVar(&yaidapRoot, "yaidap-root", "", "YAIDAP checkout on jumphost")
-	c.Flags().StringVar(&workspace, "workspace", "", "OpenTofu/Terraform workspace path")
 	return c
 }
 

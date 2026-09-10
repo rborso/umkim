@@ -21,7 +21,15 @@ All notable changes to this project are documented here.
 - Hub backup/restore: `backup-hub.sh` and `restore-hub.sh` with shared
   `lib/hub-backup-common.sh` (etcd, WireGuard, ACME, optional Harbor PVC/DB).
   See [docs/backup-restore.md](docs/backup-restore.md) and
-  [docs/plans/hub-backup-restore.md](docs/plans/hub-backup-restore.md).
+  [docs/archive/plans/hub-backup-restore.md](docs/archive/plans/hub-backup-restore.md).
+- Removed deprecated provisioner surfaces: site host CRUD API, JSON inventory
+  guest/catalog mutations, `umkim site host add|patch|delete`, `umkim site inventory set|patch|import pull`, and OpenTofu/Terraform provider stubs.
+- Archived historical provisioner design docs under `docs/archive/`.
+- Renamed console product from legacy DCM naming: UI directory `ui/umkim-console`,
+  Harbor image `umkim-console`, K8s Deployment `umkim-console`. Ansible vars
+  `umkim_console_*` and `fleet_console_namespace` replace `dcm_fleet_*` and
+  `fleet_webui_namespace` (deprecated aliases remain in role defaults for one release).
+  Delete stale `dcm-fleet-dashboard` Deployment after upgrade on existing hubs.
 - Harbor `charts` project publishes the whoami smoke-test chart.
 - Greenfield path: [docs/install.md](docs/install.md) +
   [examples/inventory/hub-only/](examples/inventory/hub-only/).

@@ -9,7 +9,7 @@ if command -v podman >/dev/null 2>&1; then
   podman image prune -f >/dev/null 2>&1 || true
   for pat in 'localhost/fleet-site-controller:test*' 'localhost/fleet-site-controller:main' \
     'harbor.local:*' 'localhost/fleet-site-controller' 'localhost/fleet-ansible-runner' \
-    'localhost/dcm-fleet-console'; do
+    'localhost/umkim-console'; do
     podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E "^${pat//\*/.*}$" || true
   done | sort -u | while read -r img; do
     [[ -z "${img}" || "${img}" == "<none>:<none>" ]] && continue

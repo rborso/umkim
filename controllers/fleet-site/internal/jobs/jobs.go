@@ -155,7 +155,7 @@ echo overlay_ok
 	return hostNetworkPrivilegedJob(ns, jobName, "fleet-site-overlay-check", "overlay-check", cmd)
 }
 
-// OverlayRecoverJob touches DCM SPM provider registrations after overlay recovery.
+// OverlayRecoverJob touches provider registrations after overlay recovery.
 func OverlayRecoverJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
 	args := ansiblePlaybookArgs("/ansible/cluster-overlay-recover.yml", clusterName, siteID)
 	args = append(args, "-e", "@/secrets/hub/ansible_vars.yml")

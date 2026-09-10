@@ -29,11 +29,11 @@ edit generated ConfigMaps or git `group_vars`.
 
 Site seed from `inventory/group_vars/all/fleet_sites.yml` remains a **one-time /
 install** bootstrap (`fleet_site_seed_registry`); ongoing site changes go through
-`umkim site create` or the console.
+`umkim site create` or the UMKIM console.
 
 ## Authentication
 
-All fleet mutations go through **fleet-console-auth** (same as the console):
+All fleet mutations go through **fleet-console-auth** (same as the UMKIM console):
 
 | Method | Use |
 |--------|-----|
@@ -41,7 +41,7 @@ All fleet mutations go through **fleet-console-auth** (same as the console):
 | `UMKIM_TOKEN` / `--token` | `Bearer fleet_sa_…` service account (automation) |
 | Hub-local dev | Direct fleet-site `:18080` with `UMKIM_DEV=1` (identity headers only; lab) |
 
-Public URL shape (via console nginx):
+Public URL shape (via UMKIM console nginx):
 
 - Fleet API: `{base}/fleet/api/v1alpha1`
 - Auth API: `{base}/fleet/auth/v1alpha1`
@@ -141,12 +141,12 @@ under `FleetSite.spec.edge.ingress[]`. Clusters bind with
 site toggle, not an ingress row.
 
 ```bash
-umkim site ingress list homelab
-umkim site ingress add homelab --id site-pf --method port_forward \
+umkim site ingress list SITE
+umkim site ingress add SITE --id site-pf --method port_forward \
   --address 203.0.113.50 --zone site.example.com
-umkim site ingress set homelab site-pf --description "Router WAN"
-umkim site ingress delete homelab edge-rp
-umkim cluster patch lab-single-0 --ingress-id site-pf
+umkim site ingress set SITE site-pf --description "Router WAN"
+umkim site ingress delete SITE edge-rp
+umkim cluster patch CLUSTER --ingress-id site-pf
 ```
 
 ### Site provisioner connector
@@ -155,18 +155,18 @@ Optional metal/VM provision before enroll / add-worker. Default provider is
 `noop` (caller supplies the SSH-ready host fragment).
 
 ```bash
-umkim site provision get homelab
-umkim site provision set homelab --provider yaidap \
+umkim site provision get SITE
+umkim site provision set SITE --provider yaidap \
   --jumphost linux@jump.example:22 \
-  --ssh-secret fleet-site-homelab-provision-ssh \
-  --inventory /home/linux/yaidap/inventory/demo \
-  --yaidap-root /home/linux/yaidap
-umkim site provision run homelab --action create_vm --subject vm01 --wait
-umkim site provision run homelab --action plan_vm --subject vm01 --wait
-umkim site provision run homelab --action create_vm --subject vm01 \
+  --ssh-secret fleet-site-SITE-provision-ssh \
+  --inventory /path/to/yaidap/inventory \
+  --yaidap-root /path/to/yaidap
+umkim site provision run SITE --action create_vm --subject vm01 --wait
+umkim site provision run SITE --action plan_vm --subject vm01 --wait
+umkim site provision run SITE --action create_vm --subject vm01 \
   --ansible-host 203.0.113.10 --wait   # noop handoff
-umkim site provision status homelab ACTION_ID
-umkim site provision actions homelab
+umkim site provision status SITE ACTION_ID
+umkim site provision actions SITE
 ```
 
 ### Connector inventory (YAIDAP YAML)
@@ -177,9 +177,9 @@ umkim site inventory files list SITE
 umkim site inventory files list SITE --tree
 umkim site inventory files get SITE --path guests.yml
 umkim site inventory files get SITE --path group_vars/all/all.yml --missing-ok
-umkim site inventory files put SITE --path host_vars/lab-single-1-0.yml --file profile.yml
-umkim site inventory files put SITE --path lab-single-1.yml --file group-membership.yml
-umkim site inventory files put SITE --path group_vars/lab-single-1.yml --file cluster-intent.yml
+umkim site inventory files put SITE --path host_vars/guest01.yml --file profile.yml
+umkim site inventory files put SITE --path cluster-a.yml --file group-membership.yml
+umkim site inventory files put SITE --path group_vars/cluster-a.yml --file cluster-intent.yml
 umkim site inventory files delete SITE --path host_vars/old-guest.yml
 umkim site inventory migrate SITE
 umkim site inventory revisions SITE [--limit 20] [--id REV]
@@ -188,29 +188,29 @@ umkim site inventory import preview SITE [--wait]
 umkim site inventory import apply SITE --confirm [--paths guests.yml,host_vars/foo.yml]
 ```
 
-Legacy JSON guest/catalog mutations (`inventory set`, `inventory patch`, `import pull`) are deprecated; use `files put` instead.
+Legacy JSON guest/catalog mutations were removed in v0.2; use `files put` instead.
 
 ### Site hosts (derived view)
 
-List and provision guests defined in inventory YAML. Host CRUD is deprecated:
+List and provision guests defined in inventory YAML:
 
 ```bash
-umkim site host list homelab
-umkim site host get homelab vm01
-umkim site host cluster-apply homelab vm01
-umkim site host provision homelab vm01 --action plan_vm --wait
-umkim site host provision homelab vm01 --wait
-umkim site host provision homelab bm01 --confirm --wait
+umkim site host list SITE
+umkim site host get SITE guest01
+umkim site host cluster-apply SITE guest01
+umkim site host provision SITE guest01 --action plan_vm --wait
+umkim site host provision SITE guest01 --wait
+umkim site host provision SITE bm01 --confirm --wait
 ```
 
-Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`). Put `ansible_host` in both `guests.yml` and `host_vars/{guest}.yml` when the guest needs a static address. Use `vm_location: least-utilized` (or `auto`) only before first placement; after a successful `create_vm`, the hub rewrites inventory to the resolved hypervisor and auto-syncs to the jumphost — `umkim site host get` then shows the concrete name (for example `virt02`). Reset to `least-utilized` explicitly to re-run placement.
+Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`). Put `ansible_host` in both `guests.yml` and `host_vars/{guest}.yml` when the guest needs a static address. Use `vm_location: least-utilized` (or `auto`) only before first placement; after a successful `create_vm`, the hub rewrites inventory to the resolved hypervisor and auto-syncs to the jumphost — `umkim site host get` then shows the concrete name (for example `hv01`). Reset to `least-utilized` explicitly to re-run placement.
 
 `install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`install_bm`** is for
 hypervisors in `hypervisors.yml` (bare metal); it PXE-reinstalls the OS via
 TempXE on the site jumphost. Example:
 
 ```bash
-umkim site host provision homelab virt03 --action install_bm --confirm --wait
+umkim site host provision SITE hv01 --action install_bm --confirm --wait
 ```
 
 **Hardware discovery** — stub a hypervisor in `hypervisors.yml` +
@@ -218,18 +218,18 @@ umkim site host provision homelab virt03 --action install_bm --confirm --wait
 import promoted drafts:
 
 ```bash
-umkim site inventory sync homelab --wait
-umkim site host provision homelab new-hv01 --action discover --wait
+umkim site inventory sync SITE --wait
+umkim site host provision SITE new-hv01 --action discover --wait
 # or PXE (TempXE; requires tempxe_discovery.enabled + MAC in host_vars):
-umkim site host provision homelab new-hv01 --action discover_pxe --confirm --wait
-umkim site inventory import preview homelab --wait
-umkim site inventory import apply homelab --confirm --paths host_vars/new-hv01.yml,hypervisors.yml
+umkim site host provision SITE new-hv01 --action discover_pxe --confirm --wait
+umkim site inventory import preview SITE --wait
+umkim site inventory import apply SITE --confirm --paths host_vars/new-hv01.yml,hypervisors.yml
 ```
 
 Import preview promotes jumphost `generated/host_vars/` and `generated/hosts/`
 into canonical hub paths; `notes.json` stays on the jumphost for reference.
 
-See [provisioner-connector-plan.md](../provisioner-connector-plan.md).
+See [fleet-site.md](fleet-site.md) for the full inventory API.
 
 Mutating commands print `OK: …` on success (and re-list ingress after site changes).
 Failures exit non-zero with an error (including when a patch is accepted but not
@@ -242,7 +242,7 @@ Filter Ready clusters by discovered capabilities (AND semantics):
 ```bash
 umkim cluster candidates --require gpu
 umkim cluster candidates --require kvm,ha_topology
-umkim cluster candidates --require storage.rwx --site homelab
+umkim cluster candidates --require storage.rwx --site SITE
 umkim cluster list --require gpu,kvm
 ```
 
@@ -257,11 +257,11 @@ KubeVirt is a **cluster operation** (Ansible job), mutual exclusion with node an
 storage ops. History type `configureKubevirt`.
 
 ```bash
-umkim cluster platform enable-kubevirt lab-ha-0
-umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --wait 45m
+umkim cluster platform enable-kubevirt CLUSTER
+umkim cluster platform enable-kubevirt CLUSTER --lan-bridge --wait 45m
 # Day-2 LAN Multus when KubeVirt is already Ready (no --force required)
-umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge
-umkim cluster platform status lab-ha-0
+umkim cluster platform enable-kubevirt CLUSTER --lan-bridge
+umkim cluster platform status CLUSTER
 umkim cluster candidates --require kubevirt
 ```
 
@@ -270,13 +270,13 @@ umkim cluster candidates --require kubevirt
 Once KubeVirt is installed, manage guest VMs through the hub API:
 
 ```bash
-umkim vm list --cluster lab-ha-0
-umkim vm stop smoke --cluster lab-ha-0           # soft ACPI shutdown
-umkim vm stop smoke --cluster lab-ha-0 --force   # hard poweroff
-umkim vm start smoke --cluster lab-ha-0
-umkim vm restart smoke --cluster lab-ha-0        # soft reboot
-umkim vm restart smoke --cluster lab-ha-0 --force
-umkim vm console smoke --cluster lab-ha-0        # serial TTY
+umkim vm list --cluster CLUSTER
+umkim vm stop smoke --cluster CLUSTER           # soft ACPI shutdown
+umkim vm stop smoke --cluster CLUSTER --force   # hard poweroff
+umkim vm start smoke --cluster CLUSTER
+umkim vm restart smoke --cluster CLUSTER        # soft reboot
+umkim vm restart smoke --cluster CLUSTER --force
+umkim vm console smoke --cluster CLUSTER        # serial TTY
 ```
 
 Console UI: **Clusters → Virtual machines**. Serial is default; VNC opens on
@@ -289,11 +289,11 @@ queue as node lifecycle — it cannot run while a node operation is in progress.
 Completed runs appear in operation history (`umkim node-op history`).
 
 ```bash
-umkim cluster storage enable-local lab-single-0
-umkim cluster storage enable-local lab-single-0 --dir /data/nfs --wait 10m
-umkim cluster storage enable-local lab-single-0 --wait 10m --force
-umkim cluster storage status lab-single-0
-umkim node-op history --cluster lab-single-0
+umkim cluster storage enable-local CLUSTER
+umkim cluster storage enable-local CLUSTER --dir /data/nfs --wait 10m
+umkim cluster storage enable-local CLUSTER --wait 10m --force
+umkim cluster storage status CLUSTER
+umkim node-op history --cluster CLUSTER
 ```
 
 Installs `nfs-server` on the node (`nfs_local`), exports `--dir` (default

@@ -4,7 +4,7 @@ UMKIM ships hub backup and restore helpers for a **single-node management
 cluster**. Test recovery in an isolated lab before relying on the path in
 production.
 
-See also [plans/hub-backup-restore.md](plans/hub-backup-restore.md) for the
+See also [archive/plans/hub-backup-restore.md](archive/plans/hub-backup-restore.md) for the
 full disaster-recovery design.
 
 ## What is backed up
@@ -83,7 +83,7 @@ ansible-playbook $INV harbor.yml -l hub --tags harbor_registries
 ansible-playbook $INV wireguard-clients.yml   # operator laptop/tablet peers (not in wg0.conf backup)
 ```
 
-See [runbooks/hub-dr-test-20260902.md](runbooks/hub-dr-test-20260902.md) for a
+See [archive/runbooks/hub-dr-test-20260902.md](archive/runbooks/hub-dr-test-20260902.md) for a
 full same-host DR test log.
 
 ## Workload recovery

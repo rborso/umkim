@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hub restore — WireGuard, K3s etcd, optional ACME and Harbor.
-# DESTRUCTIVE. Read docs/backup-restore.md and docs/plans/hub-backup-restore.md first.
+# DESTRUCTIVE. Read docs/backup-restore.md and docs/archive/plans/hub-backup-restore.md first.
 #
 # Usage:
 #   sudo ./scripts/restore-hub.sh --dry-run /var/backups/umkim/20260101T120000Z

@@ -112,9 +112,7 @@ Discovery sets:
   `fleet-ansible-runner` after playbook changes
 - Site inventory `fleet_site_enable_kubevirt` can also install during
   `site-provision.yml`; day-2 path is the platform job above
-- Legacy inventory playbooks (`fleet-platform-kubevirt.yml`,
-  `kubevirt-bridge-ready.yml`, `phase4-kubevirt-parents.yml`) are superseded
-  by the platform API/CLI for managed clusters
+- KubeVirt on managed clusters is installed via platform API/CLI (`umkim cluster platform enable-kubevirt`)
 
 ## Sample VM (pod network)
 

@@ -1,16 +1,16 @@
-# Fleet console authentication and RBAC
+# UMKIM console authentication and RBAC
 
 > Status: v0.2 is an experimental proof of concept, not a
 > production-certified identity or authorization service.
 
-`fleet-console-auth` authenticates console users and authorizes requests
+`fleet-console-auth` authenticates UMKIM console users and authorizes requests
 proxied to the fleet-site API (sites, clusters, FleetApp, chart library) and the optional
 LLM proxy.
 
 ## Public API access
 
 The public fleet-site and LLM API surfaces require authenticated access.
-Use the console or an approved API client that obtains a supported session or
+Use the UMKIM console or an approved API client that obtains a supported session or
 service-account credential. Do not publish direct controller endpoints, bypass
 the proxy, or place tokens in documentation, shell history, or source control.
 
@@ -58,7 +58,7 @@ only). Key names are not org-prefixed.
 
 Firewall, TLS, and external access behavior depend on the deployed inventory
 and network policy. This release does not guarantee that those concerns are
-fully solved; verify the live deployment before exposing the console.
+fully solved; verify the live deployment before exposing the UMKIM console.
 
 See [install.md](install.md), [secrets.md](secrets.md), and
 [fleet-verify.md](fleet-verify.md) for deployment and verification guidance.

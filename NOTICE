@@ -35,7 +35,7 @@ UMKIM-original fleet components (Robert Borso, Apache-2.0)
 
   - fleet-site-controller, fleet-edge-controller
   - fleet-console-auth, fleet-failover-controller
-  - fleet-ansible-runner, dcm-fleet-console
+  - fleet-ansible-runner, umkim-console
 
 ================================================================================
 Copyleft and GPL-licensed components in images

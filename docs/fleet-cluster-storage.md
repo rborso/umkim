@@ -53,10 +53,10 @@ defaults to `/srv/fleet-nfs`). External NFS remains under the Storage panel.
 CLI (same cluster operation):
 
 ```bash
-umkim cluster storage enable-local lab-single-0
-umkim cluster storage enable-local lab-single-0 --dir /data/nfs --wait 10m
-umkim cluster storage status lab-single-0
-umkim node-op history --cluster lab-single-0
+umkim cluster storage enable-local CLUSTER
+umkim cluster storage enable-local CLUSTER --dir /data/nfs --wait 10m
+umkim cluster storage status CLUSTER
+umkim node-op history --cluster CLUSTER
 ```
 
 API: `POST /clusters/{name}/configure-storage` (authenticated via

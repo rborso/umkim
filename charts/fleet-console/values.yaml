@@ -38,7 +38,7 @@ auth:
 dashboard:
   enabled: true
   image:
-    repository: dcm-fleet-console
+    repository: umkim-console
     tag: "0.1.0"
     pullPolicy: Always
   nodePort: 30912

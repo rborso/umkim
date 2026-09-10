@@ -32,7 +32,7 @@ else
   kctl -n fleet-console get deploy fleet-site-controller >/dev/null 2>&1 && ok "fleet-site-controller" || fail "fleet-site-controller missing"
   kctl -n fleet-system get deploy fleet-edge-controller >/dev/null 2>&1 && ok "fleet-edge-controller" || fail "fleet-edge-controller missing"
   kctl -n fleet-console get deploy fleet-console-auth >/dev/null 2>&1 && ok "fleet-console-auth" || fail "fleet-console-auth missing"
-  kctl -n fleet-console get deploy dcm-fleet-dashboard >/dev/null 2>&1 && ok "fleet console dashboard" || fail "console dashboard missing"
+  kctl -n fleet-console get deploy umkim-console >/dev/null 2>&1 && ok "UMKIM console" || fail "UMKIM console missing"
 
   GW_NS="${HUB_INGRESS_NS:-fleet-ingress}"
   HN="$(kctl -n "${GW_NS}" get deploy gateway -o jsonpath='{.spec.template.spec.hostNetwork}' 2>/dev/null || true)"

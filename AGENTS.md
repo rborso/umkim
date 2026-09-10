@@ -15,7 +15,7 @@ do not copy addresses, host names, domains, or secrets into documentation.
 | Install | [docs/install.md](docs/install.md) | Supported installation workflow |
 | Site exposure | [examples/site-profiles/](examples/site-profiles/) | Per-site ingress inventory examples |
 | Inventory | `inventory/` and [examples/inventory/hub-only/](examples/inventory/hub-only/) | Deployment inputs and templates |
-| Reference | [VERSIONS.md](VERSIONS.md), [SECURITY.md](SECURITY.md), and [docs/secrets.md](docs/secrets.md) | Pins, security, and secret handling |
+| Reference | [VERSIONS.md](VERSIONS.md), [SECURITY.md](SECURITY.md), [docs/secrets.md](docs/secrets.md), [docs/fleet-verify.md](docs/fleet-verify.md), [docs/backup-restore.md](docs/backup-restore.md), [docs/fleet-console-auth.md](docs/fleet-console-auth.md), [docs/fleet-ingress-auth.md](docs/fleet-ingress-auth.md) | Pins, verification, backup, auth, and secret handling |
 
 When documentation and runtime configuration differ, configuration and the
 installation guide take precedence. Keep design documentation topology-neutral.
@@ -43,7 +43,7 @@ installation guide take precedence. Keep design documentation topology-neutral.
 | KubeVirt / Multus platform | [docs/components/fleet-kubevirt.md](docs/components/fleet-kubevirt.md) |
 | Site exposure / ingress | [docs/components/fleet-edge.md](docs/components/fleet-edge.md), [examples/site-profiles/](examples/site-profiles/) |
 | Cluster lifecycle / detach | [docs/components/fleet-site.md](docs/components/fleet-site.md), [playbooks/flows/cluster-delete.yml](playbooks/flows/cluster-delete.yml) |
-| Console route or user workflow | `ui/dcm-fleet-console/README.md` and [docs/fleet-console-auth.md](docs/fleet-console-auth.md) |
+| Console route or user workflow | `ui/umkim-console/README.md` and [docs/fleet-console-auth.md](docs/fleet-console-auth.md) |
 | Fleet CLI (`umkim`) | [docs/components/umkim-cli.md](docs/components/umkim-cli.md) and `cmd/umkim/` |
 | Security or secret handling | [SECURITY.md](SECURITY.md) and [docs/secrets.md](docs/secrets.md) |
 | Image or version pin | [VERSIONS.md](VERSIONS.md) and `inventory/group_vars/all/common.yml` |

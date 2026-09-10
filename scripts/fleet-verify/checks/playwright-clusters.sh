@@ -4,7 +4,7 @@ set -euo pipefail
 FLEET_CONSOLE_URL="${FLEET_CONSOLE_URL:-http://127.0.0.1:30912}"
 FLEET_API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
 ROOT="${FV_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
-UI_DIR="${ROOT}/ui/dcm-fleet-console"
+UI_DIR="${ROOT}/ui/umkim-console"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/fleet-verify/lib/playwright.sh
 source "${SCRIPT_DIR}/lib/playwright.sh"

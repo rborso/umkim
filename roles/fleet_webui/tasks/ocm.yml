@@ -21,7 +21,7 @@
 - name: Fleet WebUI | Wait for OCM console
   ansible.builtin.command:
     cmd: >-
-      kubectl -n {{ fleet_webui_namespace }} wait
+      kubectl -n {{ fleet_console_namespace }} wait
       --for=condition=Available deployment/ocm-console --timeout=300s
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
