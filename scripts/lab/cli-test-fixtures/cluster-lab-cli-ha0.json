@@ -1,0 +1,16 @@
+{
+  "clusterName": "lab-cli-ha0",
+  "siteId": "homelab",
+  "bootstrapHost": "172.16.10.211",
+  "controlPlaneVip": "172.16.10.210",
+  "topology": "ha_3_node",
+  "networkMode": "wireguard",
+  "minRootDiskGi": 38,
+  "clusterRegion": "homelab",
+  "jumphost": "linux@jump.otthol.hu:30200",
+  "nodes": [
+    {"address": "172.16.10.211", "hostname": "cli-test-ha-cp1", "role": "control"},
+    {"address": "172.16.10.212", "hostname": "cli-test-ha-cp2", "role": "control"},
+    {"address": "172.16.10.213", "hostname": "cli-test-ha-cp3", "role": "control"}
+  ]
+}

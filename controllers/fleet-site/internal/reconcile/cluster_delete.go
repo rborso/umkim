@@ -13,6 +13,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -50,22 +51,53 @@ func (r *ClusterJoinReconciler) clusterNeedsDeleteJob(ctx context.Context, fcj *
 }
 
 func (r *ClusterJoinReconciler) markWGPeersRemoved(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) error {
-	if fcj.Annotations == nil {
-		fcj.Annotations = map[string]string{}
-	}
-	fcj.Annotations[annotationWGPeersRemoved] = "true"
-	return r.Update(ctx, fcj)
+	return r.patchClusterJoin(ctx, fcj, func(latest *fleetv1alpha1.FleetClusterJoin) {
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[annotationWGPeersRemoved] = "true"
+	})
+}
+
+func (r *ClusterJoinReconciler) patchClusterJoin(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, mutate func(*fleetv1alpha1.FleetClusterJoin)) error {
+	key := client.ObjectKeyFromObject(fcj)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var latest fleetv1alpha1.FleetClusterJoin
+		if err := r.Get(ctx, key, &latest); err != nil {
+			return err
+		}
+		orig := latest.DeepCopy()
+		mutate(&latest)
+		return r.Patch(ctx, &latest, client.MergeFrom(orig))
+	})
+}
+
+func (r *ClusterJoinReconciler) patchClusterJoinStatus(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, mutate func(*fleetv1alpha1.FleetClusterJoin)) error {
+	key := client.ObjectKeyFromObject(fcj)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var latest fleetv1alpha1.FleetClusterJoin
+		if err := r.Get(ctx, key, &latest); err != nil {
+			return err
+		}
+		orig := latest.DeepCopy()
+		mutate(&latest)
+		return r.Status().Patch(ctx, &latest, client.MergeFrom(orig))
+	})
 }
 
 func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {
 	if fcj.Status.Phase != fleetv1alpha1.JoinPhaseDeleting {
-		fcj.Status.Phase = fleetv1alpha1.JoinPhaseDeleting
-		if fcj.Status.DeletionStartedAt == nil {
-			now := metav1.Now()
-			fcj.Status.DeletionStartedAt = &now
+		if err := r.patchClusterJoinStatus(ctx, fcj, func(latest *fleetv1alpha1.FleetClusterJoin) {
+			latest.Status.Phase = fleetv1alpha1.JoinPhaseDeleting
+			if latest.Status.DeletionStartedAt == nil {
+				now := metav1.Now()
+				latest.Status.DeletionStartedAt = &now
+			}
+			latest.Status.Message = "Cluster deletion in progress"
+		}); err != nil {
+			return ctrl.Result{}, err
 		}
-		fcj.Status.Message = "Cluster deletion in progress"
-		_ = r.Status().Update(ctx, fcj)
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Run hub/spoke delete while overlay WG is still up so klusterlet can finish ManifestWork cleanup.

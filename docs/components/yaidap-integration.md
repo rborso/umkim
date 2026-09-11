@@ -47,7 +47,13 @@ Configure on `FleetSite.spec.provision` (API: `GET`/`PUT`/`PATCH /sites/{name}/p
 | `sshSecretRef` | yes | Hub Secret in `fleet-console` namespace; private key for jumphost |
 | `inventoryPath` | yes | Absolute path **on the jumphost** to this site's YAIDAP inventory root |
 | `yaidapRoot` | no | YAIDAP git checkout on jumphost (default `~/yaidap`) |
+| `yaidapRepo` | no* | Git remote for hub-managed YAIDAP sync (`https://…` or `git@…`) |
+| `yaidapRef` | no | Branch, tag, or commit to checkout (default `main`) |
+| `yaidapGitSecretRef` | no** | Hub Secret with deploy key (`id_ed25519`, `deploy_key`, or `id_rsa`) |
 | `defaultExtraVars` | no | Safe non-secret `-e` pairs passed to every connector run |
+
+\*Required for `POST …/provision/yaidap/sync`.  
+\*\*Required when `yaidapRepo` uses SSH (`git@…`); omit for public HTTPS remotes.
 
 **Secret:** create before binding, e.g. `fleet-site-{site}-provision-ssh` with
 `id_ed25519` / `id_ed25519.pub` (or `id_rsa` / `id_rsa.pub`). The ansible-runner
@@ -65,7 +71,11 @@ umkim site provision set SITE --provider yaidap \
 
 **Jumphost prep (operator):**
 
-1. Install YAIDAP (separate repo) on the jumphost at `yaidapRoot`.
+1. Bind `yaidapRepo`, `yaidapRoot`, and optional `yaidapGitSecretRef`, then run hub YAIDAP sync
+   (`POST /sites/{site}/provision/yaidap/sync` or `umkim site provision yaidap-sync SITE`) to
+   clone or update the checkout on the jumphost. For private repos, create a deploy-key Secret
+   in `fleet-console` (read-only repo access) and reference it in `yaidapGitSecretRef`; the key is
+   mounted only on the connector Job pod and staged on the jumphost for the duration of the sync.
 2. Maintain a per-site inventory tree at `inventoryPath` (see layout below).
 3. Ensure SSH from jumphost to hypervisors, guests, and BM targets on the site
    management LAN.
@@ -83,8 +93,9 @@ under `_meta/` and is **never** pushed to the jumphost.
 
 | Path | Synced to jumphost | Role |
 |------|-------------------|------|
-| `guests.yml` | yes | Guest index: `ansible_host`, `vm_location` (schedule tokens until first `create_vm`) |
-| `hypervisors.yml` | yes | Hypervisor group; BM hosts appear as `kind: bare_metal` in host APIs |
+| `guests.yml` | yes (hub: VM index only) | `guests.hosts`; jumphost copy also has `external.hosts` composed from hub `bare_metals.yml` on sync |
+| `bare_metals.yml` | **hub only** | Bare-metal cluster nodes (`kind: bare_metal` in host APIs) |
+| `hypervisors.yml` | yes | Hypervisor group (`kind: hypervisor` in host APIs) |
 | `{cluster}.yml` | yes | Ansible group membership (`hosts:` list) |
 | `group_vars/all/all.yml` (+ optional `group_vars/all/*.yml`) | yes | Site networks, storages, defaults |
 | `group_vars/{group}.yml` | yes | Group vars; Fleet cluster intent for cluster groups |
@@ -131,8 +142,16 @@ Three surfaces share one store:
 `host_vars/{name}.yml` from templates (`inventoryVmTemplates.ts`). Defaults:
 `vm_location: least-utilized`, libvirt profile, lab-style uplink placeholders.
 
-**Discovery stub (console):** **Add discovery stub** writes `hypervisors.yml` +
+**Hypervisor (console):** **Add hypervisor** writes `hypervisors.yml` +
 `host_vars/{name}.yml` with optional `tempxe_discovery.enabled` and uplink MAC.
+
+**Bare-metal node (console):** **Add bare metal node** writes `bare_metals.yml` +
+minimal `host_vars/{name}.yml` (no libvirt profile).
+
+**Host kinds** on `GET /sites/{name}/hosts`: `vm` (`guests.hosts`), `bare_metal`
+(`bare_metals.yml`), `hypervisor` (`hypervisors.yml`). On jumphost sync, hub
+`bare_metals.yml` is merged into YAIDAP `guests.yml` → `external.hosts` (not
+stored as a separate file on the jumphost).
 
 **Cluster automation** uses native Ansible layout:
 
@@ -170,10 +189,10 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 
 | Action | Confirm | Pre-sync inventory | Default YAIDAP invocation |
 |--------|---------|-------------------|---------------------------|
-| `discover` | no | yes | `playbooks/discover-hosts.yml` · tags `check_host_details` |
-| `discover_pxe` | **yes** | yes | `playbooks/configure-tempxe.yml` · `configure_tempxe`, `tempxe_start` · `-e install_os=true` when confirmed |
-| `install_bm` | **yes** | yes (hypervisor) | Composite TempXE on jumphost: arm → UEFI PXE reboot → wait `ks-post.log` + new `boot_id` → `tempxe_stop` |
-| `create_vm` | no* | yes | `playbooks/provision-vms.yml` · tags `create`, `never` |
+| `discover` | no | yes | `playbooks/discover-hosts.yml` · tags `check_host_details` · `-e yaidap_emit_result=true` |
+| `discover_pxe` | **yes** | yes | `playbooks/discover-pxe.yml` · tag `discover_pxe` · `--connection local` · `-e tempxe_confirm=true` |
+| `install_bm` | **yes** | yes (hypervisor) | `playbooks/install-bare-metal.yml` · tag `install_bm` · `--connection local` · `-e tempxe_confirm=true` · `-e install_os=true` |
+| `create_vm` | no* | yes | `playbooks/provision-vms.yml` · tags `create`, `never` · `-e yaidap_emit_result=true` · `-e yaidap_recreate=true` when guest has concrete `vm_location` |
 | `plan_vm` | no | yes | `playbooks/plan-vm-placement.yml` · tag `plan` (dry-run; no VM, no inventory rewrite) |
 | `destroy` | **yes** | yes | `playbooks/provision-vms.yml` · tag `destroy` · `-e confirm_destroy=true` |
 | `status` | no | no | `playbooks/configure-tempxe.yml` · tag `tempxe_status` |
@@ -189,39 +208,50 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 - `plan_vm`: existing guest in `guests.yml` (not external-only).
 - `create_vm` / `plan_vm`: `ansible_host` required in `host_vars` or sync extra
   vars (static management IP for cloud-init).
+- `destroy`: VM guest in `guests.yml`; guest phase **Ready**; `confirm=true`;
+  blocked when the guest is a cluster member and a live `FleetClusterJoin` exists
+  (unless the join is deleting). On success the hub sets guest phase **Declared**
+  (not Ready), clears cluster sub-status, and keeps inventory for reprovision.
 
-### Composite hub workflows (connector playbook)
+### YAIDAP integration contract (`YAIDAP_RESULT`)
 
-Beyond a single `ansible-playbook` call, `site-provision-connector.yml` implements:
+YAIDAP v1 integration playbooks emit a single JSON line when the hub passes
+`-e yaidap_emit_result=true` (set automatically for provision actions). The
+fleet-site controller parses the last `YAIDAP_RESULT=` line from connector job
+logs (`schema: yaidap.integration.v1`).
 
-**`install_bm`**
+```text
+YAIDAP_RESULT={"schema":"yaidap.integration.v1","action":"create_vm","subject":"vm01","phase":"ready","ok":true,"message":"VM created","vm_location":"virt02","handoff":{"hostname":"vm01","ansible_host":"172.16.10.21","ansible_user":"linux","os_family":"rocky-10"},...}
+```
 
-1. Resolve BM `ansible_host` from `hypervisors.yml` / `host_vars`.
-2. Capture pre-install `boot_id`.
-3. Arm TempXE (`tempxe_confirm=true`, `install_os=true`).
-4. SSH to target: `efibootmgr` PXE boot entry selection + `reboot`.
-5. Poll until `/root/ks-post.log` non-empty and `boot_id` changed (default 900s).
-6. `tempxe_stop` on jumphost.
+| Field | Hub use |
+|-------|---------|
+| `message` | Provision action history message |
+| `handoff` | `ProvisionHandoffHost` for enroll / add-worker |
+| `vm_location` | Persist concrete hypervisor after `create_vm` |
+| `placement` | `plan_vm` assignment summary |
+| `generated_paths` | Discovery import hints (optional) |
 
-**`discover_pxe`**
+Upstream contract reference: YAIDAP `docs/integrations/umkim.md` (sibling repo).
 
-1. Arm TempXE (same as above).
-2. Optional PXE reboot when `ansible_host` known; otherwise operator reboots manually.
-3. Wait for tarball under `generated/pxe-discovery/` (subject or MAC match).
-4. `collect_discovery` tag.
-5. `tempxe_stop`.
+### Connector workflow (`site-provision-connector.yml`)
+
+The hub connector syncs inventory to the jumphost, then runs one YAIDAP playbook
+per action. Composite TempXE / PXE flows live in YAIDAP (`install-bare-metal.yml`,
+`discover-pxe.yml`); the connector no longer re-implements them.
 
 **`create_vm`**
 
 1. Pre-sync hub bundle to jumphost.
-2. If guest already has concrete `vm_location`, run `destroy` with
-   `confirm_destroy=true` (stale libvirt cleanup).
+2. When the guest already has a concrete `vm_location`, pass
+   `-e yaidap_recreate=true` (YAIDAP destroys the stale libvirt domain before create).
 3. Ensure libvirt guest profile in `host_vars` when using legacy per-field sync.
-4. Run YAIDAP create; emit `FLEET_YAIDAP_VM_LOCATION={hypervisor}` in logs.
+4. Run YAIDAP create with `-e yaidap_emit_result=true`.
 
 After successful `create_vm`, the fleet-site controller:
 
-1. Parses `FLEET_YAIDAP_VM_LOCATION` from job logs.
+1. Parses `vm_location` from `YAIDAP_RESULT` (falls back to legacy
+   `FLEET_YAIDAP_VM_LOCATION=` log marker when absent).
 2. Rewrites `guests.yml` and `host_vars/{guest}.yml` from schedule tokens
    (`least-utilized`, `auto`, empty) to the concrete hypervisor.
 3. Marks inventory `dirty` and enqueues **inventory sync** so the jumphost matches.
@@ -283,8 +313,10 @@ Console: **Provisioner inventory** → **Site hosts** → **Provision** → **Ap
 7. bootstrap / provision as usual
 ```
 
-BM hosts are **not** required to appear in `guests.yml`; they live under
-`hypervisors.yml` and are listed with `kind: bare_metal`.
+Bare-metal cluster nodes live under hub `bare_metals.yml` (`kind: bare_metal`).
+Hypervisors live under `hypervisors.yml` (`kind: hypervisor`). Libvirt guests
+live under `guests.hosts` (`kind: vm`). Do not put `external.hosts` in hub
+`guests.yml`; the controller composes that section for the jumphost on sync.
 
 ### C. Import from jumphost
 
@@ -400,7 +432,7 @@ configured independently (`FleetSite.spec.jumphost`).
 | `discover_pxe requires tempxe_discovery.enabled` | Stub incomplete | Edit `host_vars`; enable PXE discovery + MAC |
 | Import warnings `CHANGE_ME` | Unresolved discovery draft | Edit YAML; re-sync |
 | `site provision action already running` | Overlapping jobs | Wait or inspect Job `fleet-site-prov-*` |
-| Placement still `least-utilized` after create | Job log missing marker | Inspect YAIDAP logs; verify `FLEET_YAIDAP_VM_LOCATION=` line |
+| Placement still `least-utilized` after create | Job log missing result | Inspect YAIDAP logs; verify `YAIDAP_RESULT` includes concrete `vm_location` |
 | Sync stuck `syncing` | Failed push job | Job logs; jumphost disk permissions on `inventoryPath` |
 | BM install timeout | PXE / kickstart | TempXE status on jumphost; target power; firewall |
 

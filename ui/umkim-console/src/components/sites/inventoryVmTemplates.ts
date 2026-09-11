@@ -14,7 +14,10 @@ export type VmGuestTemplateOptions = {
 
 type GuestsDoc = {
   guests?: { hosts?: Record<string, Record<string, string>> };
-  external?: { hosts?: Record<string, Record<string, string>> };
+};
+
+type BareMetalsDoc = {
+  bare_metals?: { hosts?: Record<string, Record<string, string>> };
 };
 
 type HypervisorsDoc = {
@@ -23,7 +26,9 @@ type HypervisorsDoc = {
 
 const DEFAULT_GUESTS = `guests:
   hosts: {}
-external:
+`;
+
+const DEFAULT_BARE_METALS = `bare_metals:
   hosts: {}
 `;
 
@@ -36,6 +41,12 @@ export type HypervisorDiscoveryStubOptions = {
   ansibleHost?: string;
   macAddress?: string;
   pxeDiscovery?: boolean;
+};
+
+export type BareMetalNodeOptions = {
+  name: string;
+  ansibleHost?: string;
+  os?: string;
 };
 
 export function hypervisorDiscoveryStubTemplate(opts: HypervisorDiscoveryStubOptions): string {
@@ -137,6 +148,50 @@ uplinks:
 `;
 }
 
+export function bareMetalNodeHostVarsTemplate(opts: BareMetalNodeOptions): string {
+  const name = opts.name.trim();
+  const os = opts.os?.trim() || 'rocky-10';
+  const ansibleHostLine = opts.ansibleHost?.trim()
+    ? `ansible_host: ${opts.ansibleHost.trim()}\n`
+    : '';
+  return `---
+# Bare-metal cluster node ${name} (bare_metals.yml — not a libvirt guest).
+${ansibleHostLine}os: ${os}
+configure_firewalld: false
+`;
+}
+
+export function mergeGuestIntoBareMetalsYaml(
+  existing: string,
+  guestName: string,
+  entry: { ansible_host?: string },
+): string {
+  const name = guestName.trim();
+  if (!name) {
+    throw new Error('host name required');
+  }
+  let doc: BareMetalsDoc;
+  try {
+    doc = (parse(existing?.trim() ? existing : DEFAULT_BARE_METALS) as BareMetalsDoc) ?? {};
+  } catch {
+    throw new Error('bare_metals.yml is not valid YAML — fix it before adding a bare-metal node');
+  }
+  if (!doc.bare_metals) {
+    doc.bare_metals = { hosts: {} };
+  }
+  if (!doc.bare_metals.hosts) {
+    doc.bare_metals.hosts = {};
+  }
+  const hostEntry: Record<string, string> = {};
+  const addr = entry.ansible_host?.trim();
+  if (addr) {
+    hostEntry.ansible_host = addr;
+  }
+  const prev = doc.bare_metals.hosts[name] ?? {};
+  doc.bare_metals.hosts[name] = { ...prev, ...hostEntry };
+  return stringify(doc).trimEnd() + '\n';
+}
+
 export function mergeGuestIntoGuestsYaml(
   existing: string,
   guestName: string,
@@ -157,12 +212,6 @@ export function mergeGuestIntoGuestsYaml(
   }
   if (!doc.guests.hosts) {
     doc.guests.hosts = {};
-  }
-  if (!doc.external) {
-    doc.external = { hosts: {} };
-  }
-  if (!doc.external.hosts) {
-    doc.external.hosts = {};
   }
   const hostEntry: Record<string, string> = {};
   const loc = entry.vm_location?.trim() || 'least-utilized';
@@ -192,6 +241,7 @@ mode: enroll
   if (
     rootCluster &&
     rootCluster[1] !== 'guests' &&
+    rootCluster[1] !== 'bare_metals' &&
     rootCluster[1] !== 'hypervisors' &&
     rootCluster[1] !== 'clusters'
   ) {
@@ -200,6 +250,9 @@ mode: enroll
   hosts:
     ${group}-0:
 `;
+  }
+  if (p === 'bare_metals.yml') {
+    return DEFAULT_BARE_METALS;
   }
   return '';
 }

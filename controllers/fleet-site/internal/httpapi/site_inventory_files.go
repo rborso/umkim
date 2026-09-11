@@ -231,6 +231,11 @@ func (s *Server) applySiteInventoryImport(ctx context.Context, w http.ResponseWr
 		writeJSON(w, http.StatusOK, map[string]string{"status": "no changes"})
 		return
 	}
+	put, err = yaidap.NormalizeImportPut(put)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	warnings := importApplyWarnings(put)
 	if err := connectors.PutInventoryFiles(ctx, s.Client, s.Cfg.Namespace, siteName, fleetv1alpha1.ProvisionProviderYaidap, connectors.FormatActor(actor.Kind, actor.Name), put, yaidap.ValidateInventoryFile); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

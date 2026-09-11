@@ -118,8 +118,8 @@ export interface FleetSitePatch {
   provisioningMode?: 'greenfield' | 'registry';
 }
 
-export type SiteHostKind = 'vm' | 'bare_metal';
-export type SiteHostPhase = 'Declared' | 'Provisioning' | 'Ready' | 'Failed';
+export type SiteHostKind = 'vm' | 'bare_metal' | 'hypervisor';
+export type SiteHostPhase = 'Declared' | 'Provisioning' | 'Destroying' | 'Ready' | 'Failed';
 
 export type SiteHostClusterMode = 'enroll' | 'add_worker' | 'replace_control';
 

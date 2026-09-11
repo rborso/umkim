@@ -67,12 +67,11 @@ func DefaultYaidapInvocation(action string, confirm bool) (YaidapInvocation, err
 		}, nil
 	case fleetv1alpha1.ProvisionActionDiscoverPXE:
 		inv := YaidapInvocation{
-			Playbook: "playbooks/configure-tempxe.yml",
-			Tags:     []string{"configure_tempxe", "tempxe_start"},
+			Playbook: "playbooks/discover-pxe.yml",
+			Tags:     []string{"discover_pxe"},
 		}
 		if confirm {
 			inv.ConfirmE = "tempxe_confirm=true"
-			inv.ExtraArgs = []string{"-e", "install_os=true"}
 		}
 		return inv, nil
 	case fleetv1alpha1.ProvisionActionCreateVM:
@@ -86,18 +85,14 @@ func DefaultYaidapInvocation(action string, confirm bool) (YaidapInvocation, err
 			Tags:     []string{"plan"},
 		}, nil
 	case fleetv1alpha1.ProvisionActionDestroy:
-		inv := YaidapInvocation{
+		return YaidapInvocation{
 			Playbook: "playbooks/provision-vms.yml",
 			Tags:     []string{"destroy"},
-		}
-		if confirm {
-			inv.ExtraArgs = append(inv.ExtraArgs, "-e", "confirm_destroy=true")
-		}
-		return inv, nil
+		}, nil
 	case fleetv1alpha1.ProvisionActionInstallBM:
 		inv := YaidapInvocation{
-			Playbook: "playbooks/configure-tempxe.yml",
-			Tags:     []string{"configure_tempxe", "tempxe_start"},
+			Playbook: "playbooks/install-bare-metal.yml",
+			Tags:     []string{"install_bm"},
 		}
 		if confirm {
 			inv.ConfirmE = "tempxe_confirm=true"

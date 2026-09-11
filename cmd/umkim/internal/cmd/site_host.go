@@ -16,6 +16,7 @@ func siteHostCmd() *cobra.Command {
 	cmd.AddCommand(siteHostListCmd())
 	cmd.AddCommand(siteHostGetCmd())
 	cmd.AddCommand(siteHostProvisionCmd())
+	cmd.AddCommand(siteHostDestroyCmd())
 	cmd.AddCommand(siteHostClusterApplyCmd())
 	return cmd
 }
@@ -89,6 +90,39 @@ func siteHostProvisionCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status (default from kind)")
 	c.Flags().BoolVar(&confirm, "confirm", false, "Required for install_bm / discover_pxe / destroy")
+	c.Flags().BoolVar(&wait, "wait", false, "Poll until Succeeded or Failed")
+	return c
+}
+
+func siteHostDestroyCmd() *cobra.Command {
+	var confirm, wait bool
+	c := &cobra.Command{
+		Use:   "destroy [site] [name]",
+		Short: "Destroy libvirt VM for a site host (keeps inventory for reprovision)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !confirm {
+				return fmt.Errorf("--confirm is required for destroy")
+			}
+			body := map[string]interface{}{
+				"action":  "destroy",
+				"confirm": true,
+			}
+			raw, code, err := api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/provision", body)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200, 202); err != nil {
+				return err
+			}
+			if !wait {
+				printJSON(raw)
+				return nil
+			}
+			return waitProvisionActionFromHostResponse(raw, args[0])
+		},
+	}
+	c.Flags().BoolVar(&confirm, "confirm", false, "Required: tear down libvirt VM while keeping guest in inventory")
 	c.Flags().BoolVar(&wait, "wait", false, "Poll until Succeeded or Failed")
 	return c
 }

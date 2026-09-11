@@ -116,6 +116,11 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 	if err != nil {
 		return nil, err
 	}
+	bareMetalsRaw, _ := connectors.GetInventoryFile(data, "bare_metals.yml")
+	bareMetals, err := ParseBareMetalsYAML(bareMetalsRaw)
+	if err != nil {
+		return nil, err
+	}
 	hypervisorsRaw, _ := connectors.GetInventoryFile(data, "hypervisors.yml")
 	hypervisors, err := ParseHypervisorsYAML(hypervisorsRaw)
 	if err != nil {
@@ -130,7 +135,7 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 		}
 	}
 	var out []InventoryHostView
-	add := func(name string, entry GuestEntry, external bool) {
+	addGuest := func(name string, entry GuestEntry, kind string, external bool) {
 		st := statusDoc.Guests[name]
 		if st.Phase == "" {
 			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
@@ -150,24 +155,27 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 			External:    external,
 			AnsibleHost: ip,
 			VmLocation:  vmLoc,
-			Kind:        st.Kind,
+			Kind:        kind,
 			Status:      st,
 			Clusters:    memberClusters[name],
 		})
 	}
 	for name, entry := range guests.Guests.Hosts {
-		add(name, entry, false)
+		addGuest(name, entry, fleetv1alpha1.SiteHostKindVM, false)
 	}
-	for name, entry := range guests.External.Hosts {
-		add(name, entry, true)
+	for name, entry := range bareMetals.BareMetals.Hosts {
+		addGuest(name, entry, fleetv1alpha1.SiteHostKindBareMetal, true)
+	}
+	// Read-compat: legacy external.hosts still in hub guests.yml until migrated.
+	if len(bareMetals.BareMetals.Hosts) == 0 {
+		for name, entry := range guests.External.Hosts {
+			addGuest(name, entry, fleetv1alpha1.SiteHostKindBareMetal, true)
+		}
 	}
 	for name, entry := range hypervisors.Hypervisors.Hosts {
 		st := statusDoc.Guests[name]
 		if st.Phase == "" {
 			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
-		}
-		if st.Kind == "" {
-			st.Kind = fleetv1alpha1.SiteHostKindBareMetal
 		}
 		ip := strings.TrimSpace(entry.AnsibleHost)
 		if ip == "" {
@@ -176,7 +184,7 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 		out = append(out, InventoryHostView{
 			Name:        name,
 			AnsibleHost: ip,
-			Kind:        fleetv1alpha1.SiteHostKindBareMetal,
+			Kind:        fleetv1alpha1.SiteHostKindHypervisor,
 			Status:      st,
 			Clusters:    memberClusters[name],
 		})
@@ -230,7 +238,20 @@ func GuestExists(ctx context.Context, c client.Client, ns, siteName, guestName s
 		if err != nil {
 			return false, err
 		}
+		if vmGuestInIndex(guestName, guests) {
+			return true, nil
+		}
 		if guestInIndex(guestName, guests) {
+			return true, nil
+		}
+	}
+	bmRaw, ok := connectors.GetInventoryFile(data, "bare_metals.yml")
+	if ok {
+		bm, err := ParseBareMetalsYAML(bmRaw)
+		if err != nil {
+			return false, err
+		}
+		if bareMetalInIndex(guestName, bm) {
 			return true, nil
 		}
 	}

@@ -79,7 +79,7 @@ func ParseClusterFileYAML(content string) (ClusterSpec, error) {
 	return spec, nil
 }
 
-func validateClusterSpec(name string, spec ClusterSpec, guestsYAML, hypervisorsYAML string) error {
+func validateClusterSpec(name string, spec ClusterSpec, guestsYAML, bareMetalsYAML, hypervisorsYAML string) error {
 	if err := ValidateGuestName(name); err != nil {
 		return fmt.Errorf("cluster %q: invalid name: %w", name, err)
 	}
@@ -99,27 +99,27 @@ func validateClusterSpec(name string, spec ClusterSpec, guestsYAML, hypervisorsY
 		if err := ValidateGuestName(m); err != nil {
 			return fmt.Errorf("cluster %q member %q: %w", name, m, err)
 		}
-		if (guestsYAML != "" || hypervisorsYAML != "") && !inventoryHostListed(m, guestsYAML, hypervisorsYAML) {
-			return fmt.Errorf("cluster %q: member %q not listed in guests.yml, external.hosts, or hypervisors.yml", name, m)
+		if (guestsYAML != "" || bareMetalsYAML != "" || hypervisorsYAML != "") && !inventoryHostListed(m, guestsYAML, bareMetalsYAML, hypervisorsYAML) {
+			return fmt.Errorf("cluster %q: member %q not listed in guests.yml, bare_metals.yml, or hypervisors.yml", name, m)
 		}
 	}
 	return nil
 }
 
-func validateClustersYAML(content, guestsYAML string) error {
+func validateClustersYAML(content, guestsYAML, bareMetalsYAML string) error {
 	doc, err := ParseClustersYAML(content)
 	if err != nil {
 		return err
 	}
 	for name, spec := range doc.Clusters {
-		if err := validateClusterSpec(name, spec, guestsYAML, ""); err != nil {
+		if err := validateClusterSpec(name, spec, guestsYAML, bareMetalsYAML, ""); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateLegacyClusterFile(path, content, guestsYAML string) error {
+func validateLegacyClusterFile(path, content, guestsYAML, bareMetalsYAML string) error {
 	path = connectors.NormalizeInventoryPath(path)
 	if !strings.HasPrefix(path, "clusters/") || !strings.HasSuffix(path, ".yml") {
 		return fmt.Errorf("invalid legacy cluster file path %q", path)
@@ -129,10 +129,10 @@ func validateLegacyClusterFile(path, content, guestsYAML string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	return validateClusterSpec(name, spec, guestsYAML, "")
+	return validateClusterSpec(name, spec, guestsYAML, bareMetalsYAML, "")
 }
 
-func validateClusterGroupVars(path, content, guestsYAML string, members []string) error {
+func validateClusterGroupVars(path, content, guestsYAML, bareMetalsYAML string, members []string) error {
 	path = connectors.NormalizeInventoryPath(path)
 	name := strings.TrimSuffix(strings.TrimPrefix(path, "group_vars/"), ".yml")
 	if name == "" || strings.Contains(name, "/") {
@@ -143,7 +143,7 @@ func validateClusterGroupVars(path, content, guestsYAML string, members []string
 		return fmt.Errorf("%s: %w", path, err)
 	}
 	spec.Members = members
-	return validateClusterSpec(name, spec, guestsYAML, "")
+	return validateClusterSpec(name, spec, guestsYAML, bareMetalsYAML, "")
 }
 
 // ParseInventoryGroupMembers reads host names from a root Ansible group file.
@@ -185,7 +185,7 @@ type inventoryGroupBody struct {
 	Children map[string]interface{} `yaml:"children"`
 }
 
-func validateRootInventoryGroupFile(path, content, guestsYAML, hypervisorsYAML string) error {
+func validateRootInventoryGroupFile(path, content, guestsYAML, bareMetalsYAML, hypervisorsYAML string) error {
 	groupName := connectors.RootInventoryGroupName(path)
 	if groupName == "" {
 		return fmt.Errorf("invalid root group file %q", path)
@@ -194,10 +194,10 @@ func validateRootInventoryGroupFile(path, content, guestsYAML, hypervisorsYAML s
 	if err != nil {
 		return err
 	}
-	if guestsYAML != "" || hypervisorsYAML != "" {
+	if guestsYAML != "" || bareMetalsYAML != "" || hypervisorsYAML != "" {
 		for _, m := range members {
-			if !inventoryHostListed(m, guestsYAML, hypervisorsYAML) {
-				return fmt.Errorf("%s: member %q not listed in guests.yml, external.hosts, or hypervisors.yml", path, m)
+			if !inventoryHostListed(m, guestsYAML, bareMetalsYAML, hypervisorsYAML) {
+				return fmt.Errorf("%s: member %q not listed in guests.yml, bare_metals.yml, or hypervisors.yml", path, m)
 			}
 		}
 	}
@@ -220,6 +220,7 @@ func LoadClustersFile(ctx context.Context, c client.Client, ns, siteName string)
 func LoadClustersFromData(data map[string]string) ClustersDoc {
 	doc := ClustersDoc{Clusters: map[string]ClusterSpec{}}
 	guestsYAML, _ := connectors.GetInventoryFile(data, "guests.yml")
+	bareMetalsYAML, _ := connectors.GetInventoryFile(data, "bare_metals.yml")
 	hypervisorsYAML, _ := connectors.GetInventoryFile(data, "hypervisors.yml")
 	for _, info := range connectors.ListInventoryFiles(data) {
 		if !connectors.IsRootInventoryGroupFile(info.Path) {
@@ -241,7 +242,7 @@ func LoadClustersFromData(data map[string]string) ClustersDoc {
 			continue
 		}
 		spec.Members = members
-		if err := validateClusterSpec(name, spec, guestsYAML, hypervisorsYAML); err != nil {
+		if err := validateClusterSpec(name, spec, guestsYAML, bareMetalsYAML, hypervisorsYAML); err != nil {
 			continue
 		}
 		doc.Clusters[name] = spec
@@ -267,7 +268,7 @@ func loadLegacyClustersFromData(data map[string]string, guestsYAML string) Clust
 		if err != nil {
 			continue
 		}
-		if err := validateClusterSpec(name, spec, guestsYAML, ""); err != nil {
+		if err := validateClusterSpec(name, spec, guestsYAML, "", ""); err != nil {
 			continue
 		}
 		doc.Clusters[name] = spec

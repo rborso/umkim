@@ -11,6 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -57,27 +58,11 @@ func (s *Server) handleDeleteCluster(ctx context.Context, w http.ResponseWriter,
 			}
 		}
 		cleanupKubernetes := queryParamBool(r, "cleanupKubernetes")
-		original := fcj.DeepCopy()
-		if !controllerutil.ContainsFinalizer(fcj, fleetv1alpha1.ClusterCleanupFinalizer) {
-			controllerutil.AddFinalizer(fcj, fleetv1alpha1.ClusterCleanupFinalizer)
-		}
-		if cleanupKubernetes {
-			if fcj.Annotations == nil {
-				fcj.Annotations = map[string]string{}
+		if err := s.markClusterDeleting(ctx, fcj, cleanupKubernetes); err != nil {
+			if apierrors.IsConflict(err) {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
 			}
-			fcj.Annotations[annotationCleanupKubernetes] = "true"
-		}
-		fcj.Status.Phase = fleetv1alpha1.JoinPhaseDeleting
-		fcj.Status.Message = "Cluster deletion started"
-		if fcj.Status.DeletionStartedAt == nil {
-			now := metav1.Now()
-			fcj.Status.DeletionStartedAt = &now
-		}
-		if err := s.Client.Patch(ctx, fcj, client.MergeFrom(original)); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err := s.Client.Status().Patch(ctx, fcj, client.MergeFrom(original)); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -108,6 +93,43 @@ func (s *Server) handleDeleteCluster(ctx context.Context, w http.ResponseWriter,
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) markClusterDeleting(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, cleanupKubernetes bool) error {
+	key := client.ObjectKeyFromObject(fcj)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var latest fleetv1alpha1.FleetClusterJoin
+		if err := s.Client.Get(ctx, key, &latest); err != nil {
+			return err
+		}
+		if latest.Status.Phase == fleetv1alpha1.JoinPhaseDeleting {
+			return nil
+		}
+		metaOrig := latest.DeepCopy()
+		if !controllerutil.ContainsFinalizer(&latest, fleetv1alpha1.ClusterCleanupFinalizer) {
+			controllerutil.AddFinalizer(&latest, fleetv1alpha1.ClusterCleanupFinalizer)
+		}
+		if cleanupKubernetes {
+			if latest.Annotations == nil {
+				latest.Annotations = map[string]string{}
+			}
+			latest.Annotations[annotationCleanupKubernetes] = "true"
+		}
+		if err := s.Client.Patch(ctx, &latest, client.MergeFrom(metaOrig)); err != nil {
+			return err
+		}
+		if err := s.Client.Get(ctx, key, &latest); err != nil {
+			return err
+		}
+		statusOrig := latest.DeepCopy()
+		latest.Status.Phase = fleetv1alpha1.JoinPhaseDeleting
+		latest.Status.Message = "Cluster deletion started"
+		if latest.Status.DeletionStartedAt == nil {
+			now := metav1.Now()
+			latest.Status.DeletionStartedAt = &now
+		}
+		return s.Client.Status().Patch(ctx, &latest, client.MergeFrom(statusOrig))
+	})
 }
 
 func provisionJobActive(ctx context.Context, c client.Client, ns, name string) bool {

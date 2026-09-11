@@ -2,14 +2,19 @@ package yaidap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/nodeops"
 	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// ErrDestroyClusterConflict is returned when destroy is blocked by an active FleetClusterJoin.
+var ErrDestroyClusterConflict = errors.New("destroy blocked by active cluster membership")
 
 // ValidateDiscoverAction checks preconditions for SSH hardware discovery.
 func ValidateDiscoverAction(ctx context.Context, c client.Client, ns, siteName, subject string, invHost InventoryHostView, guestFound bool) error {
@@ -104,4 +109,51 @@ func DiscoverySuccessMessage(action string) string {
 	default:
 		return ""
 	}
+}
+
+const destroySuccessMessage = "VM destroyed; guest remains in inventory"
+
+// DestroySuccessMessage returns the post-job message for destroy actions.
+func DestroySuccessMessage() string {
+	return destroySuccessMessage
+}
+
+// ValidateDestroyAction checks preconditions for tearing down a libvirt VM while keeping inventory.
+func ValidateDestroyAction(ctx context.Context, c client.Client, ns, siteName, subject string, invHost InventoryHostView, guestFound bool) error {
+	if !guestFound || invHost.External {
+		return fmt.Errorf("destroy requires an existing VM guest in guests.yml")
+	}
+	kind := strings.TrimSpace(invHost.Kind)
+	if kind == "" {
+		kind = fleetv1alpha1.SiteHostKindVM
+	}
+	if kind != fleetv1alpha1.SiteHostKindVM {
+		return fmt.Errorf("destroy applies to VM guests only")
+	}
+	phase := strings.TrimSpace(invHost.Status.Phase)
+	if phase != fleetv1alpha1.SiteHostPhaseReady && phase != fleetv1alpha1.SiteHostPhaseFailed {
+		if phase == "" {
+			phase = fleetv1alpha1.SiteHostPhaseDeclared
+		}
+		return fmt.Errorf("destroy requires guest phase Ready or Failed (current %q)", phase)
+	}
+	clustersDoc, err := LoadClustersFile(ctx, c, ns, siteName)
+	if err != nil {
+		return err
+	}
+	for clusterName, spec := range clustersDoc.Clusters {
+		for _, member := range spec.Members {
+			if member != subject {
+				continue
+			}
+			fcj, err := nodeops.FindFleetClusterJoin(ctx, c, ns, clusterName)
+			if err != nil {
+				continue
+			}
+			if fcj.Status.Phase != fleetv1alpha1.JoinPhaseDeleting {
+				return fmt.Errorf("%w: guest is a member of cluster %q; delete or unjoin the fleet cluster first", ErrDestroyClusterConflict, clusterName)
+			}
+		}
+	}
+	return nil
 }

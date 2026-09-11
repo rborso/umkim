@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestInventorySyncInProgressFromMeta(t *testing.T) {
+func TestInventorySyncInProgressIgnoresStaleMeta(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = batchv1.AddToScheme(scheme)
@@ -33,8 +33,8 @@ func TestInventorySyncInProgressFromMeta(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !busy {
-		t.Fatal("expected syncing")
+	if busy {
+		t.Fatal("stale syncing meta without job should not block")
 	}
 }
 
@@ -65,13 +65,11 @@ func TestEnqueueInventorySyncSkipsWhenBusy(t *testing.T) {
 	_ = batchv1.AddToScheme(scheme)
 	_ = fleetv1alpha1.AddToScheme(scheme)
 	ns := "fleet-console"
-	cm := &corev1.ConfigMap{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      connectors.InventoryCMName("homelab", fleetv1alpha1.ProvisionProviderYaidap),
+			Name:      JobPrefix + "busy123",
 			Namespace: ns,
-		},
-		Data: map[string]string{
-			"_meta.meta.json": `{"syncPhase":"syncing"}`,
+			Labels:    map[string]string{"fleet-site": "homelab"},
 		},
 	}
 	fs := &fleetv1alpha1.FleetSite{
@@ -84,7 +82,7 @@ func TestEnqueueInventorySyncSkipsWhenBusy(t *testing.T) {
 			},
 		},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm, fs).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(job, fs).Build()
 	jobName, err := EnqueueInventorySync(context.Background(), c, config.Config{Namespace: ns}, fs)
 	if err != nil {
 		t.Fatal(err)

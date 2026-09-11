@@ -60,29 +60,17 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 		if msg := yaidap.DiscoverySuccessMessage(cur.Action); msg != "" {
 			cur.Message = msg
 		}
+		if cur.Action == fleetv1alpha1.ProvisionActionDestroy {
+			cur.Message = yaidap.DestroySuccessMessage()
+		}
 		cur.EndedAt = &end
-		enrichHandoffHost(ctx, c, ns, fs.Name, cur)
 		if cs != nil && strings.TrimSpace(cur.JobName) != "" {
 			if logs, err := ansiblelogs.PodLogs(ctx, cs, ns, cur.JobName); err == nil {
 				cur.LogTail = ansiblelogs.Tail(logs, maxProvisionLogTail)
-				if cur.Action == fleetv1alpha1.ProvisionActionCreateVM {
-					if loc := provision.ParseResolvedVmLocation(logs); loc != "" {
-						_, _ = yaidap.PersistResolvedVmLocation(ctx, c, ns, fs.Name, cur.Subject, loc, "system/provision")
-						_ = yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, cur.Subject, yaidap.GuestStatus{
-							VmLocation: loc,
-							Message:    "vm_location=" + loc,
-						})
-						if cfg != nil {
-							_, _ = siteinventory.EnqueueInventorySync(ctx, c, *cfg, fs)
-						}
-					}
-				}
-				inventoryPath := ""
-				if fs.Spec.Provision != nil {
-					inventoryPath = fs.Spec.Provision.InventoryPath
-				}
-				_ = yaidap.FinalizeSyncFromJobLogs(ctx, c, ns, fs.Name, inventoryPath, logs)
+				applyYaidapJobResult(ctx, c, ns, fs, cur, logs, cfg)
 			}
+		} else {
+			enrichHandoffHost(ctx, c, ns, fs.Name, cur)
 		}
 		if err := CommitAction(ctx, c, fs, *cur, true); err != nil {
 			return err
@@ -102,6 +90,58 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 		return CommitAction(ctx, c, fs, *cur, true)
 	}
 	return nil
+}
+
+func applyYaidapJobResult(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, cur *fleetv1alpha1.SiteProvisionActionRecord, logs string, cfg *config.Config) {
+	if result, ok := provision.ParseYaidapResult(logs); ok && result != nil {
+		if msg := strings.TrimSpace(result.Message); msg != "" {
+			cur.Message = msg
+		}
+		if host := result.ToHandoffHost(fs.Name); host != nil {
+			cur.Host = host
+		}
+		if cur.Action == fleetv1alpha1.ProvisionActionPlanVM {
+			if summary := provision.FormatPlacementSummary(result.Placement); summary != "" {
+				if strings.TrimSpace(cur.Message) == "" {
+					cur.Message = summary
+				} else {
+					cur.Message = strings.TrimSpace(cur.Message) + "; " + summary
+				}
+			}
+		}
+		if cur.Action == fleetv1alpha1.ProvisionActionCreateVM {
+			if loc := result.ConcreteVmLocation(); loc != "" {
+				persistResolvedVmLocation(ctx, c, ns, fs, cur.Subject, loc, cfg)
+			}
+		}
+		if cur.Host == nil || strings.TrimSpace(cur.Host.AnsibleHost) == "" {
+			enrichHandoffHost(ctx, c, ns, fs.Name, cur)
+		}
+	} else {
+		if cur.Action == fleetv1alpha1.ProvisionActionCreateVM {
+			if loc := provision.ParseResolvedVmLocation(logs); loc != "" {
+				persistResolvedVmLocation(ctx, c, ns, fs, cur.Subject, loc, cfg)
+			}
+		}
+		enrichHandoffHost(ctx, c, ns, fs.Name, cur)
+	}
+	inventoryPath := ""
+	if fs.Spec.Provision != nil {
+		inventoryPath = fs.Spec.Provision.InventoryPath
+	}
+	_ = yaidap.FinalizeSyncFromJobLogs(ctx, c, ns, fs.Name, inventoryPath, logs)
+}
+
+func persistResolvedVmLocation(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, subject, loc string, cfg *config.Config) {
+	_, _ = yaidap.PersistResolvedVmLocation(ctx, c, ns, fs.Name, subject, loc, "system/provision")
+	_ = yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, subject, yaidap.GuestStatus{
+		Phase:      fleetv1alpha1.SiteHostPhaseReady,
+		VmLocation: loc,
+		Message:    "vm_location=" + loc,
+	})
+	if cfg != nil {
+		_, _ = siteinventory.EnqueueInventorySync(ctx, c, *cfg, fs)
+	}
 }
 
 func enrichHandoffHost(ctx context.Context, c client.Client, ns, siteName string, cur *fleetv1alpha1.SiteProvisionActionRecord) {
@@ -176,11 +216,21 @@ func SyncHostInventory(ctx context.Context, c client.Client, ns, siteName string
 	st := yaidap.GuestStatus{LastProvisionID: rec.ID, Message: rec.Message}
 	switch rec.Phase {
 	case fleetv1alpha1.ProvisionPhasePending, fleetv1alpha1.ProvisionPhaseRunning:
-		st.Phase = fleetv1alpha1.SiteHostPhaseProvisioning
+		if rec.Action == fleetv1alpha1.ProvisionActionDestroy {
+			st.Phase = fleetv1alpha1.SiteHostPhaseDestroying
+		} else {
+			st.Phase = fleetv1alpha1.SiteHostPhaseProvisioning
+		}
 	case fleetv1alpha1.ProvisionPhaseSucceeded:
-		st.Phase = fleetv1alpha1.SiteHostPhaseReady
-		if rec.Host != nil && rec.Host.AnsibleHost != "" {
-			st.AnsibleHost = rec.Host.AnsibleHost
+		if rec.Action == fleetv1alpha1.ProvisionActionDestroy {
+			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
+			st.Message = yaidap.DestroySuccessMessage()
+			st.Cluster = &fleetv1alpha1.SiteHostClusterStatus{}
+		} else {
+			st.Phase = fleetv1alpha1.SiteHostPhaseReady
+			if rec.Host != nil && rec.Host.AnsibleHost != "" {
+				st.AnsibleHost = rec.Host.AnsibleHost
+			}
 		}
 	case fleetv1alpha1.ProvisionPhaseFailed:
 		st.Phase = fleetv1alpha1.SiteHostPhaseFailed
@@ -188,6 +238,59 @@ func SyncHostInventory(ctx context.Context, c client.Client, ns, siteName string
 		return
 	}
 	_ = yaidap.UpdateGuestStatus(ctx, c, ns, siteName, hostName, st)
+}
+
+// RepairStaleGuestProvisioning clears hub guest rows left in Provisioning after their connector job succeeded.
+func RepairStaleGuestProvisioning(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite) {
+	if fs.Status.Provision == nil {
+		return
+	}
+	if cur := fs.Status.Provision.Current; cur != nil &&
+		(cur.Phase == fleetv1alpha1.ProvisionPhasePending || cur.Phase == fleetv1alpha1.ProvisionPhaseRunning) {
+		return
+	}
+	doc, err := yaidap.LoadStatusDoc(ctx, c, ns, fs.Name)
+	if err != nil {
+		return
+	}
+	latest := map[string]fleetv1alpha1.SiteProvisionActionRecord{}
+	for _, rec := range fs.Status.Provision.History {
+		subject := strings.TrimSpace(rec.Subject)
+		if subject == "" || rec.Phase != fleetv1alpha1.ProvisionPhaseSucceeded {
+			continue
+		}
+		if prev, ok := latest[subject]; !ok || rec.StartedAt.Time.After(prev.StartedAt.Time) {
+			latest[subject] = rec
+		}
+	}
+	for guest, st := range doc.Guests {
+		if st.Phase != fleetv1alpha1.SiteHostPhaseProvisioning &&
+			st.Phase != fleetv1alpha1.SiteHostPhaseDestroying {
+			continue
+		}
+		rec, ok := latest[guest]
+		if !ok {
+			continue
+		}
+		repair := yaidap.GuestStatus{
+			LastProvisionID: rec.ID,
+		}
+		if rec.Action == fleetv1alpha1.ProvisionActionDestroy {
+			repair.Phase = fleetv1alpha1.SiteHostPhaseDeclared
+			repair.Message = yaidap.DestroySuccessMessage()
+			repair.Cluster = &fleetv1alpha1.SiteHostClusterStatus{}
+		} else {
+			repair.Phase = fleetv1alpha1.SiteHostPhaseReady
+			repair.Message = rec.Message
+			if rec.Host != nil && strings.TrimSpace(rec.Host.AnsibleHost) != "" {
+				repair.AnsibleHost = rec.Host.AnsibleHost
+			}
+			if strings.TrimSpace(st.VmLocation) != "" {
+				repair.VmLocation = st.VmLocation
+			}
+		}
+		_ = yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, guest, repair)
+	}
 }
 
 func prependHistory(history []fleetv1alpha1.SiteProvisionActionRecord, rec fleetv1alpha1.SiteProvisionActionRecord) []fleetv1alpha1.SiteProvisionActionRecord {

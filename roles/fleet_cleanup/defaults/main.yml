@@ -4,6 +4,7 @@ fleet_cleanup_delete_harbor: false
 fleet_cleanup_delete_hub_platform: true
 
 fleet_cleanup_manifestworks:
+  - fleet-ingress-auth
   - phase6-spoke-demo
   - phase6-spoke-ingress
   - phase5-helm-release-sp

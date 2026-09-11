@@ -23,19 +23,21 @@ func ValidateInventoryFile(path, content string) error {
 	switch path {
 	case "guests.yml":
 		return validateGuestsYAML(content)
+	case "bare_metals.yml":
+		return validateBareMetalsYAML(content)
 	case "hypervisors.yml":
 		return validateHypervisorsYAML(content)
 	case "":
 		return connectors.ErrInvalidInventoryPath
 	default:
 		if connectors.IsRootInventoryGroupFile(path) {
-			return validateRootInventoryGroupFile(path, content, "", "")
+			return validateRootInventoryGroupFile(path, content, "", "", "")
 		}
 		if strings.HasPrefix(path, "group_vars/") && strings.HasSuffix(path, ".yml") {
 			return validateGroupVarsYAML(path, content)
 		}
 		if strings.HasPrefix(path, "host_vars/") && strings.HasSuffix(path, ".yml") {
-			return validateHostVarsYAML(path, content, "", "")
+			return validateHostVarsYAML(path, content, "", "", "")
 		}
 		if path == "_meta/status.json" {
 			return validateStatusJSON(content)
@@ -58,9 +60,24 @@ func validateGuestsYAML(content string) error {
 			return err
 		}
 	}
-	for name, entry := range doc.External.Hosts {
+	if len(doc.External.Hosts) > 0 {
+		return fmt.Errorf("guests.yml: external.hosts is not stored on the hub; add bare-metal nodes to bare_metals.yml")
+	}
+	return nil
+}
+
+func validateBareMetalsYAML(content string) error {
+	var doc BareMetalsYAML
+	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
+		return fmt.Errorf("bare_metals.yml: %w", err)
+	}
+	if doc.BareMetals.Hosts == nil {
+		return fmt.Errorf("bare_metals.yml: bare_metals.hosts required")
+	}
+	allowedGuestKeys := map[string]bool{"ansible_host": true, "vm_location": true}
+	for name, entry := range doc.BareMetals.Hosts {
 		if err := ValidateGuestName(name); err != nil {
-			return fmt.Errorf("external.hosts.%s: %w", name, err)
+			return fmt.Errorf("bare_metals.hosts.%s: %w", name, err)
 		}
 		if err := validateThinGuestEntry(name, entry, allowedGuestKeys); err != nil {
 			return err
@@ -127,7 +144,7 @@ func validateThinGuestEntry(name string, entry GuestEntry, allowed map[string]bo
 	return nil
 }
 
-func validateHostVarsYAML(path, content, guestsYAML, hypervisorsYAML string) error {
+func validateHostVarsYAML(path, content, guestsYAML, bareMetalsYAML, hypervisorsYAML string) error {
 	name := strings.TrimSuffix(strings.TrimPrefix(path, "host_vars/"), ".yml")
 	if err := ValidateGuestName(name); err != nil {
 		return err
@@ -136,25 +153,9 @@ func validateHostVarsYAML(path, content, guestsYAML, hypervisorsYAML string) err
 	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	if guestsYAML != "" || hypervisorsYAML != "" {
-		inGuests := false
-		if guestsYAML != "" {
-			guests, err := ParseGuestsYAML(guestsYAML)
-			if err != nil {
-				return err
-			}
-			inGuests = guestInIndex(name, guests)
-		}
-		inHypervisors := false
-		if hypervisorsYAML != "" {
-			hvs, err := ParseHypervisorsYAML(hypervisorsYAML)
-			if err != nil {
-				return err
-			}
-			inHypervisors = hypervisorInIndex(name, hvs)
-		}
-		if (guestsYAML != "" || hypervisorsYAML != "") && !inGuests && !inHypervisors {
-			return fmt.Errorf("%s: host %q not listed in guests.yml, external.hosts, or hypervisors.yml", path, name)
+	if guestsYAML != "" || bareMetalsYAML != "" || hypervisorsYAML != "" {
+		if !inventoryHostListed(name, guestsYAML, bareMetalsYAML, hypervisorsYAML) {
+			return fmt.Errorf("%s: host %q not listed in guests.yml, bare_metals.yml, or hypervisors.yml", path, name)
 		}
 	}
 	return nil
@@ -193,10 +194,16 @@ func guestInIndex(name string, doc GuestsYAML) bool {
 	return false
 }
 
-func inventoryHostListed(name, guestsYAML, hypervisorsYAML string) bool {
+func inventoryHostListed(name, guestsYAML, bareMetalsYAML, hypervisorsYAML string) bool {
 	if guestsYAML != "" {
 		guests, err := ParseGuestsYAML(guestsYAML)
-		if err == nil && guestInIndex(name, guests) {
+		if err == nil && vmGuestInIndex(name, guests) {
+			return true
+		}
+	}
+	if bareMetalsYAML != "" {
+		bm, err := ParseBareMetalsYAML(bareMetalsYAML)
+		if err == nil && bareMetalInIndex(name, bm) {
 			return true
 		}
 	}
@@ -207,6 +214,14 @@ func inventoryHostListed(name, guestsYAML, hypervisorsYAML string) bool {
 		}
 	}
 	return false
+}
+
+func vmGuestInIndex(name string, doc GuestsYAML) bool {
+	if doc.Guests.Hosts == nil {
+		return false
+	}
+	_, ok := doc.Guests.Hosts[name]
+	return ok
 }
 
 // ParseGuestsYAML parses guests.yml content.
@@ -234,19 +249,19 @@ func validateStatusJSON(content string) error {
 }
 
 // ValidateInventoryFileWithContext validates a file with cross-file checks.
-func ValidateInventoryFileWithContext(path, content, guestsYAML, hypervisorsYAML string) error {
+func ValidateInventoryFileWithContext(path, content, guestsYAML, bareMetalsYAML, hypervisorsYAML string) error {
 	path = connectors.NormalizeInventoryPath(path)
 	if connectors.LegacyClusterInventoryPath(path) {
 		if path == "clusters.yml" {
-			return validateClustersYAML(content, guestsYAML)
+			return validateClustersYAML(content, guestsYAML, bareMetalsYAML)
 		}
-		return validateLegacyClusterFile(path, content, guestsYAML)
+		return validateLegacyClusterFile(path, content, guestsYAML, bareMetalsYAML)
 	}
 	if strings.HasPrefix(path, "host_vars/") {
-		return validateHostVarsYAML(path, content, guestsYAML, hypervisorsYAML)
+		return validateHostVarsYAML(path, content, guestsYAML, bareMetalsYAML, hypervisorsYAML)
 	}
 	if connectors.IsRootInventoryGroupFile(path) {
-		return validateRootInventoryGroupFile(path, content, guestsYAML, hypervisorsYAML)
+		return validateRootInventoryGroupFile(path, content, guestsYAML, bareMetalsYAML, hypervisorsYAML)
 	}
 	if strings.HasPrefix(path, "group_vars/") && strings.HasSuffix(path, ".yml") {
 		return validateGroupVarsYAML(path, content)

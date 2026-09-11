@@ -89,6 +89,12 @@ type SiteProvisionSpec struct {
 	InventoryPath string `json:"inventoryPath,omitempty"`
 	// YaidaPRoot is an optional path to the YAIDAP checkout on the jumphost.
 	YaidaPRoot string `json:"yaidapRoot,omitempty"`
+	// YaidapRepo is the git remote URL for hub-managed YAIDAP checkout sync (https or git@).
+	YaidapRepo string `json:"yaidapRepo,omitempty"`
+	// YaidapRef is the branch, tag, or commit to checkout (default main).
+	YaidapRef string `json:"yaidapRef,omitempty"`
+	// YaidapGitSecretRef is an optional hub Secret with a deploy key (id_ed25519, deploy_key, or id_rsa).
+	YaidapGitSecretRef string `json:"yaidapGitSecretRef,omitempty"`
 	// DefaultExtraVars are safe non-secret extras passed to the connector (no passwords).
 	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
 }
@@ -127,20 +133,24 @@ type SiteProvisionStatus struct {
 	Message        string                      `json:"message,omitempty"`
 	LastActionID   string                      `json:"lastActionID,omitempty"`
 	LastActionType string                      `json:"lastActionType,omitempty"`
+	YaidapRevision string                      `json:"yaidapRevision,omitempty"`
+	YaidapSyncedAt string                      `json:"yaidapSyncedAt,omitempty"`
 	Current        *SiteProvisionActionRecord  `json:"current,omitempty"`
 	History        []SiteProvisionActionRecord `json:"history,omitempty"`
 }
 
-// Site host inventory kinds.
+// Site host inventory kinds (derived from YAIDAP inventory layout).
 const (
-	SiteHostKindVM        = "vm"
-	SiteHostKindBareMetal = "bare_metal"
+	SiteHostKindVM         = "vm"          // guests.yml → guests.hosts (libvirt workloads)
+	SiteHostKindBareMetal  = "bare_metal"  // bare_metals.yml (cluster nodes, not libvirt guests)
+	SiteHostKindHypervisor = "hypervisor"  // hypervisors.yml (placement / discovery / TempXE targets)
 )
 
 // Site host inventory phases.
 const (
 	SiteHostPhaseDeclared     = "Declared"
 	SiteHostPhaseProvisioning = "Provisioning"
+	SiteHostPhaseDestroying   = "Destroying"
 	SiteHostPhaseReady        = "Ready"
 	SiteHostPhaseFailed       = "Failed"
 )
@@ -199,6 +209,8 @@ type SiteHostClusterStatus struct {
 }
 
 // SiteHostRecord is a thin hub-owned host intent for provisioner connectors.
+// Kind is inventory-derived: vm (guests.hosts), bare_metal (bare_metals.yml),
+// hypervisor (hypervisors.yml).
 type SiteHostRecord struct {
 	Name          string                 `json:"name"`
 	Kind          string                 `json:"kind,omitempty"`

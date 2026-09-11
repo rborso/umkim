@@ -1,10 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { guestHostVarsTemplate, mergeGuestIntoGuestsYaml, templateForNewInventoryFile } from './inventoryVmTemplates';
+import {
+  guestHostVarsTemplate,
+  mergeGuestIntoBareMetalsYaml,
+  mergeGuestIntoGuestsYaml,
+  templateForNewInventoryFile,
+} from './inventoryVmTemplates';
 
 describe('inventoryVmTemplates', () => {
+  it('merges a bare-metal node into bare_metals.yml', () => {
+    const out = mergeGuestIntoBareMetalsYaml(
+      'bare_metals:\n  hosts: {}\n',
+      'bm01',
+      { ansible_host: '203.0.113.11' },
+    );
+    expect(out).toContain('bm01:');
+    expect(out).toContain('ansible_host: 203.0.113.11');
+    expect(out).toContain('bare_metals:');
+  });
+
   it('merges a guest into guests.yml', () => {
     const out = mergeGuestIntoGuestsYaml(
-      'guests:\n  hosts: {}\nexternal:\n  hosts: {}\n',
+      'guests:\n  hosts: {}\n',
       'lab-vm-0',
       { vm_location: 'virt02', ansible_host: '172.16.10.50' },
     );

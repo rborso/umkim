@@ -18,6 +18,7 @@ func siteProvisionCmd() *cobra.Command {
 	cmd.AddCommand(siteProvisionRunCmd())
 	cmd.AddCommand(siteProvisionStatusCmd())
 	cmd.AddCommand(siteProvisionActionsCmd())
+	cmd.AddCommand(siteProvisionYaidapSyncCmd())
 	return cmd
 }
 
@@ -41,7 +42,7 @@ func siteProvisionGetCmd() *cobra.Command {
 }
 
 func siteProvisionSetCmd() *cobra.Command {
-	var provider, jumphost, sshSecret, inventory, yaidapRoot string
+	var provider, jumphost, sshSecret, inventory, yaidapRoot, yaidapRepo, yaidapRef, yaidapGitSecret string
 	c := &cobra.Command{
 		Use:   "set [site]",
 		Short: "Set site provisioner binding (PUT /sites/{site}/provision)",
@@ -64,6 +65,15 @@ func siteProvisionSetCmd() *cobra.Command {
 			if cmd.Flags().Changed("yaidap-root") {
 				body["yaidapRoot"] = yaidapRoot
 			}
+			if cmd.Flags().Changed("yaidap-repo") {
+				body["yaidapRepo"] = yaidapRepo
+			}
+			if cmd.Flags().Changed("yaidap-ref") {
+				body["yaidapRef"] = yaidapRef
+			}
+			if cmd.Flags().Changed("yaidap-git-secret") {
+				body["yaidapGitSecretRef"] = yaidapGitSecret
+			}
 			raw, code, err := api.Put("/sites/"+args[0]+"/provision", body)
 			if err != nil {
 				return err
@@ -80,7 +90,29 @@ func siteProvisionSetCmd() *cobra.Command {
 	c.Flags().StringVar(&sshSecret, "ssh-secret", "", "Hub Secret name for jumphost SSH key")
 	c.Flags().StringVar(&inventory, "inventory", "", "YAIDAP inventory path on jumphost")
 	c.Flags().StringVar(&yaidapRoot, "yaidap-root", "", "YAIDAP checkout on jumphost")
+	c.Flags().StringVar(&yaidapRepo, "yaidap-repo", "", "Git remote for hub-managed YAIDAP sync")
+	c.Flags().StringVar(&yaidapRef, "yaidap-ref", "", "Branch, tag, or commit for YAIDAP sync (default main)")
+	c.Flags().StringVar(&yaidapGitSecret, "yaidap-git-secret", "", "Hub Secret with deploy key for private SSH git remotes")
 	return c
+}
+
+func siteProvisionYaidapSyncCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "yaidap-sync [site]",
+		Short: "Sync YAIDAP git checkout on the site jumphost",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, code, err := api.Post("/sites/"+args[0]+"/provision/yaidap/sync", map[string]interface{}{})
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 202); err != nil {
+				return err
+			}
+			printJSON(raw)
+			return nil
+		},
+	}
 }
 
 func siteProvisionRunCmd() *cobra.Command {

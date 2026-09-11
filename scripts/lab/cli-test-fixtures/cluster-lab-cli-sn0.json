@@ -1,0 +1,12 @@
+{
+  "clusterName": "lab-cli-sn0",
+  "siteId": "homelab",
+  "bootstrapHost": "172.16.10.202",
+  "topology": "single_node",
+  "networkMode": "wireguard",
+  "clusterRegion": "homelab",
+  "jumphost": "linux@jump.otthol.hu:30200",
+  "nodes": [
+    {"address": "172.16.10.202", "hostname": "cli-test-sn1", "role": "control"}
+  ]
+}

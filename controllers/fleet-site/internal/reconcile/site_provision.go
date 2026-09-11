@@ -30,6 +30,7 @@ func (r *Reconciler) reconcileRegistrySiteProvision(ctx context.Context, fs *fle
 }
 
 func (r *Reconciler) reconcileRegistrySiteHostClusters(ctx context.Context, fs *fleetv1alpha1.FleetSite) (ctrl.Result, error) {
+	siteprovision.RepairStaleGuestProvisioning(ctx, r.Client, r.Cfg.Namespace, fs)
 	siteName := fs.Spec.EffectiveSiteID(fs.Name)
 	if fs.Spec.EffectiveProvisionProvider() == fleetv1alpha1.ProvisionProviderYaidap {
 		data, err := connectors.Load(ctx, r.Client, r.Cfg.Namespace, siteName, fleetv1alpha1.ProvisionProviderYaidap)

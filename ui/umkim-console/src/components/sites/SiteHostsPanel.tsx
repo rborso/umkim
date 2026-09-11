@@ -18,6 +18,7 @@ import {
   provisionSiteHost,
 } from '../../api/client';
 import type { SiteHostRecord, SiteInventoryImportChange } from '../../api/types';
+import { vmLocationIsScheduleToken } from '../../utils/vmLocation';
 import { ErrorAlert } from '../ErrorAlert';
 import { SiteProvisionHistory } from './SiteProvisionHistory';
 
@@ -34,6 +35,7 @@ function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey
     case 'Declared':
       return 'blue';
     case 'Provisioning':
+    case 'Destroying':
     case 'Applying':
     case 'WaitingGroup':
       return 'orange';
@@ -61,40 +63,56 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [discoverMode, setDiscoverMode] = useState<DiscoverMode>('discover');
   const [discoverConfirm, setDiscoverConfirm] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [destroyOpen, setDestroyOpen] = useState(false);
+  const [destroyTarget, setDestroyTarget] = useState<SiteHostRecord | null>(null);
+  const [destroyConfirm, setDestroyConfirm] = useState(false);
+  const [destroying, setDestroying] = useState(false);
+  const [installBmOpen, setInstallBmOpen] = useState(false);
+  const [installBmTarget, setInstallBmTarget] = useState<SiteHostRecord | null>(null);
+  const [installBmConfirm, setInstallBmConfirm] = useState(false);
+  const [installingBm, setInstallingBm] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importItems, setImportItems] = useState<SiteInventoryImportChange[]>([]);
   const [importSelected, setImportSelected] = useState<Record<string, boolean>>({});
   const [importHostFilter, setImportHostFilter] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { background?: boolean; refreshHistory?: boolean }) => {
+    const background = opts?.background ?? false;
+    if (!background) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const hostList = await listSiteHosts(siteName);
       setHosts(hostList);
-      setHistoryRefreshKey(String(Date.now()));
+      if (opts?.refreshHistory) {
+        setHistoryRefreshKey(String(Date.now()));
+      }
     } catch (e) {
       setError(e);
     } finally {
-      setLoading(false);
+      if (!background) {
+        setLoading(false);
+      }
     }
   }, [siteName]);
 
   useEffect(() => {
-    void load();
+    void load({ refreshHistory: true });
   }, [load]);
 
   useEffect(() => {
     const active = hosts.some(
       (h) =>
         h.status?.phase === 'Provisioning' ||
+        h.status?.phase === 'Destroying' ||
         h.status?.cluster?.phase === 'Applying' ||
         h.status?.cluster?.phase === 'WaitingGroup' ||
         h.status?.cluster?.phase === 'Pending',
     );
     if (!active) return;
-    const t = setInterval(() => void load(), 5000);
+    const t = setInterval(() => void load({ background: true }), 5000);
     return () => clearInterval(t);
   }, [hosts, load]);
 
@@ -111,7 +129,7 @@ export function SiteHostsPanel({ siteName }: Props) {
       setProvisionTarget(null);
       setProvisionConfirm(false);
       setProvisionAction('create_vm');
-      await load();
+      await load({ refreshHistory: true });
     } catch (e) {
       setActionError(e);
     } finally {
@@ -145,7 +163,7 @@ export function SiteHostsPanel({ siteName }: Props) {
       setDiscoverOpen(false);
       setDiscoverTarget(null);
       setDiscoverConfirm(false);
-      await load();
+      await load({ refreshHistory: true });
     } catch (e) {
       setActionError(e);
     } finally {
@@ -197,7 +215,7 @@ export function SiteHostsPanel({ siteName }: Props) {
         .map(([p]) => p);
       await applySiteInventoryImport(siteName, paths, true);
       setImportOpen(false);
-      await load();
+      await load({ refreshHistory: true });
     } catch (e) {
       setActionError(e);
     } finally {
@@ -210,7 +228,7 @@ export function SiteHostsPanel({ siteName }: Props) {
     setActionError(null);
     try {
       await applySiteHostCluster(siteName, host.name);
-      await load();
+      await load({ refreshHistory: true });
     } catch (e) {
       setActionError(e);
     } finally {
@@ -219,8 +237,7 @@ export function SiteHostsPanel({ siteName }: Props) {
   };
 
   const needsConfirm =
-    provisionAction !== 'plan_vm' &&
-    (provisionTarget?.kind === 'bare_metal' || provisionTarget?.status?.phase === 'Ready');
+    provisionAction !== 'plan_vm' && provisionTarget?.status?.phase === 'Ready';
 
   const canEnrollNow = (host: SiteHostRecord) =>
     host.status?.phase === 'Ready' &&
@@ -228,6 +245,71 @@ export function SiteHostsPanel({ siteName }: Props) {
     (!host.status?.cluster?.phase ||
       host.status.cluster.phase === 'Failed' ||
       host.status.cluster.phase === 'Pending');
+
+  const activeClusterEnrollment = (host: SiteHostRecord) => {
+    const phase = host.status?.cluster?.phase;
+    return phase === 'Applying' || phase === 'WaitingGroup' || phase === 'Pending';
+  };
+
+  const canDestroyVM = (host: SiteHostRecord) =>
+    host.kind === 'vm' &&
+    (host.status?.phase === 'Ready' || host.status?.phase === 'Failed') &&
+    !activeClusterEnrollment(host);
+
+  const canPlanPlacement = (host: SiteHostRecord) =>
+    host.kind === 'vm' && vmLocationIsScheduleToken(host.vm_location);
+
+  const openDestroy = (host: SiteHostRecord) => {
+    setDestroyTarget(host);
+    setDestroyConfirm(false);
+    setDestroyOpen(true);
+  };
+
+  const openInstallBm = (host: SiteHostRecord) => {
+    setInstallBmTarget(host);
+    setInstallBmConfirm(false);
+    setInstallBmOpen(true);
+  };
+
+  const runInstallBm = async () => {
+    if (!installBmTarget) return;
+    setInstallingBm(true);
+    setActionError(null);
+    try {
+      await provisionSiteHost(siteName, installBmTarget.name, {
+        action: 'install_bm',
+        confirm: true,
+      });
+      setInstallBmOpen(false);
+      setInstallBmTarget(null);
+      setInstallBmConfirm(false);
+      await load({ refreshHistory: true });
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setInstallingBm(false);
+    }
+  };
+
+  const runDestroy = async () => {
+    if (!destroyTarget) return;
+    setDestroying(true);
+    setActionError(null);
+    try {
+      await provisionSiteHost(siteName, destroyTarget.name, {
+        action: 'destroy',
+        confirm: true,
+      });
+      setDestroyOpen(false);
+      setDestroyTarget(null);
+      setDestroyConfirm(false);
+      await load({ refreshHistory: true });
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setDestroying(false);
+    }
+  };
 
   const hostAnsibleAddr = (host: SiteHostRecord) =>
     (host.ansible_host || host.status?.ansible_host || '').trim();
@@ -242,9 +324,9 @@ export function SiteHostsPanel({ siteName }: Props) {
         </Title>
       </div>
       <p style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-        Derived from <code>guests.yml</code>, <code>hypervisors.yml</code>, <code>host_vars/*.yml</code>, and{' '}
-        root cluster groups. Add discovery stubs in the Provisioner inventory tab; run Discover and import preview
-        to promote hardware drafts.
+        Derived from <code>guests.yml</code> (VM guests), <code>bare_metals.yml</code>, <code>hypervisors.yml</code>,{' '}
+        <code>host_vars/*.yml</code>, and root cluster groups. Use the Provisioner inventory tab to add hosts; sync
+        before running actions.
       </p>
       {loading ? (
         <p>Loading hosts…</p>
@@ -269,9 +351,26 @@ export function SiteHostsPanel({ siteName }: Props) {
                 <Td>
                   <code>{host.name}</code>
                 </Td>
-                <Td>{host.kind || '—'}</Td>
+                <Td>
+                  {host.kind || '—'}
+                  {host.kind === 'hypervisor' && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                      placement target
+                    </div>
+                  )}
+                  {host.kind === 'bare_metal' && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                      cluster node
+                    </div>
+                  )}
+                </Td>
                 <Td>
                   <Label color={phaseColor(host.status?.phase)}>{host.status?.phase || '—'}</Label>
+                  {host.kind === 'vm' && host.status?.phase === 'Declared' && (
+                    <div style={{ fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                      No VM running — use Provision to create
+                    </div>
+                  )}
                 </Td>
                 <Td>
                   {host.clusters?.length ? (
@@ -299,7 +398,7 @@ export function SiteHostsPanel({ siteName }: Props) {
                 <Td>{host.vm_location || '—'}</Td>
                 <Td>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {host.kind === 'bare_metal' ? (
+                    {host.kind === 'hypervisor' && (
                       <>
                         <Button
                           variant="link"
@@ -313,7 +412,23 @@ export function SiteHostsPanel({ siteName }: Props) {
                           Discover (PXE)
                         </Button>
                       </>
-                    ) : (
+                    )}
+                    {host.kind === 'bare_metal' && (
+                      <>
+                        <Button
+                          variant="link"
+                          isInline
+                          isDisabled={!hostAnsibleAddr(host)}
+                          onClick={() => openDiscover(host, 'discover')}
+                        >
+                          Discover (SSH)
+                        </Button>
+                        <Button variant="link" isInline onClick={() => openInstallBm(host)}>
+                          Install bare metal
+                        </Button>
+                      </>
+                    )}
+                    {host.kind === 'vm' && (
                       <>
                         <Button
                           variant="link"
@@ -322,9 +437,14 @@ export function SiteHostsPanel({ siteName }: Props) {
                         >
                           Provision
                         </Button>
-                        {host.kind === 'vm' && (
+                        {canPlanPlacement(host) && (
                           <Button variant="link" isInline onClick={() => openProvision(host, 'plan_vm')}>
                             Plan placement
+                          </Button>
+                        )}
+                        {canDestroyVM(host) && (
+                          <Button variant="link" isInline isDanger onClick={() => openDestroy(host)}>
+                            Destroy VM
                           </Button>
                         )}
                       </>
@@ -397,6 +517,69 @@ export function SiteHostsPanel({ siteName }: Props) {
             label="I confirm this destructive or bare-metal install action"
           />
         )}
+      </Modal>
+
+      <Modal
+        title="Install bare metal"
+        isOpen={installBmOpen}
+        onClose={() => setInstallBmOpen(false)}
+        actions={[
+          <Button
+            key="run"
+            variant="danger"
+            onClick={() => void runInstallBm()}
+            isLoading={installingBm}
+            isDisabled={!installBmConfirm}
+          >
+            Install OS
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setInstallBmOpen(false)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          Run TempXE bare-metal install for <code>{installBmTarget?.name}</code>. This reinstalls the OS via PXE
+          and is destructive.
+        </p>
+        <Checkbox
+          id="installBmConfirm"
+          isChecked={installBmConfirm}
+          onChange={(_e, c) => setInstallBmConfirm(c)}
+          label="I confirm bare-metal OS install (install_os / tempxe_confirm)"
+        />
+      </Modal>
+
+      <Modal
+        title="Destroy VM"
+        isOpen={destroyOpen}
+        onClose={() => setDestroyOpen(false)}
+        actions={[
+          <Button
+            key="run"
+            variant="danger"
+            onClick={() => void runDestroy()}
+            isLoading={destroying}
+            isDisabled={!destroyConfirm}
+          >
+            Destroy VM
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setDestroyOpen(false)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          Tear down the libvirt VM for <code>{destroyTarget?.name}</code> on the site jumphost. The guest
+          remains in <code>guests.yml</code> and <code>host_vars</code> — use <strong>Provision</strong> later to
+          recreate the VM.
+        </p>
+        <Checkbox
+          id="destroyConfirm"
+          isChecked={destroyConfirm}
+          onChange={(_e, c) => setDestroyConfirm(c)}
+          label="I confirm destroying this VM (inventory is kept)"
+        />
       </Modal>
 
       <Modal

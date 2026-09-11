@@ -186,12 +186,21 @@ func ValidateRecord(rec fleetv1alpha1.SiteHostRecord, partial bool) error {
 		if kind == "" {
 			return fmt.Errorf("kind is required")
 		}
-		if kind != fleetv1alpha1.SiteHostKindVM && kind != fleetv1alpha1.SiteHostKindBareMetal {
-			return fmt.Errorf("kind must be %q or %q", fleetv1alpha1.SiteHostKindVM, fleetv1alpha1.SiteHostKindBareMetal)
+		if !isValidSiteHostKind(kind) {
+			return fmt.Errorf("kind must be %q, %q, or %q", fleetv1alpha1.SiteHostKindVM, fleetv1alpha1.SiteHostKindBareMetal, fleetv1alpha1.SiteHostKindHypervisor)
 		}
 	}
-	if k := strings.TrimSpace(rec.Kind); k != "" && k != fleetv1alpha1.SiteHostKindVM && k != fleetv1alpha1.SiteHostKindBareMetal {
-		return fmt.Errorf("kind must be %q or %q", fleetv1alpha1.SiteHostKindVM, fleetv1alpha1.SiteHostKindBareMetal)
+	if k := strings.TrimSpace(rec.Kind); k != "" && !isValidSiteHostKind(k) {
+		return fmt.Errorf("kind must be %q, %q, or %q", fleetv1alpha1.SiteHostKindVM, fleetv1alpha1.SiteHostKindBareMetal, fleetv1alpha1.SiteHostKindHypervisor)
 	}
 	return ValidateVmLocation(rec.Kind, rec.VmLocation)
+}
+
+func isValidSiteHostKind(kind string) bool {
+	switch strings.TrimSpace(kind) {
+	case fleetv1alpha1.SiteHostKindVM, fleetv1alpha1.SiteHostKindBareMetal, fleetv1alpha1.SiteHostKindHypervisor:
+		return true
+	default:
+		return false
+	}
 }

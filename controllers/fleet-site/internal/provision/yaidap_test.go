@@ -42,10 +42,25 @@ func TestDefaultYaidapInvocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if bm.Playbook != "playbooks/install-bare-metal.yml" || len(bm.Tags) != 1 || bm.Tags[0] != "install_bm" {
+		t.Fatalf("unexpected install_bm invocation: %+v", bm)
+	}
 	if bm.ConfirmE == "" {
 		t.Fatal("expected tempxe_confirm extra")
 	}
 	if len(bm.ExtraArgs) != 2 || bm.ExtraArgs[0] != "-e" || bm.ExtraArgs[1] != "install_os=true" {
 		t.Fatalf("expected install_os extra, got %+v", bm.ExtraArgs)
+	}
+	pxe, err := DefaultYaidapInvocation("discover_pxe", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pxe.Playbook != "playbooks/discover-pxe.yml" || pxe.Tags[0] != "discover_pxe" {
+		t.Fatalf("unexpected discover_pxe invocation: %+v", pxe)
+	}
+	for _, arg := range pxe.ExtraArgs {
+		if arg == "install_os=true" {
+			t.Fatal("discover_pxe should not pass install_os")
+		}
 	}
 }

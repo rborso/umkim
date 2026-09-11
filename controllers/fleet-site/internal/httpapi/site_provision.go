@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,22 +34,28 @@ const (
 )
 
 type siteProvisionBindingView struct {
-	Provider         string            `json:"provider"`
-	Jumphost         string            `json:"jumphost,omitempty"`
-	SSHSecretRef     string            `json:"sshSecretRef,omitempty"`
-	InventoryPath    string            `json:"inventoryPath,omitempty"`
-	YaidaPRoot       string            `json:"yaidapRoot,omitempty"`
-	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
-	Status           *fleetv1alpha1.SiteProvisionStatus `json:"status,omitempty"`
+	Provider           string            `json:"provider"`
+	Jumphost           string            `json:"jumphost,omitempty"`
+	SSHSecretRef       string            `json:"sshSecretRef,omitempty"`
+	InventoryPath      string            `json:"inventoryPath,omitempty"`
+	YaidaPRoot         string            `json:"yaidapRoot,omitempty"`
+	YaidapRepo         string            `json:"yaidapRepo,omitempty"`
+	YaidapRef          string            `json:"yaidapRef,omitempty"`
+	YaidapGitSecretRef string            `json:"yaidapGitSecretRef,omitempty"`
+	DefaultExtraVars   map[string]string `json:"defaultExtraVars,omitempty"`
+	Status             *fleetv1alpha1.SiteProvisionStatus `json:"status,omitempty"`
 }
 
 type siteProvisionBindingBody struct {
-	Provider         string            `json:"provider"`
-	Jumphost         string            `json:"jumphost,omitempty"`
-	SSHSecretRef     string            `json:"sshSecretRef,omitempty"`
-	InventoryPath    string            `json:"inventoryPath,omitempty"`
-	YaidaPRoot       string            `json:"yaidapRoot,omitempty"`
-	DefaultExtraVars map[string]string `json:"defaultExtraVars,omitempty"`
+	Provider           string            `json:"provider"`
+	Jumphost           string            `json:"jumphost,omitempty"`
+	SSHSecretRef       string            `json:"sshSecretRef,omitempty"`
+	InventoryPath      string            `json:"inventoryPath,omitempty"`
+	YaidaPRoot         string            `json:"yaidapRoot,omitempty"`
+	YaidapRepo         string            `json:"yaidapRepo,omitempty"`
+	YaidapRef          string            `json:"yaidapRef,omitempty"`
+	YaidapGitSecretRef string            `json:"yaidapGitSecretRef,omitempty"`
+	DefaultExtraVars   map[string]string `json:"defaultExtraVars,omitempty"`
 }
 
 type siteProvisionActionBody struct {
@@ -75,6 +82,17 @@ func (s *Server) handleSiteProvisionRoutes(ctx context.Context, w http.ResponseW
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	case rest == "provision/yaidap/sync":
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var fs fleetv1alpha1.FleetSite
+		if err := s.Client.Get(ctx, types.NamespacedName{Namespace: s.Cfg.Namespace, Name: siteName}, &fs); err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		s.syncSiteYaidapRepo(ctx, w, r, siteName, &fs)
 	case rest == "provision/actions":
 		switch r.Method {
 		case http.MethodGet:
@@ -148,12 +166,15 @@ func (s *Server) putSiteProvisionBinding(ctx context.Context, w http.ResponseWri
 		}
 	}
 	spec := &fleetv1alpha1.SiteProvisionSpec{
-		Provider:         provider,
-		Jumphost:         strings.TrimSpace(req.Jumphost),
-		SSHSecretRef:     strings.TrimSpace(req.SSHSecretRef),
-		InventoryPath:    strings.TrimSpace(req.InventoryPath),
-		YaidaPRoot:       strings.TrimSpace(req.YaidaPRoot),
-		DefaultExtraVars: req.DefaultExtraVars,
+		Provider:           provider,
+		Jumphost:           strings.TrimSpace(req.Jumphost),
+		SSHSecretRef:       strings.TrimSpace(req.SSHSecretRef),
+		InventoryPath:      strings.TrimSpace(req.InventoryPath),
+		YaidaPRoot:         strings.TrimSpace(req.YaidaPRoot),
+		YaidapRepo:         strings.TrimSpace(req.YaidapRepo),
+		YaidapRef:          strings.TrimSpace(req.YaidapRef),
+		YaidapGitSecretRef: strings.TrimSpace(req.YaidapGitSecretRef),
+		DefaultExtraVars:   req.DefaultExtraVars,
 	}
 
 	var fs fleetv1alpha1.FleetSite
@@ -193,6 +214,15 @@ func mergeProvisionSpec(dst, src *fleetv1alpha1.SiteProvisionSpec) {
 	if src.YaidaPRoot != "" {
 		dst.YaidaPRoot = src.YaidaPRoot
 	}
+	if src.YaidapRepo != "" {
+		dst.YaidapRepo = src.YaidapRepo
+	}
+	if src.YaidapRef != "" {
+		dst.YaidapRef = src.YaidapRef
+	}
+	if src.YaidapGitSecretRef != "" {
+		dst.YaidapGitSecretRef = src.YaidapGitSecretRef
+	}
 	if src.DefaultExtraVars != nil {
 		dst.DefaultExtraVars = src.DefaultExtraVars
 	}
@@ -208,6 +238,9 @@ func siteProvisionBindingFromSite(fs *fleetv1alpha1.FleetSite) siteProvisionBind
 		v.SSHSecretRef = fs.Spec.Provision.SSHSecretRef
 		v.InventoryPath = fs.Spec.Provision.InventoryPath
 		v.YaidaPRoot = fs.Spec.Provision.YaidaPRoot
+		v.YaidapRepo = fs.Spec.Provision.YaidapRepo
+		v.YaidapRef = fs.Spec.Provision.YaidapRef
+		v.YaidapGitSecretRef = fs.Spec.Provision.YaidapGitSecretRef
 		v.DefaultExtraVars = fs.Spec.Provision.DefaultExtraVars
 	}
 	return v
@@ -276,6 +309,22 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 		http.Error(w, guestErr.Error(), http.StatusInternalServerError)
 		return
 	}
+	if !guestFound {
+		http.Error(w, fmt.Sprintf("host %q not found in inventory", subject), http.StatusBadRequest)
+		return
+	}
+	hostKind := strings.TrimSpace(invHost.Kind)
+	if hostKind == "" {
+		if invHost.External {
+			hostKind = fleetv1alpha1.SiteHostKindBareMetal
+		} else {
+			hostKind = fleetv1alpha1.SiteHostKindVM
+		}
+	}
+	if err := yaidap.ValidateActionForKind(action, hostKind); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if action == fleetv1alpha1.ProvisionActionPlanVM {
 		if !guestFound || invHost.External {
 			http.Error(w, "plan_vm requires an existing provisioned VM guest in guests.yml", http.StatusBadRequest)
@@ -294,11 +343,17 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 			return
 		}
 	}
-	if req.Host == nil && guestFound {
-		kind := strings.TrimSpace(invHost.Kind)
-		if kind == "" && !invHost.External {
-			kind = fleetv1alpha1.SiteHostKindVM
+	if action == fleetv1alpha1.ProvisionActionDestroy {
+		if err := yaidap.ValidateDestroyAction(ctx, s.Client, s.Cfg.Namespace, siteName, subject, invHost, guestFound); err != nil {
+			if errors.Is(err, yaidap.ErrDestroyClusterConflict) {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
+	}
+	if req.Host == nil && guestFound {
 		if addr := strings.TrimSpace(invHost.AnsibleHost); addr != "" {
 			req.Host = &fleetv1alpha1.ProvisionHandoffHost{
 				Hostname:    subject,
@@ -514,14 +569,24 @@ func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.
 		"-e", "fleet_provision_playbook=" + inv.Playbook,
 		"-e", "fleet_provision_tags=" + strings.Join(inv.Tags, ","),
 	}
-	var extraParts []string
-	if inv.ConfirmE != "" {
-		extraParts = append(extraParts, "-e", inv.ConfirmE)
+	concreteVmLocation := false
+	if rec.Action == fleetv1alpha1.ProvisionActionCreateVM && guestFound {
+		invHost, _, guestErr := yaidap.LookupInventoryHost(ctx, s.Client, s.Cfg.Namespace, fs.Name, rec.Subject)
+		if guestErr == nil {
+			loc := strings.TrimSpace(invHost.VmLocation)
+			if loc == "" {
+				loc = strings.TrimSpace(invHost.Status.VmLocation)
+			}
+			concreteVmLocation = !sitehosts.VmLocationIsScheduleToken(loc)
+		}
 	}
-	extraParts = append(extraParts, inv.ExtraArgs...)
-	if len(extraParts) > 0 {
-		// Pass as a single shell-token string consumed by the remote script.
-		extra = append(extra, "-e", "fleet_provision_extra="+strings.Join(extraParts, " "))
+	// YAIDAP nested playbook extras (confirm_destroy, yaidap_emit_result, etc.) are resolved
+	// in site-provision-connector.yml from fleet_provision_action / fleet_provision_confirm.
+	if concreteVmLocation {
+		extra = append(extra, "-e", "fleet_provision_yaidap_recreate=true")
+	}
+	if provision.ActionUsesConnectionLocal(rec.Action) {
+		extra = append(extra, "-e", "fleet_provision_connection_local=true")
 	}
 	for k, v := range spec.DefaultExtraVars {
 		if strings.TrimSpace(k) == "" {
@@ -546,7 +611,7 @@ func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.
 
 	j := jobs.SiteProvisionConnectorJob(
 		s.Cfg.Namespace, jobName, fs.Name, fs.Spec.EffectiveSiteID(fs.Name),
-		s.Cfg.AnsibleRunnerImage, spec.SSHSecretRef, cmName, extra,
+		s.Cfg.AnsibleRunnerImage, spec.SSHSecretRef, cmName, "", extra,
 	)
 	if err := s.Client.Create(ctx, j); err != nil {
 		return "", err

@@ -9,7 +9,6 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	batchv1 "k8s.io/api/batch/v1"
@@ -25,12 +24,9 @@ const (
 	provisionInvCMFmt   = "fleet-site-%s-provision-inventory"
 )
 
-// InventorySyncInProgress reports whether a sync job is running or meta marks syncing.
+// InventorySyncInProgress reports whether an inventory sync connector job is running.
+// Stale syncPhase=syncing in meta (no active job) is ignored so sync can be retried.
 func InventorySyncInProgress(ctx context.Context, c client.Client, ns, siteName string) (bool, error) {
-	meta, err := connectors.LoadMeta(ctx, c, ns, siteName, fleetv1alpha1.ProvisionProviderYaidap)
-	if err == nil && meta.SyncPhase == "syncing" {
-		return true, nil
-	}
 	var list batchv1.JobList
 	if err := c.List(ctx, &list, client.InNamespace(ns), client.MatchingLabels{"fleet-site": siteName}); err != nil {
 		return false, err
@@ -133,7 +129,7 @@ func CreateInventoryConnectorJob(ctx context.Context, c client.Client, cfg confi
 	}
 	j := jobs.SiteProvisionConnectorJob(
 		cfg.Namespace, jobName, fs.Name, fs.Spec.EffectiveSiteID(fs.Name),
-		cfg.AnsibleRunnerImage, spec.SSHSecretRef, cmName, extra,
+		cfg.AnsibleRunnerImage, spec.SSHSecretRef, cmName, "", extra,
 	)
 	if err := c.Create(ctx, j); err != nil {
 		return "", err

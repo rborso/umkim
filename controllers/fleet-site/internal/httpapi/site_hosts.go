@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -97,6 +98,9 @@ func (s *Server) listSiteHosts(ctx context.Context, w http.ResponseWriter, siteN
 		}
 		items = append(items, row)
 	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i]["name"].(string) < items[j]["name"].(string)
+	})
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
 }
 
@@ -115,8 +119,12 @@ func inventoryViewsToHostRecords(views []yaidap.InventoryHostView) []fleetv1alph
 				Cluster:     v.Status.Cluster,
 			},
 		}
-		if rec.Kind == "" && !v.External {
-			rec.Kind = fleetv1alpha1.SiteHostKindVM
+		if rec.Kind == "" {
+			if v.External {
+				rec.Kind = fleetv1alpha1.SiteHostKindBareMetal
+			} else {
+				rec.Kind = fleetv1alpha1.SiteHostKindVM
+			}
 		}
 		out = append(out, rec)
 	}
@@ -149,6 +157,15 @@ func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r
 		http.Error(w, "guest not found in inventory", http.StatusNotFound)
 		return
 	}
+	invHost, hostFound, hostErr := yaidap.LookupInventoryHost(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
+	if hostErr != nil {
+		http.Error(w, hostErr.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !hostFound {
+		http.Error(w, "host not found in inventory", http.StatusNotFound)
+		return
+	}
 	addr, _ := yaidap.GuestAddress(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -163,8 +180,20 @@ func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r
 		}
 	}
 	action := strings.TrimSpace(req.Action)
+	hostKind := strings.TrimSpace(invHost.Kind)
+	if hostKind == "" {
+		if invHost.External {
+			hostKind = fleetv1alpha1.SiteHostKindBareMetal
+		} else {
+			hostKind = fleetv1alpha1.SiteHostKindVM
+		}
+	}
 	if action == "" {
-		action = "create_vm"
+		if hostKind != fleetv1alpha1.SiteHostKindVM {
+			http.Error(w, "action is required for host kind "+hostKind, http.StatusBadRequest)
+			return
+		}
+		action = fleetv1alpha1.ProvisionActionCreateVM
 	}
 	if err := provision.ValidateAction(action); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

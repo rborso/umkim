@@ -30,32 +30,12 @@ for authoritative terms):
   - Authelia — Apache-2.0 (optional ingress forward-auth)
 
 ================================================================================
-DCM ecosystem (forked — see MODIFICATIONS in sibling repos)
-================================================================================
-
-  - dcm-project/control-plane (Apache-2.0)
-      Fleet image: fleet/control-plane
-      Fork: https://github.com/rborso/control-plane
-      Modifications: see MODIFICATIONS.md in that repository
-
-  - dcm-project/k8s-container-service-provider (Apache-2.0)
-      Fleet image: fleet/k8s-container-service-provider
-      Fork: https://github.com/rborso/k8s-container-service-provider
-      Modifications: see MODIFICATIONS.md in that repository
-
-  - dcm-project/kubevirt-service-provider (Apache-2.0)
-      Fleet image: fleet/kubevirt-service-provider
-      Fork: https://github.com/rborso/kubevirt-service-provider
-      Modifications: see MODIFICATIONS.md in that repository
-
-================================================================================
 UMKIM-original fleet components (Robert Borso, Apache-2.0)
 ================================================================================
 
   - fleet-site-controller, fleet-edge-controller
   - fleet-console-auth, fleet-failover-controller
   - fleet-ansible-runner, umkim-console
-  - fleet-olm-subscription-sp, fleet-helm-release-sp
 
 ================================================================================
 Copyleft and GPL-licensed components in images
@@ -85,12 +65,14 @@ copied into each image at build time (LICENSE, NOTICE).
 Distribution compliance
 ================================================================================
 
-UMKIM v0.1.0 is distributed under the Apache License 2.0 (see LICENSE).
+UMKIM v0.2 is distributed under the Apache License 2.0 (see LICENSE).
 
 To obtain source code for GPL-licensed binaries bundled in UMKIM images:
 
-  1. Clone the tagged release: https://github.com/rborso/umkim (tag v0.1.0)
-     and sibling service-provider repositories listed above (same tag).
+  1. Clone this repository: https://github.com/rborso/umkim
+     (current image tag is `umkim_version` / `harbor_fleet_image_tag`, e.g.
+     `0.2.0-dev`). Sibling DCM service-provider repositories are not required
+     for the v0.2 hub image set.
   2. Follow build instructions in images/README.md and each component's
      Containerfile to reproduce the image layers that include copyleft software.
   3. For upstream components (wireguard-tools, lldap), obtain source from the

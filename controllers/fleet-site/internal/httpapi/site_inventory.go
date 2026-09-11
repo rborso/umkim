@@ -232,10 +232,6 @@ func (s *Server) syncSiteInventory(ctx context.Context, w http.ResponseWriter, r
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := yaidap.MarkSyncing(ctx, s.Client, s.Cfg.Namespace, siteName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 	default:
 		http.Error(w, "inventory sync not available for provider "+provider, http.StatusConflict)
 		return
@@ -243,6 +239,10 @@ func (s *Server) syncSiteInventory(ctx context.Context, w http.ResponseWriter, r
 	jobName, err := s.startInventorySyncJob(ctx, fs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if jobName == "" {
+		http.Error(w, "inventory sync already in progress", http.StatusConflict)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]string{"jobName": jobName, "phase": "running"})

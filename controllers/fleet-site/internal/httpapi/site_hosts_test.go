@@ -28,7 +28,8 @@ func seedInventoryCM(ns, site string) *corev1.ConfigMap {
   hosts:
     vm01:
       vm_location: virt02
-external:
+`,
+			"file.bare_metals.yml": `bare_metals:
   hosts:
     bm01:
       ansible_host: 203.0.113.11
@@ -86,6 +87,19 @@ func TestSiteHostCRUDRemoved(t *testing.T) {
 	}
 	if len(listed.Items) != 3 {
 		t.Fatalf("items=%+v", listed.Items)
+	}
+	kinds := map[string]string{}
+	for _, item := range listed.Items {
+		kinds[item.Name] = item.Kind
+	}
+	if kinds["vm01"] != fleetv1alpha1.SiteHostKindVM {
+		t.Fatalf("vm01 kind=%q", kinds["vm01"])
+	}
+	if kinds["bm01"] != fleetv1alpha1.SiteHostKindBareMetal {
+		t.Fatalf("bm01 kind=%q", kinds["bm01"])
+	}
+	if kinds["bm-hv01"] != fleetv1alpha1.SiteHostKindHypervisor {
+		t.Fatalf("bm-hv01 kind=%q", kinds["bm-hv01"])
 	}
 }
 

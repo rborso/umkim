@@ -107,6 +107,12 @@ func ProjectFromStore(ctx context.Context, c client.Client, ns, siteName string)
 		if err != nil {
 			return connectors.ProjectBundle{}, err
 		}
+		bareMetalsRaw, _ := connectors.GetInventoryFile(data, "bare_metals.yml")
+		composed, err := ComposeGuestsYAMLForSync(bundle.Files["guests.yml"], bareMetalsRaw)
+		if err != nil {
+			return connectors.ProjectBundle{}, err
+		}
+		bundle.Files["guests.yml"] = composed
 		return bundle, ValidateSyncBundle(bundle)
 	}
 	// Legacy JSON store fallback.

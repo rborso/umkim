@@ -42,6 +42,7 @@ func TestPathSynced(t *testing.T) {
 		}
 	}
 	notSynced := []string{
+		"bare_metals.yml",
 		"clusters/lab-single-1.yml",
 		"clusters.yml",
 		"catalog.yml",

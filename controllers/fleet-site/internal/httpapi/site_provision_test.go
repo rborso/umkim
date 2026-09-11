@@ -29,7 +29,7 @@ func TestSiteProvisionNoopAction(t *testing.T) {
 		},
 	}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site).Build(),
+		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 
@@ -103,12 +103,12 @@ func TestSiteProvisionConfirmRequired(t *testing.T) {
 		},
 	}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site).Build(),
+		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 	body, _ := json.Marshal(map[string]interface{}{
 		"action":  "install_bm",
-		"subject": "bare01",
+		"subject": "bm01",
 		"host":    map[string]string{"ansible_host": "203.0.113.11"},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1alpha1/sites/homelab/provision/actions", bytes.NewReader(body))

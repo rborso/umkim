@@ -21,6 +21,7 @@ import (
 
 // ManifestWorkNames matches inventory fleet_cleanup_manifestworks (hub-delivered spoke workloads).
 var ManifestWorkNames = []string{
+	"fleet-ingress-auth",
 	"phase6-spoke-demo",
 	"phase6-spoke-ingress",
 	"phase5-helm-release-sp",

@@ -39,7 +39,7 @@ func PersistResolvedVmLocation(ctx context.Context, c client.Client, ns, siteNam
 		if err != nil {
 			return connectors.InventoryPatch{}, err
 		}
-		if !guestInIndex(guestName, guestsDoc) {
+		if !vmGuestInIndex(guestName, guestsDoc) {
 			return connectors.InventoryPatch{}, fmt.Errorf("guest %q not in guests.yml", guestName)
 		}
 		hvRaw, ok := connectors.GetInventoryFile(data, "hypervisors.yml")
@@ -123,12 +123,6 @@ func patchGuestVmLocationInGuestsYAML(raw, guestName, hypervisor string) (string
 		}
 		entry.VmLocation = hypervisor
 		doc.Guests.Hosts[guestName] = entry
-	} else if entry, ok := doc.External.Hosts[guestName]; ok {
-		if strings.TrimSpace(entry.VmLocation) == hypervisor {
-			return raw, false, nil
-		}
-		entry.VmLocation = hypervisor
-		doc.External.Hosts[guestName] = entry
 	} else {
 		return "", false, fmt.Errorf("guest %q not in guests.yml", guestName)
 	}

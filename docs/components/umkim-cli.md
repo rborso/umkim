@@ -160,7 +160,11 @@ umkim site provision set SITE --provider yaidap \
   --jumphost linux@jump.example:22 \
   --ssh-secret fleet-site-SITE-provision-ssh \
   --inventory /path/to/yaidap/inventory \
-  --yaidap-root /path/to/yaidap
+  --yaidap-root /path/to/yaidap \
+  --yaidap-repo git@github.com:ORG/yaidap.git \
+  --yaidap-ref main \
+  --yaidap-git-secret fleet-site-SITE-yaidap-git
+umkim site provision yaidap-sync SITE
 umkim site provision run SITE --action create_vm --subject vm01 --wait
 umkim site provision run SITE --action plan_vm --subject vm01 --wait
 umkim site provision run SITE --action create_vm --subject vm01 \
@@ -201,21 +205,33 @@ umkim site host cluster-apply SITE guest01
 umkim site host provision SITE guest01 --action plan_vm --wait
 umkim site host provision SITE guest01 --wait
 umkim site host provision SITE bm01 --confirm --wait
+umkim site host destroy SITE guest01 --confirm --wait
+```
+
+Destroy tears down the libvirt VM while keeping the guest in inventory; phase returns to **Declared** when the job succeeds. Recreate with provision:
+
+```bash
+umkim site host destroy homelab lab-ha-0-cp1 --confirm --wait
+umkim site host list homelab   # phase: Declared
+umkim site host provision homelab lab-ha-0-cp1 --wait   # recreate VM
 ```
 
 Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`). Put `ansible_host` in both `guests.yml` and `host_vars/{guest}.yml` when the guest needs a static address. Use `vm_location: least-utilized` (or `auto`) only before first placement; after a successful `create_vm`, the hub rewrites inventory to the resolved hypervisor and auto-syncs to the jumphost — `umkim site host get` then shows the concrete name (for example `hv01`). Reset to `least-utilized` explicitly to re-run placement.
 
-`install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`install_bm`** is for
-hypervisors in `hypervisors.yml` (bare metal); it PXE-reinstalls the OS via
-TempXE on the site jumphost. Example:
+`install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`install_bm`**
+PXE-reinstalls the OS via TempXE; allowed on `bare_metal` (`bare_metals.yml`)
+and `hypervisor` (`hypervisors.yml`) hosts. Example:
 
 ```bash
 umkim site host provision SITE hv01 --action install_bm --confirm --wait
 ```
 
-**Hardware discovery** — stub a hypervisor in `hypervisors.yml` +
-`host_vars/{name}.yml` (console: *Add discovery stub*), sync, discover, then
-import promoted drafts:
+**Inventory roles** — VM guests: `guests.hosts`; bare-metal cluster nodes:
+`bare_metals.yml`; hypervisors: `hypervisors.yml`. Console: *Add VM guest*,
+*Add bare metal node*, *Add hypervisor*.
+
+**Hardware discovery** — add a hypervisor in `hypervisors.yml` +
+`host_vars/{name}.yml`, sync, discover, then import promoted drafts:
 
 ```bash
 umkim site inventory sync SITE --wait

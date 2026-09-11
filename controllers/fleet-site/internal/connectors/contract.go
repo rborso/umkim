@@ -8,6 +8,7 @@ import (
 const (
 	InventoryActionSync   = "sync_inventory"
 	InventoryActionImport = "import_inventory"
+	YaidapActionSync      = "sync_yaidap"
 )
 
 // InventoryMeta is stored in meta.json for a provider inventory ConfigMap.

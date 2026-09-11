@@ -17,9 +17,8 @@ func NativeInventorySkeleton() map[string]string {
 	return map[string]string{
 		"guests.yml": `guests:
   hosts: {}
-external:
-  hosts: {}
 `,
+		"bare_metals.yml": emptyBareMetalsYAML,
 		"hypervisors.yml": `hypervisors:
   hosts: {}
 `,
@@ -48,13 +47,15 @@ func PutInventoryFile(ctx context.Context, c client.Client, ns, siteName, path, 
 		return err
 	}
 	guestsYAML := ""
+	bareMetalsYAML := ""
 	hypervisorsYAML := ""
 	if data != nil {
 		data = connectors.NormalizeMetaKeys(data)
 		guestsYAML, _ = connectors.GetInventoryFile(data, "guests.yml")
+		bareMetalsYAML, _ = connectors.GetInventoryFile(data, "bare_metals.yml")
 		hypervisorsYAML, _ = connectors.GetInventoryFile(data, "hypervisors.yml")
 	}
-	if err := ValidateInventoryFileWithContext(path, content, guestsYAML, hypervisorsYAML); err != nil {
+	if err := ValidateInventoryFileWithContext(path, content, guestsYAML, bareMetalsYAML, hypervisorsYAML); err != nil {
 		return err
 	}
 	return connectors.PutInventoryFile(ctx, c, ns, siteName, provider, path, content, actor, nil)
@@ -162,6 +163,13 @@ func MigrateLegacyStore(ctx context.Context, c client.Client, ns, siteName, acto
 	} else {
 		for p, content := range NativeInventorySkeleton() {
 			put[p] = content
+		}
+	}
+	if data != nil {
+		if layoutPut, layoutChanged := EnsureBareMetalsLayout(data); layoutChanged {
+			for p, content := range layoutPut {
+				put[p] = content
+			}
 		}
 	}
 	if len(put) == 0 && len(deletePaths) == 0 {

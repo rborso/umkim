@@ -16,7 +16,7 @@ Full fresh install of site **`homelab`**, cluster **`lab-single-0`** (BM on virt
 - **virt03** (`172.16.10.4`) powered and reachable from jumphost before BM discover/install_bm
 - Base image **`/opt/local/rocky-10.qcow2`** on virt01/virt02 (YAIDAP `os: rocky-10` on guests)
 - Inventory **`group_vars/all/all.yml`** includes `alphabet`, `local_ssd` storage, and `networks` (see `examples/homelab/inventory/`)
-- Hypervisor **`host_vars/virt01.yml`** and **`virt02.yml`** with `os: rocky` (virt03 uses `vm_scheduling_pool: false` until BM phase adds `hypervisors-full.yml`)
+- Hypervisors **virt01**, **virt02**, **virt03** in **`hypervisors.yml`** (not `guests.hosts`); **`host_vars/virt01.yml`**, **`virt02.yml`**, **`virt03.yml`** with `os: rocky` (virt03 is a hypervisor host even when used for BM install testing)
 
 Optional API URLs (defaults target console NodePort on hub):
 

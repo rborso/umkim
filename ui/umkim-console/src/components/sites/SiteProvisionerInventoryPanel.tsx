@@ -32,7 +32,9 @@ import { ErrorAlert } from '../ErrorAlert';
 import {
   guestHostVarsTemplate,
   guestNameFromHostVarsPath,
+  bareMetalNodeHostVarsTemplate,
   hypervisorDiscoveryStubTemplate,
+  mergeGuestIntoBareMetalsYaml,
   mergeGuestIntoGuestsYaml,
   mergeHypervisorIntoHypervisorsYaml,
   templateForNewInventoryFile,
@@ -190,6 +192,9 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [discAnsibleHost, setDiscAnsibleHost] = useState('');
   const [discMac, setDiscMac] = useState('');
   const [discPxeEnabled, setDiscPxeEnabled] = useState(true);
+  const [addBmOpen, setAddBmOpen] = useState(false);
+  const [bmHostName, setBmHostName] = useState('');
+  const [bmAnsibleHost, setBmAnsibleHost] = useState('');
 
   const resetAddVmForm = () => {
     setAddVmStep(1);
@@ -216,6 +221,16 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const openAddDiscModal = () => {
     resetAddDiscForm();
     setAddDiscOpen(true);
+  };
+
+  const resetAddBmForm = () => {
+    setBmHostName('');
+    setBmAnsibleHost('');
+  };
+
+  const openAddBmModal = () => {
+    resetAddBmForm();
+    setAddBmOpen(true);
   };
 
   const filePaths = useMemo(() => {
@@ -390,6 +405,44 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
     }
   };
 
+  const addBareMetalNode = async () => {
+    const name = bmHostName.trim();
+    if (!name) {
+      setError(new Error('Host name is required'));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setVmMessage('');
+    try {
+      const bmResult = await getSiteInventoryFileOptional(siteName, 'bare_metals.yml');
+      const bareMetalsYaml = mergeGuestIntoBareMetalsYaml(bmResult.content, name, {
+        ansible_host: bmAnsibleHost.trim() || undefined,
+      });
+      const hostVarsPath = `host_vars/${name}.yml`;
+      const hostVarsYaml = bareMetalNodeHostVarsTemplate({
+        name,
+        ansibleHost: bmAnsibleHost.trim() || undefined,
+      });
+      await putSiteInventoryFile(siteName, 'bare_metals.yml', bareMetalsYaml);
+      await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
+      setAddBmOpen(false);
+      resetAddBmForm();
+      setVmMessage(
+        `Saved bare_metals.yml and ${hostVarsPath}. Sync to jumphost, then Install bare metal or Apply cluster.`,
+      );
+      await load();
+      setSelectedPath(hostVarsPath);
+      setEditorContent(hostVarsYaml);
+      setFileMissing(false);
+      setEditorDirty(false);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const addDiscoveryStub = async () => {
     const name = discHostName.trim();
     if (!name) {
@@ -535,7 +588,10 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
           Add VM guest
         </Button>
         <Button variant="secondary" onClick={openAddDiscModal}>
-          Add discovery stub
+          Add hypervisor
+        </Button>
+        <Button variant="secondary" onClick={openAddBmModal}>
+          Add bare metal node
         </Button>
         <Button variant="secondary" isLoading={busy} onClick={() => void runImportPreview()}>
           Import preview
@@ -797,9 +853,9 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         )}
       </Modal>
 
-      <Modal title="Add discovery stub" isOpen={addDiscOpen} onClose={() => setAddDiscOpen(false)}>
+      <Modal title="Add hypervisor" isOpen={addDiscOpen} onClose={() => setAddDiscOpen(false)}>
         <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-          Creates a minimal hypervisor entry for YAIDAP hardware discovery (SSH or TempXE PXE).
+          Adds <code>hypervisors.yml</code> + discovery <code>host_vars</code> for VM placement and TempXE discovery.
         </p>
         <Form>
           <FormGroup label="Host name" isRequired fieldId="discHostName">
@@ -842,6 +898,38 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
             Save stub files
           </Button>
           <Button variant="link" onClick={() => setAddDiscOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal title="Add bare metal node" isOpen={addBmOpen} onClose={() => setAddBmOpen(false)}>
+        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+          Adds <code>bare_metals.yml</code> for cluster members that are not libvirt VM guests.
+        </p>
+        <Form>
+          <FormGroup label="Host name" isRequired fieldId="bmHostName">
+            <TextInput
+              id="bmHostName"
+              value={bmHostName}
+              onChange={(_e, v) => setBmHostName(v)}
+              placeholder="e.g. bm-worker-01"
+            />
+          </FormGroup>
+          <FormGroup label="ansible_host" fieldId="bmAnsibleHost">
+            <TextInput
+              id="bmAnsibleHost"
+              value={bmAnsibleHost}
+              onChange={(_e, v) => setBmAnsibleHost(v)}
+              placeholder="172.16.10.50"
+            />
+          </FormGroup>
+        </Form>
+        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <Button variant="primary" isLoading={busy} onClick={() => void addBareMetalNode()}>
+            Save node files
+          </Button>
+          <Button variant="link" onClick={() => setAddBmOpen(false)}>
             Cancel
           </Button>
         </div>

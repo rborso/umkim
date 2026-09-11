@@ -319,7 +319,8 @@ func ReplaceControlJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret,
 }
 
 // SiteProvisionConnectorJob runs site-provision-connector.yml against a jumphost inventory.
-func SiteProvisionConnectorJob(ns, jobName, siteName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
+// gitSecret, when non-empty, mounts a deploy key at /etc/fleet/yaidap-git for sync_yaidap.
+func SiteProvisionConnectorJob(ns, jobName, siteName, siteID, runnerImage, sshSecret, inventoryCM, gitSecret string, extraArgs []string) *batchv1.Job {
 	args := []string{
 		"ansible-playbook", "/ansible/site-provision-connector.yml",
 		"-e", "fleet_site_name=" + siteName,
@@ -329,7 +330,24 @@ func SiteProvisionConnectorJob(ns, jobName, siteName, siteID, runnerImage, sshSe
 		"--limit", "jumphost",
 	}
 	args = append(args, extraArgs...)
-	return ansibleJob(ns, jobName, siteName, runnerImage, args, sshSecret, inventoryCM, "", 5400)
+	j := ansibleJob(ns, jobName, siteName, runnerImage, args, sshSecret, inventoryCM, "", 5400)
+	if strings.TrimSpace(gitSecret) != "" {
+		j.Spec.Template.Spec.Containers[0].VolumeMounts = append(j.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "yaidap-git",
+			MountPath: "/etc/fleet/yaidap-git",
+			ReadOnly:  true,
+		})
+		j.Spec.Template.Spec.Volumes = append(j.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "yaidap-git",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  gitSecret,
+					DefaultMode: ptrInt32(0600),
+				},
+			},
+		})
+	}
+	return j
 }
 
 func IngressAuthReconcileJob(ns, jobName, runnerImage, inventoryCM, globalSecretsName string, enabledClusters []string) *batchv1.Job {

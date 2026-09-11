@@ -61,6 +61,7 @@ function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey'
     case 'ScriptIssued':
       return 'blue';
     case 'Provisioning':
+    case 'Destroying':
       return 'orange';
     case 'Failed':
       return 'red';

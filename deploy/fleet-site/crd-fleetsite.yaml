@@ -123,6 +123,15 @@ spec:
                       type: string
                     yaidapRoot:
                       type: string
+                    yaidapRepo:
+                      type: string
+                      description: Git remote for hub-managed YAIDAP checkout sync on the jumphost.
+                    yaidapRef:
+                      type: string
+                      description: Branch, tag, or commit to checkout (default main).
+                    yaidapGitSecretRef:
+                      type: string
+                      description: Hub Secret with deploy key for private SSH git remotes.
                     workspacePath:
                       type: string
                     defaultExtraVars:
@@ -202,6 +211,10 @@ spec:
                     lastActionID:
                       type: string
                     lastActionType:
+                      type: string
+                    yaidapRevision:
+                      type: string
+                    yaidapSyncedAt:
                       type: string
                     current:
                       type: object

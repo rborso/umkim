@@ -14,6 +14,7 @@
     ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
     k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     fleet_cleanup_manifestworks:
+      - fleet-ingress-auth
       - phase6-spoke-demo
       - phase6-spoke-ingress
       - phase5-helm-release-sp
@@ -61,6 +62,14 @@
     fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
     ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
     k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    fleet_cleanup_manifestworks:
+      - fleet-ingress-auth
+      - phase6-spoke-demo
+      - phase6-spoke-ingress
+      - phase5-helm-release-sp
+      - phase5-olm-subscription-sp
+      - phase5-k8s-container-sp
+      - phase4-platform-bootstrap
   tasks:
     - name: Fleet cluster delete | Wait for ManagedCluster removal
       ansible.builtin.command:
@@ -84,6 +93,45 @@
       when: fleet_cluster_delete_mc_wait.rc == 0
       tags: [fleet_cluster_delete]
 
+    - name: Fleet cluster delete | Force-clear stuck ManifestWork finalizers on hub
+      ansible.builtin.command:
+        cmd: >-
+          kubectl patch manifestwork {{ item }}
+          -n {{ fleet_cluster_name }}
+          --type=json
+          -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      loop: "{{ fleet_cleanup_manifestworks }}"
+      register: fleet_cluster_delete_mw_finalizer
+      when: fleet_cluster_delete_mc_wait.rc == 0
+      failed_when: false
+      changed_when: fleet_cluster_delete_mw_finalizer.stdout is search('patched')
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Re-wait for ManagedCluster removal after finalizer cleanup
+      ansible.builtin.command:
+        cmd: kubectl get managedcluster {{ fleet_cluster_name }}
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_mc_rewait
+      until: fleet_cluster_delete_mc_rewait.rc != 0
+      retries: 12
+      delay: 5
+      failed_when: false
+      changed_when: false
+      when: fleet_cluster_delete_mc_wait.rc == 0
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Publish ManagedCluster removal state
+      ansible.builtin.set_fact:
+        fleet_cluster_mc_removed: >-
+          {{ (fleet_cluster_delete_mc_rewait.rc | default(fleet_cluster_delete_mc_wait.rc)) != 0 }}
+        cacheable: true
+      tags: [fleet_cluster_delete]
+
     - name: Fleet cluster delete | Remove fleet-kubeconfig secret on hub
       ansible.builtin.command:
         cmd: kubectl delete secret fleet-kubeconfig-{{ fleet_cluster_name }} -n fleet-system --ignore-not-found
@@ -103,7 +151,9 @@
     fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
   tasks:
     - name: Fleet cluster delete | Stage cleanup script on node
-      when: not (fleet_cluster_delete_hub_only | default(false) | bool)
+      when:
+        - not (fleet_cluster_delete_hub_only | default(false) | bool)
+        - fleet_cluster_mc_removed | default(false) | bool
       ansible.builtin.copy:
         src: /ansible/cleanup_node_local.sh
         dest: /tmp/fleet-node-cleanup.sh
@@ -114,7 +164,9 @@
     # Waiting in the foreground hangs the delete Job forever (seen with --mode reset).
     # VIP removal for reset is handled inside cleanup_node_local.sh (--vip).
     - name: Fleet cluster delete | Launch node cleanup in background
-      when: not (fleet_cluster_delete_hub_only | default(false) | bool)
+      when:
+        - not (fleet_cluster_delete_hub_only | default(false) | bool)
+        - fleet_cluster_mc_removed | default(false) | bool
       ansible.builtin.shell: |
         set -e
         LOG="/tmp/fleet-cleanup-{{ fleet_cluster_name }}.log"

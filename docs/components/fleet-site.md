@@ -61,6 +61,7 @@ inventory path. On success the action returns a handoff host fragment
 | `POST /sites/{name}/provision/inventory/import/apply` | Merge selected preview paths into hub store |
 | `GET /sites/{name}/provision/inventory/revisions[/{id}]` | Timestamped revision log + diff |
 | `POST /sites/{name}/provision/inventory/sync` | Push synced YAML files to jumphost |
+| `POST /sites/{name}/provision/yaidap/sync` | Clone or update YAIDAP git checkout on jumphost (`yaidapRepo`, `yaidapRoot`, optional deploy-key Secret) |
 | `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `discover_pxe`, `status` |
 | `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
 | `GET /sites/{name}/hosts` | Derived host list (same source as `/provision/inventory/hosts`) |
@@ -76,8 +77,9 @@ Hub inventory is stored in ConfigMap `fleet-site-{site}-yaidap-inventory` as
 
 | Path | Synced to jumphost |
 |------|-------------------|
-| `guests.yml` | Yes — thin guest index (`ansible_host`, `vm_location`; schedule tokens until first successful `create_vm`) |
-| `hypervisors.yml` | Yes — YAIDAP hypervisor group |
+| `guests.yml` | Yes — `guests.hosts` only (VM index: `ansible_host`, `vm_location`); synced to jumphost with `external.hosts` composed from `bare_metals.yml` |
+| `bare_metals.yml` | **Hub only** — bare-metal cluster nodes (`bare_metals.hosts`); composed into jumphost `guests.yml` → `external.hosts` on sync |
+| `hypervisors.yml` | Yes — YAIDAP hypervisor group (VM placement targets) |
 | `{cluster}.yml` | Yes — Ansible group membership (hosts under the group key) |
 | `group_vars/all/all.yml` (+ optional `group_vars/all/*.yml`) | Yes — site storages, networks, defaults |
 | `group_vars/{group}.yml` | Yes — group-level vars; Fleet cluster intent for cluster groups |
@@ -87,6 +89,25 @@ Hub inventory is stored in ConfigMap `fleet-site-{site}-yaidap-inventory` as
 Sync pushes only synced paths; jumphost-only files (`controllers.yml`, `routers.yml`, `generated/`) are preserved. Run `POST …/provision/inventory/migrate` to seed the native skeleton, split legacy `clusters.yml` / `clusters/*.yml` into root + `group_vars/`, and convert deprecated `catalog.yml` into `group_vars/all/all.yml`.
 
 Provision status and cluster-apply progress are recorded in `_meta/status.json` keyed by guest name.
+
+**Site host kinds** (derived from inventory layout; exposed on `GET /sites/{name}/hosts`):
+
+| Kind | Inventory source | Role |
+|------|------------------|------|
+| `vm` | `guests.yml` → `guests.hosts` | Libvirt workloads (`create_vm`, `destroy`, `plan_vm`) |
+| `bare_metal` | `bare_metals.yml` | Cluster members that are not libvirt guests (`install_bm`, `discover`) |
+| `hypervisor` | `hypervisors.yml` | Placement / discovery / TempXE targets (`discover`, `discover_pxe`; optional `install_bm`) |
+
+**Site host phases** (per-guest `status.phase` in `_meta/status.json`):
+
+| Phase | Meaning |
+|-------|---------|
+| `Declared` | Guest in inventory; no libvirt VM running (initial state or after successful `destroy`) |
+| `Provisioning` | Connector action in progress (`create_vm`, `destroy`, …) |
+| `Ready` | VM provisioned and reachable (`ansible_host` populated) |
+| `Failed` | Last provision action failed |
+
+VM lifecycle: `Declared` → `create_vm` → `Provisioning` → `Ready` → `destroy` (confirm) → `Provisioning` → `Declared`. Destroy tears down the libvirt VM only; `guests.yml` and `host_vars` are unchanged so **Provision** can recreate the VM. Destroy requires phase **Ready**, VM kind, and no active `FleetClusterJoin` for a cluster the guest belongs to (delete or unjoin the fleet cluster first). The console **Destroy VM** action on the site hosts panel wraps the same API as `POST …/hosts/{guest}/provision` with `action: destroy`.
 
 Optional **cluster membership and intent** use the native Ansible layout:
 
@@ -126,9 +147,9 @@ blocked when local validate/provision-local already ran on the node.
 
 Destructive actions require `confirm=true`. **`install_bm`** runs a composite
 TempXE flow on the jumphost: arm kickstart (`install_os=true`), start PXE,
-UEFI network boot on the target hypervisor, wait for kickstart completion
-(non-empty `/root/ks-post.log` + new `boot_id`), then `tempxe_stop`. Hypervisors listed in
-`hypervisors.yml` appear in host APIs as `kind: bare_metal`. Greenfield
+UEFI network boot on the target host, wait for kickstart completion
+(non-empty `/root/ks-post.log` + new `boot_id`), then `tempxe_stop`. Allowed on
+`bare_metal` and `hypervisor` kinds. Greenfield
 `POST /sites/{name}/provision` (site bootstrap) is unchanged and separate from
 the connector binding GET/PUT paths.
 
@@ -137,8 +158,8 @@ YAIDAP on the jumphost. Both actions auto-sync hub inventory before running.
 
 | Action | Requires | YAIDAP sketch |
 |--------|----------|---------------|
-| `discover` | Host in inventory with reachable `ansible_host` | `discover-hosts.yml --tags check_host_details` |
-| `discover_pxe` | `confirm=true`; host in `hypervisors.yml`; `host_vars` with `tempxe_discovery.enabled: true` and uplink `mac_address` | TempXE arm → optional PXE reboot → wait for discovery tarball → `collect_discovery` → `tempxe_stop` |
+| `discover` | `hypervisor` or `bare_metal` kind; reachable `ansible_host` | `discover-hosts.yml --tags check_host_details` |
+| `discover_pxe` | `confirm=true`; `hypervisor` kind in `hypervisors.yml`; `host_vars` with `tempxe_discovery.enabled: true` and uplink `mac_address` | TempXE arm → optional PXE reboot → wait for discovery tarball → `collect_discovery` → `tempxe_stop` |
 
 Discovery output lands under jumphost `generated/` (`host_vars/`, `hosts/`,
 `pxe-discovery/`). **Import preview** reads those drafts and promotes them into

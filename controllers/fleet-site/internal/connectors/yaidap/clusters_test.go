@@ -59,7 +59,7 @@ external:
   hosts: {}
 `
 	content := "topology: single_node\n"
-	if err := validateClusterGroupVars("group_vars/c1.yml", content, guests, []string{"vm01"}); err != nil {
+	if err := validateClusterGroupVars("group_vars/c1.yml", content, guests, "", []string{"vm01"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -91,7 +91,7 @@ func TestValidateHypervisorHostVars(t *testing.T) {
     virt01:
       ansible_host: 172.16.10.2
 `
-	if err := validateHostVarsYAML("host_vars/virt01.yml", "os: rocky-10\n", "", hvs); err != nil {
+	if err := validateHostVarsYAML("host_vars/virt01.yml", "os: rocky-10\n", "", "", hvs); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -35,6 +35,11 @@ var ReservedRootInventoryFiles = map[string]bool{
 	"hypervisors.yml": true,
 }
 
+// HubCanonicalInventoryFiles are hub-only inventory paths (editable, not synced as-is).
+var HubCanonicalInventoryFiles = map[string]bool{
+	"bare_metals.yml": true,
+}
+
 // JumphostOnlyRootFiles are never stored or synced from the hub inventory store.
 var JumphostOnlyRootFiles = map[string]bool{
 	"controllers.yml": true,
@@ -43,6 +48,9 @@ var JumphostOnlyRootFiles = map[string]bool{
 
 func pathSynced(p string) bool {
 	p = NormalizeInventoryPath(p)
+	if HubCanonicalInventoryFiles[p] {
+		return false
+	}
 	if IsRootInventoryGroupFile(p) || ReservedRootInventoryFiles[p] {
 		return true
 	}
@@ -61,7 +69,7 @@ func IsRootInventoryGroupFile(p string) bool {
 	if !strings.HasSuffix(p, ".yml") || strings.Contains(p, "/") {
 		return false
 	}
-	if ReservedRootInventoryFiles[p] || LegacyClusterInventoryPath(p) || JumphostOnlyRootFiles[p] || p == "catalog.yml" {
+	if ReservedRootInventoryFiles[p] || HubCanonicalInventoryFiles[p] || LegacyClusterInventoryPath(p) || JumphostOnlyRootFiles[p] || p == "catalog.yml" {
 		return false
 	}
 	return true
@@ -103,6 +111,9 @@ func InventoryPathAllowed(p string) bool {
 		return false
 	}
 	if WritableHubOnlyInventoryPath(p) {
+		return true
+	}
+	if HubCanonicalInventoryFiles[p] {
 		return true
 	}
 	if pathSynced(p) {
