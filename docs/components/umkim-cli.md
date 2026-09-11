@@ -229,7 +229,9 @@ umkim site inventory import apply SITE --confirm --paths host_vars/new-hv01.yml,
 Import preview promotes jumphost `generated/host_vars/` and `generated/hosts/`
 into canonical hub paths; `notes.json` stays on the jumphost for reference.
 
-See [fleet-site.md](fleet-site.md) for the full inventory API.
+See [fleet-site.md](fleet-site.md) for the FleetSite API and
+[yaidap-integration.md](yaidap-integration.md) for YAIDAP workflows, inventory
+layout, and action mapping.
 
 Mutating commands print `OK: …` on success (and re-list ingress after site changes).
 Failures exit non-zero with an error (including when a patch is accepted but not
@@ -323,6 +325,7 @@ umkim login
 | Unit | `cmd/umkim/internal/.../*_test.go` — client, config, bootstrap SSH args |
 | Integration | `go test ./...` with `httptest` mock auth + fleet API |
 | Lab smoke | `scripts/verify-umkim-cli.sh` — login, list clusters, node-op history |
+| Maintainer homelab rebuild | [`examples/homelab/rebuild-homelab-cli.md`](../../examples/homelab/rebuild-homelab-cli.md) — full CLI runbook with timing logs (site + BM + HA clusters) |
 
 ## Roadmap (post v0.2)
 
@@ -336,4 +339,5 @@ umkim login
 - [fleet-site.md](fleet-site.md) — API and FCJ lifecycle
 - [fleet-console-auth.md](../fleet-console-auth.md) — roles and service accounts
 - [install.md](../install.md) — hub install (Ansible)
+- [examples/homelab/rebuild-homelab-cli.md](../../examples/homelab/rebuild-homelab-cli.md) — maintainer lab rebuild via CLI (inventory in `examples/homelab/`)
 - [playbooks/flows/README.md](../../playbooks/flows/README.md) — legacy API flow playbooks

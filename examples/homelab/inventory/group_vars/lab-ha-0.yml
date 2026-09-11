@@ -1,0 +1,4 @@
+topology: ha_3_node
+autoApply: true
+haGroup: lab-ha-0
+controlPlaneVip: 172.16.10.100

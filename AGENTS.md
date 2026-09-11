@@ -43,6 +43,7 @@ installation guide take precedence. Keep design documentation topology-neutral.
 | KubeVirt / Multus platform | [docs/components/fleet-kubevirt.md](docs/components/fleet-kubevirt.md) |
 | Site exposure / ingress | [docs/components/fleet-edge.md](docs/components/fleet-edge.md), [examples/site-profiles/](examples/site-profiles/) |
 | Cluster lifecycle / detach | [docs/components/fleet-site.md](docs/components/fleet-site.md), [playbooks/flows/cluster-delete.yml](playbooks/flows/cluster-delete.yml) |
+| YAIDAP provisioner connector | [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md) |
 | Console route or user workflow | `ui/umkim-console/README.md` and [docs/fleet-console-auth.md](docs/fleet-console-auth.md) |
 | Fleet CLI (`umkim`) | [docs/components/umkim-cli.md](docs/components/umkim-cli.md) and `cmd/umkim/` |
 | Security or secret handling | [SECURITY.md](SECURITY.md) and [docs/secrets.md](docs/secrets.md) |

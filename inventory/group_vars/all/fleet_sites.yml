@@ -1,7 +1,5 @@
 ---
-# Management site only (hub_gateway). Copy to inventory/group_vars/all/fleet_sites.yml
-# or merge the fleet_sites: block — remove homelab/lab-remote sites from the lab inventory.
-
+# Management site only (hub_gateway). Workload sites are created later via the UMKIM console.
 fleet_sites:
   management:
     display_name: Management DC
@@ -15,29 +13,5 @@ fleet_sites:
       enabled: true
       expected_wan_ip: "{{ hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].fleet_hub_public_ipv4 | default(hostvars[fleet_hub_inventory_hostname | default('umkim-hub')].ansible_host | default('')) }}"
     wireguard_pool: null
-
-  homelab:
-    display_name: Homelab
-    region: homelab
-    jumphost: linux@jump.otthol.hu:30200
-    ingress:
-      - id: homelab-pf
-        method: port_forward
-        address: "172.16.10.4"
-        zone: "{{ fleet_homelab_edge_domain }}"
-        wildcard: "*.{{ fleet_homelab_edge_domain }}"
-        description: "Port-forward to virt03.lab.local (lab-single-0): 80→30080, 443→30443"
-      - id: edge-rp
-        method: reverse_proxy
-        operator_notes: "External reverse proxy terminates TLS; operator configures vhosts"
-    dns_target_note: "A/AAAA *.{{ fleet_homelab_edge_domain }} → virt03 (port-forward 80→30080, 443→30443)"
-
-  lab-jumphost:
-    display_name: Lab jumphost (hub gateway)
-    region: lab
-    hub_gateway: true
-    hub_zone: "{{ fleet_edge_domain }}"
-    hub_wildcard: "*.{{ fleet_edge_domain }}"
-    dns_target_note: "A/AAAA *.<fleet_edge_domain> → hub WAN (no spoke port-forward)"
 
 fleet_site_cluster_hosts: []

@@ -1,0 +1,16 @@
+guests:
+  hosts:
+    lab-ha-0-cp1:
+      ansible_host: 172.16.10.101
+      vm_location: least-utilized
+    lab-ha-0-cp2:
+      ansible_host: 172.16.10.102
+      vm_location: least-utilized
+    lab-ha-0-cp3:
+      ansible_host: 172.16.10.103
+      vm_location: least-utilized
+    lab-ha-0-w1:
+      ansible_host: 172.16.10.140
+      vm_location: least-utilized
+external:
+  hosts: {}

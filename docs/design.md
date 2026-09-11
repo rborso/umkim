@@ -117,6 +117,7 @@ See [components/fleet-edge.md](components/fleet-edge.md).
   installed after Ready via console/CLI/API — not a FleetApp.
 - **Provisioner connector** (optional, implemented for YAIDAP): hub owns native
   YAML inventory on the hub; YAIDAP executes via connector jobs — see
+  [components/yaidap-integration.md](components/yaidap-integration.md) and
   [components/fleet-site.md](components/fleet-site.md).
 - **Ingress authentication** protects selected public application routes; it is
   separate from console login.
@@ -132,7 +133,7 @@ See [components/fleet-edge.md](components/fleet-edge.md).
 | FleetSite and FleetClusterJoin | [components/fleet-site.md](components/fleet-site.md) |
 | Helm apps | [components/fleet-apps.md](components/fleet-apps.md) |
 | KubeVirt platform | [components/fleet-kubevirt.md](components/fleet-kubevirt.md) |
-| Provisioner connector | [components/fleet-site.md](components/fleet-site.md) |
+| Provisioner connector / YAIDAP | [components/yaidap-integration.md](components/yaidap-integration.md) |
 | Edge routes | [components/fleet-edge.md](components/fleet-edge.md) |
 | Site exposure examples | [../examples/site-profiles/](../examples/site-profiles/) |
 | Versions | [../VERSIONS.md](../VERSIONS.md) |

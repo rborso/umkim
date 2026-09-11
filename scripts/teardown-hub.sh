@@ -16,7 +16,7 @@
 # Environment (same as install-hub.sh):
 #   INV, ANSIBLE_VAULT_PASSWORD_FILE
 #   FLEET_API              fleet-site API (default http://127.0.0.1:18080/api/v1alpha1)
-#   TEARDOWN_CLUSTER_TIMEOUT_SEC  per-cluster delete wait (default 3600)
+#   TEARDOWN_CLUSTER_TIMEOUT_SEC  per-cluster delete wait (default 1200)
 #
 # Options:
 #   --confirm              Required. Without this flag the script exits immediately.
@@ -33,8 +33,8 @@ cd "$ROOT"
 export INV="${INV:--i inventory/hosts.yml -i inventory/hosts-from-hub.yml}"
 
 API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
-CLUSTER_TIMEOUT="${TEARDOWN_CLUSTER_TIMEOUT_SEC:-3600}"
-POLL_INTERVAL="${TEARDOWN_POLL_INTERVAL_SEC:-20}"
+CLUSTER_TIMEOUT="${TEARDOWN_CLUSTER_TIMEOUT_SEC:-1200}"
+POLL_INTERVAL="${TEARDOWN_POLL_INTERVAL_SEC:-15}"
 # Direct fleet-site API requires identity headers (FLEET_SITE_REQUIRE_IDENTITY=true).
 API_ID_HEADERS=(
   -H "X-Fleet-Subject-Kind: User"
@@ -124,6 +124,72 @@ api_delete_cluster() {
   esac
 }
 
+cluster_phase() {
+  local name="$1"
+  api_get "${API}/clusters/${name}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('provisioning_phase',''))" 2>/dev/null || echo ""
+}
+
+managed_cluster_exists() {
+  kubectl_cmd get managedcluster "$1" >/dev/null 2>&1
+}
+
+force_remove_stuck_cluster() {
+  local name="$1"
+  local phase jobs
+  phase="$(cluster_phase "${name}")"
+  jobs="$(kubectl_cmd get jobs -n fleet-console -o name 2>/dev/null | grep -E "fleet-cluster-delete-${name}($|-)" | tr '\n' ' ' || true)"
+
+  case "${phase}" in
+    ScriptIssued|Enrolled|Pending|Validated|Failed)
+      if ! managed_cluster_exists "${name}"; then
+        log "Force-removing never-joined cluster ${name} (phase=${phase}, no ManagedCluster)"
+        if [[ "${DRY_RUN}" -eq 1 ]]; then
+          log "[dry-run] kubectl delete fleetclusterjoin ${name} -n fleet-console"
+          return 0
+        fi
+        kubectl_cmd delete fleetclusterjoin "${name}" -n fleet-console --ignore-not-found --wait=false 2>/dev/null || true
+        return 0
+      fi
+      ;;
+  esac
+
+  if [[ "${phase}" == "Deleting" && -n "${jobs}" ]]; then
+    local stuck=0
+    while read -r job; do
+      [[ -n "${job}" ]] || continue
+      local succeeded
+      succeeded="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.succeeded}' 2>/dev/null || echo 0)"
+      if [[ "${succeeded}" != "1" ]]; then
+        local age
+        age="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.startTime}' 2>/dev/null || true)"
+        if [[ -n "${age}" ]]; then
+          stuck=1
+        fi
+      fi
+    done <<< "${jobs//$' '/$'\n'}"
+
+    if [[ "${stuck}" -eq 1 ]] && managed_cluster_exists "${name}"; then
+      log "ManagedCluster ${name} stuck terminating; clearing OCM finalizers"
+      if [[ "${DRY_RUN}" -eq 1 ]]; then
+        log "[dry-run] kubectl patch managedcluster ${name} --type=merge -p '{\"metadata\":{\"finalizers\":[]}}'"
+        return 0
+      fi
+      kubectl_cmd patch managedcluster "${name}" --type=merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+      kubectl_cmd delete managedcluster "${name}" --ignore-not-found --wait=false 2>/dev/null || true
+    fi
+
+    if [[ "${stuck}" -eq 1 ]]; then
+      log "Replacing stuck delete job(s) for ${name}: ${jobs}"
+      if [[ "${DRY_RUN}" -eq 1 ]]; then
+        log "[dry-run] kubectl delete ${jobs} -n fleet-console"
+        return 0
+      fi
+      kubectl_cmd delete ${jobs} -n fleet-console --ignore-not-found --wait=false 2>/dev/null || true
+      api_delete_cluster "${name}"
+    fi
+  fi
+}
+
 wait_cluster_gone() {
   local name="$1"
   local max="${CLUSTER_TIMEOUT}"
@@ -136,17 +202,21 @@ wait_cluster_gone() {
       log "Cluster ${name} removed from fleet API"
       return 0
     fi
-    if [[ $((elapsed - last_log)) -ge 300 ]]; then
-      phase="$(api_get "${API}/clusters/${name}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('provisioning_phase','?'))" 2>/dev/null || echo '?')"
-      jobs="$(kubectl_cmd get jobs -n fleet-console -o name 2>/dev/null | grep -E "fleet-cluster-delete-${name}" | tr '\n' ' ' || true)"
+    if [[ "${elapsed}" -ge 60 ]]; then
+      force_remove_stuck_cluster "${name}"
+    fi
+    if [[ $((elapsed - last_log)) -ge 60 ]]; then
+      phase="$(cluster_phase "${name}")"
+      jobs="$(kubectl_cmd get jobs -n fleet-console -o name 2>/dev/null | grep -E "fleet-cluster-delete-${name}($|-)" | tr '\n' ' ' || true)"
       log "Still waiting for ${name} (${elapsed}s): HTTP ${code} phase=${phase} jobs=${jobs:-none}"
       last_log=${elapsed}
     fi
     sleep "${POLL_INTERVAL}"
     elapsed=$((elapsed + POLL_INTERVAL))
   done
-  echo "ERROR: timeout waiting for cluster ${name} to disappear (${max}s)" >&2
-  return 1
+  log "WARN: timeout waiting for cluster ${name} (${max}s); kubectl fallback"
+  kubectl_fallback_cluster_cleanup
+  return 0
 }
 
 wait_delete_jobs() {
@@ -242,7 +312,7 @@ if [[ "${SKIP_CLUSTER_DELETE}" -eq 0 ]]; then
     for name in "${CLUSTERS[@]}"; do
       [[ -n "${name}" ]] || continue
       if [[ "${DRY_RUN}" -eq 0 ]]; then
-        wait_cluster_gone "${name}" || kubectl_fallback_cluster_cleanup
+        wait_cluster_gone "${name}"
       fi
     done
     if [[ "${DRY_RUN}" -eq 0 ]]; then

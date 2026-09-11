@@ -1,38 +1,13 @@
 ---
-# Hub gateway + FCJ workload clusters (console / cluster-create.yml).
+# Hub gateway edge routing. Workload cluster entries are added after FCJ clusters reach Ready.
 
 fleet_edge_enable: true
 fleet_edge_direct_ingress_default: true
 fleet_edge_public_nodeport: "{{ 80 if (fleet_edge_acme_enabled | default(false) | bool) else 9080 }}"
 
-fleet_edge_clusters:
-  lab-single-0:
-    site: homelab
-    direct_ingress: true
-    ingress_id: homelab-pf
-    method: port_forward
-    tls_policy: acme_cluster
-    dns_zone: "{{ fleet_homelab_edge_domain }}"
-    edge_wan_ip: "172.16.10.4"
-    upstream_host: 10.10.0.10
-    traefik_http_port: 30080
-    traefik_https_port: 30443
-  lab-ha-0:
-    site: homelab
-    direct_ingress: true
-    ingress_id: edge-rp
-    method: reverse_proxy
-    tls_policy: external
-    upstream_host: 10.10.0.12
-    traefik_http_port: 30080
-    traefik_https_port: 30443
+fleet_edge_clusters: {}
 
 fleet_edge_apps: []
-# Populated after FCJ clusters reach Ready (spoke_ingress push); avoid hub-install failure on greenfield.
-fleet_edge_phase6_clusters:
-  - lab-single-0
-  - lab-ha-0
-ocm_manifestwork_phase6_clusters:
-  - lab-single-0
-  - lab-ha-0
+fleet_edge_phase6_clusters: []
+ocm_manifestwork_phase6_clusters: []
 ocm_spoke_kubeconfig_sync_targets: []

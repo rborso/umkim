@@ -1,0 +1,44 @@
+---
+memory: 4096
+cores: 2
+libvirt_dir: /opt/local
+alphabet: abcdefghijklmnopqrstuvwxyz
+domain: lab.local
+configure_firewalld: false
+ssh_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICc1HPI+d2zS/vgGc7pNvRUvB0GIEGJzAkENvMwEoUvI linux@bck.otthol.local"
+ssh_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICc1HPI+d2zS/vgGc7pNvRUvB0GIEGJzAkENvMwEoUvI linux@bck.otthol.local"
+cloudinit_user: linux
+cloudinit_password: "yaidap-lab-only"
+storages:
+  - name: local
+    type: local
+    shared: false
+    path: /opt/local
+    os: [rocky, fedora, rocky-10]
+  - name: local_ssd
+    type: local
+    shared: false
+    path: /opt/local
+    os: [rocky, fedora, rocky-10]
+networks:
+  - network_name: mgmt_nw
+    cidr: 192.168.1.0/24
+    gw: 192.168.1.1
+    dhcp_start: 192.168.1.200
+    dhcp_end: 192.168.1.240
+    dns: 192.168.1.1
+    domain: lab.local
+    tag: ""
+    physical_network: mgmt_access_l1
+    default_route: true
+  - network_name: lab_nw
+    cidr: 172.16.10.0/24
+    gw: 172.16.10.1
+    dhcp_start: 172.16.10.100
+    dhcp_end: 172.16.10.199
+    dns: 172.16.10.1
+    domain: lab.local
+    tag: "10"
+    physical_network: default_l2
+    default_route: false

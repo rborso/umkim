@@ -803,13 +803,29 @@
           when:
             - fleet_provision_action == 'discover'
             - fleet_disc_target_ip.stdout | default('') | trim | length > 0
-          ansible.builtin.command:
-            argv:
-              - ssh-keygen
-              - -R
-              - "{{ fleet_disc_target_ip.stdout | trim }}"
-          changed_when: true
-          failed_when: false
+          block:
+            - name: Remove stale discover target host key
+              ansible.builtin.command:
+                argv:
+                  - ssh-keygen
+                  - -R
+                  - "{{ fleet_disc_target_ip.stdout | trim }}"
+              changed_when: true
+              failed_when: false
+
+            - name: Seed discover target host key after refresh
+              ansible.builtin.shell: |
+                set -euo pipefail
+                ip="{{ fleet_disc_target_ip.stdout | trim }}"
+                mkdir -p ~/.ssh
+                chmod 700 ~/.ssh
+                touch ~/.ssh/known_hosts
+                chmod 600 ~/.ssh/known_hosts
+                ssh-keyscan -H "${ip}" >> ~/.ssh/known_hosts 2>/dev/null || true
+              args:
+                executable: /bin/bash
+              changed_when: true
+              failed_when: false
 
         - name: Run YAIDAP ansible-playbook command on jumphost
           ansible.builtin.shell: |

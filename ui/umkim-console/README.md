@@ -58,7 +58,7 @@ manages hub site host inventory, provision actions, and optional cluster automat
 (enroll single-node or HA group, add worker, replace control plane) for registry sites.
 **Sites → detail → Provisioner inventory** (YAIDAP sites) edits the native YAML tree;
 use **Add VM guest** (name/placement, then CPU/memory/disk) to seed `guests.yml` + `host_vars/` templates, **Sync to jumphost**,
-then provision on **Site hosts**. Cluster
+then provision on **Site hosts**. See [yaidap-integration.md](../../docs/components/yaidap-integration.md). Cluster
 jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equivalents:
 `umkim site patch`, `umkim site host`, and `umkim cluster patch`
 ([umkim-cli.md](../../docs/components/umkim-cli.md)).
@@ -87,6 +87,7 @@ ingress, authentication provider, or external endpoint.
 
 - [Console authentication guide](../../docs/fleet-console-auth.md)
 - [Fleet-site component](../../docs/components/fleet-site.md)
+- [YAIDAP integration](../../docs/components/yaidap-integration.md)
 - [FleetApp Helm installs](../../docs/components/fleet-apps.md)
 - [Installation guide](../../docs/install.md)
 - [Design guide](../../docs/design.md)

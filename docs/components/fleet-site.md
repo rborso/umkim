@@ -148,6 +148,7 @@ drafts often include `CHANGE_ME` placeholders; **import preview** surfaces
 action. When `ansible_host` is unknown, PXE discovery waits for a manual reboot.
 
 Flow: [playbooks/flows/site-provision-yaidap.yml](../../playbooks/flows/site-provision-yaidap.yml).
+Full YAIDAP integration reference: [yaidap-integration.md](yaidap-integration.md).
 Historical design notes: [archive/design-provisioner-connector.md](../archive/design-provisioner-connector.md).
 
 ## Hub independence

@@ -13,16 +13,6 @@
   failed_when: false
   tags: [ocm, ocm_reset]
 
-- name: OCM | Delete hub ManagedCluster when forcing re-join
-  ansible.builtin.command:
-    cmd: kubectl delete managedcluster {{ ocm_cluster_name }} --ignore-not-found --wait=true
-  environment:
-    KUBECONFIG: "{{ hostvars[ocm_hub_host].ocm_kubeconfig }}"
-    PATH: "{{ k3s_command_path }}"
-  delegate_to: "{{ ocm_hub_host }}"
-  when: ocm_force_rejoin | default(false) | bool
-  tags: [ocm, ocm_reset]
-
 - name: OCM | Check klusterlet namespace on spoke
   ansible.builtin.command:
     cmd: kubectl get ns open-cluster-management-agent
@@ -34,18 +24,30 @@
   failed_when: false
   tags: [ocm, ocm_reset]
 
+# Klusterlet cleanup must run before waiting on hub ManagedCluster deletion.
+# MC finalizers (resource-cleanup) clear only after the spoke agent is gone.
 - name: OCM | Remove partial klusterlet install before re-join
   ansible.builtin.command:
-    cmd: kubectl delete ns {{ item }} --ignore-not-found --wait=true
+    cmd: kubectl delete ns {{ item }} --ignore-not-found --wait=false
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
   loop:
-    - open-cluster-management
-    - open-cluster-management-agent
     - open-cluster-management-agent-addon
+    - open-cluster-management-agent
+    - open-cluster-management
   when:
     - ocm_force_rejoin | default(false) | bool
       or ocm_reset_mc.stdout | trim != ocm_cluster_name
       or ocm_reset_agent_ns.rc != 0
+  tags: [ocm, ocm_reset]
+
+- name: OCM | Delete hub ManagedCluster when forcing re-join
+  ansible.builtin.command:
+    cmd: kubectl delete managedcluster {{ ocm_cluster_name }} --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ hostvars[ocm_hub_host].ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  delegate_to: "{{ ocm_hub_host }}"
+  when: ocm_force_rejoin | default(false) | bool
   tags: [ocm, ocm_reset]
