@@ -58,15 +58,20 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if fs.Spec.IsRegistry() {
-		if res, err := r.reconcileRegistrySiteProvision(ctx, &fs); err != nil {
+		res, err := r.reconcileRegistrySiteProvision(ctx, &fs)
+		if err != nil {
 			return ctrl.Result{}, err
-		} else if res.Requeue || res.RequeueAfter > 0 {
-			return res, nil
 		}
+		// Cluster-apply polling always requeues; still mark registry sites Ready once.
 		if fs.Status.Phase == "" || fs.Status.Phase == phaseDraft {
 			fs.Status.Phase = phaseReady
 			fs.Status.Message = "Registry site (datacenter metadata)"
-			_ = r.Status().Update(ctx, &fs)
+			if err := r.Status().Update(ctx, &fs); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		if res.Requeue || res.RequeueAfter > 0 {
+			return res, nil
 		}
 		return ctrl.Result{RequeueAfter: time.Duration(r.Cfg.RequeueIntervalSec) * time.Second}, nil
 	}
