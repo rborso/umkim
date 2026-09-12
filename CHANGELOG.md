@@ -2,7 +2,9 @@
 
 All notable changes to this project are documented here.
 
-## [0.2.0-dev] — lab / reference
+## [Unreleased]
+
+## [0.2.0] — 2026-09-12 — lab / reference
 
 - Rocky Linux 10 only; one management hub. Hub images are tagged from this
   repository (`umkim_version` / `harbor_fleet_image_tag`).
@@ -28,8 +30,8 @@ All notable changes to this project are documented here.
 - Renamed console product from legacy DCM naming: UI directory `ui/umkim-console`,
   Harbor image `umkim-console`, K8s Deployment `umkim-console`. Ansible vars
   `umkim_console_*` and `fleet_console_namespace` replace `dcm_fleet_*` and
-  `fleet_webui_namespace` (deprecated aliases remain in role defaults for one release).
-  Delete stale `dcm-fleet-dashboard` Deployment after upgrade on existing hubs.
+  `fleet_webui_namespace` (removed in 0.2.0). Delete stale `dcm-fleet-dashboard`
+  Deployment after upgrade on existing hubs.
 - Harbor `charts` project publishes the whoami smoke-test chart.
 - Greenfield path: [docs/install.md](docs/install.md) +
   [examples/inventory/hub-only/](examples/inventory/hub-only/).

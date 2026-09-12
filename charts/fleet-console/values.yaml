@@ -4,7 +4,7 @@ auth:
   enabled: true
   image:
     repository: fleet-console-auth
-    tag: "0.1.0"
+    tag: "0.2.0"
     pullPolicy: Always
   port: 18090
   sessionSecret: change-me-fleet-console-auth
@@ -39,7 +39,7 @@ dashboard:
   enabled: true
   image:
     repository: umkim-console
-    tag: "0.1.0"
+    tag: "0.2.0"
     pullPolicy: Always
   nodePort: 30912
   buildId: ""

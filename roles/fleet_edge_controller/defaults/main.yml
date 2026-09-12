@@ -1,7 +1,7 @@
 ---
 fleet_edge_controller_enabled: true
 fleet_edge_controller_namespace: fleet-system
-fleet_edge_controller_tag: "{{ harbor_fleet_image_tag | default(umkim_version | default('0.2.0-dev')) }}"
+fleet_edge_controller_tag: "{{ harbor_fleet_image_tag | default(umkim_version | default('0.2.0')) }}"
 fleet_edge_controller_image: "{{ harbor_fleet_image_prefix }}/fleet-edge-controller:{{ fleet_edge_controller_tag }}"
 fleet_edge_controller_replicas: 1
 fleet_edge_route_sync_enabled: false

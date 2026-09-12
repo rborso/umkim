@@ -71,7 +71,7 @@ To obtain source code for GPL-licensed binaries bundled in UMKIM images:
 
   1. Clone this repository: https://github.com/rborso/umkim
      (current image tag is `umkim_version` / `harbor_fleet_image_tag`, e.g.
-     `0.2.0-dev`). Sibling DCM service-provider repositories are not required
+     `0.2.0`). Sibling DCM service-provider repositories are not required
      for the v0.2 hub image set.
   2. Follow build instructions in images/README.md and each component's
      Containerfile to reproduce the image layers that include copyleft software.

@@ -49,32 +49,32 @@ harbor_fleet_umkim_legal_images:
   - fleet-ansible-runner
 harbor_fleet_push_images:
   - repository: fleet-site-controller
-    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
     local_src: "{{ harbor_umkim_root }}/controllers"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/controllers"
     containerfile: fleet-site/Containerfile
   - repository: fleet-ansible-runner
-    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
     local_src: "{{ harbor_umkim_root }}/images/fleet-ansible-runner"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-ansible-runner"
     containerfile: Dockerfile
   - repository: fleet-edge-controller
-    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
     local_src: "{{ harbor_fleet_edge_controller_local_src }}"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-edge"
     containerfile: Containerfile
   - repository: fleet-failover-controller
-    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
     local_src: "{{ harbor_umkim_root }}/controllers"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/controllers"
     containerfile: fleet-failover/Containerfile
   - repository: umkim-console
-    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
     local_src: "{{ harbor_fleet_umkim_console_local_src }}"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/umkim-console"
     containerfile: Containerfile
   - repository: fleet-console-auth
-    tag: "{{ harbor_fleet_image_tag | default('0.2.0-dev') }}"
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
     local_src: "{{ harbor_fleet_console_auth_local_src }}"
     clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-console-auth"
     containerfile: Containerfile

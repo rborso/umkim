@@ -27,7 +27,7 @@ Usage: cleanup_node_local.sh [options]
 Detach from UMKIM fleet (default) or fully reset local K3s.
 
 Options:
-  --mode detach|reset    detach (default): remove OCM/fleet glue, keep K3s + apps
+  --mode detach|reset    detach (default): remove OCM/DCM fleet glue, keep K3s + apps
                          reset: detach then uninstall K3s and wipe CNI/kubelet state
   --cluster NAME         Also remove /tmp/bootstrap-NAME and /tmp/bootstrap-NAME.tar.gz
   --vip ADDRESS          Remove HA control plane VIP (e.g. 192.168.1.80) from local NICs

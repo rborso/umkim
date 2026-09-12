@@ -40,10 +40,3 @@ fleet_auth_oidc_redirect_url: ""
 umkim_console_nodeport: 30912
 umkim_console_enabled: true
 fleet_console_auth_http_port: 18090
-
-# Deprecated aliases (remove next release)
-fleet_webui_namespace: "{{ fleet_console_namespace | default('fleet-console') }}"
-dcm_fleet_console_tag: "{{ umkim_console_tag }}"
-dcm_fleet_console_image_name: "{{ umkim_console_image_name }}"
-dcm_fleet_dashboard_nodeport: "{{ umkim_console_nodeport }}"
-dcm_fleet_dashboard_enabled: "{{ umkim_console_enabled }}"

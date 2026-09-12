@@ -53,7 +53,7 @@ hub_umkim_version() {
     ver="$(git -C "${root}" describe --tags --always --dirty 2>/dev/null || true)"
     [[ -n "${ver}" ]] && { echo "${ver}"; return 0; }
   fi
-  echo "0.2.0-dev"
+  echo "0.2.0"
 }
 
 hub_k3s_snap_dir() {

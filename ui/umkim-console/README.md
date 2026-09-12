@@ -73,7 +73,7 @@ publication use the Harbor role (`Containerfile` in this directory). Example:
 
 ```bash
 ansible-playbook harbor.yml -l hub --tags harbor_push_fleet -e harbor_fleet_push_force=true \
-  -e '{"harbor_fleet_push_images":[{"repository":"umkim-console","tag":"0.2.0-dev"}]}'
+  -e '{"harbor_fleet_push_images":[{"repository":"umkim-console","tag":"0.2.0"}]}'
 ```
 
 Resolve all hosts, registries, tags, and credentials from authorized inventory and secret configuration.

@@ -65,7 +65,7 @@ inventory path. On success the action returns a handoff host fragment
 | `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `discover_pxe`, `status` |
 | `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
 | `GET /sites/{name}/hosts` | Derived host list (same source as `/provision/inventory/hosts`) |
-| `POST/PATCH/DELETE /sites/{name}/hosts/{host}` | **Deprecated** — use inventory file API |
+| `POST/PATCH/DELETE /sites/{name}/hosts/{host}` | **Removed in v0.2** — use inventory file API (`PUT/PATCH …/provision/inventory/files/…`) |
 | `POST /sites/{name}/hosts/{host}/provision` | Provision by guest name |
 | `GET/POST /sites/{name}/hosts/{host}/cluster` | Cluster status / manual apply from cluster group files |
 

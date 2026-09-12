@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Security scans for UMKIM v0.1.0 release gate.
+# Security scans for UMKIM v0.2.0 release gate.
 # Usage: ./scripts/security-scan.sh [--skip-images]
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
