@@ -30,8 +30,10 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 	}
 
 	switch route.Status.TLSPhase {
-	case fleetv1alpha1.TLSPhaseFailedDNS, fleetv1alpha1.TLSPhaseFailedRateLimit:
+	case fleetv1alpha1.TLSPhaseFailedRateLimit:
 		return spokeACMEState{Blocked: true, TLSPhase: route.Status.TLSPhase, TLSMessage: route.Status.TLSMessage}
+	case fleetv1alpha1.TLSPhaseFailedDNS:
+		// Retry DNS when site ingress or overlay path changes (do not latch permanently).
 	}
 
 	if r.Config.ACMEDNSCheckEnabled && regCluster.EffectiveMethod() != "reverse_proxy" {
@@ -42,7 +44,7 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 		}
 	}
 
-	ok, msg := validateSpokeConnectivity(ctx, siteHost)
+	ok, msg := validateSpokeConnectivityForCluster(ctx, siteHost, regCluster)
 	if !ok {
 		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhasePendingPreflight, msg)
 		return spokeACMEState{Blocked: true, TLSPhase: fleetv1alpha1.TLSPhasePendingPreflight, TLSMessage: msg}
@@ -62,13 +64,14 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 	}
 
 	probeHost := spokeProbeHost(ctx, siteHost, regCluster)
+	probePort := spokeProbeHTTPSPort(regCluster)
 	if probeHost == "" {
 		msg := fmt.Sprintf("cannot determine public probe address for %s", siteHost)
 		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseFailed, msg)
 		return spokeACMEState{Blocked: true, TLSPhase: fleetv1alpha1.TLSPhaseFailed, TLSMessage: msg}
 	}
 
-	if prodOK, _ := probeACMECert(probeHost, siteHost, false); prodOK {
+	if prodOK, _ := probeACMECertOnPort(probeHost, probePort, siteHost, false); prodOK {
 		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseReady, "")
 		return spokeACMEState{
 			ApplyACME:    true,
@@ -80,7 +83,7 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 	stagingOK := route.Annotations != nil && route.Annotations[annotationSpokeACMEStagingOK] == "true"
 	if r.Config.SpokeACMEPreflightEnabled {
 		if !stagingOK {
-			if stagingReady, _ := probeACMECert(probeHost, siteHost, true); stagingReady {
+			if stagingReady, _ := probeACMECertOnPort(probeHost, probePort, siteHost, true); stagingReady {
 				_ = r.annotateSpokeStagingOK(ctx, route)
 				stagingOK = true
 			} else {

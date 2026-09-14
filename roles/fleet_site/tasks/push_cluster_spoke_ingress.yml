@@ -19,6 +19,9 @@
     fleet_site_spoke_endpoint: >-
       {{ hostvars[groups['site_bootstrap'][0]].fleet_site_sp_endpoint
          | default(hostvars[groups['site_bootstrap'][0]].ansible_host) }}
+    fleet_site_spoke_acme_http_challenge: >-
+      {{ hostvars[groups['site_bootstrap'][0]].fleet_cluster_exposure_mode
+         | default('') == 'port_forward' }}
 
 - name: Fleet site | Render spoke ingress ManifestWork
   ansible.builtin.template:
@@ -30,6 +33,7 @@
     spoke_ingress_http_nodeport: "{{ fleet_site_spoke_http_port }}"
     spoke_ingress_https_nodeport: "{{ fleet_site_spoke_https_port }}"
     fleet_edge_direct_ingress: "{{ fleet_site_spoke_direct_ingress }}"
+    phase6_spoke_acme_http_challenge: "{{ fleet_site_spoke_acme_http_challenge }}"
 
 - name: Fleet site | Apply spoke ingress ManifestWork on hub
   ansible.builtin.command:

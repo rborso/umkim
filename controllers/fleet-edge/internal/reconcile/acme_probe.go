@@ -47,7 +47,14 @@ func waitACMECerts(ctx context.Context, probeHost string, hostnames []string, st
 }
 
 func probeACMECert(probeHost, hostname string, staging bool) (bool, error) {
-	addr := net.JoinHostPort(probeHost, "443")
+	return probeACMECertOnPort(probeHost, 443, hostname, staging)
+}
+
+func probeACMECertOnPort(probeHost string, port int, hostname string, staging bool) (bool, error) {
+	if port <= 0 {
+		port = 443
+	}
+	addr := net.JoinHostPort(probeHost, fmt.Sprintf("%d", port))
 	dialer := &net.Dialer{Timeout: 8 * time.Second}
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{
 		ServerName:         hostname,

@@ -645,7 +645,7 @@ POST=()
 if [ -s /imagemap/images.json ]; then
   cat > /tmp/fleet-image-rewrite.sh <<'EOS'
 #!/bin/bash
-python3 - <<'PY'
+exec python3 -c '
 import json, sys
 m = json.load(open("/imagemap/images.json"))
 data = sys.stdin.read()
@@ -653,7 +653,7 @@ for src, dst in sorted(m.items(), key=lambda kv: -len(kv[0])):
     if src and dst:
         data = data.replace(src, dst)
 sys.stdout.write(data)
-PY
+'
 EOS
   chmod +x /tmp/fleet-image-rewrite.sh
   POST=(--post-renderer /tmp/fleet-image-rewrite.sh)
@@ -825,10 +825,18 @@ else
 fi
 if [ -n "$TGZ" ]; then
   META=$(helm show chart "$TGZ")
-  NAME=$(printf '%s\n' "$META" | awk '/^name:/{print $2; exit}')
+  META_NAME=$(printf '%s\n' "$META" | awk '/^name:/{print $2; exit}')
   VER=$(printf '%s\n' "$META" | awk '/^version:/{print $2; exit}')
+  NAME="${META_NAME}"
   [ -n "${FLEET_CHART_NAME:-}" ] && NAME="${FLEET_CHART_NAME}"
   [ -n "$VERSION" ] && VER="$VERSION"
+  if [ -n "${FLEET_CHART_NAME:-}" ] && [ "${FLEET_CHART_NAME}" != "${META_NAME}" ]; then
+    mkdir -p /tmp/chart-rename
+    tar -xzf "$TGZ" -C /tmp/chart-rename
+    CHARTDIR=$(find /tmp/chart-rename -mindepth 1 -maxdepth 1 -type d | head -1)
+    sed -i "s/^name:.*/name: ${FLEET_CHART_NAME}/" "${CHARTDIR}/Chart.yaml"
+    TGZ=$(helm package "${CHARTDIR}" -d /tmp | awk '{print $NF}')
+  fi
   PUSH_OUT=$(helm push "$TGZ" "$DEST" --insecure-skip-tls-verify 2>&1)
   printf '%s\n' "$PUSH_OUT"
   DIGEST=$(printf '%s\n' "$PUSH_OUT" | awk '/^Digest:/{print $2; exit}')
@@ -857,8 +865,9 @@ import json, os, re, subprocess, sys
 rendered = open("/tmp/rendered.yaml").read()
 imgs = []
 for m in re.finditer(r"image:\s+(\S+)", rendered):
-    imgs.append(m.group(1).strip().strip("\"'"))
-    imgs.append(m.group(1).strip())
+    raw = m.group(1).strip().strip("\"'")
+    if raw:
+        imgs.append(raw)
 uniq = []
 seen = set()
 for i in imgs:
@@ -902,6 +911,11 @@ lines = ["fleet:", "  copiedImages:"]
 for c in copied:
     lines.append("    - from: %s" % json.dumps(c["from"]))
     lines.append("      to: %s" % json.dumps(c["to"]))
+if len(copied) == 1:
+    to_ref = copied[0]["to"]
+    if ":" in to_ref:
+        repo, tag = to_ref.rsplit(":", 1)
+        lines.extend(["image:", "  repository: %s" % repo, "  tag: %s" % tag])
 open("/tmp/image-values.yaml", "w").write("\n".join(lines) + "\n")
 print("copied", len(copied), "images", flush=True)
 PY

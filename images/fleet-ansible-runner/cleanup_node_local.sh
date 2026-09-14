@@ -153,12 +153,7 @@ cleanup_kubernetes_glue() {
     return 0
   fi
   if [[ -n "${KUBECTL}" && -f /etc/rancher/k3s/k3s.yaml ]]; then
-    log "Removing OCM klusterlet namespaces (if present)"
-    for ns in open-cluster-management open-cluster-management-agent open-cluster-management-agent-addon; do
-      run_timeout 60 "${KUBECTL} delete ns ${ns} --ignore-not-found --wait=false --request-timeout=15s"
-    done
-    log "Removing fleet dcm-worker namespace (if present)"
-    run_timeout 60 "${KUBECTL} delete ns dcm-worker --ignore-not-found --wait=false --request-timeout=15s"
+    log "Skipping OCM klusterlet removal in detach mode (preserving spoke Traefik/platform)"
   fi
 }
 

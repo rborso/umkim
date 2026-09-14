@@ -139,8 +139,11 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 	}
 
 	peers, _ := r.clusterWGPeers(ctx, fcj, clusterName)
+	cleanupKubernetes := clusterCleanupKubernetes(fcj)
 	if len(peers) > 0 && !wgPeersRemoved(fcj) && fcj.Status.WgRemoveJobName == "" {
-		if teardown.ManagedClusterExists(ctx, r.Client, clusterName) {
+		if !cleanupKubernetes && teardown.ManagedClusterExists(ctx, r.Client, clusterName) {
+			// Detach keeps ManagedCluster + preserved ManifestWorks; proceed with WG teardown.
+		} else if teardown.ManagedClusterExists(ctx, r.Client, clusterName) {
 			fcj.Status.Message = "Waiting for ManagedCluster removal before WireGuard peer teardown"
 			if err := r.Status().Update(ctx, fcj); err != nil {
 				return ctrl.Result{}, err

@@ -12,3 +12,23 @@ fleet_site_secrets_dir: "{{ playbook_dir }}/secrets/fleet-sites"
 fleet_site_output_dir: "{{ playbook_dir }}/output/fleet-sites"
 # Console hub finalize: Traefik NodePort + IngressClass on new clusters.
 fleet_cluster_spoke_ingress_enabled: true
+
+# Hub-delivered spoke ManifestWorks removed on cluster delete (reset removes all).
+fleet_cleanup_manifestworks:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase6-spoke-ingress
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp
+  - phase4-platform-bootstrap
+
+# Detach keeps spoke Traefik + platform (cert-manager) so site-routed apps stay reachable.
+fleet_cleanup_manifestworks_detach:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp

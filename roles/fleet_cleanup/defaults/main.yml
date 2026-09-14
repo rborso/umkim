@@ -13,6 +13,15 @@ fleet_cleanup_manifestworks:
   - phase5-kubevirt-sp
   - phase4-platform-bootstrap
 
+# Detach keeps spoke Traefik + platform (cert-manager) so site-routed apps stay reachable.
+fleet_cleanup_manifestworks_detach:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp
+
 fleet_cleanup_legacy_manifestworks:
   - phase6-spoke-ingress-demo
   - phase5-k8s-container-sp

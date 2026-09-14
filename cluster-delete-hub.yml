@@ -13,14 +13,6 @@
     ocm_cluster_name: "{{ fleet_cluster_name }}"
     ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
     k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    fleet_cleanup_manifestworks:
-      - fleet-ingress-auth
-      - phase6-spoke-demo
-      - phase6-spoke-ingress
-      - phase5-helm-release-sp
-      - phase5-olm-subscription-sp
-      - phase5-k8s-container-sp
-      - phase4-platform-bootstrap
     fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
   tasks:
     - ansible.builtin.import_role:
@@ -36,6 +28,7 @@
         PATH: "{{ k3s_command_path }}"
       register: fleet_cluster_delete_mc
       changed_when: "'deleted' in fleet_cluster_delete_mc.stdout"
+      when: fleet_cluster_cleanup_mode == 'reset'
       tags: [fleet_cluster_delete]
 
 - name: Fleet cluster delete | Spoke klusterlet cleanup
@@ -47,11 +40,14 @@
     ocm_force_rejoin: true
     ocm_hub_host: "{{ fleet_site_hub_inventory_name | default(groups['hub'] | first | default('umkim-hub')) }}"
     ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
   tasks:
     - ansible.builtin.import_role:
         name: ocm
         tasks_from: reset_spoke_join.yml
-      when: not (fleet_cluster_delete_hub_only | default(false) | bool)
+      when:
+        - not (fleet_cluster_delete_hub_only | default(false) | bool)
+        - fleet_cluster_cleanup_mode == 'reset'
       tags: [fleet_cluster_delete]
 
 - name: Fleet cluster delete | Hub wait for ManagedCluster removal
@@ -62,15 +58,21 @@
     fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
     ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
     k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    fleet_cleanup_manifestworks:
-      - fleet-ingress-auth
-      - phase6-spoke-demo
-      - phase6-spoke-ingress
-      - phase5-helm-release-sp
-      - phase5-olm-subscription-sp
-      - phase5-k8s-container-sp
-      - phase4-platform-bootstrap
+    fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
   tasks:
+    - name: Fleet cluster delete | Load fleet site cleanup defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/roles/fleet_site/defaults/main.yml"
+
+    - name: Fleet cluster delete | Select ManifestWorks for finalizer cleanup
+      ansible.builtin.set_fact:
+        fleet_cleanup_manifestworks_effective: >-
+          {{
+            fleet_cleanup_manifestworks
+            if fleet_cluster_cleanup_mode == 'reset'
+            else fleet_cleanup_manifestworks_detach
+          }}
+
     - name: Fleet cluster delete | Wait for ManagedCluster removal
       ansible.builtin.command:
         cmd: kubectl get managedcluster {{ fleet_cluster_name }}
@@ -83,6 +85,14 @@
       delay: 5
       failed_when: false
       changed_when: false
+      when: fleet_cluster_cleanup_mode == 'reset'
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Detach keeps ManagedCluster for preserved ManifestWorks
+      ansible.builtin.set_fact:
+        fleet_cluster_mc_removed: true
+        cacheable: true
+      when: fleet_cluster_cleanup_mode == 'detach'
       tags: [fleet_cluster_delete]
 
     - name: Fleet cluster delete | Note ManagedCluster still present (non-fatal)
@@ -90,7 +100,9 @@
         msg: >-
           ManagedCluster {{ fleet_cluster_name }} still present after spoke cleanup;
           hub controller will wait before WireGuard peer removal
-      when: fleet_cluster_delete_mc_wait.rc == 0
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - fleet_cluster_delete_mc_wait.rc == 0
       tags: [fleet_cluster_delete]
 
     - name: Fleet cluster delete | Force-clear stuck ManifestWork finalizers on hub
@@ -103,9 +115,11 @@
       environment:
         KUBECONFIG: "{{ ocm_kubeconfig }}"
         PATH: "{{ k3s_command_path }}"
-      loop: "{{ fleet_cleanup_manifestworks }}"
+      loop: "{{ fleet_cleanup_manifestworks_effective }}"
       register: fleet_cluster_delete_mw_finalizer
-      when: fleet_cluster_delete_mc_wait.rc == 0
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - fleet_cluster_delete_mc_wait.rc == 0
       failed_when: false
       changed_when: fleet_cluster_delete_mw_finalizer.stdout is search('patched')
       tags: [fleet_cluster_delete]
@@ -122,7 +136,9 @@
       delay: 5
       failed_when: false
       changed_when: false
-      when: fleet_cluster_delete_mc_wait.rc == 0
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - fleet_cluster_delete_mc_wait.rc == 0
       tags: [fleet_cluster_delete]
 
     - name: Fleet cluster delete | Publish ManagedCluster removal state
@@ -130,6 +146,7 @@
         fleet_cluster_mc_removed: >-
           {{ (fleet_cluster_delete_mc_rewait.rc | default(fleet_cluster_delete_mc_wait.rc)) != 0 }}
         cacheable: true
+      when: fleet_cluster_cleanup_mode == 'reset'
       tags: [fleet_cluster_delete]
 
     - name: Fleet cluster delete | Remove fleet-kubeconfig secret on hub

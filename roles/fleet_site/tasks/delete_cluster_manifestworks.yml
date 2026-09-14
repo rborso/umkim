@@ -1,5 +1,14 @@
 ---
 # Delete OCM ManifestWorks for one cluster namespace on the hub.
+- name: Fleet cluster delete | Select ManifestWorks for cleanup mode
+  ansible.builtin.set_fact:
+    fleet_cleanup_manifestworks_effective: >-
+      {{
+        fleet_cleanup_manifestworks
+        if (fleet_cluster_cleanup_mode | default('detach')) == 'reset'
+        else fleet_cleanup_manifestworks_detach
+      }}
+
 - name: Fleet cluster delete | Remove ManifestWorks on hub
   ansible.builtin.command:
     cmd: >-
@@ -9,7 +18,7 @@
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
-  loop: "{{ fleet_cleanup_manifestworks }}"
+  loop: "{{ fleet_cleanup_manifestworks_effective }}"
   loop_control:
     label: "{{ fleet_cluster_name | default(fleet_site_name) }}/{{ item }}"
   register: fleet_cluster_delete_mw

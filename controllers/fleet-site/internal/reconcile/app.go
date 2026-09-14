@@ -88,7 +88,9 @@ func (r *AppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		if err := r.ensureImageMapCM(ctx, &app, fc); err != nil {
 			return r.failApp(ctx, &app, err.Error())
 		}
-		imageMapCM = appImageMapCMName(app.Name)
+		if !chartImageValuesOverride(fc) {
+			imageMapCM = appImageMapCMName(app.Name)
+		}
 	}
 	jobName := appJobName("fa-i-", app.Name)
 	job := jobs.HelmAppJob(jobs.HelmAppJobOpts{
@@ -247,11 +249,36 @@ func (r *AppReconciler) libraryChart(ctx context.Context, app *fleetv1alpha1.Fle
 	return &fc
 }
 
+func chartImageValuesOverride(fc *fleetv1alpha1.FleetChart) bool {
+	v := strings.TrimSpace(fc.Status.ImageValues)
+	return strings.Contains(v, "\nimage:") || strings.HasPrefix(v, "image:")
+}
+
+func expandImageMapEntries(from, to string) map[string]string {
+	out := map[string]string{}
+	if from == "" || to == "" {
+		return out
+	}
+	add := func(ref string) {
+		if ref != "" {
+			out[ref] = to
+		}
+	}
+	add(from)
+	if strings.HasPrefix(from, "docker.io/library/") {
+		add(strings.TrimPrefix(from, "docker.io/library/"))
+		add(strings.TrimPrefix(from, "docker.io/"))
+	} else if strings.HasPrefix(from, "docker.io/") {
+		add(strings.TrimPrefix(from, "docker.io/"))
+	}
+	return out
+}
+
 func (r *AppReconciler) ensureImageMapCM(ctx context.Context, app *fleetv1alpha1.FleetApp, fc *fleetv1alpha1.FleetChart) error {
 	m := map[string]string{}
 	for _, img := range fc.Status.ImagesCopied {
-		if img.From != "" && img.To != "" {
-			m[img.From] = img.To
+		for ref, dst := range expandImageMapEntries(img.From, img.To) {
+			m[ref] = dst
 		}
 	}
 	raw, err := json.Marshal(m)
