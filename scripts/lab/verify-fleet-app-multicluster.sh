@@ -2,6 +2,9 @@
 # E2E: FleetChart publish (copy + external), multi-cluster FleetApp deploy,
 # HTTPS/Let's Encrypt checks, and lab-single-0 detach persistence.
 #
+# Routing: lab-single-0 (homelab-pf) uses route.mode site; lab-ha-0 (edge-rp)
+# uses route.mode hub via the hub gateway (*.demo.otthol.hu).
+#
 # Prerequisites: lab-single-0 + lab-ha-0 Ready; hub API on localhost:18080.
 #
 # Optional env:
@@ -9,7 +12,8 @@
 #   SINGLE_CLUSTER          default lab-single-0
 #   HA_CLUSTER              default lab-ha-0
 #   SINGLE_SITE_HOST        default fleettest-single.homelab.otthol.hu
-#   HA_SITE_HOST            default fleettest-ha.lab-ha-0.demo.otthol.hu
+#   HA_HUB_HOST             default petclinic-ha.demo.otthol.hu (lab-ha-0 is hub-routed)
+#   FLEET_HUB_GATEWAY       default http://127.0.0.1:80
 #   SKIP_DETACH=1           skip cluster detach test (keeps lab-single-0 enrolled)
 #   SKIP_CHART_PUBLISH=1    skip whoami-copy publish
 set -euo pipefail
@@ -19,12 +23,13 @@ API="${FLEET_SITE_API:-http://127.0.0.1:18080/api/v1alpha1}"
 SINGLE="${SINGLE_CLUSTER:-lab-single-0}"
 HA="${HA_CLUSTER:-lab-ha-0}"
 SINGLE_HOST="${SINGLE_SITE_HOST:-fleettest-single.homelab.otthol.hu}"
-HA_HOST="${HA_SITE_HOST:-fleettest-ha.lab-ha-0.demo.otthol.hu}"
+HUB_GATEWAY="${FLEET_HUB_GATEWAY:-http://127.0.0.1:80}"
 COPY_CHART="${FLEET_COPY_CHART:-whoami-copy}"
 COPY_APP="${FLEET_COPY_APP:-whoami-copy}"
 EXT_CHART="${FLEET_EXT_CHART:-pet-clinic-helm}"
 EXT_APP="${FLEET_EXT_APP:-petclinic-ha}"
 EXT_RELEASE="${FLEET_EXT_RELEASE:-petclinic-ha}"
+HA_HUB_HOST="${HA_HUB_HOST:-${EXT_RELEASE}.demo.otthol.hu}"
 SKIP_DETACH="${SKIP_DETACH:-0}"
 SKIP_CHART_PUBLISH="${SKIP_CHART_PUBLISH:-0}"
 SKIP_TLS_WAIT="${SKIP_TLS_WAIT:-0}"
@@ -62,11 +67,21 @@ wait_route_tls() {
 }
 
 create_app() {
-  local name="$1" cluster="$2" chart="$3" version="$4" release="$5" ns="$6" mode="$7" site_host="${8:-}"
+  local name="$1" cluster="$2" chart="$3" version="$4" release="$5" ns="$6" mode="$7" route_host="${8:-}"
   local body
-  if [[ -n "$site_host" ]]; then
+  if [[ "$mode" == "hub" ]]; then
+    if [[ -n "$route_host" ]]; then
+      body=$(jq -n --arg name "$name" --arg cluster "$cluster" --arg chart "$chart" \
+        --arg version "$version" --arg release "$release" --arg ns "$ns" --arg mode "$mode" --arg hh "$route_host" \
+        '{name:$name,clusterName:$cluster,chart:$chart,version:$version,releaseName:$release,namespace:$ns,route:{mode:$mode,hubHost:$hh}}')
+    else
+      body=$(jq -n --arg name "$name" --arg cluster "$cluster" --arg chart "$chart" \
+        --arg version "$version" --arg release "$release" --arg ns "$ns" --arg mode "$mode" \
+        '{name:$name,clusterName:$cluster,chart:$chart,version:$version,releaseName:$release,namespace:$ns,route:{mode:$mode}}')
+    fi
+  elif [[ -n "$route_host" ]]; then
     body=$(jq -n --arg name "$name" --arg cluster "$cluster" --arg chart "$chart" \
-      --arg version "$version" --arg release "$release" --arg ns "$ns" --arg mode "$mode" --arg sh "$site_host" \
+      --arg version "$version" --arg release "$release" --arg ns "$ns" --arg mode "$mode" --arg sh "$route_host" \
       '{name:$name,clusterName:$cluster,chart:$chart,version:$version,releaseName:$release,namespace:$ns,route:{mode:$mode,siteHost:$sh}}')
   else
     body=$(jq -n --arg name "$name" --arg cluster "$cluster" --arg chart "$chart" \
@@ -181,8 +196,8 @@ log "Deploy ${COPY_APP} (${COPY_CHART}, copy images) on ${SINGLE} route=site hos
 create_app "$COPY_APP" "$SINGLE" "$COPY_CHART" "0.1.0" "$COPY_APP" default site "$SINGLE_HOST"
 wait_app_phase "$COPY_APP" Ready 360
 
-log "Deploy ${EXT_APP} (${EXT_CHART}, external images) on ${HA} route=site host=${HA_HOST}"
-create_app "$EXT_APP" "$HA" "$EXT_CHART" "0.1.1" "$EXT_RELEASE" default site "$HA_HOST"
+log "Deploy ${EXT_APP} (${EXT_CHART}, external images) on ${HA} route=hub host=${HA_HUB_HOST}"
+create_app "$EXT_APP" "$HA" "$EXT_CHART" "0.1.1" "$EXT_RELEASE" default hub "$HA_HUB_HOST"
 wait_app_phase "$EXT_APP" Ready 600
 
 log "Wait TLS Ready for site routes"
@@ -203,19 +218,13 @@ else
   assert_route_http "${SINGLE_HOST}" "${SINGLE_UPSTREAM}" 30080
 fi
 
-log "Verify ${HA_HOST} (reverse_proxy — workload + Traefik route)"
-HA_UPSTREAM=$(curl -sf "${HDR[@]}" "${API}/clusters/${HA}" | jq -r '.upstream_host // empty')
-[[ -n "$HA_UPSTREAM" ]] || fail "missing upstream_host for ${HA}"
+# reverse_proxy clusters without operator vhosts use hub routing only (lab-ha-0 / edge-rp).
+
+log "Verify ${HA_HUB_HOST} (hub route on ${HA} — workload + hub gateway)"
 assert_app_on_cluster "$HA" "$EXT_RELEASE" default 'PetClinic'
-assert_route_http "${HA_HOST}" "${HA_UPSTREAM}" 30080
-if curl -sfk --max-time 15 "https://${HA_HOST}/" | grep -qi 'PetClinic'; then
-  issuer=$(echo | openssl s_client -connect "${HA_HOST}:443" -servername "${HA_HOST}" 2>/dev/null \
-    | openssl x509 -noout -issuer 2>/dev/null || true)
-  echo "  public HTTPS issuer: ${issuer:-none}"
-  echo "$issuer" | grep -qi "Let's Encrypt" || echo "  WARN: public cert not Let's Encrypt (configure external reverse_proxy)"
-else
-  echo "  WARN: https://${HA_HOST}/ not publicly reachable (external reverse_proxy vhost may be required)"
-fi
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -H "Host: ${HA_HUB_HOST}" "${HUB_GATEWAY}/" || true)
+[[ "$code" =~ ^(200|301|302|308|404)$ ]] || fail "hub route HTTP ${HA_HUB_HOST}@${HUB_GATEWAY} unexpected status ${code:-none}"
+echo "  OK: hub gateway HTTP ${code} for ${HA_HUB_HOST}"
 
 if [[ "$SKIP_DETACH" == "1" ]]; then
   log "SKIP_DETACH=1 — skipping detach test"

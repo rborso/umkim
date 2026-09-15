@@ -281,17 +281,11 @@ func upstreamServers(route fleetv1alpha1.FleetAppRoute, reg clusters.Registry, g
 }
 
 func clusterUpstreamURL(c clusters.Cluster, globalACME bool, routeMode string) string {
-	// Hub catalog hostnames are programmed on spoke Ingress :80 only; HTTPS entrypoint serves site zones.
+	// Hub catalog hostnames bind on spoke web-hub (:30081); web (:30080) has global HTTP→HTTPS redirect.
 	if routeMode == fleetv1alpha1.RouteModeHub {
-		port := c.TraefikHTTPPort
-		if c.SpokeACMEEnabled(globalACME) {
-			port = c.TraefikHubHTTPPort
-			if port == 0 {
-				port = 30081
-			}
-		}
+		port := c.TraefikHubHTTPPort
 		if port == 0 {
-			port = 30080
+			port = 30081
 		}
 		return fmt.Sprintf("http://%s:%d", c.UpstreamHost, port)
 	}

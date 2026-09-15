@@ -205,8 +205,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				SpokeACME:     false,
 				RedirectHTTPS: regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled),
 				// Hub Traefik always upstreams hub catalog hosts to spoke :30081 (web-hub).
-				UseHubEntrypoint: regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled) &&
-					routeMode == fleetv1alpha1.RouteModeHub,
+				UseHubEntrypoint: routeMode == fleetv1alpha1.RouteModeHub,
 			}
 			spokeState := r.resolveSpokeACMEState(ctx, &route, clusterName, regCluster)
 			if spokeState.ApplyACME {

@@ -175,10 +175,10 @@ On hub: `kubectl get managedclusters`, confirm `lab-single-0` and `lab-ha-0` Acc
 
 ## Edge bindings
 
-| Cluster | Ingress ID | Method | TLS |
-|---------|------------|--------|-----|
-| lab-single-0 | homelab-pf | port_forward | acme_cluster (auto from ingress) |
-| lab-ha-0 | edge-rp | reverse_proxy | external (auto from ingress) |
+| Cluster | Ingress ID | Method | TLS | FleetApp routing |
+|---------|------------|--------|-----|------------------|
+| lab-single-0 | homelab-pf | port_forward | acme_cluster (auto from ingress) | `site` (`*.homelab.otthol.hu`) |
+| lab-ha-0 | edge-rp | reverse_proxy | external (auto from ingress) | `hub` (`*.demo.otthol.hu` via hub gateway) |
 
 Set at cluster create via `edge.ingressId` in JSON under `examples/homelab/`.
 

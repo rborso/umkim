@@ -75,8 +75,8 @@ func TestBuildHubRoute(t *testing.T) {
 	if strings.Contains(s, "acme-challenge") {
 		t.Fatalf("non-ACME build must not exclude acme-challenge: %s", s)
 	}
-	if !strings.Contains(s, "10.10.0.3:30080") {
-		t.Fatalf("missing upstream: %s", s)
+	if !strings.Contains(s, "10.10.0.3:30081") {
+		t.Fatalf("missing hub upstream on web-hub port: %s", s)
 	}
 	mids := hubRouterMiddlewares(fleetv1alpha1.RouteModeHub, false, true, authOpts(), false)
 	if len(mids) != 2 || mids[1] != "fleet-edge-authelia" {
@@ -184,8 +184,8 @@ func TestBuildStandbyDualUpstreamHealthCheck(t *testing.T) {
 		"followRedirects: false",
 		"passHostHeader: true",
 		"weight: 10",
-		"10.10.0.10:30080",
-		"10.10.0.12:30080",
+		"10.10.0.10:30081",
+		"10.10.0.12:30081",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("missing %q in:\n%s", want, s)
@@ -224,7 +224,7 @@ func TestBuildStandbyHubRouteUsesHTTPUpstreamOnACMECluster(t *testing.T) {
 	s := string(out)
 	for _, want := range []string{
 		"http://10.10.0.12:30081",
-		"http://10.10.0.10:30080",
+		"http://10.10.0.10:30081",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("missing %q in:\n%s", want, s)
@@ -287,6 +287,42 @@ func TestBuildHubRouteUsesHTTPUpstreamWhenEffectiveModeSite(t *testing.T) {
 	s := string(out)
 	if !strings.Contains(s, "http://10.10.0.12:30081") {
 		t.Fatalf("hub catalog route must force HTTP upstream:\n%s", s)
+	}
+}
+
+func TestBuildHubRouteUsesWebHubOnReverseProxyCluster(t *testing.T) {
+	routes := []fleetv1alpha1.FleetAppRoute{{
+		Spec: fleetv1alpha1.FleetAppRouteSpec{
+			InstanceID:    "petclinic-ha",
+			Cluster:       "lab-ha-0",
+			Mode:          fleetv1alpha1.RouteModeHub,
+			EffectiveMode: fleetv1alpha1.RouteModeHub,
+			HubHost:       "petclinic-ha.demo.otthol.hu",
+		},
+	}}
+	reg := clusters.Registry{
+		Clusters: map[string]clusters.Cluster{
+			"lab-ha-0": {
+				Method:             "reverse_proxy",
+				TlsPolicy:          "external",
+				UpstreamHost:     "10.10.0.12",
+				TraefikHTTPPort:  30080,
+				TraefikHubHTTPPort: 30081,
+			},
+		},
+	}
+	out, err := Build(routes, reg, true, BuildOptions{
+		CertsReady: map[string]bool{"petclinic-ha.demo.otthol.hu": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "http://10.10.0.12:30081") {
+		t.Fatalf("reverse_proxy hub route must use web-hub upstream:\n%s", s)
+	}
+	if strings.Contains(s, "10.10.0.12:30080") {
+		t.Fatalf("hub route must not use web entrypoint upstream (redirect loop):\n%s", s)
 	}
 }
 
