@@ -44,8 +44,10 @@ Role bindings are enforced by the proxy before requests reach the upstream
 services. Scoped roles (`site-admin`, `cluster-admin`) use FleetRoleBinding
 scope without organization partitioning.
 
-Global LLM API keys are managed at `/api/v1alpha1/llm-api-keys` (dc-admin
-only). Key names are not org-prefixed.
+Global LLM API keys are managed at `/api/v1alpha1/llm-api-keys` on the auth
+service (dc-admin only). Browser and console traffic uses
+`/fleet/auth/v1alpha1/llm-api-keys` via the nginx proxy. Key names are not
+org-prefixed.
 
 ## Operational guidance
 

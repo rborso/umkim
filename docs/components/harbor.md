@@ -19,10 +19,16 @@ pushes:
 ansible-playbook harbor.yml -l hub --tags harbor_push_fleet
 ```
 
-Use the corresponding chart-push tag when publishing the repository’s charts.
+Use the `harbor_push_charts` tag when publishing the repository’s charts:
+
+```bash
+ansible-playbook harbor.yml -l hub --tags harbor_push_charts
+```
+
 Operators can also publish into the hub library with
 [scripts/fleet-chart.sh](../../scripts/fleet-chart.sh) or the console Apps
-Library tab (`POST /api/v1alpha1/charts`). Fleet-built images use the release image tag configured by
+Library tab (`POST /fleet/api/v1alpha1/charts`; controller path
+`/api/v1alpha1/charts`). Fleet-built images use the release image tag configured by
 `umkim_version`/`harbor_fleet_image_tag`.
 
 v0.2 hub images are built from this checkout. Sibling service-provider

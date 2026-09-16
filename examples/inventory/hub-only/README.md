@@ -18,11 +18,24 @@ that inventory is intended, then follow the supported sequence in the
 
 ## Review before installation
 
-- Set the inventory host key and connection values.
-- Set site, domain, endpoint, and DNS inputs for the deployment.
-- Review group-level defaults and optional workload configuration.
-- Supply encrypted vault data through the approved secret-handling process.
-- Validate inventory before running an installation playbook.
+`bootstrap-hub-inventory.sh` copies these files; edit the listed ones before
+install (see script output for the full list):
+
+| File | What to set |
+|------|-------------|
+| `inventory/hosts.yml` | Hub host key, public IPv4 (`ansible_host`), SSH user |
+| `inventory/host_vars/umkim-hub.yml` | `fleet_hub_public_ipv4` (same WAN IP) |
+| `inventory/group_vars/all/site.yml` | `fleet_edge_domain`, DNS, LDAP base DN |
+| `inventory/group_vars/all/fleet_sites.yml` | Management site seed |
+| `inventory/group_vars/all/vault.yml` | Encrypted secrets (not copied by bootstrap) |
+
+Also review `common.yml`, `hub/main.yml`, `fcj-workloads.yml`, and
+`fleet_workloads.yml`. Greenfield `common.yml` sets
+`fleet_fcj_default_ingress_auth_enabled: false`; enable ingress-auth in
+`hub/main.yml` when Authelia is required. Optional Velero settings live in
+`group_vars/all/fleet_backup.yml` (copy from this template if needed).
+
+Validate inventory before running an installation playbook.
 
 Use the variable definitions and comments in the copied files as the current
 contract. Do not infer values from this README or other examples.

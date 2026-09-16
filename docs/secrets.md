@@ -35,7 +35,10 @@ copy a Kubernetes Secret value into a command, example, or ticket.
 
 1. Generate or obtain high-entropy values in an approved secret manager.
 2. Encrypt the vault before use and restrict access to the vault password.
-3. Run the secret preflight check before deployment.
+3. Run `./scripts/preflight-secrets.sh` (or `./scripts/preflight-v1.sh`, which
+   includes it) before deployment. Preflight currently validates required vault
+   keys such as `harbor_admin_password` and
+   `fleet_console_auth_session_secret`; other keys are operator responsibility.
 4. Rotate compromised, bootstrap, and break-glass credentials promptly.
 5. Keep encrypted vault and recovery material in protected, off-repository
    backups.

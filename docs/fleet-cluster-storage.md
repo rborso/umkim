@@ -15,7 +15,7 @@ supported; migrate workloads instead.
 | `local_path` | K3s local storage | Default local-only option |
 | `nfs_external` | Shared external NFS | Requires an operator-provided NFS server and per-cluster path |
 | `nfs_local` | Single-node evaluation | Restricted to a single-node cluster |
-| `longhorn` | HA cluster storage at creation | Restricted to the supported HA creation path |
+| `longhorn` | HA cluster storage at creation | Restricted to `ha_3_node` topology at create time |
 
 The NFS provisioner creates a subdirectory for each PVC beneath the configured
 cluster path. Provide the server, export base, cluster path, optional client
@@ -91,7 +91,7 @@ availability, or backup guarantee. Validation is not used for `nfs_local`
 
 ## Longhorn
 
-Longhorn is validated only for the HA creation path and may use either its
+Longhorn is validated only for `ha_3_node` topology at create time and may use either its
 default data directory or a dedicated block device. Review disk selection and
 failure-domain requirements before choosing it.
 

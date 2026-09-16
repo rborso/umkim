@@ -16,9 +16,9 @@ after the cluster is ready.
    configure the K3s runtime, and deploy the device plugin.
 5. Run capability discovery and verify that Kubernetes reports GPU capacity.
 
-The repository provides `gpu-host-prep.yml` for host preparation and
-`playbooks/flows/gpu-cluster-enable.yml` for post-ready runtime setup. Review
-their inventory inputs and Secure Boot requirements before use.
+The repository provides `playbooks/flows/gpu-host-prep.yml` for host
+preparation and `playbooks/flows/gpu-cluster-enable.yml` for post-ready runtime
+setup. Review their inventory inputs and Secure Boot requirements before use.
 
 ## Inference terminology and runtime
 
@@ -26,9 +26,10 @@ The deployed GPU inference chart is **llama.cpp**, using the CUDA
 `llama-server` image.
 
 The default `llama-cpp-helm` values use an NVIDIA runtime class and
-`hostNetwork: true`. They do not request `nvidia.com/gpu` unless
-`useGpuResource` is enabled. Review those defaults, host networking, resource
-requests, model cache storage, and node isolation before deploying inference.
+`hostNetwork: true`. The chart `values.yaml` lists GPU resources, but the
+rendered Deployment omits `nvidia.com/gpu` unless `useGpuResource: true`
+(default `false`). Review those defaults, host networking, resource requests,
+model cache storage, and node isolation before deploying inference.
 
 Capability discovery uses the device plugin’s reported GPU capacity. A host
 driver alone is not evidence that the scheduler can place GPU workloads.

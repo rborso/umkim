@@ -28,7 +28,9 @@ repository root.
 ```
 
 The currently registered suite names include `hub`, `core`, `edge`, `backup`,
-`tenancy` (console auth and RBAC checks), `llm`, `nested`, `apps`, `regression`, and `all`.
+`tenancy` (console auth and RBAC checks), `llm`, `apps`, `regression`, and
+`all`. The `verify-fleet.sh --help` text may list legacy names (`nested`,
+`catalog`); use `apps` for chart-library checks.
 
 For a Helm app smoke test on a Ready cluster, use
 `scripts/verify-fleet-app.sh` (set `FLEET_APP_CLUSTER`) or the console **Apps**
@@ -37,7 +39,9 @@ charts. See [components/fleet-apps.md](components/fleet-apps.md).
 
 ## Cluster reinstall presets
 
-Cluster reinstall is an L2 operation. The only built-in preset names are:
+Cluster reinstall is an L2 operation. The built-in preset names are homelab-profile
+checks (`profiles: [homelab]` in the check registry); use `--profile homelab`
+when your inventory matches that profile. Preset names:
 
 - `lab-sn01`
 - `lab-3n01`

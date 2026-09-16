@@ -50,7 +50,14 @@ continuing:
 |------|-------------|
 | `inventory/hosts.yml` | Hub inventory host key, public IPv4 (`ansible_host`), SSH user |
 | `inventory/host_vars/umkim-hub.yml` | `fleet_hub_public_ipv4` (same WAN IPv4 as in `hosts.yml`) |
-| `inventory/group_vars/all/fleet_sites.yml` | Per-site ingress profiles — see [examples/site-profiles/](../examples/site-profiles/) |
+| `inventory/group_vars/all/site.yml` | `fleet_edge_domain`, DNS, LDAP base DN |
+| `inventory/group_vars/all/fleet_sites.yml` | Management site seed (`hub_gateway: true`); workload sites are created in the console |
+| `inventory/group_vars/all/vault.yml` | Encrypted secrets (see §2 below) |
+
+`profile.yml`, `common.yml`, `hub/main.yml`, and other files copied by
+`bootstrap-hub-inventory.sh` ship with template defaults; review comments
+before install. Workload site ingress patterns:
+[examples/site-profiles/](../examples/site-profiles/).
 
 Then run:
 
@@ -117,8 +124,11 @@ export ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass
 ```
 
 The wrapper runs host preparation, WireGuard, OCM, Harbor, platform services,
-console, hub ingress, firewall, FleetSite, and fleet-edge. Image builds can take a
-long time. To resume a known failed phase, use a targeted tag, for example:
+fleet-console-auth CRD, console auth, console, hub ingress, firewall, FleetSite,
+and fleet-edge. Optional ingress-auth (Authelia) deploys when
+`fleet_ingress_auth_enabled: true` in `inventory/group_vars/hub/main.yml`
+(greenfield template defaults it off). Image builds can take a long time. To
+resume a known failed phase, use a targeted tag, for example:
 
 ```bash
 ansible-playbook $INV hub-install.yml -l hub --tags harbor_push_fleet
@@ -151,10 +161,14 @@ Treat the config as a secret. Details and peer lifecycle are in
 After the hub is ready and your WireGuard client can reach the overlay:
 
 1. Sign in to the UMKIM console through the private management path.
-2. Create a registry site other than the management site. Choose an exposure
-   mode (`hub_gateway`, `port_forward`, `reverse_proxy`, or `none`) that
-   matches how that location reaches the WAN. See
-   [examples/site-profiles/](../examples/site-profiles/).
+2. Create a registry site other than the management site. Configure exposure
+   to match how that location reaches the WAN:
+   - optional **`hubGateway`** (inventory: `hub_gateway: true`) for hub-routed DNS;
+   - optional **`ingress[]`** rows with `method` `port_forward` or `reverse_proxy`;
+   - **private** when neither is set (no fleet-managed WAN path).
+   The console create wizard offers `port_forward`, `hub_gateway`, or `custom`
+   profiles; `reverse_proxy` is an ingress-row method under custom. See
+   [examples/site-profiles/](../examples/site-profiles/) and [design.md](design.md).
 3. Create a FleetClusterJoin cluster for that site.
 4. Download its bootstrap bundle through the authenticated UMKIM console and treat
    the archive as a secret.
@@ -192,9 +206,10 @@ Publish additional charts with **Apps → Add chart** or
 `oci://<hub-overlay>:30443/charts/whoami`. The library lists it after import.
 `route.mode` defaults to `none`. Match routing to site exposure:
 
-- `hub` — site uses `hub_gateway`; DNS for `hubHost` must be ready.
-- `site` — site uses `port_forward` or `reverse_proxy`; `siteHost` and site
-  ingress must be configured.
+- `hub` — site has `hubGateway` (inventory `hub_gateway: true`); DNS for
+  `hubHost` must be ready.
+- `site` — site has `port_forward` or `reverse_proxy` ingress; `siteHost` and
+  site ingress must be configured.
 - `none` — chart or workload owns ingress (or app is internal).
 
 Hub-routed apps require a healthy hub. `site` and `none` apps can remain
@@ -233,7 +248,7 @@ instead of `domains`, `external_endpoints`, and per-cluster `domain_bindings`.
    Set `hubGateway` / `hubZone` where the site used `hub_gateway`.
 2. Patch each `FleetClusterJoin`: set `spec.edge.ingressId` to the chosen ingress
    row (former `domainBindings[0]` is a common mapping).
-3. Re-apply `fleet_edge.yml` or let the fleet-site controller reconcile
+3. Re-apply `fleet-edge.yml` or let the fleet-site controller reconcile
    `fleet-edge-clusters` and `fleet-edge-domains` ConfigMaps.
 4. Verify no two `port_forward` clusters share the same `ingressId`.
 

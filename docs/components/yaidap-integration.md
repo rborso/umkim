@@ -191,14 +191,15 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 |--------|---------|-------------------|---------------------------|
 | `discover` | no | yes | `playbooks/discover-hosts.yml` · tags `check_host_details` · `-e yaidap_emit_result=true` |
 | `discover_pxe` | **yes** | yes | `playbooks/discover-pxe.yml` · tag `discover_pxe` · `--connection local` · `-e tempxe_confirm=true` |
-| `install_bm` | **yes** | yes (hypervisor) | `playbooks/install-bare-metal.yml` · tag `install_bm` · `--connection local` · `-e tempxe_confirm=true` · `-e install_os=true` |
+| `install_bm` | **yes** | yes | `playbooks/install-bare-metal.yml` · tag `install_bm` · `--connection local` · `-e tempxe_confirm=true` · `-e install_os=true` |
 | `create_vm` | no* | yes | `playbooks/provision-vms.yml` · tags `create`, `never` · `-e yaidap_emit_result=true` · `-e yaidap_recreate=true` when guest has concrete `vm_location` |
 | `plan_vm` | no | yes | `playbooks/plan-vm-placement.yml` · tag `plan` (dry-run; no VM, no inventory rewrite) |
 | `destroy` | **yes** | yes | `playbooks/provision-vms.yml` · tag `destroy` · `-e confirm_destroy=true` |
 | `status` | no | no | `playbooks/configure-tempxe.yml` · tag `tempxe_status` |
 
-\*Re-provision on an already-**Ready** VM guest requires console/CLI confirm
-(destructive recreate semantics).
+\*Re-provision on an already-**Ready** VM guest with a concrete `vm_location`
+sets `yaidap_recreate=true`. The console requires a confirm checkbox for this
+case; the API does not enforce `confirm` on `create_vm` today.
 
 **Validation highlights:**
 
@@ -208,7 +209,8 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 - `plan_vm`: existing guest in `guests.yml` (not external-only).
 - `create_vm` / `plan_vm`: `ansible_host` required in `host_vars` or sync extra
   vars (static management IP for cloud-init).
-- `destroy`: VM guest in `guests.yml`; guest phase **Ready**; `confirm=true`;
+- `destroy`: VM guest in `guests.yml`; guest phase **Ready** or **Failed**;
+  `confirm=true`;
   blocked when the guest is a cluster member and a live `FleetClusterJoin` exists
   (unless the join is deleting). On success the hub sets guest phase **Declared**
   (not Ready), clears cluster sub-status, and keeps inventory for reprovision.

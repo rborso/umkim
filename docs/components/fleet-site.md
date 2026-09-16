@@ -115,7 +115,7 @@ Provision status and cluster-apply progress are recorded in `_meta/status.json` 
 | `Ready` | VM provisioned and reachable (`ansible_host` populated) |
 | `Failed` | Last provision action failed |
 
-VM lifecycle: `Declared` → `create_vm` → `Provisioning` → `Ready` → `destroy` (confirm) → `Provisioning` → `Declared`. Destroy tears down the libvirt VM only; `guests.yml` and `host_vars` are unchanged so **Provision** can recreate the VM. Destroy requires phase **Ready**, VM kind, and no active `FleetClusterJoin` for a cluster the guest belongs to (delete or unjoin the fleet cluster first). The console **Destroy VM** action on the site hosts panel wraps the same API as `POST …/hosts/{guest}/provision` with `action: destroy`.
+VM lifecycle: `Declared` → `create_vm` → `Provisioning` → `Ready` → `destroy` (confirm) → `Provisioning` → `Declared`. Destroy tears down the libvirt VM only; `guests.yml` and `host_vars` are unchanged so **Provision** can recreate the VM. Destroy requires guest phase **Ready** or **Failed**, VM kind, and no active `FleetClusterJoin` for a cluster the guest belongs to (delete or unjoin the fleet cluster first). The console **Destroy VM** action on the site hosts panel wraps the same API as `POST …/hosts/{guest}/provision` with `action: destroy`.
 
 Optional **cluster membership and intent** use the native Ansible layout:
 

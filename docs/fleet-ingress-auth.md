@@ -22,9 +22,13 @@ procedures between the two deployments.
 ## Before enabling a public route
 
 1. Confirm the cluster is ready and ingress matches the route:
-   - `route.mode: site` needs a cluster bound to `port_forward` or `reverse_proxy` ingress.
-   - **Ingress auth** is only available on **`port_forward`** ingress (not `reverse_proxy`).
-   - `route.mode: hub` needs site `hubGateway` (and hub zone DNS).
+   - `route.mode: site` needs a cluster bound to `port_forward` or `reverse_proxy`
+     ingress for site-routed public URLs.
+   - **Ingress auth** (Authelia forward-auth on the spoke) is only available on
+     **`port_forward`** ingress (not `reverse_proxy`).
+   - `route.mode: hub` needs site `hubGateway` (and hub zone DNS). Hub-routed
+     routes with `route.requireAuth: true` can use hub Authelia when hub
+     forward-auth is enabled.
    - `route.mode: none` is out of scope unless the chart exposes its own ingress.
 2. Configure DNS for the application and authentication portal with the
    organization’s DNS provider.

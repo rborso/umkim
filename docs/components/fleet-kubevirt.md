@@ -103,9 +103,10 @@ Discovery sets:
 
 ## Implementation notes
 
-- Playbook: `cluster-configure-kubevirt.yml` →
+- Playbook: `cluster-configure-kubevirt.yml` imports `kubevirt_host_bridge` on
+  all nodes (when LAN bridge is requested), then
   `roles/fleet_site/tasks/push_site_kubevirt_platform.yml`
-- Roles: `kubevirt_stack`, `kubevirt_bridge_nad`
+- Roles: `kubevirt_host_bridge`, `kubevirt_stack`, `kubevirt_bridge_nad`
 - Pins: `roles/kubevirt_stack/defaults/main.yml`
 - Runner image must COPY `cluster-configure-kubevirt.yml` (see
   `images/fleet-ansible-runner/Dockerfile`); rebuild/push

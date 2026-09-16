@@ -41,5 +41,11 @@ device-plugin-reported capacity, and successful capability discovery. See
 ## Verify
 
 Run the LLM and GPU checks through [fleet-verify.md](../fleet-verify.md) after
-an authenticated deployment. Follow [install.md](../install.md) for the
-supported enablement path.
+an authenticated deployment.
+
+Enable the hub proxy with `fleet-llm.yml` (set `fleet_llm_enabled: true` in
+`inventory/group_vars/hub/main.yml` or pass `-e fleet_llm_enabled=true`):
+
+```bash
+ansible-playbook fleet-llm.yml -l hub --tags fleet_llm_hub -e fleet_llm_enabled=true
+```

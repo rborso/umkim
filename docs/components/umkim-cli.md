@@ -7,7 +7,7 @@
 
 | Phase | Tool | Source of truth |
 |-------|------|-----------------|
-| Hub install | Ansible (`docs/install.md`, `fleet-deploy.yml`) | Git `inventory/` |
+| Hub install | Ansible (`docs/install.md`, `hub-install.yml` via `install-hub.sh`) | Git `inventory/` |
 | Fleet operations | `umkim` CLI | Hub CRDs (`FleetSite`, `FleetClusterJoin`, …) |
 | Derived runtime | Controllers | Per-cluster Ansible inventory ConfigMaps, secrets, jobs |
 

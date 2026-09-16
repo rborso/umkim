@@ -22,11 +22,12 @@ Sources:
 - An `oci://` URL on the Helm OCI allowlist
 - An `http(s)://` URL to a `.tgz`
 
-`imagePolicy` is `external` (spokes pull upstream images), `proxy` (Harbor
-pull-through for Quay/GHCR), or `copy` (best-effort `helm template` + `skopeo`
-into Harbor `mirror`, original chart name unchanged). Copied images keep their
-upstream path under the `mirror` project; they are not renamed with a `-local`
-suffix.
+`imagePolicy` is `external` (spokes pull upstream images), `proxy` (metadata
+only — expects Harbor proxy projects for upstream registries; the publish job
+does not rewrite chart image references), or `copy` (best-effort `helm template`
++ `skopeo` into Harbor `mirror`, original chart name unchanged). Copied images
+keep their upstream path under the `mirror` project; they are not renamed with
+a `-local` suffix.
 
 Seeded hub charts (`whoami`, `pet-clinic-helm`, `llama-cpp-helm`, `rocky-10-vm`)
 appear in the library after Harbor publish and a Harbor import by

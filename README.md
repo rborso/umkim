@@ -13,22 +13,27 @@ reverse proxy, or private-only.
 
 ## Start here
 
-1. Prepare a Rocky Linux 10 hub host and clone this repository.
+1. Prepare a Rocky Linux 10 hub host (workload join nodes are Rocky Linux 10
+   as well) and clone this repository.
 2. Create a fresh hub inventory from the public template:
 
    ```bash
    ./scripts/bootstrap-hub-inventory.sh
    ```
 
-3. Set inventory values and encrypted Vault secrets, then install the hub:
+3. Edit inventory (`site.yml`, WAN IP, `fleet_sites.yml`, etc.), create
+   encrypted Vault secrets, and run `./scripts/preflight-v1.sh`.
+4. Install and verify the hub:
 
    ```bash
    ./scripts/install-hub.sh
+   ./scripts/verify-hub-install.sh
    ```
 
-4. Verify the hub, create a non-management site and a FleetClusterJoin cluster,
-   wait until it is **Ready**, then install a Helm chart with **Apps** (you
-   must select the cluster).
+5. Create a WireGuard operator client, sign in to the console over the overlay,
+   create a non-management site and a FleetClusterJoin cluster, wait until it
+   is **Ready**, then install a Helm chart with **Apps** (you must select the
+   cluster).
 
 The complete safe path is [docs/install.md](docs/install.md). Do not use a
 pre-filled `inventory/` as a public template.
@@ -42,7 +47,8 @@ exposure model.
 
 **Hub** typically runs WireGuard (overlay endpoint), the fleet console (auth
 proxy and UI), Harbor (images and charts), OCM (hub-side multi-cluster
-control), and fleet-edge / ingress-auth services.
+control), fleet-edge routing, and optional ingress-auth (Authelia) when
+enabled in inventory.
 
 **Adding a cluster.** An operator creates a non-management `FleetSite`, then a
 `FleetClusterJoin`. The hub issues a **bootstrap bundle** that includes

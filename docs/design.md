@@ -61,7 +61,7 @@ Inventory examples live under [../examples/site-profiles/](../examples/site-prof
 3. The controller issues a bootstrap bundle containing enrollment material.
 4. The operator runs the bundle on the cluster control node.
 5. After local K3s validation, the hub provisions OCM registration and platform
-   manifests.
+   manifests (OLM, cert-manager, spoke Traefik ingress).
 6. The cluster becomes Ready and can receive Helm charts via `FleetApp`.
    Optional KubeVirt is a separate spoke platform operation (not a FleetApp);
    see [components/fleet-kubevirt.md](components/fleet-kubevirt.md).

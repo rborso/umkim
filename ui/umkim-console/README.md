@@ -14,8 +14,9 @@ npm run dev
 ```
 
 `FLEET_API_PROXY` is the local Vite proxy target for `/fleet/api/` and
-`/fleet/auth/`. Provide an authorized environment value; this README
-intentionally supplies no production endpoint.
+`/fleet/auth/`. The Vite dev server does not proxy `/llm/`; use a deployed hub
+or extend `vite.config.ts` for local LLM proxy testing. Provide an authorized
+environment value; this README intentionally supplies no production endpoint.
 
 ## Build and test
 

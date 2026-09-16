@@ -9,17 +9,18 @@ service.
 
 ## Create a client
 
-After the hub WireGuard server is configured, run from a trusted Ansible
-controller:
+After the hub WireGuard server is configured, run from the hub or another host
+with inventory access and `ansible-playbook` (see [install.md](install.md) §4):
 
 ```bash
 ./scripts/wg-dev-client.sh <operator-device>
 ```
 
-The helper records the client in the operator-client inventory, runs
-`wireguard-clients.yml`, and writes an importable configuration under
-`output/wireguard-clients/`. Existing operator and FleetClusterJoin peers are
-added without rewriting the hub interface configuration.
+The helper records the client in
+`inventory/group_vars/all/wg_operator_clients.yml`, runs `wireguard-clients.yml`,
+and writes an importable configuration under `output/wireguard-clients/`.
+Existing operator and FleetClusterJoin peers are added without rewriting the
+hub interface configuration.
 
 Import the generated configuration with the approved WireGuard client on the
 operator device. Confirm that only the intended overlay routes are installed

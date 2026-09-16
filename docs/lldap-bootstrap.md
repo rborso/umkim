@@ -19,10 +19,12 @@ operation is explicitly configured.
 Fleet roles are assigned through Fleet role bindings. The standard roles are
 `dc-admin`, `viewer`, `site-admin`, and `cluster-admin`.
 
-The chart bootstraps the configured console LDAP groups, including the default
-administrator, viewer, site-administrator, and cluster-administrator groups.
-Directory membership alone is not a substitute for reviewing the associated
-Fleet role binding.
+The chart bootstraps the configured console LDAP groups. Default group CNs are
+`fleet-admins`, `fleet-viewers`, `fleet-site-admins`, and
+`fleet-cluster-admins` (Fleet roles `dc-admin`, `viewer`, `site-admin`, and
+`cluster-admin` are assigned via Fleet role bindings, not LDAP group names
+alone). Directory membership alone is not a substitute for reviewing the
+associated Fleet role binding.
 
 The LLDAP directory administrator is a directory-management identity. It does
 not automatically receive platform-administrator access to the UMKIM console.

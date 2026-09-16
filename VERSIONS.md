@@ -8,9 +8,15 @@ public tag was `v0.1.0`.
 
 | Need | Source of truth |
 | --- | --- |
-| UMKIM, K3s, OCM, platform, and component versions | `inventory/group_vars/all/common.yml` and role defaults |
-| Fleet image tag | `harbor_fleet_image_tag` |
+| UMKIM release tag and fleet image tag | `inventory/group_vars/all/common.yml` (`umkim_version`, `harbor_fleet_image_tag`) |
+| Phase 4 platform pins (OLM, cert-manager, Traefik, controller images) | `inventory/group_vars/all/common.yml` |
+| K3s channel | `roles/k3s/defaults/main.yml` (`k3s_channel`) |
+| OCM bundle and clusteradm | `inventory/group_vars/hub/main.yml` |
+| Harbor chart version | `roles/harbor/defaults/main.yml` |
 | Public bootstrap defaults | `examples/inventory/hub-only/` |
+
+Run `./scripts/fleet-version.sh` to print resolved pins from the active
+inventory.
 
 Hub install builds fleet images from this checkout. Sibling service-provider
 repositories are not required.
