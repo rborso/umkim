@@ -10,14 +10,15 @@ import (
 )
 
 type siteIngressRow struct {
-	ID            string   `json:"id"`
-	Method        string   `json:"method"`
-	Address       string   `json:"address,omitempty"`
-	Zone          string   `json:"zone,omitempty"`
-	Wildcard      string   `json:"wildcard,omitempty"`
-	Description   string   `json:"description,omitempty"`
-	OperatorNotes string   `json:"operatorNotes,omitempty"`
-	Assigned      []string `json:"assignedClusters,omitempty"`
+	ID             string   `json:"id"`
+	Method         string   `json:"method"`
+	Address        string   `json:"address,omitempty"`
+	WanAddressMode string   `json:"wanAddressMode,omitempty"`
+	Zone           string   `json:"zone,omitempty"`
+	Wildcard       string   `json:"wildcard,omitempty"`
+	Description    string   `json:"description,omitempty"`
+	OperatorNotes  string   `json:"operatorNotes,omitempty"`
+	Assigned       []string `json:"assignedClusters,omitempty"`
 }
 
 type siteIngressDoc struct {
@@ -66,6 +67,9 @@ func siteIngressListCmd() *cobra.Command {
 				if row.Address != "" {
 					m["address"] = row.Address
 				}
+				if row.WanAddressMode != "" {
+					m["wanAddressMode"] = row.WanAddressMode
+				}
 				if row.Zone != "" {
 					m["zone"] = row.Zone
 				}
@@ -89,7 +93,7 @@ func siteIngressListCmd() *cobra.Command {
 }
 
 func siteIngressAddCmd() *cobra.Command {
-	var id, method, address, zone, wildcard, description, notes string
+	var id, method, address, zone, wildcard, description, notes, wanAddressMode string
 	c := &cobra.Command{
 		Use:   "add [site]",
 		Short: "Add an ingress entry (PATCH /sites/{name})",
@@ -113,13 +117,14 @@ func siteIngressAddCmd() *cobra.Command {
 				}
 			}
 			row := siteIngressRow{
-				ID:            id,
-				Method:        method,
-				Address:       strings.TrimSpace(address),
-				Zone:          strings.TrimSpace(zone),
-				Wildcard:      strings.TrimSpace(wildcard),
-				Description:   strings.TrimSpace(description),
-				OperatorNotes: strings.TrimSpace(notes),
+				ID:             id,
+				Method:         method,
+				Address:        strings.TrimSpace(address),
+				WanAddressMode: strings.TrimSpace(wanAddressMode),
+				Zone:           strings.TrimSpace(zone),
+				Wildcard:       strings.TrimSpace(wildcard),
+				Description:    strings.TrimSpace(description),
+				OperatorNotes:  strings.TrimSpace(notes),
 			}
 			rows := append(append([]siteIngressRow{}, doc.Spec.Edge.Ingress...), row)
 			return patchSiteIngressAction(args[0], rows, fmt.Sprintf("entry %q added", id))
@@ -127,7 +132,8 @@ func siteIngressAddCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&id, "id", "", "Ingress entry id (required)")
 	c.Flags().StringVar(&method, "method", "", "port_forward or reverse_proxy (required)")
-	c.Flags().StringVar(&address, "address", "", "WAN address (required for port_forward)")
+	c.Flags().StringVar(&address, "address", "", "WAN address (required for port_forward with fixed mode)")
+	c.Flags().StringVar(&wanAddressMode, "wan-address-mode", "", "WAN validation mode: fixed or dns")
 	c.Flags().StringVar(&zone, "zone", "", "DNS zone (required for port_forward)")
 	c.Flags().StringVar(&wildcard, "wildcard", "", "DNS wildcard (defaults to *.zone for port_forward)")
 	c.Flags().StringVar(&description, "description", "", "Short description")
@@ -136,7 +142,7 @@ func siteIngressAddCmd() *cobra.Command {
 }
 
 func siteIngressSetCmd() *cobra.Command {
-	var method, address, zone, wildcard, description, notes, newID string
+	var method, address, zone, wildcard, description, notes, newID, wanAddressMode string
 	c := &cobra.Command{
 		Use:   "set [site] [id]",
 		Short: "Update fields on an ingress entry",
@@ -180,6 +186,9 @@ func siteIngressSetCmd() *cobra.Command {
 			if cmd.Flags().Changed("address") {
 				row.Address = strings.TrimSpace(address)
 			}
+			if cmd.Flags().Changed("wan-address-mode") {
+				row.WanAddressMode = strings.TrimSpace(wanAddressMode)
+			}
 			if cmd.Flags().Changed("zone") {
 				row.Zone = strings.TrimSpace(zone)
 			}
@@ -204,6 +213,7 @@ func siteIngressSetCmd() *cobra.Command {
 	c.Flags().StringVar(&newID, "new-id", "", "Rename ingress entry id")
 	c.Flags().StringVar(&method, "method", "", "port_forward or reverse_proxy")
 	c.Flags().StringVar(&address, "address", "", "WAN address")
+	c.Flags().StringVar(&wanAddressMode, "wan-address-mode", "", "WAN validation mode: fixed or dns")
 	c.Flags().StringVar(&zone, "zone", "", "DNS zone")
 	c.Flags().StringVar(&wildcard, "wildcard", "", "DNS wildcard")
 	c.Flags().StringVar(&description, "description", "", "Short description")
@@ -268,6 +278,9 @@ func patchSiteIngressAction(site string, rows []siteIngressRow, action string) e
 		}
 		if row.Address != "" {
 			m["address"] = row.Address
+		}
+		if row.WanAddressMode != "" {
+			m["wanAddressMode"] = row.WanAddressMode
 		}
 		if row.Zone != "" {
 			m["zone"] = row.Zone
@@ -335,6 +348,9 @@ func patchSiteIngressAction(site string, rows []siteIngressRow, action string) e
 		}
 		if row.Address != "" {
 			m["address"] = row.Address
+		}
+		if row.WanAddressMode != "" {
+			m["wanAddressMode"] = row.WanAddressMode
 		}
 		if row.Zone != "" {
 			m["zone"] = row.Zone

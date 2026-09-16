@@ -57,8 +57,8 @@ umkim config show
 umkim site list | get NAME | create -f site.yaml
 umkim site patch NAME [--jumphost user@host:port] [--region REGION] [--failure-domain FD] [-f patch.json]
 umkim site ingress list SITE
-umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--address A] [--zone Z] [--wildcard W]
-umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--zone …] [--wildcard …]
+umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--address A] [--wan-address-mode fixed|dns] [--zone Z] [--wildcard W]
+umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--wan-address-mode fixed|dns] [--zone …] [--wildcard …]
 umkim site ingress delete SITE ID
 umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME

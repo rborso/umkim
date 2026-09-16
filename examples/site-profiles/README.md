@@ -12,7 +12,8 @@ only topology.
 | Profile | Inventory shape |
 |---------|-----------------|
 | [Hub gateway](hub-gateway/) | `hub_gateway: true` (+ `hub_zone` / `hub_wildcard`) |
-| [Port forward](port-forward/) | `ingress[]` with `method: port_forward` |
+| [Port forward](port-forward/) | `ingress[]` with `method: port_forward` (static WAN, `wan_address_mode: fixed`) |
+| [Port forward DDNS](port-forward-ddns/) | `port_forward` with `wan_address_mode: dns` and `wan_egress` (no stored public IP) |
 | [Reverse proxy](reverse-proxy/) | `ingress[]` with `method: reverse_proxy` (may combine with PF) |
 | [Internal](internal/) | No `ingress` rows; no hub gateway |
 

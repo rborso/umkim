@@ -13,7 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func validateSiteIngressRows(ingress []fleetv1alpha1.FleetSiteIngressSpec) error {
+func validateSiteIngressRows(edge fleetv1alpha1.FleetSiteEdgeSpec, ingress []fleetv1alpha1.FleetSiteIngressSpec) error {
+	siteSpec := fleetv1alpha1.FleetSiteSpec{Edge: edge}
 	seen := map[string]struct{}{}
 	for _, ent := range ingress {
 		id := strings.TrimSpace(ent.ID)
@@ -26,11 +27,16 @@ func validateSiteIngressRows(ingress []fleetv1alpha1.FleetSiteIngressSpec) error
 		seen[id] = struct{}{}
 		switch ent.Method {
 		case fleetv1alpha1.IngressMethodPortForward:
-			if strings.TrimSpace(ent.Address) == "" {
-				return fmt.Errorf("ingress %q: address is required for port_forward", id)
+			mode := siteSpec.EffectiveWanAddressMode(ent)
+			if strings.TrimSpace(ent.Address) == "" && mode == fleetv1alpha1.WanAddressModeFixed {
+				return fmt.Errorf("ingress %q: address is required for port_forward with wanAddressMode fixed", id)
 			}
 			if strings.TrimSpace(ent.Zone) == "" {
 				return fmt.Errorf("ingress %q: zone is required for port_forward", id)
+			}
+			if mode := strings.TrimSpace(ent.WanAddressMode); mode != "" &&
+				mode != fleetv1alpha1.WanAddressModeFixed && mode != fleetv1alpha1.WanAddressModeDNS {
+				return fmt.Errorf("ingress %q: wanAddressMode must be fixed or dns", id)
 			}
 		case fleetv1alpha1.IngressMethodReverseProxy:
 			// id only; address and operatorNotes optional
@@ -93,12 +99,13 @@ func resolveEdgeFromIngress(site *fleetv1alpha1.FleetSite, ingressID string) (re
 		return registry.ClusterIngressInput{}, err
 	}
 	return registry.ClusterIngressInput{
-		IngressID:     ci.IngressID,
-		Method:        ci.Method,
-		TlsPolicy:     ci.TlsPolicy,
-		DirectIngress: registry.DirectIngressFromMethod(ci.Method),
-		DNSZone:       ci.Zone,
-		EdgeWANIP:     ci.Address,
+		IngressID:      ci.IngressID,
+		Method:         ci.Method,
+		TlsPolicy:      ci.TlsPolicy,
+		DirectIngress:  registry.DirectIngressFromMethod(ci.Method),
+		DNSZone:        ci.Zone,
+		EdgeWANIP:      ingress.EdgeWANIP(ci),
+		WanAddressMode: ci.WanAddressMode,
 	}, nil
 }
 

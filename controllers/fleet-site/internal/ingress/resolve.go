@@ -12,12 +12,21 @@ type ClusterIngress struct {
 	IngressID       string
 	Method          string
 	Address         string
+	WanAddressMode  string
 	Zone            string
 	Wildcard        string
 	TlsPolicy       string
 	AllowsAuth      bool
 	AllowsSpokeACME bool
 	AllowsSiteRoute bool
+}
+
+// EdgeWANIP returns the fleet-edge-clusters edge_wan_ip value for resolved ingress.
+func EdgeWANIP(ci ClusterIngress) string {
+	if ci.WanAddressMode == fleetv1alpha1.WanAddressModeDNS {
+		return ""
+	}
+	return ci.Address
 }
 
 // ResolveClusterIngress returns ingress metadata for a cluster bound to ingressID on the site.
@@ -38,10 +47,11 @@ func ResolveClusterIngress(site fleetv1alpha1.FleetSiteSpec, ingressID string) (
 		Zone:      strings.TrimSpace(ent.Zone),
 		Wildcard:  strings.TrimSpace(ent.EffectiveWildcard()),
 	}
+	out.WanAddressMode = site.EffectiveWanAddressMode(ent)
 	switch ent.Method {
 	case fleetv1alpha1.IngressMethodPortForward:
-		if out.Address == "" {
-			return ClusterIngress{}, fmt.Errorf("ingress %q: address is required for port_forward", ingressID)
+		if out.Address == "" && out.WanAddressMode == fleetv1alpha1.WanAddressModeFixed {
+			return ClusterIngress{}, fmt.Errorf("ingress %q: address is required for port_forward with wanAddressMode fixed", ingressID)
 		}
 		if out.Zone == "" {
 			return ClusterIngress{}, fmt.Errorf("ingress %q: zone is required for port_forward", ingressID)

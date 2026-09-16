@@ -3,21 +3,21 @@ package reconcile
 import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
 )
 
 // edgeClusterUpsert mirrors fleet-edge-clusters YAML fields written by FCJ reconcile.
 type edgeClusterUpsert struct {
-	Site          string
-	Management    bool
-	ReadOnly      bool
-	DirectIngress bool
-	IngressID     string
-	Method        string
-	TlsPolicy     string
-	DNSZone       string
-	EdgeWANIP     string
-	UpstreamHost  string
+	Site            string
+	Management      bool
+	ReadOnly        bool
+	DirectIngress   bool
+	IngressID       string
+	Method          string
+	TlsPolicy       string
+	DNSZone         string
+	EdgeWANIP       string
+	WanAddressMode  string
+	UpstreamHost    string
 	TraefikHTTPPort int
 }
 
@@ -43,12 +43,13 @@ func mergeEdgeClusterEntryForJoin(prev edgeClusterUpsert, fcj *fleetv1alpha1.Fle
 	}
 
 	if site != nil && ingressID != "" {
-		if ci, err := ingress.ResolveClusterIngress(site.Spec, ingressID); err == nil {
-			out.Method = ci.Method
-			out.TlsPolicy = ci.TlsPolicy
-			out.DNSZone = ci.Zone
-			out.EdgeWANIP = ci.Address
-			out.DirectIngress = registry.DirectIngressFromMethod(ci.Method)
+		if fields, err := ingress.ResolveEdgeClusterIngress(site.Spec, ingressID); err == nil {
+			out.Method = fields.Method
+			out.TlsPolicy = fields.TlsPolicy
+			out.DNSZone = fields.DNSZone
+			out.EdgeWANIP = fields.EdgeWANIP
+			out.WanAddressMode = fields.WanAddressMode
+			out.DirectIngress = fields.DirectIngress
 		}
 	}
 	if out.Method == "" {
@@ -57,6 +58,7 @@ func mergeEdgeClusterEntryForJoin(prev edgeClusterUpsert, fcj *fleetv1alpha1.Fle
 		out.TlsPolicy = prev.TlsPolicy
 		out.DNSZone = prev.DNSZone
 		out.EdgeWANIP = prev.EdgeWANIP
+		out.WanAddressMode = prev.WanAddressMode
 	}
 	return out
 }

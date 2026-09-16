@@ -16,7 +16,7 @@
         {
           "id": "homelab-pf",
           "method": "port_forward",
-          "address": "172.16.10.4",
+          "wanAddressMode": "dns",
           "zone": "homelab.otthol.hu",
           "wildcard": "*.homelab.otthol.hu",
           "description": "Port-forward to virt03 (lab-single-0): 80→30080, 443→30443"
@@ -27,7 +27,10 @@
           "operatorNotes": "External reverse proxy terminates TLS; operator configures vhosts"
         }
       ],
-      "dnsTargetNote": "A/AAAA *.homelab.otthol.hu → virt03 (port-forward 80→30080, 443→30443)"
+      "wanEgress": {
+        "enabled": true,
+        "dnsTargetNote": "A/AAAA *.homelab.otthol.hu → current WAN (router port-forward 80→30080, 443→30443)"
+      }
     }
   }
 }

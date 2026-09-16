@@ -23,6 +23,7 @@ type edgeClusterEntry struct {
 	TlsPolicy       string                 `yaml:"tls_policy,omitempty"`
 	DNSZone         string                 `yaml:"dns_zone,omitempty"`
 	EdgeWANIP       string                 `yaml:"edge_wan_ip,omitempty"`
+	WanAddressMode  string                 `yaml:"wan_address_mode,omitempty"`
 	UpstreamHost    string                 `yaml:"upstream_host"`
 	TraefikHTTPPort int                    `yaml:"traefik_http_port"`
 	Capabilities    map[string]interface{} `yaml:"capabilities,omitempty"`

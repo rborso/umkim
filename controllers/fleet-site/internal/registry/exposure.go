@@ -4,25 +4,31 @@ import fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha
 
 // ClusterIngressInput mirrors fleet-edge-clusters YAML entry fields.
 type ClusterIngressInput struct {
-	IngressID     string
-	Method        string
-	TlsPolicy     string
-	DirectIngress bool
-	DNSZone       string
-	EdgeWANIP     string
+	IngressID      string
+	Method         string
+	TlsPolicy      string
+	DirectIngress  bool
+	DNSZone        string
+	EdgeWANIP      string
+	WanAddressMode string
 }
 
 // ClusterIngressFromResolved builds registry input from resolved ingress metadata.
 func ClusterIngressFromResolved(ci struct {
-	IngressID, Method, TlsPolicy, Address, Zone string
+	IngressID, Method, TlsPolicy, Address, Zone, WanAddressMode string
 }) ClusterIngressInput {
+	edgeWAN := ci.Address
+	if ci.WanAddressMode == fleetv1alpha1.WanAddressModeDNS {
+		edgeWAN = ""
+	}
 	return ClusterIngressInput{
-		IngressID:     ci.IngressID,
-		Method:        ci.Method,
-		TlsPolicy:     ci.TlsPolicy,
-		DirectIngress: AllowsDirectSiteIngress(ci.Method),
-		DNSZone:       ci.Zone,
-		EdgeWANIP:     ci.Address,
+		IngressID:      ci.IngressID,
+		Method:         ci.Method,
+		TlsPolicy:      ci.TlsPolicy,
+		DirectIngress:  AllowsDirectSiteIngress(ci.Method),
+		DNSZone:        ci.Zone,
+		EdgeWANIP:      edgeWAN,
+		WanAddressMode: ci.WanAddressMode,
 	}
 }
 

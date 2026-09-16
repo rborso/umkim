@@ -33,6 +33,14 @@ bind with `FleetClusterJoin.spec.edge.ingressId`. When a site has exactly one
 `port_forward` ingress, an empty `ingressId` auto-binds at reconcile time.
 Inventory examples: [../../examples/site-profiles/](../../examples/site-profiles/).
 
+Port-forward rows support optional **`wanAddressMode`** (`fixed` or `dns`) for
+WAN/DNS validation during spoke ACME. Pair `dns` mode with
+`spec.edge.wanEgress` when the public address is tracked by DDNS rather than
+stored on the ingress row. Patching site ingress via the console, CLI, or
+`PATCH /sites/{name}` refreshes bound clusters in the `fleet-edge-clusters`
+ConfigMap (`edge_wan_ip`, `wan_address_mode`, and related fields) without
+re-provisioning the cluster.
+
 Match per-app `FleetApp` `route.mode` to cluster ingress:
 
 - `hub` with site `hubGateway` (and hub zone DNS)

@@ -19,9 +19,33 @@
     fleet_site_spoke_endpoint: >-
       {{ hostvars[groups['site_bootstrap'][0]].fleet_site_sp_endpoint
          | default(hostvars[groups['site_bootstrap'][0]].ansible_host) }}
+
+- name: Fleet site | Resolve spoke ingress method from fleet-edge-clusters
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - "{{ fleet_edge_clusters_cm_namespace | default('fleet-system') }}"
+      - get
+      - configmap
+      - "{{ fleet_edge_clusters_cm_name | default('fleet-edge-clusters') }}"
+      - -o
+      - "jsonpath={.data.clusters\\.yaml}"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_site_edge_clusters_raw
+  changed_when: false
+
+- name: Fleet site | Parse cluster ingress method for phase6 ACME
+  ansible.builtin.set_fact:
+    fleet_site_spoke_ingress_method: >-
+      {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].method
+         | default('') }}
     fleet_site_spoke_acme_http_challenge: >-
-      {{ hostvars[groups['site_bootstrap'][0]].fleet_cluster_exposure_mode
-         | default('') == 'port_forward' }}
+      {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].method
+         | default(hostvars[groups['site_bootstrap'][0]].fleet_cluster_exposure_mode | default(''))
+         == 'port_forward' }}
 
 - name: Fleet site | Render spoke ingress ManifestWork
   ansible.builtin.template:
@@ -37,7 +61,13 @@
 
 - name: Fleet site | Apply spoke ingress ManifestWork on hub
   ansible.builtin.command:
-    cmd: kubectl apply -f /tmp/manifestwork-phase6-{{ fleet_site_ocm_cluster }}.yaml
+    argv:
+      - kubectl
+      - apply
+      - --server-side
+      - --force-conflicts
+      - -f
+      - /tmp/manifestwork-phase6-{{ fleet_site_ocm_cluster }}.yaml
   environment:
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
@@ -65,25 +95,10 @@
   delay: 10
   changed_when: false
 
-- name: Fleet site | Restart Traefik deployment after ManifestWork sync
-  ansible.builtin.command:
-    argv:
-      - kubectl
-      - -n
-      - "{{ phase6_spoke_ingress_namespace }}"
-      - rollout
-      - restart
-      - deployment/traefik
-  environment:
-    KUBECONFIG: "{{ hostvars[fleet_site_bootstrap_host].k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
-    PATH: "{{ k3s_command_path }}"
-  delegate_to: "{{ fleet_site_bootstrap_host }}"
-  become: true
-  register: fleet_site_traefik_restart
-  failed_when: false
-  changed_when: fleet_site_traefik_restart.rc == 0
-
-- name: Fleet site | Wait for Traefik deployment on spoke
+# Do not rollout restart Traefik here: HTTP-01 ACME validates on public :80 while the pod
+# is still starting and Let's Encrypt sees connection refused. OCM applies deployment
+# updates when the ManifestWork spec changes; wait for that rollout only.
+- name: Fleet site | Wait for Traefik deployment after ManifestWork change
   ansible.builtin.command:
     argv:
       - kubectl
@@ -98,6 +113,7 @@
     PATH: "{{ k3s_command_path }}"
   delegate_to: "{{ fleet_site_bootstrap_host }}"
   become: true
+  when: fleet_site_spoke_ingress_apply.changed | default(false) | bool
   changed_when: false
 
 - name: Fleet site | Probe spoke Traefik /ping locally on cluster node

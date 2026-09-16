@@ -201,7 +201,9 @@ func routeTargetsCluster(route *fleetv1alpha1.FleetAppRoute, clusterName string)
 
 func (r *RouteReconciler) validateSiteDNS(ctx context.Context, hostname string, cluster clusters.Cluster) (bool, string) {
 	expected := strings.TrimSpace(cluster.EdgeWANIP)
-	if cluster.EffectiveMethod() == "port_forward" && isPrivateProbeHost(expected) {
+	relaxed := cluster.DNSValidationRelaxed() ||
+		(cluster.EffectiveMethod() == "port_forward" && isPrivateProbeHost(expected))
+	if relaxed {
 		if _, ips, err := dns.ValidateHost(ctx, hostname, ""); err != nil || len(ips) == 0 {
 			return false, fmt.Sprintf("hostname %s did not resolve", hostname)
 		}

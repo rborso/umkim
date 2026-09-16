@@ -143,10 +143,6 @@ func (s *Server) handlePatchSite(ctx context.Context, w http.ResponseWriter, r *
 			for i := range rows {
 				rows[i].AssignedClusters = nil
 			}
-			if err := validateSiteIngressRows(rows); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
 			fs.Spec.Edge.Ingress = rows
 		}
 	}
@@ -167,10 +163,22 @@ func (s *Server) handlePatchSite(ctx context.Context, w http.ResponseWriter, r *
 		fs.Spec.ProvisioningMode = *patch.ProvisioningMode
 	}
 	fs.Spec.NormalizeIngress()
+	if patch.Ingress != nil {
+		if err := validateSiteIngressRows(fs.Spec.Edge, fs.Spec.Edge.Ingress); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 
 	if err := s.Client.Update(ctx, &fs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if patch.Ingress != nil {
+		if err := registry.SyncEdgeClustersFromSiteIngress(ctx, s.Client, s.domainRegistryConfig(), &fs); err != nil {
+			http.Error(w, "site updated but edge cluster sync failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	_ = registry.SyncSiteAssignedClusters(ctx, s.Client, s.domainRegistryConfig())
 	_ = registry.ReconcileEdgeDomains(ctx, s.Client, s.domainRegistryConfig())

@@ -35,12 +35,17 @@ func spokeProbeHost(_ context.Context, hostname string, regCluster clusters.Clus
 			return host
 		}
 	}
-	if ip := strings.TrimSpace(regCluster.EdgeWANIP); ip != "" && !invalidProbeHost(ip) {
-		return ip
+	if !regCluster.DNSValidationRelaxed() {
+		if ip := strings.TrimSpace(regCluster.EdgeWANIP); ip != "" && !invalidProbeHost(ip) {
+			return ip
+		}
 	}
 	_, ips, err := dns.ValidateHost(context.Background(), hostname, "")
 	if err == nil && len(ips) > 0 {
 		return ips[0]
+	}
+	if ip := strings.TrimSpace(regCluster.EdgeWANIP); ip != "" && !invalidProbeHost(ip) {
+		return ip
 	}
 	if host := strings.TrimSpace(regCluster.UpstreamHost); host != "" {
 		return host

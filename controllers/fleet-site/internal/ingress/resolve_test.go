@@ -66,3 +66,26 @@ func TestHostMatchesWildcard(t *testing.T) {
 		t.Fatal("expected no match")
 	}
 }
+
+func TestResolveClusterIngress_dnsModeEmptyAddress(t *testing.T) {
+	site := fleetv1alpha1.FleetSiteSpec{
+		Edge: fleetv1alpha1.FleetSiteEdgeSpec{
+			WanEgress: &fleetv1alpha1.FleetSiteWanEgressSpec{Enabled: true},
+			Ingress: []fleetv1alpha1.FleetSiteIngressSpec{{
+				ID:     "pf1",
+				Method: fleetv1alpha1.IngressMethodPortForward,
+				Zone:   "demo.example.com",
+			}},
+		},
+	}
+	ci, err := ResolveClusterIngress(site, "pf1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ci.WanAddressMode != fleetv1alpha1.WanAddressModeDNS {
+		t.Fatalf("mode=%q", ci.WanAddressMode)
+	}
+	if got := EdgeWANIP(ci); got != "" {
+		t.Fatalf("edge wan ip=%q want empty", got)
+	}
+}

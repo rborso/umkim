@@ -3,6 +3,7 @@ package clusters
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +20,7 @@ type Cluster struct {
 	DNSZone           string `yaml:"dns_zone,omitempty"`
 	UpstreamHost      string `yaml:"upstream_host"`
 	EdgeWANIP         string `yaml:"edge_wan_ip,omitempty"`
+	WanAddressMode    string `yaml:"wan_address_mode,omitempty"`
 	TraefikHTTPPort   int    `yaml:"traefik_http_port"`
 	TraefikHubHTTPPort int   `yaml:"traefik_hub_http_port,omitempty"`
 	TraefikHTTPSPort  int    `yaml:"traefik_https_port,omitempty"`
@@ -29,7 +31,17 @@ const (
 	methodReverseProxy = "reverse_proxy"
 
 	TLSPolicyACMECluster = "acme_cluster"
+
+	wanAddressModeDNS = "dns"
 )
+
+// DNSValidationRelaxed reports whether site DNS checks skip strict edge_wan_ip matching.
+func (c Cluster) DNSValidationRelaxed() bool {
+	if strings.TrimSpace(c.WanAddressMode) == wanAddressModeDNS {
+		return true
+	}
+	return false
+}
 
 // EffectiveMethod resolves cluster ingress method (legacy direct_ingress → port_forward).
 func (c Cluster) EffectiveMethod() string {

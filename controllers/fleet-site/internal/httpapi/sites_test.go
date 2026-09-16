@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -205,5 +206,73 @@ func TestPostSiteNormalizesLatchedSiteID(t *testing.T) {
 	}
 	if fs.Spec.SiteId != "homelab" {
 		t.Fatalf("siteId=%q want homelab", fs.Spec.SiteId)
+	}
+}
+
+func TestPatchSiteIngressSyncsEdgeClusters(t *testing.T) {
+	ns := "fleet-console"
+	site := &fleetv1alpha1.FleetSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			SiteName:         "homelab",
+			SiteId:           "homelab",
+			ProvisioningMode: fleetv1alpha1.ProvisioningModeRegistry,
+			Edge: fleetv1alpha1.FleetSiteEdgeSpec{
+				WanEgress: &fleetv1alpha1.FleetSiteWanEgressSpec{Enabled: true},
+				Ingress: []fleetv1alpha1.FleetSiteIngressSpec{{
+					ID: "homelab-pf", Method: fleetv1alpha1.IngressMethodPortForward,
+					Address: "203.0.113.50", Zone: "homelab.example.com",
+				}},
+			},
+		},
+	}
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-edge-clusters", Namespace: "fleet-system"},
+		Data: map[string]string{
+			"clusters.yaml": `clusters:
+  lab-single-0:
+    site: homelab
+    direct_ingress: true
+    ingress_id: homelab-pf
+    method: port_forward
+    edge_wan_ip: 203.0.113.50
+    upstream_host: 10.10.0.12
+    traefik_http_port: 30080
+`,
+		},
+	}
+	s := &Server{
+		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, cm).Build(),
+		Cfg: config.Config{
+			Namespace:               ns,
+			ManagementSiteID:        "umkim",
+			RequireIdentity:         false,
+			EdgeClustersCMNamespace: "fleet-system",
+			EdgeClustersCMName:      "fleet-edge-clusters",
+		},
+	}
+	body, _ := json.Marshal(map[string]interface{}{
+		"ingress": []map[string]interface{}{
+			{
+				"id":             "homelab-pf",
+				"method":         "port_forward",
+				"wanAddressMode": "dns",
+				"zone":           "homelab.example.com",
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1alpha1/sites/homelab", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	s.handlePatchSite(context.Background(), rec, req, "homelab")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var updated corev1.ConfigMap
+	if err := s.Client.Get(context.Background(), client.ObjectKey{Namespace: "fleet-system", Name: "fleet-edge-clusters"}, &updated); err != nil {
+		t.Fatal(err)
+	}
+	raw := updated.Data["clusters.yaml"]
+	if !strings.Contains(raw, "wan_address_mode: dns") {
+		t.Fatalf("expected synced wan mode:\n%s", raw)
 	}
 }

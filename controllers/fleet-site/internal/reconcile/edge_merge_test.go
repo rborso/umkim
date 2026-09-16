@@ -42,6 +42,31 @@ func TestMergeEdgeClusterEntryForJoinPreservesConsoleFields(t *testing.T) {
 	}
 }
 
+func TestMergeEdgeClusterEntryForJoinDnsModeClearsEdgeWANIP(t *testing.T) {
+	prev := edgeClusterUpsert{IngressID: "homelab-pf", TraefikHTTPPort: 30080}
+	fcj := &fleetv1alpha1.FleetClusterJoin{
+		Spec: fleetv1alpha1.FleetClusterJoinSpec{SiteId: "homelab"},
+	}
+	site := &fleetv1alpha1.FleetSite{
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			Edge: fleetv1alpha1.FleetSiteEdgeSpec{
+				WanEgress: &fleetv1alpha1.FleetSiteWanEgressSpec{Enabled: true},
+				Ingress: []fleetv1alpha1.FleetSiteIngressSpec{{
+					ID: "homelab-pf", Method: fleetv1alpha1.IngressMethodPortForward,
+					Address: "203.0.113.1", Zone: "homelab.example.com",
+				}},
+			},
+		},
+	}
+	got := mergeEdgeClusterEntryForJoin(prev, fcj, site, "10.10.0.12")
+	if got.WanAddressMode != fleetv1alpha1.WanAddressModeDNS {
+		t.Fatalf("wan_address_mode=%q", got.WanAddressMode)
+	}
+	if got.EdgeWANIP != "" {
+		t.Fatalf("edge_wan_ip=%q want empty", got.EdgeWANIP)
+	}
+}
+
 func TestMergeEdgeClusterEntryForJoinPrefersFCJSpec(t *testing.T) {
 	prev := edgeClusterUpsert{IngressID: "old-ingress"}
 	fcj := &fleetv1alpha1.FleetClusterJoin{

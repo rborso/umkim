@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"net"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +18,9 @@ const (
 
 	IngressMethodPortForward  = "port_forward"
 	IngressMethodReverseProxy = "reverse_proxy"
+
+	WanAddressModeFixed = "fixed"
+	WanAddressModeDNS   = "dns"
 
 	TLSPolicyInherit      = "inherit"
 	TLSPolicyExternal     = "external"
@@ -249,6 +253,7 @@ type FleetSiteIngressSpec struct {
 	ID               string   `json:"id"`
 	Method           string   `json:"method"`
 	Address          string   `json:"address,omitempty"`
+	WanAddressMode   string   `json:"wanAddressMode,omitempty"`
 	Zone             string   `json:"zone,omitempty"`
 	Wildcard         string   `json:"wildcard,omitempty"`
 	Description      string   `json:"description,omitempty"`
@@ -414,6 +419,31 @@ func (s *ClusterStorageSpec) EffectiveLonghornStorageClass() string {
 
 // FleetSiteStorageSpec is deprecated; use ClusterStorageSpec.
 type FleetSiteStorageSpec = ClusterStorageSpec
+
+func isPrivateAddress(addr string) bool {
+	ip := net.ParseIP(strings.TrimSpace(addr))
+	if ip == nil {
+		return false
+	}
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+}
+
+// EffectiveWanAddressMode resolves WAN validation mode for a port_forward ingress row.
+// Explicit wanAddressMode wins; otherwise infer from wanEgress, private address, or default fixed.
+func (s *FleetSiteSpec) EffectiveWanAddressMode(ent FleetSiteIngressSpec) string {
+	mode := strings.TrimSpace(ent.WanAddressMode)
+	switch mode {
+	case WanAddressModeFixed, WanAddressModeDNS:
+		return mode
+	}
+	if we := s.EffectiveWanEgress(); we != nil && we.Enabled && strings.TrimSpace(we.ExpectedWanIp) == "" {
+		return WanAddressModeDNS
+	}
+	if isPrivateAddress(ent.Address) {
+		return WanAddressModeDNS
+	}
+	return WanAddressModeFixed
+}
 
 // EffectiveWanEgress returns site WAN egress config (wanEgress preferred over legacy externalAccess).
 func (s *FleetSiteSpec) EffectiveWanEgress() *FleetSiteWanEgressSpec {

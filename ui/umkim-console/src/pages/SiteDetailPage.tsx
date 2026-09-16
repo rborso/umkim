@@ -242,6 +242,7 @@ export function SiteDetailPage() {
           id: rest.id.trim(),
           zone,
           address: rest.address?.trim(),
+          wanAddressMode: rest.wanAddressMode?.trim() as FleetSiteIngress['wanAddressMode'],
           wildcard,
         };
       });
@@ -685,7 +686,7 @@ export function SiteDetailPage() {
                               <LabeledField label="WAN address" fieldId={`ingress-address-${i}`} help={getFieldHelp('site.endpointAddress')}>
                                 <TextInput
                                   aria-label="Ingress address"
-                                  placeholder="WAN IP or VIP"
+                                  placeholder={row.wanAddressMode === 'dns' ? 'Optional hint (DDNS updates via DNS)' : 'WAN IP or VIP'}
                                   value={row.address || ''}
                                   onChange={(_e, v) => {
                                     markEdgeDirty();
@@ -694,6 +695,22 @@ export function SiteDetailPage() {
                                     setIngress(next);
                                   }}
                                 />
+                              </LabeledField>
+                              <LabeledField label="WAN address mode" fieldId={`ingress-wan-mode-${i}`} help={getFieldHelp('site.wanAddressMode')}>
+                                <FormSelect
+                                  aria-label="WAN address mode"
+                                  value={row.wanAddressMode || ''}
+                                  onChange={(_e, v) => {
+                                    markEdgeDirty();
+                                    const next = [...ingress];
+                                    next[i] = { ...row, wanAddressMode: (v || undefined) as FleetSiteIngress['wanAddressMode'] };
+                                    setIngress(next);
+                                  }}
+                                >
+                                  <FormSelectOption value="" label="Auto (from WAN egress / address)" />
+                                  <FormSelectOption value="fixed" label="Fixed public IP (strict DNS match)" />
+                                  <FormSelectOption value="dns" label="DNS / DDNS (resolve host only)" />
+                                </FormSelect>
                               </LabeledField>
                               <LabeledField label="DNS zone" fieldId={`ingress-zone-${i}`} help={getFieldHelp('site.domainZone')}>
                                 <TextInput

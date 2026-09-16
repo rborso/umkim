@@ -38,8 +38,16 @@ export const SITES_FIELD_HELP: Record<string, FieldHelpContent> = {
     example: 'homelab-pf',
   },
   'site.endpointAddress': {
-    description: 'Public IP or VIP on a port_forward ingress row where WAN traffic arrives before DNAT to cluster NodePorts.',
+    description: 'Public IP or VIP on a port_forward ingress row where WAN traffic arrives before DNAT to cluster NodePorts. Optional when WAN address mode is DNS/DDNS.',
     example: '203.0.113.50',
+  },
+  'site.wanAddressMode': {
+    description:
+      'How fleet-edge validates site DNS for ACME. Fixed requires A/AAAA to match the WAN address; DNS resolves the hostname only (for DDNS or rotating WAN). Auto infers from WAN egress and address.',
+    example: 'dns',
+    examples: ['fixed', 'dns'],
+    relatedFields: ['site.wanEgress', 'site.expectedWanIp', 'site.endpointAddress'],
+    learnMoreUrl: DOCS.fleetEdge,
   },
   'site.domainZoneId': {
     description: 'Stable ingress row id (FleetSite.spec.edge.ingress[].id). Clusters bind with ingressId.',

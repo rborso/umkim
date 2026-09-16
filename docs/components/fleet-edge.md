@@ -16,8 +16,21 @@ Each `FleetSite` declares one or more **ingress entries** under
 
 | Ingress `method` | Cardinality | TLS (derived) | Ingress auth |
 |---|---|---|---|
-| `port_forward` | One cluster per entry (`id`, `address`, `zone` required) | `acme_cluster` on spoke | Allowed (zone from ingress) |
+| `port_forward` | One cluster per entry (`id`, `zone` required; `address` required only when `wanAddressMode` is `fixed`) | `acme_cluster` on spoke | Allowed (zone from ingress) |
 | `reverse_proxy` | Many clusters per entry (`id` required; optional `address`, `operatorNotes`) | `external` (off-cluster) | Not available |
+
+Each `port_forward` ingress row may set **`wanAddressMode`**:
+
+| Mode | Use when | `edge_wan_ip` in `fleet-edge-clusters` | ACME DNS preflight |
+|---|---|---|---|
+| `fixed` | Static public WAN | Same as `ingress.address` | Hostname A/AAAA must include expected IP |
+| `dns` | DDNS or rotating WAN | Empty (DNS-only validation) | Resolve hostname + TCP/HTTP-01 connectivity only |
+
+When `wanAddressMode` is omitted, the fleet-site controller infers `dns` if
+`spec.edge.wanEgress.enabled` is true and `expectedWanIp` is empty, if
+`address` is a private IP, or otherwise defaults to `fixed`. See
+[port-forward-ddns](../../examples/site-profiles/port-forward-ddns/) for a DDNS
+profile example.
 
 Optional `spec.edge.hubGateway` (with `hubZone` / `hubWildcard`) enables hub-routed
 public URLs for clusters using `route.mode: hub`. This replaces the former site-level

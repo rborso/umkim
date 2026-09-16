@@ -71,6 +71,10 @@ spec:
                             enum: [port_forward, reverse_proxy]
                           address:
                             type: string
+                          wanAddressMode:
+                            type: string
+                            enum: [fixed, dns]
+                            description: WAN address validation mode for port_forward (fixed = strict DNS IP match; dns = resolve host only)
                           zone:
                             type: string
                           wildcard:

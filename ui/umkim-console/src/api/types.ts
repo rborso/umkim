@@ -10,6 +10,7 @@ export type FleetSitePhase =
   | 'Failed';
 
 export type FleetIngressMethod = 'port_forward' | 'reverse_proxy';
+export type FleetWanAddressMode = 'fixed' | 'dns';
 export type FleetTlsPolicy = 'inherit' | 'external' | 'acme_cluster' | 'acme_hub' | 'passthrough';
 
 export interface FleetSiteExternalAccess {
@@ -28,6 +29,7 @@ export interface FleetSiteIngress {
   id: string;
   method: FleetIngressMethod;
   address?: string;
+  wanAddressMode?: FleetWanAddressMode;
   zone?: string;
   wildcard?: string;
   description?: string;

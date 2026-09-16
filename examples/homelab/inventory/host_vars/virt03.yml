@@ -41,22 +41,3 @@ uplinks:
           - 5900-5999
         udp_open: []
         services_open: []
-  - name: n0p1
-    physical_network: mgmt_access_l1
-    model: e1000
-    interface: enp0s20f0u2
-    mac_address: "00:e0:4c:23:1a:28"
-    networks:
-      - zone: external
-        cloudinit: false
-        pxe: false
-        vm_network: true
-        network_name: mgmt_nw
-        tag: ""
-        bridge_name: n0p1_mgmt_nw
-        ip: "192.168.1.130"
-        default_route: false
-        tcp_open:
-          - 22
-        udp_open: []
-        services_open: []

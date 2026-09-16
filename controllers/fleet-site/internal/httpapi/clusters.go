@@ -433,6 +433,7 @@ func (s *Server) handlePatchCluster(ctx context.Context, w http.ResponseWriter, 
 				ent.DirectIngress = resolved.DirectIngress
 				ent.DNSZone = resolved.DNSZone
 				ent.EdgeWANIP = resolved.EdgeWANIP
+				ent.WanAddressMode = resolved.WanAddressMode
 			}
 			if patch.Edge.UpstreamHost != "" {
 				ent.UpstreamHost = patch.Edge.UpstreamHost

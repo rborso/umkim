@@ -14,3 +14,12 @@ func TestSpokeACMEEnabled(t *testing.T) {
 		t.Fatal("expected false for external tls policy")
 	}
 }
+
+func TestDNSValidationRelaxed(t *testing.T) {
+	if !(Cluster{WanAddressMode: wanAddressModeDNS}).DNSValidationRelaxed() {
+		t.Fatal("dns mode should relax validation")
+	}
+	if (Cluster{WanAddressMode: "fixed"}).DNSValidationRelaxed() {
+		t.Fatal("fixed mode should not relax validation")
+	}
+}
