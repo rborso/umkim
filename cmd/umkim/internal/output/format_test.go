@@ -88,3 +88,15 @@ func TestSiteIngressSummary(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestWriteAppsTable(t *testing.T) {
+	raw := []byte(`{"apps":[{"name":"whoami","clusterName":"lab","chart":"whoami","phase":"Ready","route":{"mode":"hub","hubHost":"whoami.apps.example.com"}}]}`)
+	out := capture(func() {
+		if err := WriteApps(raw, FormatTable); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "whoami") || !strings.Contains(out, "hub") {
+		t.Fatalf("out=%q", out)
+	}
+}

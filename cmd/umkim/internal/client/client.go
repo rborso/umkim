@@ -98,6 +98,49 @@ func (c *Client) Whoami() (map[string]interface{}, error) {
 	return c.authJSON(http.MethodGet, "/me", nil)
 }
 
+func (c *Client) AuthGet(path string) ([]byte, int, error) {
+	return c.authDo(http.MethodGet, path, nil)
+}
+
+func (c *Client) AuthPost(path string, body interface{}) ([]byte, int, error) {
+	return c.authDo(http.MethodPost, path, body)
+}
+
+func (c *Client) AuthDelete(path string) ([]byte, int, error) {
+	return c.authDo(http.MethodDelete, path, nil)
+}
+
+func (c *Client) authDo(method, path string, body interface{}) ([]byte, int, error) {
+	if c.authURL == "" {
+		return nil, 0, fmt.Errorf("auth URL not configured (set UMKIM_AUTH_URL)")
+	}
+	var r io.Reader
+	if body != nil {
+		raw, _ := json.Marshal(body)
+		r = bytes.NewReader(raw)
+	}
+	req, err := http.NewRequest(method, c.authURL+path, r)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	c.applyAuth(req)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+	_ = c.saveCookies()
+	return raw, resp.StatusCode, nil
+}
+
 func (c *Client) Get(path string) ([]byte, int, error) {
 	return c.do(http.MethodGet, path, nil)
 }

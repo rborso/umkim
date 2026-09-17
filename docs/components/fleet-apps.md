@@ -39,7 +39,8 @@ stay until an operator prunes them.
 ## Create (install)
 
 Use the console **Apps** page, authenticated `POST /fleet/api/v1alpha1/apps`,
-or [playbooks/flows/app-install.yml](../../playbooks/flows/app-install.yml).
+`umkim app create` (see [umkim-cli.md](umkim-cli.md)), or
+[playbooks/flows/app-install.yml](../../playbooks/flows/app-install.yml).
 The controller path is `/api/v1alpha1/apps`; `clusterName` is required.
 
 Required fields:

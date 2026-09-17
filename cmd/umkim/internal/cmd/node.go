@@ -3,10 +3,53 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/rborso/umkim/cmd/umkim/internal/output"
 	"github.com/spf13/cobra"
 )
+
+func nodePatchCmd() *cobra.Command {
+	var cluster string
+	var labels []string
+	c := &cobra.Command{
+		Use:   "patch [node]",
+		Short: "Patch node labels (PATCH /clusters/{c}/nodes/{node})",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cluster == "" {
+				return fmt.Errorf("--cluster required")
+			}
+			if len(labels) == 0 {
+				return fmt.Errorf("at least one --label key=value required")
+			}
+			labelMap := map[string]string{}
+			for _, pair := range labels {
+				k, v, ok := strings.Cut(pair, "=")
+				if !ok || strings.TrimSpace(k) == "" {
+					return fmt.Errorf("invalid --label %q (expected key=value)", pair)
+				}
+				labelMap[strings.TrimSpace(k)] = v
+			}
+			body := map[string]interface{}{
+				"labels": labelMap,
+			}
+			raw, code, err := api.Patch("/clusters/"+cluster+"/nodes/"+args[0], body)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code); err != nil {
+				return err
+			}
+			printJSON(raw)
+			return nil
+		},
+	}
+	c.Flags().StringVar(&cluster, "cluster", "", "Cluster name")
+	c.Flags().StringArrayVar(&labels, "label", nil, "Label key=value (repeatable)")
+	return c
+}
+
 
 func nodeCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -14,6 +57,7 @@ func nodeCmd() *cobra.Command {
 		Short: "Cluster node operations",
 	}
 	cmd.AddCommand(nodeListCmd())
+	cmd.AddCommand(nodePatchCmd())
 	cmd.AddCommand(nodeAddCmd())
 	cmd.AddCommand(nodeRemoveCmd())
 	cmd.AddCommand(nodeReplaceCmd())

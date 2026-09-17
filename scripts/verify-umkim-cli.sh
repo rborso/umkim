@@ -37,6 +37,12 @@ if [[ "${UMKIM_DEV:-}" == "1" ]]; then
   echo "== umkim node-op history (dev) =="
   UMKIM_DEV=1 "$CLI" node-op history --cluster "$CLUSTER" | head -c 400
   echo
+  echo "== umkim app list (dev) =="
+  UMKIM_DEV=1 "$CLI" app list | head -c 400
+  echo
+  echo "== umkim infra get hub (dev) =="
+  UMKIM_DEV=1 "$CLI" infra get hub -o table | head -c 400
+  echo
   echo "umkim CLI verify OK (dev mode)"
   exit 0
 fi
@@ -85,5 +91,20 @@ fi
 echo "== umkim node-op history =="
 "$CLI" node-op history --cluster "$CLUSTER" | head -c 400
 echo
+
+echo "== umkim app list =="
+"$CLI" app list | head -c 400
+echo
+
+echo "== umkim infra get hub =="
+"$CLI" infra get hub -o table | head -c 400
+echo
+
+echo "== umkim auth users list =="
+if "$CLI" auth users list 2>/dev/null | head -c 200; then
+  echo
+else
+  echo "(skipped: requires dcAdmin or auth unavailable)"
+fi
 
 echo "umkim CLI verify OK"

@@ -17,6 +17,7 @@ func clusterStorageCmd() *cobra.Command {
 		Short: "Configure cluster storage backends (NFS RWX)",
 	}
 	cmd.AddCommand(clusterStorageEnableLocalCmd())
+	cmd.AddCommand(clusterStorageValidateCmd())
 	cmd.AddCommand(clusterStorageStatusCmd())
 	return cmd
 }
@@ -136,6 +137,98 @@ The per-cluster subdirectory is <dir>/<cluster> unless --cluster-path is set.`,
 	c.Flags().StringVar(&storageClass, "storage-class", "nfs-client", "Kubernetes StorageClass name")
 	c.Flags().BoolVar(&force, "force", false, "Re-run configure even when already Applied")
 	c.Flags().DurationVar(&wait, "wait", 0, "Wait for Applied/Failed (e.g. 10m); 0 = return after request accepted")
+	return c
+}
+
+func clusterStorageValidateCmd() *cobra.Command {
+	var server, exportBase, clusterPath, storageClass, delegateHost, mountPath string
+	c := &cobra.Command{
+		Use:   "validate [cluster]",
+		Short: "Pre-validate external NFS storage (POST /validate-storage)",
+		Long: `Validate external NFS connectivity before configure (same as console Storage → Validate).
+
+Requires --server. Only nfs_external is supported by the API.`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := strings.TrimSpace(args[0])
+			server = strings.TrimSpace(server)
+			if server == "" {
+				return fmt.Errorf("--server required")
+			}
+			exportBase = strings.TrimSpace(exportBase)
+			if exportBase == "" {
+				exportBase = "/srv/fleet-nfs"
+			}
+			clusterPath = strings.TrimSpace(clusterPath)
+			if clusterPath == "" {
+				clusterPath = name
+			}
+			storageClass = strings.TrimSpace(storageClass)
+			if storageClass == "" {
+				storageClass = "nfs-client"
+			}
+			nfs := map[string]interface{}{
+				"enabled":      true,
+				"server":       server,
+				"exportBase":   exportBase,
+				"clusterPath":  clusterPath,
+				"storageClass": storageClass,
+			}
+			if delegateHost != "" {
+				nfs["delegateHost"] = delegateHost
+			}
+			if mountPath != "" {
+				nfs["mountPath"] = mountPath
+			}
+			body := map[string]interface{}{
+				"backend": "nfs_external",
+				"nfs":     nfs,
+			}
+			raw, code, err := api.Post("/clusters/"+name+"/validate-storage", body)
+			if err != nil {
+				return err
+			}
+			if code != http.StatusOK && code != http.StatusUnprocessableEntity {
+				if err := mustOK(raw, code); err != nil {
+					return err
+				}
+			}
+			var result struct {
+				OK     bool                     `json:"ok"`
+				Checks []map[string]interface{} `json:"checks"`
+			}
+			if err := json.Unmarshal(raw, &result); err != nil {
+				printJSON(raw)
+				return nil
+			}
+			format, ferr := outputFormat()
+			if ferr != nil {
+				return ferr
+			}
+			if format == output.FormatJSON {
+				printJSON(raw)
+			} else {
+				for _, chk := range result.Checks {
+					id := fmt.Sprint(chk["name"])
+					status := "fail"
+					if ok, _ := chk["ok"].(bool); ok {
+						status = "pass"
+					}
+					fmt.Printf("%s\t%s\t%s\n", id, status, chk["message"])
+				}
+			}
+			if !result.OK {
+				return fmt.Errorf("storage validation failed")
+			}
+			return nil
+		},
+	}
+	c.Flags().StringVar(&server, "server", "", "NFS server address (required)")
+	c.Flags().StringVar(&exportBase, "export-base", "/srv/fleet-nfs", "NFS export base path on server")
+	c.Flags().StringVar(&clusterPath, "cluster-path", "", "Export subdirectory (default: cluster name)")
+	c.Flags().StringVar(&storageClass, "storage-class", "nfs-client", "StorageClass name")
+	c.Flags().StringVar(&delegateHost, "delegate-host", "", "Optional delegate host for mount probe")
+	c.Flags().StringVar(&mountPath, "mount-path", "", "Optional client mount path for probe")
 	return c
 }
 

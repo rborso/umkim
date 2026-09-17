@@ -63,14 +63,24 @@ umkim site ingress delete SITE ID
 umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME
 
+umkim site delete NAME --confirm
+umkim site validate NAME
+
 umkim cluster list | get NAME | create -f cluster.yaml
 umkim cluster list --require gpu,kvm
 umkim cluster candidates [--require gpu|kvm|ha_topology|storage.rwx|…] [--site SITE]
 umkim cluster patch NAME [--jumphost user@host:port] [--ingress-id ID] [-f patch.json]
 umkim cluster provision NAME | wait NAME [--phase Ready] [--timeout 30m]
+umkim cluster validate NAME
+umkim cluster discover NAME [--wait 5m]
 umkim cluster bootstrap NAME [--ssh-user linux]
 umkim cluster delete NAME [--cleanup-kubernetes]
+umkim cluster ingress-auth enable NAME --lldap-password-file FILE [--expose-lldap-webui]
+umkim cluster ingress-auth disable NAME
+umkim cluster acme enable NAME
+umkim cluster acme disable NAME
 umkim cluster storage enable-local NAME [--dir /path] [--cluster-path NAME] [--force] [--wait 10m]
+umkim cluster storage validate NAME --server NFS_HOST [--export-base /path]
 umkim cluster storage status NAME
 umkim cluster platform enable-kubevirt NAME [--lan-bridge] [--bridge NAME] [--force] [--wait 45m]
 umkim cluster platform status NAME
@@ -86,18 +96,88 @@ umkim chart add --chart package.tgz [--name N] [--version V] [--image-policy …
 umkim chart add -f chart.json
 umkim chart delete NAME
 
+umkim app list | get NAME | create [--cluster C --chart CHART …] [-f app.json]
+umkim app delete NAME
+
+umkim infra get hub
+umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
+umkim acme get | set [--hub-enabled] [--staging] [--email E]
+umkim llm get | set [--hub-enabled] [--public-host H]
+
+umkim edge dns validate --host FQDN [--expected-ip IP]
+umkim edge hostname check --host FQDN
+
 umkim node list --cluster NAME
 umkim node add --cluster NAME --address IP [--hostname HN]
 umkim node remove --cluster NAME NODE [--force]
 umkim node replace --cluster NAME --old-node NODE --address IP [--force]
+umkim node patch --cluster NAME NODE --label key=value
 
 umkim node-op history --cluster NAME
 umkim node-op logs --cluster NAME --id ID
+umkim node-op validate --cluster NAME -f body.json [--phase pre|post]
+
+umkim auth users list
+umkim auth groups list
+umkim auth role-bindings list | get NAME | create -f rb.json | delete NAME
+umkim auth service-accounts list | create -f sa.json [--quiet-token]
+umkim auth audit list [--limit N]
+umkim auth llm-api-keys list | create --name N | delete NAME | rotate NAME | revoke NAME | activate NAME
 ```
 
 `chart add` mirrors console **Apps → Library** (`POST /charts`): OCI/HTTP origin
 JSON or multipart `.tgz` upload. Example:
 [examples/umkim/chart-add-oci.json](../../examples/umkim/chart-add-oci.json).
+
+### FleetApp installs
+
+Install Helm charts onto a Ready cluster (console **Apps → Install**):
+
+```bash
+umkim app list
+umkim app create --cluster lab-ha-0 --chart whoami --version 0.1.0 --route-mode none
+umkim app create -f examples/umkim/app-create-whoami.json
+umkim app get whoami
+umkim app delete whoami
+```
+
+See [fleet-apps.md](fleet-apps.md).
+
+### Hub infrastructure and platform toggles
+
+Mirror the console **Infrastructure** page:
+
+```bash
+umkim infra get hub
+umkim infra get hub -o table
+umkim ingress-auth get
+umkim ingress-auth set --hub-enabled --hub-lldap-webui
+umkim acme set --hub-enabled
+umkim llm set --hub-enabled --public-host llm.example.com
+```
+
+Per-cluster ingress auth and ACME:
+
+```bash
+umkim cluster ingress-auth enable CLUSTER --lldap-password-file /path/to/secret
+umkim cluster acme enable CLUSTER
+```
+
+Prefer `--lldap-password-file` over `--lldap-password` to avoid shell history leaks.
+
+### Access control admin
+
+`umkim auth` subcommands require the **dcAdmin** role (same as console **Access control**):
+
+```bash
+umkim auth users list
+umkim auth role-bindings create -f role-binding.json
+umkim auth service-accounts create -f sa.json
+umkim auth llm-api-keys create --name automation --display-name "CI bot"
+```
+
+Service account and LLM key tokens print once to stderr unless `--quiet-token` is set.
+See [fleet-console-auth.md](../fleet-console-auth.md).
 
 `cluster create` + `bootstrap` + `provision` + `wait` mirrors
 [playbooks/flows/cluster-create.yml](../../playbooks/flows/cluster-create.yml).

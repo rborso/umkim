@@ -440,6 +440,261 @@ func WriteNodeOps(raw []byte, format Format) error {
 	return nil
 }
 
+func WriteApps(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		Apps []map[string]interface{} `json:"apps"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	if format == FormatWide {
+		printTable(
+			[]string{"NAME", "CLUSTER", "CHART", "VERSION", "NAMESPACE", "PHASE", "ROUTE", "ROUTE_HOST"},
+			body.Apps,
+			func(a map[string]interface{}) []string {
+				route, _ := a["route"].(map[string]interface{})
+				mode := strField(route, "mode")
+				host := strField(route, "hubHost")
+				if host == "" {
+					host = strField(route, "siteHost")
+				}
+				return []string{
+					strField(a, "name"),
+					strField(a, "clusterName"),
+					truncate(strField(a, "chart"), 32),
+					strField(a, "version"),
+					strField(a, "namespace"),
+					strField(a, "phase"),
+					mode,
+					host,
+				}
+			},
+		)
+		return nil
+	}
+	printTable(
+		[]string{"NAME", "CLUSTER", "CHART", "PHASE", "ROUTE"},
+		body.Apps,
+		func(a map[string]interface{}) []string {
+			route, _ := a["route"].(map[string]interface{})
+			return []string{
+				strField(a, "name"),
+				strField(a, "clusterName"),
+				truncate(strField(a, "chart"), 32),
+				strField(a, "phase"),
+				strField(route, "mode"),
+			}
+		},
+	)
+	return nil
+}
+
+func WriteHubInfrastructure(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var hub map[string]interface{}
+	if err := json.Unmarshal(raw, &hub); err != nil {
+		return err
+	}
+	if format == FormatWide {
+		printTable(
+			[]string{"HOST", "SITE", "HUB_ZONE", "WIREGUARD", "GATEWAY", "PUBLIC"},
+			[]map[string]interface{}{hub},
+			func(h map[string]interface{}) []string {
+				return []string{
+					strField(h, "host_name"),
+					strField(h, "management_site_id"),
+					strField(h, "hub_zone"),
+					strField(h, "wireguard_ip"),
+					yesNo(boolField(h, "hub_gateway")),
+					strField(h, "public_endpoint"),
+				}
+			},
+		)
+		return nil
+	}
+	fmt.Printf("HOST\t%s\nSITE\t%s\nZONE\t%s\nWIREGUARD\t%s\n",
+		strField(hub, "host_name"),
+		strField(hub, "management_site_id"),
+		strField(hub, "hub_zone"),
+		strField(hub, "wireguard_ip"),
+	)
+	return nil
+}
+
+func WriteAuthUsers(raw []byte, format Format) error {
+	return writeAuthCRList(raw, format, "users", []string{"NAME", "DISPLAY", "AUTH", "GROUPS"},
+		func(item map[string]interface{}) []string {
+			spec, _ := item["spec"].(map[string]interface{})
+			meta, _ := item["metadata"].(map[string]interface{})
+			groups := joinStrings(spec, "groups")
+			return []string{
+				strField(meta, "name"),
+				specStr(spec, "displayName"),
+				specStr(spec, "authMethod"),
+				truncate(groups, 40),
+			}
+		})
+}
+
+func WriteAuthGroups(raw []byte, format Format) error {
+	return writeAuthCRList(raw, format, "groups", []string{"NAME", "DISPLAY"},
+		func(item map[string]interface{}) []string {
+			spec, _ := item["spec"].(map[string]interface{})
+			meta, _ := item["metadata"].(map[string]interface{})
+			return []string{strField(meta, "name"), specStr(spec, "displayName")}
+		})
+}
+
+func WriteAuthRoleBindings(raw []byte, format Format) error {
+	return writeAuthCRList(raw, format, "roleBindings", []string{"NAME", "ROLE", "SUBJECTS", "SCOPES"},
+		func(item map[string]interface{}) []string {
+			spec, _ := item["spec"].(map[string]interface{})
+			meta, _ := item["metadata"].(map[string]interface{})
+			roleRef, _ := spec["roleRef"].(map[string]interface{})
+			subjects := formatSubjects(spec["subjects"])
+			scopes := formatScopes(spec["scopes"])
+			return []string{
+				strField(meta, "name"),
+				strField(roleRef, "name"),
+				truncate(subjects, 40),
+				truncate(scopes, 40),
+			}
+		})
+}
+
+func WriteAuthServiceAccounts(raw []byte, format Format) error {
+	return writeAuthCRList(raw, format, "serviceAccounts", []string{"NAME", "DISPLAY"},
+		func(item map[string]interface{}) []string {
+			spec, _ := item["spec"].(map[string]interface{})
+			meta, _ := item["metadata"].(map[string]interface{})
+			return []string{strField(meta, "name"), specStr(spec, "displayName")}
+		})
+}
+
+func WriteAuthAudit(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		Events []map[string]interface{} `json:"auditEvents"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	printTable(
+		[]string{"TIME", "ACTOR", "ACTION", "RESULT", "PATH"},
+		body.Events,
+		func(ev map[string]interface{}) []string {
+			spec, _ := ev["spec"].(map[string]interface{})
+			actorObj, _ := spec["actor"].(map[string]interface{})
+			httpObj, _ := spec["http"].(map[string]interface{})
+			actorStr := strField(actorObj, "kind")
+			if n := strField(actorObj, "name"); n != "" {
+				if actorStr != "" {
+					actorStr += ":" + n
+				} else {
+					actorStr = n
+				}
+			}
+			return []string{
+				truncate(strField(spec, "timestamp"), 24),
+				truncate(actorStr, 24),
+				strField(spec, "action"),
+				strField(spec, "result"),
+				truncate(strField(httpObj, "path"), 48),
+			}
+		},
+	)
+	return nil
+}
+
+func WriteAuthLLMApiKeys(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		APIEndpoint string                   `json:"apiEndpoint"`
+		Keys        []map[string]interface{} `json:"keys"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	if body.APIEndpoint != "" {
+		fmt.Printf("API_ENDPOINT\t%s\n", body.APIEndpoint)
+	}
+	printTable(
+		[]string{"NAME", "DISPLAY", "PREFIX", "ACTIVE", "MODELS"},
+		body.Keys,
+		func(k map[string]interface{}) []string {
+			spec, _ := k["spec"].(map[string]interface{})
+			status, _ := k["status"].(map[string]interface{})
+			meta, _ := k["metadata"].(map[string]interface{})
+			return []string{
+				strField(meta, "name"),
+				specStr(spec, "displayName"),
+				strField(status, "keyPrefix"),
+				yesNo(boolField(status, "active")),
+				truncate(joinStrings(spec, "models"), 32),
+			}
+		},
+	)
+	return nil
+}
+
+func writeAuthCRList(raw []byte, format Format, key string, headers []string, rowFn func(map[string]interface{}) []string) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body map[string][]map[string]interface{}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	printTable(headers, body[key], rowFn)
+	return nil
+}
+
+func formatSubjects(raw interface{}) string {
+	list, ok := raw.([]interface{})
+	if !ok {
+		return ""
+	}
+	parts := make([]string, 0, len(list))
+	for _, item := range list {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		parts = append(parts, strField(m, "kind")+":"+strField(m, "name"))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func formatScopes(raw interface{}) string {
+	list, ok := raw.([]interface{})
+	if !ok {
+		return ""
+	}
+	parts := make([]string, 0, len(list))
+	for _, item := range list {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		parts = append(parts, strField(m, "kind")+"/"+strField(m, "name"))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func clusterPhase(c map[string]interface{}) string {
 	if p := strField(c, "provisioning_phase"); p != "" {
 		return p

@@ -49,6 +49,11 @@ service (dc-admin only). Browser and console traffic uses
 `/fleet/auth/v1alpha1/llm-api-keys` via the nginx proxy. Key names are not
 org-prefixed.
 
+Automation can use the same auth API via `umkim auth` (list/create/rotate LLM
+keys, role bindings, service accounts). Tokens are shown once on create/rotate;
+use `--quiet-token` when parsing JSON only. See
+[umkim-cli.md](components/umkim-cli.md).
+
 ## Operational guidance
 
 - Bootstrap the first administrator through the supported installation flow;

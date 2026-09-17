@@ -42,6 +42,8 @@ func siteCmd() *cobra.Command {
 	cmd.AddCommand(siteHostCmd())
 	cmd.AddCommand(siteProvisionCmd())
 	cmd.AddCommand(siteInventoryCmd())
+	cmd.AddCommand(siteDeleteCmd())
+	cmd.AddCommand(siteValidateCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List sites",
@@ -124,4 +126,52 @@ func sitePatchCmd() *cobra.Command {
 	c.Flags().StringVar(&failureDomain, "failure-domain", "", "Failure domain label")
 	c.Flags().StringVar(&displayName, "display-name", "", "Display name")
 	return c
+}
+
+func siteDeleteCmd() *cobra.Command {
+	var confirm bool
+	c := &cobra.Command{
+		Use:   "delete [name]",
+		Short: "Delete a registry site (DELETE /sites/{name})",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !confirm {
+				return fmt.Errorf("--confirm required")
+			}
+			raw, code, err := api.Delete("/sites/" + args[0])
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200, 202, 204); err != nil {
+				return err
+			}
+			fmt.Printf("OK: site %q deleted\n", args[0])
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&confirm, "confirm", false, "Confirm site deletion")
+	return c
+}
+
+func siteValidateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "validate [name]",
+		Short: "Validate site intent (POST /sites/{name}/validate)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, code, err := api.Post("/sites/"+args[0]+"/validate", nil)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code); err != nil {
+				return err
+			}
+			if len(raw) > 0 {
+				printJSON(raw)
+			} else {
+				fmt.Printf("OK: site %q validation passed\n", args[0])
+			}
+			return nil
+		},
+	}
 }
