@@ -16,11 +16,32 @@
   ansible.builtin.shell: |
     set -euo pipefail
     want="{{ calico_node_ipv4 }}"
-    ip -4 -o addr show | awk -v want="$want" '
-      {
-        split($4, p, "/")
-        if (p[1] == want) { sub(/:$/, "", $2); print $2; exit }
-      }'
+    bridge="{{ kubevirt_bridge_host_bridge | default('n0p0_mgmt_nw') }}"
+    ip_on_iface() {
+      ip -4 -o addr show dev "$1" 2>/dev/null | awk -v want="$want" '
+        { split($4, p, "/"); if (p[1] == want) { found=1 } } END { exit(found ? 0 : 1) }'
+    }
+    if ip_on_iface "${bridge}"; then
+      echo "${bridge}"
+      exit 0
+    fi
+    plain=""
+    bridge_match=""
+    while IFS= read -r iface; do
+      [[ -n "${iface}" ]] || continue
+      iface="${iface%%@*}"
+      if [[ -d "/sys/class/net/${iface}/bridge" ]]; then
+        bridge_match="${iface}"
+        break
+      fi
+      [[ -z "${plain}" ]] && plain="${iface}"
+    done < <(ip -4 -o addr show | awk -v want="$want" '
+      { split($4, p, "/"); if (p[1] == want) { sub(/:$/, "", $2); print $2 } }')
+    if [[ -n "${bridge_match}" ]]; then
+      echo "${bridge_match}"
+    elif [[ -n "${plain}" ]]; then
+      echo "${plain}"
+    fi
   args:
     executable: /bin/bash
   register: calico_iface_detect

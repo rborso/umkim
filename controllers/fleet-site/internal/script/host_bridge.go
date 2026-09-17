@@ -98,6 +98,17 @@ current_gateway() {
   ip -4 route show default 2>/dev/null | awk '{print $3; exit}'
 }
 
+# DHCP may re-add /32 or other addresses on the enslaved NIC; Calico breaks if it
+# still autodetects that interface instead of the bridge.
+flush_slave_ipv4() {
+  local slave="$1"
+  [[ -n "${slave}" ]] || return 0
+  ip -4 -o addr show dev "${slave}" 2>/dev/null | while read -r _ _ cidr _; do
+    log "Removing stray IPv4 ${cidr} from bridge slave ${slave}"
+    ip addr del "${cidr}" dev "${slave}" 2>/dev/null || true
+  done
+}
+
 # Final desired state: MGMT_IP on BRIDGE_NAME, optional slave under that bridge.
 already_ok() {
   local slave="$1"
@@ -271,6 +282,7 @@ main() {
   log "mgmtIp=${MGMT_IP} ipIface=${ip_iface} bridge=${BRIDGE_NAME} slave=${slave:-none} keepIp=${KEEP_IP}"
 
   if already_ok "${slave}"; then
+    flush_slave_ipv4 "${slave}"
     log "Bridge ${BRIDGE_NAME} already configured for ${MGMT_IP}; nothing to do"
     exit 0
   fi
@@ -308,6 +320,7 @@ main() {
   fi
 
   sleep 2
+  flush_slave_ipv4 "${slave}"
   if ! ip link show "${BRIDGE_NAME}" >/dev/null 2>&1; then
     log "ERROR: bridge ${BRIDGE_NAME} missing after configure"
     exit 1

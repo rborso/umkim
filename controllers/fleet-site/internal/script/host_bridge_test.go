@@ -35,6 +35,7 @@ func TestRenderHostBridgeEnabled(t *testing.T) {
 		"assert_not_already_bridged",
 		"nmcli connection add type bridge",
 		"fleet-kubevirt-bridge",
+		"flush_slave_ipv4",
 		"usage: $0 <mgmt_ipv4>",
 	} {
 		if !strings.Contains(out, want) {
@@ -63,6 +64,10 @@ func TestRenderBundleModeKubevirtBridgeHooks(t *testing.T) {
 	for _, want := range []string{
 		"run_kubevirt_host_bridge_local",
 		"run_kubevirt_host_bridge_peers",
+		"inventory_mgmt_peer_ips",
+		"mapfile -t peers",
+		"ensure_kernel_modules_peer \"${host}\" < /dev/null &",
+		"wait_for_ssh_host \"${host}\" \"${key_file}\"",
 		"configure-kubevirt-bridge.sh",
 		"local_mgmt_ip_from_inventory",
 		"bash \"${script}\" \"${mgmt_ip}\"",

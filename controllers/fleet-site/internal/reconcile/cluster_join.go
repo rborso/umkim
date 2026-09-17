@@ -820,7 +820,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 			b.WriteString(fmt.Sprintf("k3s_control_plane_vip=%s\n", vip))
 			b.WriteString(fmt.Sprintf("k3s_cluster_join_server=https://%s:6443\n", vip))
 		}
-		writeFleetClusterK3sNetworkVars(&b)
+		writeFleetClusterK3sNetworkVars(&b, fcj)
 		writeHarborBootstrapVars(&b, r.Cfg.HubWireguardIP, r.harborAdminPassword(ctx))
 		b.WriteString("harbor_enable_quay_mirror=false\n")
 		b.WriteString(fmt.Sprintf("fleet_site_min_root_disk_gi=%d\n", minDisk))
@@ -850,7 +850,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString(fmt.Sprintf("fleet_site_id=%s\n", fcj.Spec.SiteId))
 		b.WriteString(fmt.Sprintf("fleet_site_wg_ip=%s/32\n", bootstrapWG))
 		b.WriteString(fmt.Sprintf("fleet_site_sp_endpoint=%s\n", bootstrapWG))
-		writeFleetClusterK3sNetworkVars(&b)
+		writeFleetClusterK3sNetworkVars(&b, fcj)
 		writeFleetClusterStorageVars(&b, fcj, clusterName)
 		writeFleetClusterEdgeVars(&b, fcj, site)
 		b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
@@ -891,7 +891,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	b.WriteString(fmt.Sprintf("fleet_hub_wireguard_ip=%s\n", r.Cfg.HubWireguardIP))
 	writeFleetClusterWireguardEndpointVars(&b, r.Cfg)
 	b.WriteString(fmt.Sprintf("fleet_site_min_root_disk_gi=%d\n", minDisk))
-	writeFleetClusterK3sNetworkVars(&b)
+	writeFleetClusterK3sNetworkVars(&b, fcj)
 	writeHarborBootstrapVars(&b, r.Cfg.HubWireguardIP, r.harborAdminPassword(ctx))
 	b.WriteString("harbor_enable_quay_mirror=false\n")
 	b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
@@ -917,7 +917,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	b.WriteString(fmt.Sprintf("fleet_cluster_kvm=%s\n", kubevirtEnable))
 	b.WriteString("fleet_site_auto_install_kubevirt_operator=false\n")
 	writeFleetClusterKubevirtBridgeVars(&b, fcj)
-	writeFleetClusterK3sNetworkVars(&b)
+	writeFleetClusterK3sNetworkVars(&b, fcj)
 	writeFleetClusterStorageVars(&b, fcj, clusterName)
 	writeFleetClusterEdgeVars(&b, fcj, site)
 	b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
@@ -1016,9 +1016,15 @@ func writeFleetClusterKubevirtBridgeVars(b *strings.Builder, fcj *fleetv1alpha1.
 	}
 }
 
-func writeFleetClusterK3sNetworkVars(b *strings.Builder) {
-	// auto: bundle Calico role detects the management LAN NIC per node (see roles/calico/tasks/detect_iface.yml).
-	b.WriteString("calico_ip_autodetection_method=auto\n")
+func writeFleetClusterK3sNetworkVars(b *strings.Builder, fcj *fleetv1alpha1.FleetClusterJoin) {
+	// When the host bridge moves mgmt IP off the slave NIC, Calico must autodetect the bridge interface.
+	if fcj != nil && fcj.Spec.WantsKubevirtBridge() {
+		hb := fcj.Spec.Providers.KubevirtBridge
+		b.WriteString(fmt.Sprintf("calico_ip_autodetection_method=interface=%s\n", hb.EffectiveBridgeName()))
+	} else {
+		// auto: bundle Calico role detects the management LAN NIC per node (see roles/calico/tasks/detect_iface.yml).
+		b.WriteString("calico_ip_autodetection_method=auto\n")
+	}
 	b.WriteString(fmt.Sprintf("fleet_cluster_wireguard_interface=%s\n", wg.OverlayInterfaceName))
 	b.WriteString("k3s_bind_address=0.0.0.0\n")
 	b.WriteString("k3s_node_ip={{ fleet_node_mgmt_address | default(ansible_host) }}\n")

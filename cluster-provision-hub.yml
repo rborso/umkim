@@ -51,6 +51,39 @@
       when: k3s_cluster_mode | default(false) | bool
       tags: [harbor, harbor_registries, fleet_cluster_provision]
 
+- name: Fleet cluster provision | Longhorn host dependencies on all nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_longhorn
+        tasks_from: host_deps.yml
+      when: fleet_cluster_longhorn_enabled | default(false) | bool
+      tags: [fleet_cluster_longhorn, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Longhorn data disk prep on control nodes
+  hosts: fleet_cluster_control
+  become: true
+  gather_facts: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_longhorn
+        tasks_from: disk_prep.yml
+      when: fleet_cluster_longhorn_enabled | default(false) | bool
+      tags: [fleet_cluster_longhorn, fleet_cluster_provision]
+
+- name: Fleet cluster provision | Longhorn install on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_longhorn
+        tasks_from: install.yml
+      when: fleet_cluster_longhorn_enabled | default(false) | bool
+      tags: [fleet_cluster_longhorn, fleet_cluster_provision]
+
 - name: Fleet cluster provision | Hub registration and ManifestWorks
   hosts: hub
   become: true

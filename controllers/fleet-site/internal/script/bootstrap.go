@@ -255,7 +255,11 @@ ensure_kernel_modules_local() {
 
 wait_for_ssh_host() {
   local host="$1" i
-  local ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes)
+  local key_file="${2:-}"
+  local -a ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes)
+  if [[ -n "${key_file}" ]]; then
+    ssh_opts+=(-i "${key_file}")
+  fi
   for i in $(seq 1 60); do
     if ssh "${ssh_opts[@]}" "linux@${host}" "true" 2>/dev/null; then
       return 0
@@ -263,6 +267,17 @@ wait_for_ssh_host() {
     sleep 5
   done
   return 1
+}
+
+inventory_mgmt_peer_ips() {
+  local host
+  while IFS= read -r host; do
+    [[ -n "${host}" ]] || continue
+    if is_local_mgmt_host "${host}"; then
+      continue
+    fi
+    printf '%s\n' "${host}"
+  done < <(inventory_mgmt_ips)
 }
 
 ensure_kernel_modules_peer() {
@@ -299,7 +314,7 @@ PEEREOF
     return 0
   fi
   log "Waiting for peer ${host} after kernel module reboot..."
-  wait_for_ssh_host "${host}" || { log "ERROR: peer ${host} unreachable after reboot"; return 1; }
+  wait_for_ssh_host "${host}" "${key_file}" || { log "ERROR: peer ${host} unreachable after reboot"; return 1; }
   ssh -i "${key_file}" "${ssh_opts[@]}" "linux@${host}" "sudo bash -s" <<<"${remote_script}" || {
     log "ERROR: kernel modules still unavailable on peer ${host} after reboot"
     return 1
@@ -310,18 +325,16 @@ PEEREOF
 ensure_kernel_modules_peers() {
   local key_file="${BUNDLE_DIR}/ssh/id_rsa"
   local host
+  local -a peers=()
   local -a pids=()
   [[ -f "${key_file}" ]] || return 0
   chmod 600 "${key_file}"
-  while IFS= read -r host; do
-    [[ -n "${host}" ]] || continue
-    if is_local_mgmt_host "${host}"; then
-      continue
-    fi
+  mapfile -t peers < <(inventory_mgmt_peer_ips)
+  for host in "${peers[@]}"; do
     log "Ensuring kernel modules on peer ${host}"
-    ensure_kernel_modules_peer "${host}" &
+    ensure_kernel_modules_peer "${host}" < /dev/null &
     pids+=("$!")
-  done < <(inventory_mgmt_ips)
+  done
   for pid in "${pids[@]}"; do
     wait "${pid}" || exit 1
   done
@@ -450,14 +463,13 @@ run_kubevirt_host_bridge_peers() {
   local script="${BUNDLE_DIR}/configure-kubevirt-bridge.sh"
   local key_file="${BUNDLE_DIR}/ssh/id_rsa"
   local ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=2)
+  local -a peers=()
   local host remote
   [[ -f "${key_file}" ]] || { log "ERROR: no bundle SSH key; cannot configure peer bridges"; exit 1; }
   chmod 600 "${key_file}"
-  while IFS= read -r host; do
-    [[ -n "${host}" ]] || continue
-    if is_local_mgmt_host "${host}"; then
-      continue
-    fi
+  mapfile -t peers < <(inventory_mgmt_peer_ips)
+  for host in "${peers[@]}"; do
+    wait_for_ssh_host "${host}" "${key_file}" || { log "ERROR: peer ${host} unreachable before bridge configure"; exit 1; }
     log "Configuring KubeVirt host bridge on peer ${host}"
     remote="/tmp/configure-kubevirt-bridge.sh"
     scp -i "${key_file}" "${ssh_opts[@]}" "${script}" "linux@${host}:${remote}" || {
@@ -471,7 +483,7 @@ run_kubevirt_host_bridge_peers() {
       log "ERROR: peer ${host} bridge configure failed"
       exit 1
     fi
-  done < <(inventory_mgmt_ips)
+  done
 }
 {{ end -}}
 

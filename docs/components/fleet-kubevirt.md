@@ -104,9 +104,20 @@ Discovery sets:
 ## Implementation notes
 
 - Playbook: `cluster-configure-kubevirt.yml` imports `kubevirt_host_bridge` on
-  all nodes (when LAN bridge is requested), then
+  all nodes (when LAN bridge is requested), reconciles Calico autodetection to
+  the bridge interface on bootstrap, then
   `roles/fleet_site/tasks/push_site_kubevirt_platform.yml`
 - Roles: `kubevirt_host_bridge`, `kubevirt_stack`, `kubevirt_bridge_nad`
+- Day-2 LAN bridge moves the node management IP onto `n0p0_mgmt_nw` (default).
+  Calico must use `IP_AUTODETECTION_METHOD=interface=<bridge>` afterward;
+  stray DHCP `/32` addresses on the enslaved NIC are flushed by
+  `configure-kubevirt-bridge.sh`. Bootstrap with LAN bridge runs the same script
+  on the bootstrap node and **every peer** control node before Calico install
+  (peer jobs use the bundle SSH key with stdin detached so parallel kernel-module
+  work cannot skip the last peer). Inventory sets
+  `calico_ip_autodetection_method=interface=<bridge>` when
+  `spec.providers.kubevirtBridge.enabled` is true; `roles/calico/tasks/detect_iface.yml`
+  also prefers the bridge when it already carries the management IP.
 - Pins: `roles/kubevirt_stack/defaults/main.yml`
 - Runner image must COPY `cluster-configure-kubevirt.yml` (see
   `images/fleet-ansible-runner/Dockerfile`); rebuild/push

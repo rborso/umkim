@@ -124,6 +124,33 @@ func TestBuildClusterInventoryINI_haHubRunnerKeepsMgmtOnNodes(t *testing.T) {
 	}
 }
 
+func TestBuildClusterInventoryINI_haKubevirtBridgeUsesCalicoBridgeAutodetection(t *testing.T) {
+	r := testClusterJoinReconciler()
+	fcj := &fleetv1alpha1.FleetClusterJoin{
+		Spec: fleetv1alpha1.FleetClusterJoinSpec{
+			ClusterName:     "lab-ha-0",
+			SiteId:          "homelab",
+			BootstrapHost:   "172.16.10.101",
+			Topology:        fleetv1alpha1.ClusterTopologyHA3Node,
+			ControlPlaneVip: "172.16.10.100",
+			Providers: fleetv1alpha1.ClusterProvidersSpec{
+				Install: fleetv1alpha1.ProviderInstallSpec{Kubevirt: true},
+				KubevirtBridge: fleetv1alpha1.KubevirtBridgeSpec{
+					Enabled:    true,
+					BridgeName: "n0p0_mgmt_nw",
+				},
+			},
+		},
+	}
+	nodes := []wg.NodeWG{
+		{Hostname: "lab-ha-0-cp1", Address: "172.16.10.101", WGAddress: "10.10.0.12/32", Role: fleetv1alpha1.NodeRoleControl},
+	}
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, false)
+	if !strings.Contains(ini, "calico_ip_autodetection_method=interface=n0p0_mgmt_nw") {
+		t.Fatalf("kubevirt bridge inventory must pin Calico to bridge interface, got:\n%s", ini)
+	}
+}
+
 func TestBuildClusterInventoryINI_haHubRunnerJumphostUsesMgmtLAN(t *testing.T) {
 	r := testClusterJoinReconciler()
 	fcj := &fleetv1alpha1.FleetClusterJoin{
