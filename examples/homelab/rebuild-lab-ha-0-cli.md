@@ -212,11 +212,10 @@ curl "${HDR[@]}" -X POST "$API/apps" -d '{
   "route":{"mode":"hub","hubHost":"petclinic-ha.demo.otthol.hu"}
 }'
 
-# Rocky 10 KubeVirt VM on mgmt-l2 (no route)
-curl "${HDR[@]}" -X POST "$API/apps" -d "$(jq -n \
-  --arg yaml "cpu: 2\nmemory: 2Gi\ndisk:\n  size: 20Gi\n  storageClass: longhorn\n  volumeMode: Filesystem\nnetwork:\n  mode: lan\n  multusNetwork: default/mgmt-l2" \
-  '{name:"rocky-lan-ha",clusterName:"lab-ha-0",chart:"rocky-10-vm",version:"0.1.1",
-    releaseName:"rocky-lan-ha",namespace:"default",valuesYaml:$yaml,route:{mode:"none"}}')"
+# Rocky 10 KubeVirt VM on mgmt-l2 with static LAN IP (no route)
+umkim app create --cluster lab-ha-0 --chart rocky-10-vm --version 0.1.2 \
+  --release rocky-lan-ha --route-mode none \
+  --values-file examples/homelab/rocky-lan-ha-values.yaml
 ```
 
 Poll: `curl "${HDR[@]}" "$API/apps/whoami-ha" | jq .phase` → `Ready`.

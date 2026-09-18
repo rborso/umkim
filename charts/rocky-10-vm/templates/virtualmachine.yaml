@@ -98,6 +98,34 @@ spec:
                 expire: false
                 list: |
                   {{ .Values.cloudInit.user | default "rocky" }}:{{ .Values.cloudInit.password | default "rocky" }}
+              {{- if .Values.network.staticIP }}
+              {{- $iface := .Values.network.interface | default "enp1s0" }}
+              write_files:
+                - path: /etc/NetworkManager/system-connections/{{ $iface }}-static.nmconnection
+                  permissions: "0600"
+                  content: |
+                    [connection]
+                    id={{ $iface }}-static
+                    type=ethernet
+                    interface-name={{ $iface }}
+                    autoconnect=true
+
+                    [ethernet]
+
+                    [ipv4]
+                    method=manual
+                    address1={{ .Values.network.staticIP }}{{ if .Values.network.gateway }},{{ .Values.network.gateway }}{{ end }}
+                    {{- with .Values.network.dns }}
+                    dns={{ join ";" . }};
+                    {{- end }}
+
+                    [ipv6]
+                    method=ignore
+              runcmd:
+                - nmcli con delete "Wired connection 1" 2>/dev/null || true
+                - nmcli con load /etc/NetworkManager/system-connections/{{ $iface }}-static.nmconnection
+                - nmcli con up {{ $iface }}-static
+              {{- end }}
               {{- with .Values.cloudInit.extraUserData }}
               {{ . | nindent 14 }}
               {{- end }}

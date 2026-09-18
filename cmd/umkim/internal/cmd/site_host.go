@@ -74,7 +74,9 @@ func siteHostProvisionCmd() *cobra.Command {
 			if action != "" {
 				body["action"] = action
 			}
-			raw, code, err := api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/provision", body)
+			raw, code, err := retryOnHTTP409(func() ([]byte, int, error) {
+				return api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/provision", body)
+			})
 			if err != nil {
 				return err
 			}
@@ -108,7 +110,9 @@ func siteHostDestroyCmd() *cobra.Command {
 				"action":  "destroy",
 				"confirm": true,
 			}
-			raw, code, err := api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/provision", body)
+			raw, code, err := retryOnHTTP409(func() ([]byte, int, error) {
+				return api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/provision", body)
+			})
 			if err != nil {
 				return err
 			}

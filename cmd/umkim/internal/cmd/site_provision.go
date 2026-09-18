@@ -139,7 +139,9 @@ func siteProvisionRunCmd() *cobra.Command {
 					"osFamily":     osFamily,
 				}
 			}
-			raw, code, err := api.Post("/sites/"+args[0]+"/provision/actions", body)
+			raw, code, err := retryOnHTTP409(func() ([]byte, int, error) {
+				return api.Post("/sites/"+args[0]+"/provision/actions", body)
+			})
 			if err != nil {
 				return err
 			}

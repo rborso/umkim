@@ -70,8 +70,10 @@ disk:
 
 The chart imports Rocky 10 GenericCloud via CDI (`volumeMode: Filesystem` is
 required for Longhorn in this lab) and applies cloud-init (default serial
-login `rocky` / `rocky`). See [fleet-kubevirt.md](fleet-kubevirt.md) and
-[charts/rocky-10-vm/README.md](../../charts/rocky-10-vm/README.md).
+login `rocky` / `rocky`). For LAN guests, set `network.staticIP`, `gateway`,
+and `dns` — Rocky GenericCloud ignores cloud-init `network:` v2, so the chart
+writes a NetworkManager keyfile instead. See [fleet-kubevirt.md](fleet-kubevirt.md)
+and [charts/rocky-10-vm/README.md](../../charts/rocky-10-vm/README.md).
 
 Short chart names expand to the hub Harbor prefix, for example `whoami` →
 `oci://<hub-overlay-ip>:30443/charts/whoami`. Charts must match the

@@ -89,7 +89,9 @@ func siteInventorySyncCmd() *cobra.Command {
 		Short: "Push connector inventory to jumphost",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			raw, code, err := api.Post("/sites/"+args[0]+"/provision/inventory/sync", map[string]interface{}{})
+			raw, code, err := retryOnHTTP409(func() ([]byte, int, error) {
+				return api.Post("/sites/"+args[0]+"/provision/inventory/sync", map[string]interface{}{})
+			})
 			if err != nil {
 				return err
 			}

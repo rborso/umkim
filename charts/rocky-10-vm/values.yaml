@@ -21,6 +21,11 @@ network:
   # pod = masquerade on the pod network; lan = Multus bridge (requires NAD)
   mode: pod
   multusNetwork: default/mgmt-l2
+  # LAN static IPv4 (Rocky GenericCloud ignores cloud-init network: v2; chart uses NetworkManager).
+  staticIP: ""
+  gateway: ""
+  dns: []
+  interface: enp1s0
 
 cloudInit:
   # Default local user for serial/VNC console smoke tests. Override in production.
