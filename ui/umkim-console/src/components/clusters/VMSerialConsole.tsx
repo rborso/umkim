@@ -38,7 +38,7 @@ export function VMSerialConsole({ clusterName, namespace, name, active }: Props)
     );
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => {
-      term.writeln('Connected.');
+      term.writeln('Connected. Click here, then type (login: rocky / rocky).');
       term.focus();
     };
     ws.onmessage = (ev) => {
@@ -51,9 +51,15 @@ export function VMSerialConsole({ clusterName, namespace, name, active }: Props)
     ws.onerror = () => term.writeln('\r\n[console error]');
     ws.onclose = () => term.writeln('\r\n[disconnected]');
     const disp = term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
+      if (ws.readyState !== WebSocket.OPEN) {
+        return;
       }
+      // Match umkim CLI / KubeVirt: send keystrokes as binary frames.
+      ws.send(new TextEncoder().encode(data));
+    });
+    term.attachCustomKeyEventHandler((event) => {
+      event.stopPropagation();
+      return true;
     });
     const onResize = () => fit.fit();
     window.addEventListener('resize', onResize);
@@ -74,7 +80,20 @@ export function VMSerialConsole({ clusterName, namespace, name, active }: Props)
     <div
       ref={containerRef}
       data-testid="vm-serial-console"
-      style={{ height: '420px', width: '100%', background: '#1e1e1e', padding: '4px' }}
+      role="application"
+      tabIndex={0}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        termRef.current?.focus();
+      }}
+      style={{
+        height: '420px',
+        width: '100%',
+        background: '#1e1e1e',
+        padding: '4px',
+        outline: 'none',
+        cursor: 'text',
+      }}
     />
   );
 }

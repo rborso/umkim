@@ -45,6 +45,7 @@ spec:
         cpu:
           cores: {{ int .Values.cpu }}
         devices:
+          autoattachSerialConsole: true
           disks:
             - name: rootdisk
               disk:
@@ -52,6 +53,9 @@ spec:
             - name: cloudinitdisk
               disk:
                 bus: virtio
+          consoles:
+            - name: default
+              serial: {}
           interfaces:
             {{- if eq (.Values.network.mode | default "pod") "lan" }}
             - name: lan
@@ -121,7 +125,11 @@ spec:
 
                     [ipv6]
                     method=ignore
+              {{- end }}
               runcmd:
+                - systemctl enable --now serial-getty@ttyS0.service
+              {{- if .Values.network.staticIP }}
+              {{- $iface := .Values.network.interface | default "enp1s0" }}
                 - nmcli con delete "Wired connection 1" 2>/dev/null || true
                 - nmcli con load /etc/NetworkManager/system-connections/{{ $iface }}-static.nmconnection
                 - nmcli con up {{ $iface }}-static

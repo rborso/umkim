@@ -23,7 +23,7 @@ harbor_charts_to_push:
   - name: llama-cpp-helm
     version: 0.1.2
   - name: rocky-10-vm
-    version: 0.1.2
+    version: 0.1.3
 harbor_chart_repositories: []
 harbor_fleet_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}"
 harbor_fleet_image_prefix: "{{ harbor_fleet_registry }}/{{ harbor_fleet_project }}"
