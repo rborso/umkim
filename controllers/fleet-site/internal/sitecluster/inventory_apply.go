@@ -258,30 +258,42 @@ func applyInventoryReplaceControl(ctx context.Context, c client.Client, cfg conf
 }
 
 func syncInventoryGuestClusterStatus(ctx context.Context, c client.Client, ns, siteName string, h yaidap.InventoryHostView) error {
-	if h.Status.Cluster == nil || h.Status.Cluster.FCJName == "" && h.Status.Cluster.ClusterName == "" {
+	rawDoc, err := yaidap.LoadStatusDoc(ctx, c, ns, siteName)
+	if err != nil {
+		return err
+	}
+	rawCluster := (*fleetv1alpha1.SiteHostClusterStatus)(nil)
+	if g, ok := rawDoc.Guests[h.Name]; ok {
+		rawCluster = g.Cluster
+	}
+	if yaidap.GuestClusterStatusNeedsFCJEnrich(rawCluster) {
+		fcjSt, ok := yaidap.FCJClusterStatusForHost(ctx, c, ns, siteName, h.Name)
+		if !ok {
+			return nil
+		}
+		return yaidap.UpdateGuestStatus(ctx, c, ns, siteName, h.Name, yaidap.GuestStatus{Cluster: fcjSt})
+	}
+	if rawCluster == nil || rawCluster.FCJName == "" && rawCluster.ClusterName == "" {
 		return nil
 	}
-	fcjName := h.Status.Cluster.FCJName
+	fcjName := rawCluster.FCJName
 	if fcjName == "" {
-		fcjName = h.Status.Cluster.ClusterName
+		fcjName = rawCluster.ClusterName
 	}
 	fcj, err := nodeops.FindFleetClusterJoin(ctx, c, ns, fcjName)
 	if err != nil {
 		if nodeops.IsClusterNotFound(err) {
-			if h.Status.Cluster != nil {
-				return yaidap.UpdateGuestStatus(ctx, c, ns, siteName, h.Name, yaidap.GuestStatus{
-					Cluster: &fleetv1alpha1.SiteHostClusterStatus{},
-				})
-			}
-			return nil
+			return yaidap.UpdateGuestStatus(ctx, c, ns, siteName, h.Name, yaidap.GuestStatus{
+				Cluster: &fleetv1alpha1.SiteHostClusterStatus{},
+			})
 		}
 		return err
 	}
 	st := clusterStatusFromFCJ(nil, fcjName, fcj)
-	if h.Status.Cluster != nil {
-		st.Mode = h.Status.Cluster.Mode
+	if rawCluster != nil {
+		st.Mode = rawCluster.Mode
 	}
-	if st.Phase == h.Status.Cluster.Phase && st.Message == h.Status.Cluster.Message {
+	if st.Phase == rawCluster.Phase && st.Message == rawCluster.Message {
 		return nil
 	}
 	return yaidap.UpdateGuestStatus(ctx, c, ns, siteName, h.Name, yaidap.GuestStatus{Cluster: &st})

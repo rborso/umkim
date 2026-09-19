@@ -127,13 +127,17 @@ Verify: `virsh list --all` shows no `lab-ha-0-*`; `ls /opt/local/lab-ha-0*` → 
 
 ## Phase 3 — Recreate VMs
 
-Ensure inventory includes worker `lab-ha-0-w1`:
+Ensure inventory includes worker `lab-ha-0-w1` (guest + `add_worker` group, not in the HA enroll group):
 
 ```bash
 umkim site inventory files put homelab --path guests.yml \
   --file examples/homelab/inventory/guests.yml
 umkim site inventory files put homelab --path host_vars/lab-ha-0-w1.yml \
   --file examples/homelab/inventory/host_vars/lab-ha-0-w1.yml
+umkim site inventory files put homelab --path lab-ha-0-w1.yml \
+  --file examples/homelab/inventory/lab-ha-0-w1.yml
+umkim site inventory files put homelab --path group_vars/lab-ha-0-w1.yml \
+  --file examples/homelab/inventory/group_vars/lab-ha-0-w1.yml
 umkim site inventory sync homelab --wait
 ```
 

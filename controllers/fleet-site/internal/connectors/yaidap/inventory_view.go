@@ -128,15 +128,21 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 	}
 	clustersDoc := LoadClustersFromData(data)
 	statusDoc := loadStatusDoc(data)
-	memberClusters := map[string][]string{}
+	fcjHosts := loadFCJHostIndex(ctx, c, ns, siteName)
+	memberClusters := fcjHosts.clusters
 	for cname, spec := range clustersDoc.Clusters {
 		for _, m := range spec.Members {
-			memberClusters[m] = append(memberClusters[m], cname)
+			memberClusters[m] = appendClusterName(memberClusters[m], cname)
 		}
 	}
 	var out []InventoryHostView
 	addGuest := func(name string, entry GuestEntry, kind string, external bool) {
 		st := statusDoc.Guests[name]
+		if guestClusterStatusNeedsFCJEnrich(st.Cluster) {
+			if fcjSt, ok := fcjHosts.status[name]; ok {
+				st.Cluster = cloneSiteHostClusterStatus(fcjSt)
+			}
+		}
 		if st.Phase == "" {
 			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
 		}
@@ -174,6 +180,11 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 	}
 	for name, entry := range hypervisors.Hypervisors.Hosts {
 		st := statusDoc.Guests[name]
+		if guestClusterStatusNeedsFCJEnrich(st.Cluster) {
+			if fcjSt, ok := fcjHosts.status[name]; ok {
+				st.Cluster = cloneSiteHostClusterStatus(fcjSt)
+			}
+		}
 		if st.Phase == "" {
 			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
 		}
@@ -190,6 +201,100 @@ func ListInventoryHosts(ctx context.Context, c client.Client, ns, siteName strin
 		})
 	}
 	return out, nil
+}
+
+type fcjHostIndex struct {
+	clusters map[string][]string
+	status   map[string]fleetv1alpha1.SiteHostClusterStatus
+}
+
+func loadFCJHostIndex(ctx context.Context, c client.Client, ns, siteName string) fcjHostIndex {
+	out := fcjHostIndex{
+		clusters: map[string][]string{},
+		status:   map[string]fleetv1alpha1.SiteHostClusterStatus{},
+	}
+	var list fleetv1alpha1.FleetClusterJoinList
+	if err := c.List(ctx, &list, client.InNamespace(ns)); err != nil {
+		return out
+	}
+	for i := range list.Items {
+		fcj := list.Items[i]
+		if strings.TrimSpace(fcj.Spec.SiteId) != strings.TrimSpace(siteName) {
+			continue
+		}
+		clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)
+		for _, node := range fcj.Spec.Nodes {
+			host := strings.TrimSpace(node.Hostname)
+			if host == "" {
+				continue
+			}
+			out.clusters[host] = appendClusterName(out.clusters[host], clusterName)
+			out.status[host] = hostClusterStatusFromFCJ(clusterName, &fcj, nodeClusterMode(node))
+		}
+	}
+	return out
+}
+
+// FCJClusterStatusForHost returns observed cluster handoff status when the host is a FleetClusterJoin node.
+func FCJClusterStatusForHost(ctx context.Context, c client.Client, ns, siteName, hostName string) (*fleetv1alpha1.SiteHostClusterStatus, bool) {
+	idx := loadFCJHostIndex(ctx, c, ns, siteName)
+	st, ok := idx.status[hostName]
+	if !ok {
+		return nil, false
+	}
+	return cloneSiteHostClusterStatus(st), true
+}
+
+// GuestClusterStatusNeedsFCJEnrich reports whether stored guest status lacks cluster handoff phase.
+func GuestClusterStatusNeedsFCJEnrich(st *fleetv1alpha1.SiteHostClusterStatus) bool {
+	return st == nil || strings.TrimSpace(st.Phase) == ""
+}
+
+func guestClusterStatusNeedsFCJEnrich(st *fleetv1alpha1.SiteHostClusterStatus) bool {
+	return GuestClusterStatusNeedsFCJEnrich(st)
+}
+
+func nodeClusterMode(node fleetv1alpha1.FleetClusterJoinNodeSpec) string {
+	if node.EffectiveRole() == fleetv1alpha1.NodeRoleWorker {
+		return fleetv1alpha1.SiteHostClusterModeAddWorker
+	}
+	return fleetv1alpha1.SiteHostClusterModeEnroll
+}
+
+func hostClusterStatusFromFCJ(clusterName string, fcj *fleetv1alpha1.FleetClusterJoin, mode string) fleetv1alpha1.SiteHostClusterStatus {
+	st := fleetv1alpha1.SiteHostClusterStatus{
+		ClusterName: clusterName,
+		FCJName:     clusterName,
+		Mode:        mode,
+		Message:     fcj.Status.Message,
+	}
+	switch fcj.Status.Phase {
+	case fleetv1alpha1.JoinPhaseReady:
+		st.Phase = fleetv1alpha1.SiteHostClusterPhaseReady
+	case fleetv1alpha1.JoinPhaseFailed:
+		st.Phase = fleetv1alpha1.SiteHostClusterPhaseFailed
+	default:
+		st.Phase = fleetv1alpha1.SiteHostClusterPhaseApplying
+	}
+	return st
+}
+
+func cloneSiteHostClusterStatus(st fleetv1alpha1.SiteHostClusterStatus) *fleetv1alpha1.SiteHostClusterStatus {
+	out := st
+	return &out
+}
+
+func appendClusterName(names []string, clusterName string) []string {
+	clusterName = strings.TrimSpace(clusterName)
+	if clusterName == "" {
+		return names
+	}
+	for _, existing := range names {
+		if existing == clusterName {
+			return names
+		}
+	}
+	return append(names, clusterName)
 }
 
 // LookupInventoryHost returns one derived host row by name.
