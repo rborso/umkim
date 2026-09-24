@@ -7,6 +7,13 @@
       or (fleet_cluster_storage_backend | default('local_path') in ['nfs_external', 'nfs_local'])
     )
 
+# Provisioner install uses kubectl on the bootstrap control plane only (workers/agents have no kubectl).
+- name: Fleet cluster storage | Skip NFS provisioner on non-bootstrap nodes
+  ansible.builtin.meta: end_host
+  when: >-
+    (groups.get('site_bootstrap', []) | length > 0)
+    and inventory_hostname not in groups['site_bootstrap']
+
 - name: Fleet cluster storage | Resolve nfs_local server from host when unset
   ansible.builtin.set_fact:
     fleet_cluster_nfs_server: "{{ ansible_host | default(inventory_hostname) }}"
