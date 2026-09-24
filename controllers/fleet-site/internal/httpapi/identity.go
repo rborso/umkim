@@ -42,6 +42,20 @@ func (a FleetActor) isPlatformAdmin() bool {
 	return a.DCAdmin
 }
 
+// requireIdentity requires console identity headers on sensitive reads such as
+// bootstrap script download. Lab mode (RequireIdentity false) stays open.
+func (s *Server) requireIdentity(w http.ResponseWriter, r *http.Request) bool {
+	a := actorFromRequest(r)
+	if a.Kind != "" && a.Name != "" {
+		return true
+	}
+	if s.Cfg.RequireIdentity {
+		http.Error(w, "unauthorized: missing fleet identity headers", http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
 // requireMutatingActor ensures identity headers are present for console-originated mutations.
 // When Cfg.RequireIdentity is true (default), missing subject headers return 401.
 // When false (lab), missing headers are treated as platform admin for direct API access.

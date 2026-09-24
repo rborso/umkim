@@ -31,7 +31,8 @@ func (r *Reconciler) reconcileRegistrySiteProvision(ctx context.Context, fs *fle
 
 func (r *Reconciler) reconcileRegistrySiteHostClusters(ctx context.Context, fs *fleetv1alpha1.FleetSite) (ctrl.Result, error) {
 	siteprovision.RepairStaleGuestProvisioning(ctx, r.Client, r.Cfg.Namespace, fs)
-	siteName := fs.Spec.EffectiveSiteID(fs.Name)
+	// Inventory ConfigMaps are keyed by the FleetSite name. spec.siteId is a lookup alias.
+	siteName := fs.Name
 	if fs.Spec.EffectiveProvisionProvider() == fleetv1alpha1.ProvisionProviderYaidap {
 		data, err := connectors.Load(ctx, r.Client, r.Cfg.Namespace, siteName, fleetv1alpha1.ProvisionProviderYaidap)
 		if err != nil {

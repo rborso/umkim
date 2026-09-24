@@ -77,9 +77,11 @@ inventory path. On success the action returns a handoff host fragment
 | `POST /sites/{name}/hosts/{host}/provision` | Provision by guest name |
 | `GET/POST /sites/{name}/hosts/{host}/cluster` | Cluster status / manual apply from cluster group files |
 
-Hub inventory is stored in ConfigMap `fleet-site-{site}-yaidap-inventory` as
-`file.*` YAML keys plus hub-only `_meta/*` (`meta.json`, `status.json`,
-`revisions.json`).
+Hub inventory is stored in ConfigMap `fleet-site-{name}-yaidap-inventory`, where
+`{name}` is the FleetSite `metadata.name`, as `file.*` YAML keys plus hub-only
+`_meta/*` (`meta.json`, `status.json`, `revisions.json`). `spec.siteId` is a
+lookup alias for that site and the id stamped on cluster joins. It does not
+select a different inventory ConfigMap.
 
 **Native Ansible/YAIDAP tree**
 
@@ -251,7 +253,10 @@ Hub finalize inventory for HA sets **`fleet_site_sp_endpoint`** (WireGuard IP of
 the bootstrap control plane) in **`[site_bootstrap:vars]`**. Spoke ingress
 verification curls that overlay address for Traefik `/ping`, not the management
 LAN `ansible_host` used for jumphost SSH. Custom inventory must preserve this
-when `site_bootstrap` nodes use ProxyJump to lab addresses.
+when `site_bootstrap` nodes use ProxyJump to lab addresses. Generated inventory
+keeps Ansible host names and group names distinct: a shared name makes
+`delegate_to` drop `ansible_host`, so the cluster alias lives in `[fleet_cluster]`
+rather than a group named after the cluster.
 
 The HA bootstrap bundle parallelizes peer kernel-module setup, skips redundant
 local kernel package installs when modules are already loaded, and uses shorter

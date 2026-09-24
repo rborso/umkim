@@ -16,37 +16,37 @@ import (
 )
 
 type clusterSummary struct {
-	Name              string            `json:"name"`
-	Site              string            `json:"site,omitempty"`
-	Available         bool              `json:"available"`
-	Management        bool              `json:"management,omitempty"`
-	ReadOnly          bool              `json:"read_only,omitempty"`
-	Capabilities      map[string]bool   `json:"capabilities,omitempty"`
-	Topology          map[string]string `json:"topology,omitempty"`
-	IngressEnabled     bool              `json:"ingress_enabled,omitempty"`
-	IngressAuthEnabled bool              `json:"ingress_auth_enabled,omitempty"`
-	DirectIngress      bool              `json:"direct_ingress,omitempty"`
-	IngressID          string            `json:"ingress_id,omitempty"`
-	Method             string            `json:"method,omitempty"`
-	TlsPolicy          string            `json:"tls_policy,omitempty"`
-	DNSZone            string            `json:"dns_zone,omitempty"`
-	EdgeWANIP          string            `json:"edge_wan_ip,omitempty"`
-	UpstreamHost      string            `json:"upstream_host,omitempty"`
-	TraefikHTTPPort   int               `json:"traefik_http_port,omitempty"`
-	Jumphost          string            `json:"jumphost,omitempty"`
-	ConsoleManaged          bool              `json:"console_managed,omitempty"`
-	Labels                  map[string]string `json:"labels,omitempty"`
-	ProvisioningPhase       string            `json:"provisioning_phase,omitempty"`
-	ProvisioningMode        string            `json:"provisioning_mode,omitempty"`
-	ManagedClusterAvailable bool                         `json:"managed_cluster_available,omitempty"`
-	CapabilityDiscovery     *capabilityDiscoverySummary  `json:"capability_discovery,omitempty"`
-	Storage                 map[string]interface{}       `json:"storage,omitempty"`
-	StorageStatus           *clusterStorageStatusJSON    `json:"storageStatus,omitempty"`
+	Name                    string                               `json:"name"`
+	Site                    string                               `json:"site,omitempty"`
+	Available               bool                                 `json:"available"`
+	Management              bool                                 `json:"management,omitempty"`
+	ReadOnly                bool                                 `json:"read_only,omitempty"`
+	Capabilities            map[string]bool                      `json:"capabilities,omitempty"`
+	Topology                map[string]string                    `json:"topology,omitempty"`
+	IngressEnabled          bool                                 `json:"ingress_enabled,omitempty"`
+	IngressAuthEnabled      bool                                 `json:"ingress_auth_enabled,omitempty"`
+	DirectIngress           bool                                 `json:"direct_ingress,omitempty"`
+	IngressID               string                               `json:"ingress_id,omitempty"`
+	Method                  string                               `json:"method,omitempty"`
+	TlsPolicy               string                               `json:"tls_policy,omitempty"`
+	DNSZone                 string                               `json:"dns_zone,omitempty"`
+	EdgeWANIP               string                               `json:"edge_wan_ip,omitempty"`
+	UpstreamHost            string                               `json:"upstream_host,omitempty"`
+	TraefikHTTPPort         int                                  `json:"traefik_http_port,omitempty"`
+	Jumphost                string                               `json:"jumphost,omitempty"`
+	ConsoleManaged          bool                                 `json:"console_managed,omitempty"`
+	Labels                  map[string]string                    `json:"labels,omitempty"`
+	ProvisioningPhase       string                               `json:"provisioning_phase,omitempty"`
+	ProvisioningMode        string                               `json:"provisioning_mode,omitempty"`
+	ManagedClusterAvailable bool                                 `json:"managed_cluster_available,omitempty"`
+	CapabilityDiscovery     *capabilityDiscoverySummary          `json:"capability_discovery,omitempty"`
+	Storage                 map[string]interface{}               `json:"storage,omitempty"`
+	StorageStatus           *clusterStorageStatusJSON            `json:"storageStatus,omitempty"`
 	Providers               map[string]clusterProviderStatusJSON `json:"providers,omitempty"`
-	IngressAuthStatus       *clusterIngressAuthStatusJSON `json:"ingressAuthStatus,omitempty"`
-	AcmeEnabled             bool                          `json:"acme_enabled,omitempty"`
-	AcmeStatus              *clusterAcmeStatusJSON        `json:"acmeStatus,omitempty"`
-	NodeOperation           *clusterNodeOperationJSON     `json:"nodeOperation,omitempty"`
+	IngressAuthStatus       *clusterIngressAuthStatusJSON        `json:"ingressAuthStatus,omitempty"`
+	AcmeEnabled             bool                                 `json:"acme_enabled,omitempty"`
+	AcmeStatus              *clusterAcmeStatusJSON               `json:"acmeStatus,omitempty"`
+	NodeOperation           *clusterNodeOperationJSON            `json:"nodeOperation,omitempty"`
 }
 
 type clusterAcmeStatusJSON struct {
@@ -79,11 +79,11 @@ type clusterProviderStatusJSON struct {
 }
 
 type clusterNodeOperationJSON struct {
-	Type    string `json:"type,omitempty"`
-	Node    string `json:"node,omitempty"`
-	Phase   string `json:"phase,omitempty"`
-	JobName string `json:"jobName,omitempty"`
-	Message string `json:"message,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Node      string `json:"node,omitempty"`
+	Phase     string `json:"phase,omitempty"`
+	JobName   string `json:"jobName,omitempty"`
+	Message   string `json:"message,omitempty"`
 	Force     bool   `json:"force,omitempty"`
 	ID        string `json:"id,omitempty"`
 	ActorKind string `json:"actorKind,omitempty"`
@@ -91,12 +91,12 @@ type clusterNodeOperationJSON struct {
 }
 
 type clusterPatchBody struct {
-	SiteID       string            `json:"siteId,omitempty"`
-	Jumphost     *string           `json:"jumphost,omitempty"`
-	Capabilities map[string]bool   `json:"capabilities,omitempty"`
-	Topology     map[string]string `json:"topology,omitempty"`
-	Edge         *clusterEdgePatch `json:"edge,omitempty"`
-	CustomLabels map[string]string `json:"customLabels,omitempty"`
+	SiteID       string                   `json:"siteId,omitempty"`
+	Jumphost     *string                  `json:"jumphost,omitempty"`
+	Capabilities map[string]bool          `json:"capabilities,omitempty"`
+	Topology     map[string]string        `json:"topology,omitempty"`
+	Edge         *clusterEdgePatch        `json:"edge,omitempty"`
+	CustomLabels map[string]string        `json:"customLabels,omitempty"`
 	IngressAuth  *clusterIngressAuthPatch `json:"ingressAuth,omitempty"`
 }
 
@@ -144,10 +144,16 @@ func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, nam
 		return
 	}
 	if sub == "bootstrap-script" && r.Method == http.MethodGet {
+		if !s.requireIdentity(w, r) {
+			return
+		}
 		s.serveClusterBootstrapScript(r.Context(), w, name)
 		return
 	}
 	if sub == "bootstrap-bundle" && r.Method == http.MethodGet {
+		if !s.requireIdentity(w, r) {
+			return
+		}
 		s.serveClusterBootstrapBundle(r.Context(), w, name)
 		return
 	}

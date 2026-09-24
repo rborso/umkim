@@ -238,10 +238,10 @@ func (r *Reconciler) issueScript(ctx context.Context, fs *fleetv1alpha1.FleetSit
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"bootstrap.sh":    bootstrap,
+			"bootstrap.sh":     bootstrap,
 			"enrollment-token": enrollToken,
-			"wg-private-key":  priv,
-			"wg-public-key":   pub,
+			"wg-private-key":   priv,
+			"wg-public-key":    pub,
 		},
 	}
 	if err := controllerutil.SetControllerReference(fs, secret, r.Scheme); err != nil {
@@ -459,10 +459,10 @@ fleet_site_wg_ip=%s
 wireguard_address=%s
 ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 
-[%[1]s]
+[fleet_site]
 %[1]s ansible_host=%s
 
-[%[1]s:vars]
+[fleet_site:vars]
 fleet_site_enable_kubevirt=%s
 fleet_site_auto_install_kubevirt_operator=%s
 
@@ -539,9 +539,9 @@ func (r *Reconciler) fail(ctx context.Context, fs *fleetv1alpha1.FleetSite, err 
 	return ctrl.Result{}, err
 }
 
-func bootstrapSecretName(siteName string) string  { return "fleet-site-" + siteName + "-bootstrap" }
-func sshSecretName(siteName string) string         { return "fleet-site-" + siteName + "-ansible-ssh" }
-func inventoryCMName(siteName string) string       { return "fleet-site-" + siteName + "-inventory" }
+func bootstrapSecretName(siteName string) string { return "fleet-site-" + siteName + "-bootstrap" }
+func sshSecretName(siteName string) string       { return "fleet-site-" + siteName + "-ansible-ssh" }
+func inventoryCMName(siteName string) string     { return "fleet-site-" + siteName + "-inventory" }
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := ctrl.NewControllerManagedBy(mgr).

@@ -3,6 +3,7 @@ package reconcile
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -34,6 +35,9 @@ import (
 const finalizerName = "edge.umkim.com/route-cleanup"
 const annotationFailoverGeneration = "fleet.umkim.com/failover-generation"
 const annotationFleetRoutesRebuildKey = "edge.umkim.com/fleet-routes-rebuild-key"
+
+// errRebuildDeferred means hub ACME issuance owns fleet-routes.yml for this pass.
+var errRebuildDeferred = errors.New("fleet routes rebuild deferred while ACME is issuing")
 
 // routeRebuildPredicate reconciles on spec changes, failover annotations, and activeCluster updates.
 type routeRebuildPredicate struct {
@@ -74,11 +78,11 @@ func annotationValue(ann map[string]string, key string) string {
 
 type RouteReconciler struct {
 	client.Client
-	APIReader client.Reader
-	Config    config.Config
-	RestConfig rest.Config
-	acme      *acmeCoordinator
-	spokeACME *spokeACMEQueue
+	APIReader     client.Reader
+	Config        config.Config
+	RestConfig    rest.Config
+	acme          *acmeCoordinator
+	spokeACME     *spokeACMEQueue
 	fleetRoutesMu sync.Mutex
 }
 
@@ -99,7 +103,11 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				return ctrl.Result{}, err
 			}
 		}
-		return r.rebuildFleetRoutesCM(ctx)
+		res, err := r.rebuildFleetRoutesCM(ctx)
+		if errors.Is(err, errRebuildDeferred) {
+			return res, nil
+		}
+		return res, err
 	}
 
 	if !controllerutil.ContainsFinalizer(&route, finalizerName) {
@@ -150,7 +158,11 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if r.shouldRebuildFleetRoutes(&route, specPatched) {
-		if _, err := r.rebuildFleetRoutesCM(ctx); err != nil {
+		res, err := r.rebuildFleetRoutesCM(ctx)
+		if errors.Is(err, errRebuildDeferred) {
+			return res, nil
+		}
+		if err != nil {
 			return r.fail(ctx, &route, err)
 		}
 		if err := r.markFleetRoutesRebuilt(ctx, &route); err != nil {
@@ -174,6 +186,8 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{RequeueAfter: time.Duration(r.Config.RequeueSeconds) * time.Second}, nil
 	}
 
+	held := false
+	heldMsg := ""
 	if spokeHosts := manifests.SpokeHostsForRoute(route); len(spokeHosts) > 0 {
 		for _, h := range manifests.HostsForRoute(route) {
 			if err := hostnames.FindDuplicate(ctx, r.Client, route.Namespace, h, route.Name); err != nil {
@@ -181,10 +195,6 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			}
 		}
 		if err := manifests.ValidateRouteHosts(route); err != nil {
-			return r.fail(ctx, &route, err)
-		}
-		kc, err := hubKubeconfig()
-		if err != nil {
 			return r.fail(ctx, &route, err)
 		}
 		for _, target := range route.PlacementClusters() {
@@ -212,10 +222,22 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				targetOpts.SpokeACME = true
 				targetOpts.CertResolver = spokeState.CertResolver
 				if spokeState.SkipApply {
+					held = true
+					if spokeState.TLSMessage != "" {
+						heldMsg = spokeState.TLSMessage
+					}
 					continue
 				}
 			} else if spokeState.Blocked {
+				held = true
+				if spokeState.TLSMessage != "" {
+					heldMsg = spokeState.TLSMessage
+				}
 				continue
+			}
+			kc, err := hubKubeconfig()
+			if err != nil {
+				return r.fail(ctx, &route, err)
 			}
 			yaml, err := manifests.RenderManifestWork(route, spokeHosts, clusterName, target.Service, targetOpts)
 			if err != nil {
@@ -225,6 +247,17 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				return r.fail(ctx, &route, err)
 			}
 		}
+	}
+
+	if held {
+		if heldMsg != "" {
+			msg = heldMsg
+		}
+		if err := r.patchStatus(ctx, &route, fleetv1alpha1.PhasePending, msg); err != nil {
+			return ctrl.Result{}, err
+		}
+		logger.Info("route apply held", "instance", route.Spec.InstanceID, "message", msg)
+		return ctrl.Result{RequeueAfter: time.Duration(r.Config.RequeueSeconds) * time.Second}, nil
 	}
 
 	if err := r.patchStatus(ctx, &route, fleetv1alpha1.PhaseApplied, msg); err != nil {
@@ -429,7 +462,7 @@ func (r *RouteReconciler) rebuildFleetRoutesCM(ctx context.Context) (ctrl.Result
 	// Avoid fighting hub ACME issuance (legacy hostNetwork): coordinator patches fleet routes
 	// during TLS-ALPN; periodic route reconciles must not overwrite mid-issuance.
 	if r.acme != nil && r.acme.Issuing() {
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Duration(r.Config.RequeueSeconds) * time.Second}, errRebuildDeferred
 	}
 	if bytes.Equal(prevRoutesYAML, data) {
 		return ctrl.Result{}, nil

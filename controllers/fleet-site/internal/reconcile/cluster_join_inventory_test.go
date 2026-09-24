@@ -47,6 +47,12 @@ func TestBuildClusterInventoryINI_singleNodeUsesMgmtLAN(t *testing.T) {
 	if !strings.Contains(ini, "wireguard_address=10.10.0.14/32") {
 		t.Fatal("missing overlay wireguard_address")
 	}
+	if !strings.Contains(ini, "harbor_host=10.10.0.1") {
+		t.Fatal("missing harbor_host")
+	}
+	if strings.Contains(ini, "harbor_admin_password") {
+		t.Fatal("inventory must not carry harbor_admin_password")
+	}
 	if strings.Contains(ini, "calico_ip_autodetection_method=interface=wg-umkim") {
 		t.Fatal("calico must not use wg-umkim")
 	}
@@ -56,11 +62,11 @@ func TestBuildClusterInventoryINI_haUsesMgmtLANPerNode(t *testing.T) {
 	r := testClusterJoinReconciler()
 	fcj := &fleetv1alpha1.FleetClusterJoin{
 		Spec: fleetv1alpha1.FleetClusterJoinSpec{
-			ClusterName:      "homelab-ha",
-			SiteId:           "homelab",
-			BootstrapHost:    "198.51.100.81",
-			Topology:         fleetv1alpha1.ClusterTopologyHA3Node,
-			ControlPlaneVip:  "198.51.100.84",
+			ClusterName:     "homelab-ha",
+			SiteId:          "homelab",
+			BootstrapHost:   "198.51.100.81",
+			Topology:        fleetv1alpha1.ClusterTopologyHA3Node,
+			ControlPlaneVip: "198.51.100.84",
 			Nodes: []fleetv1alpha1.FleetClusterJoinNodeSpec{
 				{Hostname: "virt02-ha-cp1", Address: "198.51.100.81", Role: fleetv1alpha1.NodeRoleControl},
 				{Hostname: "virt02-ha-cp2", Address: "198.51.100.82", Role: fleetv1alpha1.NodeRoleControl},
@@ -182,6 +188,34 @@ func TestBuildClusterInventoryINI_haHubRunnerJumphostUsesMgmtLAN(t *testing.T) {
 	hubVars := ini[strings.Index(ini, "[hub:vars]"):]
 	if strings.Contains(hubVars, "ProxyCommand") {
 		t.Fatal("hub:vars must not include jumphost ProxyCommand when hubRunner")
+	}
+}
+
+func TestBuildClusterInventoryINI_hostAndGroupNamesDiffer(t *testing.T) {
+	r := testClusterJoinReconciler()
+	fcj := &fleetv1alpha1.FleetClusterJoin{
+		Spec: fleetv1alpha1.FleetClusterJoinSpec{
+			ClusterName:     "lab-ha-0",
+			SiteId:          "homelab",
+			BootstrapHost:   "172.16.10.101",
+			Topology:        fleetv1alpha1.ClusterTopologyHA3Node,
+			ControlPlaneVip: "172.16.10.100",
+			Nodes: []fleetv1alpha1.FleetClusterJoinNodeSpec{
+				{Hostname: "lab-ha-0-cp1", Address: "172.16.10.101", Role: fleetv1alpha1.NodeRoleControl},
+			},
+		},
+	}
+	nodes := []wg.NodeWG{
+		{Hostname: "lab-ha-0-cp1", Address: "172.16.10.101", WGAddress: "10.10.0.12/32", Role: fleetv1alpha1.NodeRoleControl},
+	}
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, true)
+	if !strings.Contains(ini, "\n[fleet_cluster]\nlab-ha-0 ansible_host=") {
+		t.Fatalf("cluster alias must live in [fleet_cluster], got:\n%s", ini)
+	}
+	for _, group := range []string{"[lab-ha-0]", "[lab-ha-0:vars]", "[lab-ha-0-cp1]", "[lab-ha-0-cp1:vars]"} {
+		if strings.Contains(ini, "\n"+group+"\n") || strings.HasPrefix(ini, group+"\n") {
+			t.Fatalf("inventory group %s collides with a host name:\n%s", group, ini)
+		}
 	}
 }
 

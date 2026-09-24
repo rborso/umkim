@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fleetDefaultWorkloadSiteId } from './client';
+import { fleetDefaultWorkloadSiteId, fleetSiteById } from './client';
 import type { FleetSite } from './types';
 
 function site(
@@ -37,5 +37,20 @@ describe('fleetDefaultWorkloadSiteId', () => {
   it('skips non-registry sites', () => {
     const sites = [site('legacy'), site('site-a', { registry: true })];
     expect(fleetDefaultWorkloadSiteId(sites)).toBe('site-a');
+  });
+});
+
+describe('fleetSiteById', () => {
+  it('resolves ingress when siteName differs from metadata.name', () => {
+    const sites: FleetSite[] = [
+      {
+        metadata: { name: 'cr-name' },
+        spec: {
+          siteName: 'pretty',
+          edge: { ingress: [{ id: 'wan', method: 'port_forward' }] },
+        },
+      },
+    ];
+    expect(fleetSiteById(sites, 'pretty')?.spec.edge?.ingress?.[0]?.id).toBe('wan');
   });
 });

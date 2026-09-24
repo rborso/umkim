@@ -27,11 +27,11 @@ type catalogList struct {
 }
 
 type catalogInstance struct {
-	UID          string `json:"uid"`
-	ID           string `json:"id"`
-	DisplayName  string `json:"display_name"`
-	ResourceID   string `json:"resource_id"`
-	Spec         instSpec `json:"spec"`
+	UID         string   `json:"uid"`
+	ID          string   `json:"id"`
+	DisplayName string   `json:"display_name"`
+	ResourceID  string   `json:"resource_id"`
+	Spec        instSpec `json:"spec"`
 }
 
 type instSpec struct {
@@ -265,15 +265,12 @@ func (s *Syncer) syncInstance(ctx context.Context, inst catalogInstance) error {
 		return s.Client.Create(ctx, route)
 	}
 	preserveEffectiveMode := existing.Spec.EffectiveMode
-	preserveSiteHost := existing.Spec.SiteHost
 	desired := route.Spec
 	sortClusterTargets(desired.ClusterTargets)
 	if preserveEffectiveMode != "" {
 		desired.EffectiveMode = preserveEffectiveMode
 	}
-	if preserveSiteHost != "" {
-		desired.SiteHost = preserveSiteHost
-	} else if existing.Spec.SiteHost != "" && desired.SiteHost == "" {
+	if desired.SiteHost == "" && existing.Spec.SiteHost != "" {
 		desired.SiteHost = existing.Spec.SiteHost
 	}
 	existingSpec := existing.Spec

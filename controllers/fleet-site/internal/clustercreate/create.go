@@ -9,6 +9,7 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/providers"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/sites"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/storage"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,16 +102,12 @@ func Create(ctx context.Context, c client.Client, cfg config.Config, req Request
 		}
 		req.ClusterCapabilities["kvm"] = true
 	}
-	var site fleetv1alpha1.FleetSite
-	if err := c.Get(ctx, client.ObjectKey{Namespace: cfg.Namespace, Name: req.SiteId}, &site); err != nil {
-		if apierrors.IsNotFound(err) {
-			if err2 := c.Get(ctx, client.ObjectKey{Namespace: cfg.Namespace, Name: req.ClusterName}, &site); err2 != nil || site.Spec.EffectiveSiteID(site.Name) != req.SiteId {
-				return nil, fmt.Errorf("site not found")
-			}
-		} else {
-			return nil, err
-		}
+	found, err := sites.FindFleetSite(ctx, c, cfg.Namespace, req.SiteId)
+	if err != nil {
+		return nil, fmt.Errorf("site not found")
 	}
+	site := *found
+	siteID := site.Spec.EffectiveSiteID(site.Name)
 	site.Spec.NormalizeIngress()
 	if _, err := getManagedCluster(ctx, c, req.ClusterName); err == nil {
 		return nil, fmt.Errorf("cluster already exists in OCM")
@@ -126,7 +123,7 @@ func Create(ctx context.Context, c client.Client, cfg config.Config, req Request
 		ingressID = site.Spec.AutoIngressID()
 	}
 	if ingressID != "" {
-		bindings, err := existingIngressBindings(ctx, c, cfg, req.SiteId, req.ClusterName)
+		bindings, err := existingIngressBindings(ctx, c, cfg, siteID, req.ClusterName)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +142,7 @@ func Create(ctx context.Context, c client.Client, cfg config.Config, req Request
 		},
 		Spec: fleetv1alpha1.FleetClusterJoinSpec{
 			ClusterName:         req.ClusterName,
-			SiteId:              req.SiteId,
+			SiteId:              siteID,
 			BootstrapHost:       req.BootstrapHost,
 			Jumphost:            strings.TrimSpace(req.Jumphost),
 			MinRootDiskGi:       minDisk,

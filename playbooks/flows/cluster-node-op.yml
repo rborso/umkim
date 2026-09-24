@@ -113,6 +113,17 @@
         msg: "Pre-validation failed: {{ fleet_flow_node_pre_validate.json | to_nice_json }}"
       when: not (fleet_flow_node_pre_validate.json.ok | default(false) | bool)
 
+    - name: Record node operation id before execute
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}"
+        method: GET
+        return_content: true
+      register: fleet_flow_node_op_before
+
+    - name: Remember node operation id from before execute
+      ansible.builtin.set_fact:
+        fleet_flow_node_op_previous_id: "{{ fleet_flow_node_op_before.json.nodeOperation.id | default('') }}"
+
     - name: Execute add worker
       ansible.builtin.uri:
         url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/nodes"
@@ -123,7 +134,7 @@
           address: "{{ fleet_flow_node_address }}"
           hostname: "{{ fleet_flow_node_hostname | default(omit) }}"
           role: worker
-        status_code: [202, 409, 422]
+        status_code: [202]
       when: fleet_flow_node_op_type == 'addWorker'
 
     - name: Execute remove worker
@@ -134,7 +145,7 @@
           }}
         method: DELETE
         headers: "{{ fleet_flow_identity_headers }}"
-        status_code: [202, 409, 422]
+        status_code: [202]
       when: fleet_flow_node_op_type == 'removeWorker'
 
     - name: Execute replace control plane
@@ -149,7 +160,7 @@
           newNode:
             address: "{{ fleet_flow_node_address }}"
             hostname: "{{ fleet_flow_node_hostname | default(omit) }}"
-        status_code: [202, 409, 422]
+        status_code: [202]
       when: fleet_flow_node_op_type == 'replaceControlPlane'
 
     - name: Wait for node operation to finish
@@ -159,7 +170,9 @@
         return_content: true
       register: fleet_flow_node_op_poll
       until: >-
-        (fleet_flow_node_op_poll.json.nodeOperation.phase | default('')) in ['Succeeded', 'Failed']
+        (fleet_flow_node_op_poll.json.nodeOperation.id | default('')) | length > 0
+        and (fleet_flow_node_op_poll.json.nodeOperation.id | default('')) != fleet_flow_node_op_previous_id
+        and (fleet_flow_node_op_poll.json.nodeOperation.phase | default('')) in ['Succeeded', 'Failed']
       retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
       delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
 

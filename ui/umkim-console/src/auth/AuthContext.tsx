@@ -90,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       groups: me.groups ?? [],
       permissions: me.permissions ?? [],
       dcAdmin: !!me.dcAdmin,
+      roles: me.roles ?? [],
     });
   }, []);
 

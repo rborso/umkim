@@ -28,6 +28,10 @@
       tags: [calico, fleet_site_provision]
 
   tasks:
+    - name: Load Harbor admin password from the hub Ansible secret
+      ansible.builtin.set_fact:
+        harbor_admin_password: "{{ (lookup('file', '/secrets/hub/ansible_vars.yml') | from_yaml).harbor_admin_password }}"
+      when: harbor_admin_password | default('') | length == 0
     - ansible.builtin.import_role:
         name: harbor
         tasks_from: registries.yml

@@ -60,6 +60,22 @@ func ApplyImport(ctx context.Context, c client.Client, ns, siteName, actor strin
 	})
 }
 
+// MarkImportFailed records an import apply error so GET inventory is not a silent sync.
+func MarkImportFailed(ctx context.Context, c client.Client, ns, siteName string, importErr error) error {
+	if importErr == nil {
+		return nil
+	}
+	return connectors.PatchInventory(ctx, c, ns, siteName, provider, func(data map[string]string) (connectors.InventoryPatch, error) {
+		meta, err := connectors.LoadMetaFromData(data, provider)
+		if err != nil {
+			return connectors.InventoryPatch{}, err
+		}
+		meta.SyncPhase = "failed"
+		meta.LastImportNote = importErr.Error()
+		return connectors.InventoryPatch{Meta: &meta}, nil
+	})
+}
+
 // MarkSynced updates meta after successful push sync.
 func MarkSynced(ctx context.Context, c client.Client, ns, siteName, inventoryPath string) error {
 	return connectors.PatchInventory(ctx, c, ns, siteName, provider, func(data map[string]string) (connectors.InventoryPatch, error) {

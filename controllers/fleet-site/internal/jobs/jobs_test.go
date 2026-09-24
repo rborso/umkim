@@ -149,4 +149,13 @@ func TestProvisionJobHABundleDeadline(t *testing.T) {
 	if !strings.Contains(cmd, "cluster-provision-hub.yml") {
 		t.Fatalf("expected hub bundle playbook, got %v", job.Spec.Template.Spec.Containers[0].Command)
 	}
+	foundHubSecret := false
+	for _, v := range job.Spec.Template.Spec.Volumes {
+		if v.Name == "hub-secrets" && v.Secret != nil && v.Secret.SecretName == HubAnsibleSecretsName {
+			foundHubSecret = true
+		}
+	}
+	if !foundHubSecret {
+		t.Fatal("provision job does not mount the hub Ansible secret")
+	}
 }

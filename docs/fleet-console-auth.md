@@ -42,7 +42,16 @@ The service seeds these Fleet roles:
 
 Role bindings are enforced by the proxy before requests reach the upstream
 services. Scoped roles (`site-admin`, `cluster-admin`) use FleetRoleBinding
-scope without organization partitioning.
+scope without organization partitioning. A scoped binding can list unscoped
+collections such as apps and charts, and it can mutate objects in its own
+site or cluster. It does not authorize unscoped mutations (`POST` or `DELETE`
+on `/apps` or `/charts`, or `cluster-enrollments`). Those require a binding
+with no scopes or a `*` scope, such as `dc-admin`.
+
+A disabled `FleetUser` is rejected on login and on later requests that present
+that user's session. The login does not refresh the user's groups. Service-account
+tokens are not checked against `FleetUser`. `PATCH` with `spec.disabled: false`
+clears the flag.
 
 Global LLM API keys are managed at `/api/v1alpha1/llm-api-keys` on the auth
 service (dc-admin only). Browser and console traffic uses

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
@@ -30,6 +30,7 @@ import {
   fleetClusterIsDeleting,
   fleetClusterIsPending,
   fleetClusterPhase,
+  fleetSiteById,
   getFleetCluster,
   listFleetClusterNodes,
   listFleetSites,
@@ -129,6 +130,47 @@ export function ClusterDetailPage() {
   const [exposeLldapWebUI, setExposeLldapWebUI] = useState(false);
   const [authActionError, setAuthActionError] = useState<unknown>(null);
   const [authActionBusy, setAuthActionBusy] = useState(false);
+  const formDirtyRef = useRef(false);
+
+  const touchForm = () => {
+    formDirtyRef.current = true;
+  };
+  const setSiteIdTouched = (v: string) => {
+    touchForm();
+    setSiteId(v);
+  };
+  const setRegionTouched = (v: string) => {
+    touchForm();
+    setRegion(v);
+  };
+  const setNestDepthTouched = (v: string) => {
+    touchForm();
+    setNestDepth(v);
+  };
+  const setProvisionerTouched = (v: string) => {
+    touchForm();
+    setProvisioner(v);
+  };
+  const setIngressIdTouched = (v: string) => {
+    touchForm();
+    setIngressId(v);
+  };
+  const setJumphostTouched = (v: string) => {
+    touchForm();
+    setJumphost(v);
+  };
+  const setUpstreamHostTouched = (v: string) => {
+    touchForm();
+    setUpstreamHost(v);
+  };
+  const setTraefikPortTouched = (v: string) => {
+    touchForm();
+    setTraefikPort(v);
+  };
+  const setClusterLabelsTouched: typeof setClusterLabels = (value) => {
+    touchForm();
+    setClusterLabels(value);
+  };
 
   const load = useCallback(async () => {
     if (!name) return;
@@ -142,15 +184,17 @@ export function ClusterDetailPage() {
       } catch {
         setSites([]);
       }
-      setSiteId(c.site || '');
-      setClusterLabels(c.labels || {});
-      setRegion(c.topology?.region || c.labels?.['fleet.topology/region'] || '');
-      setNestDepth(c.topology?.nest_depth || c.labels?.['fleet.topology/nest_depth'] || '0');
-      setProvisioner(c.topology?.provisioner || c.labels?.['fleet.topology/provisioner'] || 'k3s');
-      setIngressId(c.ingress_id || '');
-      setJumphost(c.jumphost || '');
-      setUpstreamHost(c.upstream_host || '');
-      setTraefikPort(String(c.traefik_http_port || 30080));
+      if (!formDirtyRef.current) {
+        setSiteId(c.site || '');
+        setClusterLabels(c.labels || {});
+        setRegion(c.topology?.region || c.labels?.['fleet.topology/region'] || '');
+        setNestDepth(c.topology?.nest_depth || c.labels?.['fleet.topology/nest_depth'] || '0');
+        setProvisioner(c.topology?.provisioner || c.labels?.['fleet.topology/provisioner'] || 'k3s');
+        setIngressId(c.ingress_id || '');
+        setJumphost(c.jumphost || '');
+        setUpstreamHost(c.upstream_host || '');
+        setTraefikPort(String(c.traefik_http_port || 30080));
+      }
       const clusterReady = c.available || fleetClusterPhase(c) === 'Ready';
       if (clusterReady) {
         try {
@@ -184,7 +228,7 @@ export function ClusterDetailPage() {
   }, [load, cluster?.capability_discovery?.phase, cluster?.nodeOperation?.phase, cluster?.storageStatus?.phase]);
 
   const selectedSite = useMemo(
-    () => sites.find((s) => (s.spec.siteId || s.metadata?.name) === (siteId || cluster?.site)),
+    () => fleetSiteById(sites, siteId || cluster?.site),
     [sites, siteId, cluster?.site],
   );
   const ingressOptions = useMemo(
@@ -276,6 +320,7 @@ export function ClusterDetailPage() {
     };
     try {
       setCluster(await patchFleetCluster(name, patch));
+      formDirtyRef.current = false;
       await load();
     } catch (e) {
       setSaveError(e);
@@ -574,23 +619,23 @@ export function ClusterDetailPage() {
                 phase={phase}
                 site={selectedSite}
                 siteId={siteId}
-                setSiteId={setSiteId}
+                setSiteId={setSiteIdTouched}
                 clusterLabels={clusterLabels}
-                setClusterLabels={setClusterLabels}
+                setClusterLabels={setClusterLabelsTouched}
                 region={region}
-                setRegion={setRegion}
+                setRegion={setRegionTouched}
                 nestDepth={nestDepth}
-                setNestDepth={setNestDepth}
+                setNestDepth={setNestDepthTouched}
                 provisioner={provisioner}
-                setProvisioner={setProvisioner}
+                setProvisioner={setProvisionerTouched}
                 ingressId={ingressId}
-                setIngressId={setIngressId}
+                setIngressId={setIngressIdTouched}
                 jumphost={jumphost}
-                setJumphost={setJumphost}
+                setJumphost={setJumphostTouched}
                 upstreamHost={upstreamHost}
-                setUpstreamHost={setUpstreamHost}
+                setUpstreamHost={setUpstreamHostTouched}
                 traefikPort={traefikPort}
-                setTraefikPort={setTraefikPort}
+                setTraefikPort={setTraefikPortTouched}
                 ingressOptions={ingressOptions}
                 authPrereqReady={authPrereqReady}
                 authPrereqIngress={authPrereqIngress}

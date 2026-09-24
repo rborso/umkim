@@ -109,10 +109,10 @@ func (s *Server) getSiteInventory(ctx context.Context, w http.ResponseWriter, si
 	}
 	fs, ok := s.loadFleetSite(ctx, w, siteName)
 	if ok && fs != nil {
-		s.refreshInventoryJobs(ctx, fs)
 		if provider == fleetv1alpha1.ProvisionProviderYaidap {
 			_ = yaidap.MigrateLegacyStore(ctx, s.Client, s.Cfg.Namespace, siteName, "system/migrate")
 		}
+		s.refreshInventoryJobs(ctx, fs)
 	}
 	meta, err := connectors.LoadMeta(ctx, s.Client, s.Cfg.Namespace, siteName, provider)
 	if err != nil {

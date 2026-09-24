@@ -297,10 +297,10 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   }, [load]);
 
   useEffect(() => {
-    if (!loading && selectedPath) {
+    if (!loading && selectedPath && !editorDirty) {
       void loadFile(selectedPath);
     }
-  }, [loading, selectedPath, loadFile]);
+  }, [loading, selectedPath, loadFile, editorDirty]);
 
   const saveFile = async () => {
     setBusy(true);
@@ -614,6 +614,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
             files={files}
             onSelect={(path) => {
               if (path !== selectedPath) {
+                setEditorDirty(false);
                 setSelectedPath(path);
               }
             }}
@@ -633,6 +634,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
           ) : null}
           <Form style={{ maxWidth: '56rem' }}>
             <TextArea
+              data-testid="site-inventory-editor"
               value={editorContent}
               onChange={(_e, v) => {
                 setEditorContent(v);

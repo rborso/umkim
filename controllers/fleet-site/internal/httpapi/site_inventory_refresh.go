@@ -42,10 +42,14 @@ func (s *Server) refreshInventoryJobs(ctx context.Context, fs *fleetv1alpha1.Fle
 				changes := yaidap.CompareImportFiles(localData, remoteFiles)
 				_ = s.storeImportPreview(ctx, fs.Name, changes)
 			}
+			importFailed := false
 			if pulled, ok := provision.ParseInventoryImport(logs); ok {
-				_ = yaidap.ApplyImport(ctx, s.Client, s.Cfg.Namespace, fs.Name, "system/import", pulled, true)
+				if err := yaidap.ApplyImport(ctx, s.Client, s.Cfg.Namespace, fs.Name, "system/import", pulled, true); err != nil {
+					importFailed = true
+					_ = yaidap.MarkImportFailed(ctx, s.Client, s.Cfg.Namespace, fs.Name, err)
+				}
 			}
-			if provision.InventoryJobSucceeded(logs) {
+			if !importFailed && provision.InventoryJobSucceeded(logs) {
 				path := ""
 				if fs.Spec.Provision != nil {
 					path = fs.Spec.Provision.InventoryPath

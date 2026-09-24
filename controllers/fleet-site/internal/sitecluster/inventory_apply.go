@@ -11,11 +11,31 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/nodeops"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/sites"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// inventoryStoreName is the FleetSite metadata name, which keys the inventory ConfigMap.
+// siteName may be that name or spec.siteId.
+func inventoryStoreName(ctx context.Context, c client.Client, ns, siteName string) string {
+	fs, err := sites.FindFleetSite(ctx, c, ns, siteName)
+	if err != nil || fs == nil {
+		return siteName
+	}
+	return fs.Name
+}
+
+func inventoryJoinSiteID(ctx context.Context, c client.Client, ns, storeName string) string {
+	fs, err := sites.FindFleetSite(ctx, c, ns, storeName)
+	if err != nil || fs == nil {
+		return storeName
+	}
+	return fs.Spec.EffectiveSiteID(fs.Name)
+}
+
 // ReconcileInventorySite applies cluster intents from root group + group_vars files for inventory-first sites.
 func ReconcileInventorySite(ctx context.Context, c client.Client, cfg config.Config, siteName string) error {
+	siteName = inventoryStoreName(ctx, c, cfg.Namespace, siteName)
 	clustersDoc, err := yaidap.LoadClustersFile(ctx, c, cfg.Namespace, siteName)
 	if err != nil {
 		return err
@@ -102,7 +122,7 @@ func applyInventoryEnroll(ctx context.Context, c client.Client, cfg config.Confi
 	_ = yaidap.UpdateGuestStatus(ctx, c, cfg.Namespace, siteName, member, yaidap.GuestStatus{Cluster: &st})
 	_, err := clustercreate.Create(ctx, c, cfg, clustercreate.Request{
 		ClusterName:     clusterName,
-		SiteId:          siteName,
+		SiteId:          inventoryJoinSiteID(ctx, c, cfg.Namespace, siteName),
 		BootstrapHost:   addr,
 		Jumphost:        intent.Jumphost,
 		MinRootDiskGi:   ProvisionedVMMinRootDiskGi,
@@ -173,7 +193,7 @@ func applyInventoryEnrollHA(ctx context.Context, c client.Client, cfg config.Con
 	}
 	_, err := clustercreate.Create(ctx, c, cfg, clustercreate.Request{
 		ClusterName:     clusterName,
-		SiteId:          siteName,
+		SiteId:          inventoryJoinSiteID(ctx, c, cfg.Namespace, siteName),
 		BootstrapHost:   leader.AnsibleHost,
 		Jumphost:        intent.Jumphost,
 		MinRootDiskGi:   ProvisionedVMMinRootDiskGi,
@@ -314,6 +334,7 @@ func containsName(names []string, want string) bool {
 
 // ApplyInventoryClusterNow manually applies one cluster from clusters.yml.
 func ApplyInventoryClusterNow(ctx context.Context, c client.Client, cfg config.Config, siteName, clusterName string) error {
+	siteName = inventoryStoreName(ctx, c, cfg.Namespace, siteName)
 	doc, err := yaidap.LoadClustersFile(ctx, c, cfg.Namespace, siteName)
 	if err != nil {
 		return err
@@ -335,6 +356,7 @@ func ApplyInventoryClusterNow(ctx context.Context, c client.Client, cfg config.C
 
 // ApplyInventoryGuestCluster applies cluster intent for a guest listed in clusters.yml.
 func ApplyInventoryGuestCluster(ctx context.Context, c client.Client, cfg config.Config, siteName, guestName string) error {
+	siteName = inventoryStoreName(ctx, c, cfg.Namespace, siteName)
 	doc, err := yaidap.LoadClustersFile(ctx, c, cfg.Namespace, siteName)
 	if err != nil {
 		return err

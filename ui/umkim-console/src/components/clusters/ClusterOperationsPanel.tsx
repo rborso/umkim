@@ -325,6 +325,8 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const lastPostValidated = useRef('');
   const [historyRefreshKey, setHistoryRefreshKey] = useState('');
   const lastHistoryPhase = useRef('');
+  const [lanBridge, setLanBridge] = useState(false);
+  const [bridgeName, setBridgeName] = useState('n0p0_mgmt_nw');
 
   useEffect(() => {
     setNfsDir(cluster.storage?.nfs?.exportBase || '/srv/fleet-nfs');
@@ -538,8 +540,6 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const kubevirtPhase = cluster.providers?.kubevirt?.phase || '';
   const kubevirtReady = kubevirtPhase === 'Ready' || !!cluster.capabilities?.kubevirt;
   const multusL2 = !!cluster.capabilities?.['network.multus_l2'];
-  const [lanBridge, setLanBridge] = useState(false);
-  const [bridgeName, setBridgeName] = useState('n0p0_mgmt_nw');
 
   const enableKubevirt = async (opts?: { lanBridge?: boolean }) => {
     setActing(true);

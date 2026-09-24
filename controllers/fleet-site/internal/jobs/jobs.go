@@ -48,7 +48,7 @@ func ProvisionJob(ns, name, clusterName, siteID, topology string, bundleMode boo
 		playbook = "/ansible/cluster-provision.yml"
 		deadline = 5400
 	}
-	return ansibleJob(ns, "fleet-site-provision-"+name, clusterName, runnerImage, ansiblePlaybookArgs(playbook, clusterName, siteID), sshSecret, inventoryCM, "", deadline)
+	return ansibleJob(ns, "fleet-site-provision-"+name, clusterName, runnerImage, ansiblePlaybookArgs(playbook, clusterName, siteID), sshSecret, inventoryCM, HubAnsibleSecretsName, deadline)
 }
 
 // WGPeer is a hub WireGuard peer to sync.

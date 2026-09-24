@@ -9,18 +9,19 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/sites"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GuestStatus tracks hub-observed provision/cluster state for one guest.
 type GuestStatus struct {
-	Phase           string                         `json:"phase,omitempty"`
-	Message         string                         `json:"message,omitempty"`
-	LastProvisionID string                         `json:"lastProvisionID,omitempty"`
-	AnsibleHost     string                         `json:"ansible_host,omitempty"`
+	Phase           string                               `json:"phase,omitempty"`
+	Message         string                               `json:"message,omitempty"`
+	LastProvisionID string                               `json:"lastProvisionID,omitempty"`
+	AnsibleHost     string                               `json:"ansible_host,omitempty"`
 	Cluster         *fleetv1alpha1.SiteHostClusterStatus `json:"cluster,omitempty"`
-	Kind            string                         `json:"kind,omitempty"`
-	VmLocation      string                         `json:"vm_location,omitempty"`
+	Kind            string                               `json:"kind,omitempty"`
+	VmLocation      string                               `json:"vm_location,omitempty"`
 }
 
 // InventoryStatusDoc is _meta/status.json.
@@ -30,13 +31,13 @@ type InventoryStatusDoc struct {
 
 // InventoryHostView is a derived host row for API/UI.
 type InventoryHostView struct {
-	Name        string                              `json:"name"`
-	External    bool                                `json:"external,omitempty"`
-	AnsibleHost string                              `json:"ansible_host,omitempty"`
-	VmLocation  string                              `json:"vm_location,omitempty"`
-	Kind        string                              `json:"kind,omitempty"`
-	Status      GuestStatus                         `json:"status,omitempty"`
-	Clusters    []string                            `json:"clusters,omitempty"`
+	Name        string      `json:"name"`
+	External    bool        `json:"external,omitempty"`
+	AnsibleHost string      `json:"ansible_host,omitempty"`
+	VmLocation  string      `json:"vm_location,omitempty"`
+	Kind        string      `json:"kind,omitempty"`
+	Status      GuestStatus `json:"status,omitempty"`
+	Clusters    []string    `json:"clusters,omitempty"`
 }
 
 func loadStatusDoc(data map[string]string) InventoryStatusDoc {
@@ -208,6 +209,26 @@ type fcjHostIndex struct {
 	status   map[string]fleetv1alpha1.SiteHostClusterStatus
 }
 
+func acceptedSiteIDs(ctx context.Context, c client.Client, ns, siteName string) map[string]struct{} {
+	ids := map[string]struct{}{}
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			ids[id] = struct{}{}
+		}
+	}
+	add(siteName)
+	fs, err := sites.FindFleetSite(ctx, c, ns, siteName)
+	if err != nil || fs == nil {
+		return ids
+	}
+	add(fs.Name)
+	add(fs.Spec.SiteId)
+	add(fs.Spec.SiteName)
+	add(fs.Spec.EffectiveSiteID(fs.Name))
+	return ids
+}
+
 func loadFCJHostIndex(ctx context.Context, c client.Client, ns, siteName string) fcjHostIndex {
 	out := fcjHostIndex{
 		clusters: map[string][]string{},
@@ -217,9 +238,10 @@ func loadFCJHostIndex(ctx context.Context, c client.Client, ns, siteName string)
 	if err := c.List(ctx, &list, client.InNamespace(ns)); err != nil {
 		return out
 	}
+	accepted := acceptedSiteIDs(ctx, c, ns, siteName)
 	for i := range list.Items {
 		fcj := list.Items[i]
-		if strings.TrimSpace(fcj.Spec.SiteId) != strings.TrimSpace(siteName) {
+		if _, ok := accepted[strings.TrimSpace(fcj.Spec.SiteId)]; !ok {
 			continue
 		}
 		clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)

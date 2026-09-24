@@ -44,7 +44,11 @@ copy a Kubernetes Secret value into a command, example, or ticket.
    backups.
 
 The repository ignores the live vault file; only the example schema should be
-tracked. Spoke workload secrets remain on the cluster after hub detach; hub
-backup does not include spoke etcd or workload secrets. See [install.md](install.md),
+tracked. Cluster inventory ConfigMaps do not carry the Harbor admin password.
+Cluster provision Jobs read it from the hub Ansible secret
+`fleet-site-hub-ansible-secrets` (mounted at `/secrets/hub/ansible_vars.yml`).
+Spoke `registries.yaml` still contains that password because K3s uses it to
+authenticate to Harbor. Spoke workload secrets remain on the cluster after hub
+detach; hub backup does not include spoke etcd or workload secrets. See [install.md](install.md),
 [backup-restore.md](backup-restore.md), and [fleet-console-auth.md](fleet-console-auth.md)
 for related operational guidance.

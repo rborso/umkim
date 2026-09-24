@@ -18,10 +18,12 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/registry"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/script"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/sites"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ssh"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/storage"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/teardown"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/ssh"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/wg"
+	"gopkg.in/yaml.v3"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"gopkg.in/yaml.v3"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -69,7 +70,13 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 					return ctrl.Result{Requeue: true}, nil
 				}
 				delete(fcj.Annotations, "fleet.umkim.com/provision")
-				_ = r.Update(ctx, &fcj)
+				if err := r.Update(ctx, &fcj); err != nil {
+					return ctrl.Result{}, err
+				}
+				fcj.Status.Message = "provision ignored; cluster is Ready"
+				if err := r.Status().Update(ctx, &fcj); err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 		}
 		ensureProviderStatusDefaults(&fcj, clusterName)
@@ -372,7 +379,7 @@ func (r *ClusterJoinReconciler) issueClusterScript(ctx context.Context, fcj *fle
 	}
 
 	if bundleMode {
-	ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, false)
+		ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, false)
 		hostBridgeScript := ""
 		if fcj.Spec.WantsKubevirtBridge() {
 			hb := fcj.Spec.Providers.KubevirtBridge
@@ -503,10 +510,10 @@ func (r *ClusterJoinReconciler) clusterNodeWG(ctx context.Context, fcj *fleetv1a
 		out := make([]wg.NodeWG, 0, len(fcj.Status.Nodes))
 		for _, n := range fcj.Status.Nodes {
 			out = append(out, wg.NodeWG{
-				Hostname:   n.Hostname,
-				Address:    n.Address,
-				WGAddress:  n.WireguardAddress,
-				PublicKey:  n.WireguardPublicKey,
+				Hostname:  n.Hostname,
+				Address:   n.Address,
+				WGAddress: n.WireguardAddress,
+				PublicKey: n.WireguardPublicKey,
 			})
 		}
 		return out, nil
@@ -662,10 +669,12 @@ func writeFleetNFSDelegateInventory(b *strings.Builder, fcj *fleetv1alpha1.Fleet
 		return
 	}
 	host := strings.TrimSpace(fcj.Spec.Storage.NFS.DelegateHost)
-	b.WriteString(fmt.Sprintf("\n[%s]\n", storage.NFSDelegateInventoryHost()))
+	// Group name must differ from the host name. Ansible drops ansible_host on
+	// delegate_to when a host and a group share a name.
+	b.WriteString("\n[fleet_nfs]\n")
 	b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", storage.NFSDelegateInventoryHost(), host, sshUser))
 	if hubRunner {
-		b.WriteString(fmt.Sprintf("\n[%s:vars]\n", storage.NFSDelegateInventoryHost()))
+		b.WriteString("\n[fleet_nfs:vars]\n")
 		b.WriteString("ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\n")
 		b.WriteString("ansible_ssh_private_key_file=/root/.ssh/id_rsa\n")
 	}
@@ -699,11 +708,11 @@ func (r *ClusterJoinReconciler) loadFleetSite(ctx context.Context, siteID string
 	if siteID == "" || r.Reconciler == nil || r.Reconciler.Client == nil {
 		return nil
 	}
-	var fs fleetv1alpha1.FleetSite
-	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: siteID}, &fs); err != nil {
+	fs, err := sites.FindFleetSite(ctx, r.Client, r.Cfg.Namespace, siteID)
+	if err != nil {
 		return nil
 	}
-	return &fs
+	return fs
 }
 
 func (r *ClusterJoinReconciler) effectiveJumphost(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) string {
@@ -717,8 +726,8 @@ func (r *ClusterJoinReconciler) effectiveJumphost(ctx context.Context, fcj *flee
 	if siteID == "" {
 		return ""
 	}
-	var fs fleetv1alpha1.FleetSite
-	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: siteID}, &fs); err != nil {
+	fs := r.loadFleetSite(ctx, siteID)
+	if fs == nil {
 		return ""
 	}
 	return strings.TrimSpace(fs.Spec.Jumphost)
@@ -821,7 +830,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 			b.WriteString(fmt.Sprintf("k3s_cluster_join_server=https://%s:6443\n", vip))
 		}
 		writeFleetClusterK3sNetworkVars(&b, fcj)
-		writeHarborBootstrapVars(&b, r.Cfg.HubWireguardIP, r.harborAdminPassword(ctx))
+		writeHarborBootstrapVars(&b, r.Cfg.HubWireguardIP)
 		b.WriteString("harbor_enable_quay_mirror=false\n")
 		b.WriteString(fmt.Sprintf("fleet_site_min_root_disk_gi=%d\n", minDisk))
 		b.WriteString(fmt.Sprintf("fleet_hub_wireguard_ip=%s\n", r.Cfg.HubWireguardIP))
@@ -835,10 +844,6 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		writeFleetClusterStorageVars(&b, fcj, clusterName)
-		b.WriteString(fmt.Sprintf("\n[%s]\n", initHost))
-		b.WriteString(fmt.Sprintf("fleet_site_wg_ip=%s/32\n", bootstrapWG))
-		b.WriteString(fmt.Sprintf("fleet_site_sp_endpoint=%s\n", bootstrapWG))
-		b.WriteString(fmt.Sprintf("fleet_site_enable_kubevirt=%s\n", kubevirtEnable))
 		b.WriteString("\n[site_bootstrap]\n")
 		sshHost := nodeAnsibleHost(bootstrap, bootstrapMgmt, hubRunner, useMgmtLAN)
 		b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", initHost, sshHost, r.Cfg.SSHUser))
@@ -858,13 +863,11 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
 		b.WriteString("\n[ocm_spoke_join:children]\n")
 		b.WriteString("site_bootstrap\n")
-		b.WriteString(fmt.Sprintf("\n[%s]\n", clusterName))
 		clusterSSHHost := bootstrapWG
 		if useMgmtLAN {
 			clusterSSHHost = bootstrapMgmt
 		}
-		b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", clusterName, clusterSSHHost, r.Cfg.SSHUser))
-		b.WriteString(fmt.Sprintf("\n[%s:vars]\n", clusterName))
+		writeClusterAliasInventory(&b, clusterName, clusterSSHHost, r.Cfg.SSHUser)
 		b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 		b.WriteString(fmt.Sprintf("fleet_site=%s\n", fcj.Spec.SiteId))
@@ -892,7 +895,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	writeFleetClusterWireguardEndpointVars(&b, r.Cfg)
 	b.WriteString(fmt.Sprintf("fleet_site_min_root_disk_gi=%d\n", minDisk))
 	writeFleetClusterK3sNetworkVars(&b, fcj)
-	writeHarborBootstrapVars(&b, r.Cfg.HubWireguardIP, r.harborAdminPassword(ctx))
+	writeHarborBootstrapVars(&b, r.Cfg.HubWireguardIP)
 	b.WriteString("harbor_enable_quay_mirror=false\n")
 	b.WriteString("k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
 	b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
@@ -924,9 +927,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString("\n[ocm_spoke_join:children]\n")
 	b.WriteString("site_bootstrap\n")
-	b.WriteString(fmt.Sprintf("\n[%s]\n", clusterName))
-	b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", clusterName, sshHost, r.Cfg.SSHUser))
-	b.WriteString(fmt.Sprintf("\n[%s:vars]\n", clusterName))
+	writeClusterAliasInventory(&b, clusterName, sshHost, r.Cfg.SSHUser)
 	b.WriteString("k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString("ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml\n")
 	b.WriteString(fmt.Sprintf("fleet_site=%s\n", fcj.Spec.SiteId))
@@ -935,6 +936,15 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	writeHubInventorySection(&b, r, hubRunner, sshKeyFile, sshArgs)
 	writeFleetNFSDelegateInventory(&b, fcj, hubRunner, r.Cfg.SSHUser)
 	return b.String()
+}
+
+// writeClusterAliasInventory adds the cluster name as an Ansible host without
+// also creating a group of that name. Ansible drops ansible_host on delegate_to
+// when a host and a group share a name (OCM CSR approval SSHes to this host).
+func writeClusterAliasInventory(b *strings.Builder, clusterName, sshHost, sshUser string) {
+	b.WriteString("\n[fleet_cluster]\n")
+	b.WriteString(fmt.Sprintf("%s ansible_host=%s ansible_user=%s\n", clusterName, sshHost, sshUser))
+	b.WriteString("\n[fleet_cluster:vars]\n")
 }
 
 // writeHubInventorySection emits [hub] for cluster Ansible jobs. Hub-runner pods run
@@ -963,36 +973,13 @@ func writeHubInventorySection(b *strings.Builder, r *ClusterJoinReconciler, hubR
 	b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
 }
 
-func writeHarborBootstrapVars(b *strings.Builder, hubIP, password string) {
+func writeHarborBootstrapVars(b *strings.Builder, hubIP string) {
 	host := strings.TrimSpace(hubIP)
 	if host == "" {
 		host = "10.10.0.1"
 	}
 	b.WriteString(fmt.Sprintf("harbor_host=%s\n", host))
 	b.WriteString("harbor_nodeport_https=30443\n")
-	if strings.TrimSpace(password) != "" {
-		b.WriteString(fmt.Sprintf("harbor_admin_password=%s\n", password))
-	}
-}
-
-func (r *ClusterJoinReconciler) harborAdminPassword(ctx context.Context) string {
-	if r.Client == nil {
-		return ""
-	}
-	var secret corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{Name: jobs.HubAnsibleSecretsName, Namespace: r.Cfg.Namespace}, &secret); err != nil {
-		return ""
-	}
-	raw, ok := secret.Data["ansible_vars.yml"]
-	if !ok {
-		return ""
-	}
-	var vars map[string]interface{}
-	if err := yaml.Unmarshal(raw, &vars); err != nil {
-		return ""
-	}
-	p, _ := vars["harbor_admin_password"].(string)
-	return strings.Trim(strings.TrimSpace(p), "\"")
 }
 
 func writeFleetClusterKubevirtBridgeVars(b *strings.Builder, fcj *fleetv1alpha1.FleetClusterJoin) {
@@ -1413,9 +1400,15 @@ func (r *ClusterJoinReconciler) clusterJoinBundleMode(fcj *fleetv1alpha1.FleetCl
 	return !fcj.Spec.IsLAN()
 }
 
-func clusterBootstrapSecretName(clusterName string) string { return "fleet-cluster-" + clusterName + "-bootstrap" }
-func clusterSSHSecretName(clusterName string) string       { return "fleet-cluster-" + clusterName + "-ansible-ssh" }
-func clusterInventoryCMName(clusterName string) string     { return "fleet-cluster-" + clusterName + "-inventory" }
+func clusterBootstrapSecretName(clusterName string) string {
+	return "fleet-cluster-" + clusterName + "-bootstrap"
+}
+func clusterSSHSecretName(clusterName string) string {
+	return "fleet-cluster-" + clusterName + "-ansible-ssh"
+}
+func clusterInventoryCMName(clusterName string) string {
+	return "fleet-cluster-" + clusterName + "-inventory"
+}
 
 func staleClusterWGPeers(existing []wg.NodeWG, status []fleetv1alpha1.FleetClusterJoinNodeStatus, keep map[string]struct{}) []jobs.WGPeer {
 	seen := map[string]struct{}{}

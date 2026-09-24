@@ -51,6 +51,8 @@ configure those per ingress entry.
 Use `route.mode: hub` when the site has `hubGateway` enabled and DNS for
 `hubHost` is ready. Use `route.mode: site` when the cluster is bound to a
 `port_forward` or `reverse_proxy` ingress entry and `siteHost` is configured.
+A catalog `routing.site_host` value updates the route host; an empty catalog
+host leaves the existing host in place.
 
 ## Hub independence
 

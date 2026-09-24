@@ -48,13 +48,18 @@ func (s *Server) handleUserByName(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, u)
 	case http.MethodPatch:
-		var patch authv1.FleetUser
+		var patch struct {
+			Spec struct {
+				Disabled    *bool  `json:"disabled"`
+				DisplayName string `json:"displayName,omitempty"`
+			} `json:"spec"`
+		}
 		if err := jsonDecode(r.Body, &patch); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if patch.Spec.Disabled {
-			u.Spec.Disabled = true
+		if patch.Spec.Disabled != nil {
+			u.Spec.Disabled = *patch.Spec.Disabled
 		}
 		if patch.Spec.DisplayName != "" {
 			u.Spec.DisplayName = patch.Spec.DisplayName

@@ -240,6 +240,9 @@ func (s *Server) handleSiteByName(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "management site does not support bootstrap actions", http.StatusForbidden)
 			return
 		}
+		if !s.requireIdentity(w, r) {
+			return
+		}
 		s.serveBootstrapScript(ctx, w, name)
 	case rest == "validate" && r.Method == http.MethodPost:
 		if s.siteIsManagement(ctx, name) {

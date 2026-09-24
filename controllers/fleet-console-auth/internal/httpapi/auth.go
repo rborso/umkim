@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -42,7 +43,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	groups := s.RBAC.ResolveFleetGroups(r.Context(), principal.Groups)
 	actor := rbac.Actor{Kind: "User", Name: principal.ExternalID, Groups: groups}
-	_ = s.ensureUser(r.Context(), principal, groups)
+	if err := s.ensureUser(r.Context(), principal, groups); err != nil {
+		if errors.Is(err, errUserDisabled) {
+			_ = s.Audit.Record(r.Context(), authv1.SubjectRef{Kind: "User", Name: principal.ExternalID}, "auth.login", "deny", nil, nil, httpInfo(r), err.Error())
+			http.Error(w, "user disabled", http.StatusForbidden)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	token, err := s.Sessions.Issue(principal.Username, principal.ExternalID, principal.AuthMethod, "User", groups)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -153,12 +162,18 @@ func (s *Server) resolveActor(r *http.Request) (rbac.Actor, bool) {
 		}
 		claims, err := s.Sessions.Parse(raw)
 		if err == nil {
+			if s.sessionUserDisabled(r, claims.Kind, claims.Sub) {
+				return rbac.Actor{}, false
+			}
 			return rbac.Actor{Kind: claims.Kind, Name: claims.Sub, Groups: claims.Groups}, true
 		}
 	}
 	if c, err := r.Cookie(s.Sessions.CookieName()); err == nil && c.Value != "" {
 		claims, err := s.Sessions.Parse(c.Value)
 		if err == nil {
+			if s.sessionUserDisabled(r, claims.Kind, claims.Sub) {
+				return rbac.Actor{}, false
+			}
 			return rbac.Actor{Kind: claims.Kind, Name: claims.Sub, Groups: claims.Groups}, true
 		}
 	}
@@ -203,6 +218,20 @@ func (s *Server) setSessionCookie(w http.ResponseWriter, token string) {
 	})
 }
 
+var errUserDisabled = errors.New("user disabled")
+
+func (s *Server) sessionUserDisabled(r *http.Request, kind, sub string) bool {
+	if kind == "ServiceAccount" || sub == "" {
+		return false
+	}
+	var u authv1.FleetUser
+	err := s.Client.Get(r.Context(), types.NamespacedName{Namespace: s.Cfg.Namespace, Name: sanitizeName(sub)}, &u)
+	if err != nil {
+		return false
+	}
+	return u.Spec.Disabled
+}
+
 func (s *Server) ensureUser(ctx context.Context, p *identity.Principal, groups []string) error {
 	name := sanitizeName(p.ExternalID)
 	var u authv1.FleetUser
@@ -220,6 +249,9 @@ func (s *Server) ensureUser(ctx context.Context, p *identity.Principal, groups [
 			Status: authv1.FleetUserStatus{LastLogin: &now},
 		}
 		return s.Client.Create(ctx, &u)
+	}
+	if u.Spec.Disabled {
+		return errUserDisabled
 	}
 	u.Spec.DisplayName = p.DisplayName
 	u.Spec.Groups = groups

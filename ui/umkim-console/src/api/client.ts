@@ -106,6 +106,18 @@ export function fleetSiteEffectiveId(s: FleetSite): string {
   return s.spec?.siteId || s.spec?.siteName || s.metadata?.name || '';
 }
 
+/** Resolve a site from an id that may be siteId, siteName, or metadata.name. */
+export function fleetSiteById(sites: FleetSite[], id: string | undefined): FleetSite | undefined {
+  if (!id) return undefined;
+  return sites.find(
+    (s) =>
+      fleetSiteEffectiveId(s) === id ||
+      s.metadata?.name === id ||
+      s.spec?.siteId === id ||
+      s.spec?.siteName === id,
+  );
+}
+
 /** Human-readable site label for a fleet.site / siteId value. */
 export function fleetSiteLabelForId(sites: FleetSite[], siteId: string | undefined): string {
   if (!siteId) return '—';
@@ -395,9 +407,11 @@ export async function validateFleetClusterNodeOperation(
   try {
     data = JSON.parse(text) as import('./types').NodeOperationValidateResult;
   } catch {
+    onUnauthorized(r.status);
     throw new ApiError('node-operation validate → HTTP ' + r.status, r.status, text);
   }
   if (!r.ok && r.status !== 422) {
+    onUnauthorized(r.status);
     throw new ApiError('node-operation validate → HTTP ' + r.status, r.status, text);
   }
   return data;
@@ -696,9 +710,11 @@ export function fleetClusterPhase(c: FleetCluster): string {
 export async function downloadFleetSiteBootstrapScript(name: string): Promise<string> {
   const r = await fetch(
     FLEET_SITE_API_BASE + '/sites/' + encodeURIComponent(name) + '/bootstrap-script',
+    { credentials: 'include' },
   );
   const text = await r.text();
   if (!r.ok) {
+    onUnauthorized(r.status);
     throw new ApiError('bootstrap-script → HTTP ' + r.status, r.status, text);
   }
   return text;

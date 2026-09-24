@@ -14,10 +14,10 @@ import (
 const policyCacheTTL = 30 * time.Second
 
 type policyCache struct {
-	mu        sync.RWMutex
-	loadedAt  time.Time
-	roles     map[string]authv1.FleetRole
-	bindings  []authv1.FleetRoleBinding
+	mu       sync.RWMutex
+	loadedAt time.Time
+	roles    map[string]authv1.FleetRole
+	bindings []authv1.FleetRoleBinding
 }
 
 type Engine struct {
@@ -61,7 +61,7 @@ func (e *Engine) Authorize(ctx context.Context, actor Actor, req Request) (bool,
 		if !ok {
 			continue
 		}
-		if !scopeMatches(b.Spec.Scopes, req.ScopeKind, req.ScopeName) {
+		if !scopeMatches(b.Spec.Scopes, req.ScopeKind, req.ScopeName, req.Verb) {
 			continue
 		}
 		if ruleAllows(role.Spec.Rules, req) {
@@ -173,18 +173,20 @@ func subjectMatches(actor Actor, subjects []authv1.SubjectRef) bool {
 	return false
 }
 
-func scopeMatches(scopes []authv1.ScopeRef, kind, name string) bool {
+func scopeMatches(scopes []authv1.ScopeRef, kind, name, verb string) bool {
 	if len(scopes) == 0 {
-		return true
-	}
-	if kind == "" && name == "" {
-		// List: binding is scoped but list is allowed; caller filters results.
 		return true
 	}
 	for _, s := range scopes {
 		if s.Kind == "*" || s.Name == "*" {
 			return true
 		}
+	}
+	if kind == "" && name == "" {
+		// Lists stay visible. Unscoped mutations require a global or wildcard binding.
+		return verb == "get" || verb == "list"
+	}
+	for _, s := range scopes {
 		if strings.EqualFold(s.Kind, kind) && (s.Name == name || s.Name == "*") {
 			return true
 		}

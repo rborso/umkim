@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	annotationWGPeersRemoved       = "fleet.umkim.com/wg-peers-removed"
-	annotationCleanupKubernetes    = "fleet.umkim.com/cleanup-kubernetes"
+	annotationWGPeersRemoved     = "fleet.umkim.com/wg-peers-removed"
+	annotationCleanupKubernetes  = "fleet.umkim.com/cleanup-kubernetes"
+	annotationDeleteJobSucceeded = "fleet.umkim.com/delete-job-succeeded"
 )
 
 func wgPeersRemoved(fcj *fleetv1alpha1.FleetClusterJoin) bool {
@@ -32,22 +33,43 @@ func clusterCleanupKubernetes(fcj *fleetv1alpha1.FleetClusterJoin) bool {
 	return fcj.Annotations != nil && fcj.Annotations[annotationCleanupKubernetes] == "true"
 }
 
+func deleteJobSucceeded(fcj *fleetv1alpha1.FleetClusterJoin) bool {
+	return fcj.Annotations != nil && fcj.Annotations[annotationDeleteJobSucceeded] == "true"
+}
+
+// clusterNeedsDeleteJob is true until one delete Job succeeds. A later pass
+// starts another Job only while the ManagedCluster is still present. WireGuard
+// records alone do not request another delete Job after success. Hub-only
+// clusters with no ManagedCluster still get that first Job.
 func (r *ClusterJoinReconciler) clusterNeedsDeleteJob(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) bool {
-	if teardown.ManagedClusterExists(ctx, r.Client, clusterName) {
-		return true
+	if deleteJobSucceeded(fcj) {
+		return teardown.ManagedClusterExists(ctx, r.Client, clusterName)
 	}
-	if fcj.Status.ProvisionJobName != "" {
-		return true
-	}
-	if fcj.Status.DeleteJobName != "" {
-		return true
-	}
-	// Detach enrolled nodes (bootstrap/WG records) even when MC already removed.
-	if _, err := r.clusterNodeWG(ctx, fcj, clusterName); err == nil {
-		return true
-	}
-	// Hub-only: provider deregistration + ManifestWork cleanup.
 	return true
+}
+
+func (r *ClusterJoinReconciler) markDeleteJobSucceeded(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) error {
+	if err := r.patchClusterJoin(ctx, fcj, func(latest *fleetv1alpha1.FleetClusterJoin) {
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[annotationDeleteJobSucceeded] = "true"
+	}); err != nil {
+		return err
+	}
+	return r.Get(ctx, client.ObjectKeyFromObject(fcj), fcj)
+}
+
+func (r *ClusterJoinReconciler) clearDeleteJobSucceeded(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) error {
+	if err := r.patchClusterJoin(ctx, fcj, func(latest *fleetv1alpha1.FleetClusterJoin) {
+		if latest.Annotations == nil {
+			return
+		}
+		delete(latest.Annotations, annotationDeleteJobSucceeded)
+	}); err != nil {
+		return err
+	}
+	return r.Get(ctx, client.ObjectKeyFromObject(fcj), fcj)
 }
 
 func (r *ClusterJoinReconciler) markWGPeersRemoved(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) error {
@@ -102,6 +124,11 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 
 	// Run hub/spoke delete while overlay WG is still up so klusterlet can finish ManifestWork cleanup.
 	needsDeleteJob := r.clusterNeedsDeleteJob(ctx, fcj, clusterName)
+	if needsDeleteJob && deleteJobSucceeded(fcj) {
+		if err := r.clearDeleteJobSucceeded(ctx, fcj); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 	if needsDeleteJob && fcj.Status.DeleteJobName == "" {
 		if err := r.startClusterDelete(ctx, fcj, clusterName); err != nil {
 			return r.failClusterDelete(ctx, fcj, err)
@@ -121,6 +148,11 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 				return ctrl.Result{Requeue: true}, nil
 			}
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		}
+		if ok {
+			if err := r.markDeleteJobSucceeded(ctx, fcj); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 		fcj.Status.DeleteJobName = ""
 		if !ok {

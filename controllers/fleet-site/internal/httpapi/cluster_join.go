@@ -31,7 +31,7 @@ type clusterCreateBody struct {
 	ClusterCapabilities map[string]bool   `json:"clusterCapabilities,omitempty"`
 	GPU                 bool              `json:"gpu,omitempty"`
 	Storage             *struct {
-		LocalPath     *struct {
+		LocalPath *struct {
 			Enabled *bool `json:"enabled,omitempty"`
 		} `json:"localPath,omitempty"`
 		Backend       string `json:"backend,omitempty"`
@@ -53,16 +53,16 @@ type clusterCreateBody struct {
 			StorageClass string `json:"storageClass,omitempty"`
 		} `json:"longhorn,omitempty"`
 	} `json:"storage,omitempty"`
-	Edge           fleetv1alpha1.FleetClusterJoinEdgeSpec `json:"edge,omitempty"`
-	Topology       string                                 `json:"topology,omitempty"`
-	NetworkMode    string                                 `json:"networkMode,omitempty"`
-	RockyVersion   string                                 `json:"rockyVersion,omitempty"`
-	HubLanApi      string                                 `json:"hubLanApi,omitempty"`
-	ControlPlaneVip string                                `json:"controlPlaneVip,omitempty"`
-	Nodes          []fleetv1alpha1.FleetClusterJoinNodeSpec `json:"nodes,omitempty"`
-	Providers      *struct {
-		Install        fleetv1alpha1.ProviderInstallSpec  `json:"install,omitempty"`
-		KubevirtBridge fleetv1alpha1.KubevirtBridgeSpec   `json:"kubevirtBridge,omitempty"`
+	Edge            fleetv1alpha1.FleetClusterJoinEdgeSpec   `json:"edge,omitempty"`
+	Topology        string                                   `json:"topology,omitempty"`
+	NetworkMode     string                                   `json:"networkMode,omitempty"`
+	RockyVersion    string                                   `json:"rockyVersion,omitempty"`
+	HubLanApi       string                                   `json:"hubLanApi,omitempty"`
+	ControlPlaneVip string                                   `json:"controlPlaneVip,omitempty"`
+	Nodes           []fleetv1alpha1.FleetClusterJoinNodeSpec `json:"nodes,omitempty"`
+	Providers       *struct {
+		Install        fleetv1alpha1.ProviderInstallSpec `json:"install,omitempty"`
+		KubevirtBridge fleetv1alpha1.KubevirtBridgeSpec  `json:"kubevirtBridge,omitempty"`
 	} `json:"providers,omitempty"`
 }
 
@@ -400,12 +400,12 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 			Edge: fleetv1alpha1.FleetClusterJoinEdgeSpec{
 				IngressId: ingressID,
 			},
-			Topology:            topology,
-			NetworkMode:         networkMode,
-			RockyVersion:        s.Cfg.RockyMajor(req.RockyVersion),
-			HubLanApi:           req.HubLanApi,
-			ControlPlaneVip:     strings.TrimSpace(req.ControlPlaneVip),
-			Nodes:               req.Nodes,
+			Topology:        topology,
+			NetworkMode:     networkMode,
+			RockyVersion:    s.Cfg.RockyMajor(req.RockyVersion),
+			HubLanApi:       req.HubLanApi,
+			ControlPlaneVip: strings.TrimSpace(req.ControlPlaneVip),
+			Nodes:           req.Nodes,
 		},
 		Status: fleetv1alpha1.FleetClusterJoinStatus{
 			Phase:   fleetv1alpha1.JoinPhasePending,
@@ -615,7 +615,9 @@ func (s *Server) serveClusterBootstrapBundle(ctx context.Context, w http.Respons
 	_, _ = w.Write(archiveBytes)
 }
 
-func clusterBootstrapSecretName(clusterName string) string { return "fleet-cluster-" + clusterName + "-bootstrap" }
+func clusterBootstrapSecretName(clusterName string) string {
+	return "fleet-cluster-" + clusterName + "-bootstrap"
+}
 
 func clusterTokenMatches(ctx context.Context, c client.Client, ns, clusterName, token string) bool {
 	var secret corev1.Secret
@@ -646,6 +648,13 @@ func (s *Server) triggerClusterAction(ctx context.Context, w http.ResponseWriter
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
+	}
+	if action == "provision" && fcj.Status.Phase == fleetv1alpha1.JoinPhaseReady {
+		clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)
+		if mc, err := getManagedCluster(ctx, s.Client, clusterName); err == nil && mcConditionAvailable(mc) {
+			http.Error(w, "cluster is already provisioned", http.StatusConflict)
+			return
+		}
 	}
 	if fcj.Annotations == nil {
 		fcj.Annotations = map[string]string{}

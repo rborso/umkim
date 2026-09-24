@@ -7,7 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-edge/internal/config"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestProviderToCluster(t *testing.T) {
@@ -240,5 +245,85 @@ func TestResolveTargetServices(t *testing.T) {
 	}
 	if got[1].Service.Name != "svc-standby" || got[1].SprmID != "sprm-standby" {
 		t.Fatalf("unexpected standby: %+v", got[1])
+	}
+}
+
+func TestSyncInstanceUpdatesCatalogSiteHost(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	scheme := runtime.NewScheme()
+	if err := fleetv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	const (
+		ns  = "fleet-system"
+		uid = "abcdefghijkl"
+	)
+	existing := &fleetv1alpha1.FleetAppRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route-" + uid, Namespace: ns},
+		Spec: fleetv1alpha1.FleetAppRouteSpec{
+			InstanceID:    uid,
+			Mode:          fleetv1alpha1.RouteModeSite,
+			EffectiveMode: fleetv1alpha1.RouteModeHub,
+			Cluster:       "lab",
+			HubHost:       "demo.example.com",
+			SiteHost:      "site-a.example.com",
+			HealthPath:    "/",
+			Service:       fleetv1alpha1.ServiceRef{Namespace: "default", Name: "demo", Port: 80},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+	syncer := &Syncer{
+		Client: c,
+		Config: config.Config{
+			CatalogAPIURL:   srv.URL + "/api/v1alpha1",
+			RouteNamespace:  ns,
+			FleetEdgeDomain: "example.com",
+		},
+		HTTP: srv.Client(),
+	}
+	inst := catalogInstance{
+		UID: uid,
+		Spec: instSpec{
+			CatalogItemID: "item",
+			ResourceIDs:   []string{"res-1"},
+			UserValues: []userValue{
+				{Path: "routing.mode", Value: "site"},
+				{Path: "routing.cluster", Value: "lab"},
+				{Path: "routing.site_host", Value: "site-b.example.com"},
+				{Path: "routing.hub_host", Value: "demo.example.com"},
+				{Path: "metadata.name", Value: "demo"},
+			},
+		},
+	}
+	if err := syncer.syncInstance(context.Background(), inst); err != nil {
+		t.Fatal(err)
+	}
+	var got fleetv1alpha1.FleetAppRoute
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(existing), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Spec.SiteHost != "site-b.example.com" {
+		t.Fatalf("site host = %q, want site-b.example.com", got.Spec.SiteHost)
+	}
+	if got.Spec.EffectiveMode != fleetv1alpha1.RouteModeHub {
+		t.Fatalf("effective mode = %q, want hub", got.Spec.EffectiveMode)
+	}
+
+	inst.Spec.UserValues[2].Value = ""
+	if err := syncer.syncInstance(context.Background(), inst); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(existing), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Spec.SiteHost != "site-b.example.com" {
+		t.Fatalf("empty catalog host replaced site host with %q", got.Spec.SiteHost)
+	}
+	if got.Spec.EffectiveMode != fleetv1alpha1.RouteModeHub {
+		t.Fatalf("effective mode = %q, want hub", got.Spec.EffectiveMode)
 	}
 }

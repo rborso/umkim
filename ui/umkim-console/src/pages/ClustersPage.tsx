@@ -26,6 +26,7 @@ import {
   fleetClusterIsConsoleProvisioned,
   fleetClusterPhase,
   fleetDefaultWorkloadSiteId,
+  fleetSiteById,
   fleetSiteEffectiveId,
   fleetSiteIsManagement,
   fleetSiteLabelForId,
@@ -178,7 +179,7 @@ export function ClustersPage() {
   );
 
   const selectedSite = useMemo(
-    () => registrySites.find((s) => (s.spec.siteId || s.metadata?.name) === form.siteId),
+    () => fleetSiteById(registrySites, form.siteId),
     [registrySites, form.siteId],
   );
 
