@@ -1,4 +1,5 @@
-{% set phase6_spoke_acme = fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% set spoke_ingress_method = fleet_site_spoke_ingress_method | default('') %}
+{% set phase6_spoke_acme = fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool and spoke_ingress_method == 'port_forward' %}
 {% set phase6_spoke_acme_http_challenge = phase6_spoke_acme_http_challenge | default(false) | bool %}
 {% set phase6_traefik_file_provider = fleet_ingress_auth_enabled | default(false) | bool %}
 apiVersion: work.open-cluster-management.io/v1
@@ -10,7 +11,7 @@ metadata:
     fleet.umkim.com/phase: "6"
     fleet.umkim.com/role: "spoke"
 spec:
-{% if fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% if phase6_spoke_acme %}
   manifestConfigs:
     - resourceIdentifier:
         group: ""
@@ -26,7 +27,7 @@ spec:
         kind: Namespace
         metadata:
           name: {{ phase6_spoke_ingress_namespace }}
-{% if fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% if phase6_spoke_acme %}
       - apiVersion: v1
         kind: PersistentVolumeClaim
         metadata:
@@ -112,7 +113,7 @@ spec:
                     - --providers.file.directory=/etc/traefik/dynamic
                     - --providers.file.watch=true
 {% endif %}
-{% if fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% if phase6_spoke_acme %}
                     - --certificatesresolvers.letsencrypt.acme.email={{ fleet_edge_acme_email }}
                     - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
 {% if fleet_edge_acme_staging | default(false) | bool %}
@@ -145,7 +146,7 @@ spec:
                     initialDelaySeconds: 3
                     periodSeconds: 10
                   volumeMounts:
-{% if fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% if phase6_spoke_acme %}
                     - name: acme
                       mountPath: /data
 {% endif %}
@@ -155,7 +156,7 @@ spec:
                       readOnly: true
 {% endif %}
               volumes:
-{% if fleet_edge_acme_enabled | default(false) | bool and fleet_edge_direct_ingress | default(false) | bool %}
+{% if phase6_spoke_acme %}
                 - name: acme
                   persistentVolumeClaim:
                     claimName: traefik-acme

@@ -1,6 +1,7 @@
 # nginx reverse-proxy vhost template (commented).
-# TLS terminates on the edge router; cluster Traefik listens HTTP on NodePort 30080.
-# Cluster node: 203.0.113.101 — must be reachable from the router LAN.
+# TLS terminates on the edge router; cluster Traefik listens HTTP on NodePort 30080 (web).
+# reverse_proxy clusters do not enable spoke HTTP→HTTPS redirect (TLS is off-cluster).
+# Cluster VIP: 203.0.113.101 — must be reachable from the router LAN.
 # See examples/site-profiles/reverse-proxy/README.md
 
 # server {

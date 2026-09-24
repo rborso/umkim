@@ -13,6 +13,9 @@
       {{ fleet_edge_clusters[item].direct_ingress
          | default(fleet_edge_direct_ingress_default | default(true))
          if item in fleet_edge_clusters else false }}
+    fleet_site_spoke_ingress_method: >-
+      {{ fleet_edge_clusters[item].method | default('')
+         if item in fleet_edge_clusters else '' }}
     phase6_spoke_acme_http_challenge: >-
       {{ fleet_edge_clusters[item].method | default('') == 'port_forward'
          if item in fleet_edge_clusters else false }}

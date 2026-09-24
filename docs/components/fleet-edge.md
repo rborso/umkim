@@ -19,6 +19,12 @@ Each `FleetSite` declares one or more **ingress entries** under
 | `port_forward` | One cluster per entry (`id`, `zone` required; `address` required only when `wanAddressMode` is `fixed`) | `acme_cluster` on spoke | Allowed (zone from ingress) |
 | `reverse_proxy` | Many clusters per entry (`id` required; optional `address`, `operatorNotes`) | `external` (off-cluster) | Not available |
 
+Clusters bound to **`reverse_proxy`** do not receive spoke Let's Encrypt or the
+Traefik `web` entrypoint HTTP→HTTPS redirect (phase6 spoke ingress). TLS
+terminates on the operator reverse proxy; site `FleetApp` routes use plain HTTP
+on NodePort **30080** with per-host Ingress rules. Set `siteHost` explicitly on
+each app.
+
 Each `port_forward` ingress row may set **`wanAddressMode`**:
 
 | Mode | Use when | `edge_wan_ip` in `fleet-edge-clusters` | ACME DNS preflight |
