@@ -2,12 +2,27 @@
 # Confirm the hub chart library lists seeded Harbor charts.
 set -euo pipefail
 
-API="${FLEET_SITE_API:-http://127.0.0.1:18080/api/v1alpha1}"
+# Prefer direct fleet-site NodePort (identity headers). Console proxy may require session cookies.
+API="${FLEET_SITE_API_DIRECT:-${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}}"
 HDR=(-H 'Accept: application/json' -H 'X-Fleet-Subject-Kind: User' -H 'X-Fleet-Subject-Name: fleet-flow' -H 'X-Fleet-DC-Admin: true')
 
 echo "=== verify-fleet-chart ==="
-if ! curl -sfS "${HDR[@]}" "${API}/charts" -o /tmp/fleet-charts.json; then
-  echo "FAIL GET /charts" >&2
+for _ in $(seq 1 30); do
+  curl -sf --connect-timeout 2 "${API%/api/v1alpha1}/healthz" >/dev/null 2>&1 \
+    || curl -sf --connect-timeout 2 "http://127.0.0.1:18080/healthz" >/dev/null 2>&1 && break
+  sleep 2
+done
+ok=0
+for _ in $(seq 1 30); do
+  code="$(curl -sS -o /tmp/fleet-charts.json -w '%{http_code}' "${HDR[@]}" "${API}/charts" 2>/dev/null || echo "000")"
+  if [[ "${code}" == "200" ]]; then
+    ok=1
+    break
+  fi
+  sleep 2
+done
+if [[ "${ok}" != "1" ]]; then
+  echo "FAIL GET /charts (fleet-site API not ready)" >&2
   exit 1
 fi
 python3 - <<'PY'

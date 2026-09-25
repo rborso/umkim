@@ -47,6 +47,8 @@ export type BareMetalNodeOptions = {
   name: string;
   ansibleHost?: string;
   os?: string;
+  macAddress?: string;
+  pxeDiscovery?: boolean;
 };
 
 export function hypervisorDiscoveryStubTemplate(opts: HypervisorDiscoveryStubOptions): string {
@@ -154,11 +156,38 @@ export function bareMetalNodeHostVarsTemplate(opts: BareMetalNodeOptions): strin
   const ansibleHostLine = opts.ansibleHost?.trim()
     ? `ansible_host: ${opts.ansibleHost.trim()}\n`
     : '';
+  const mac = opts.macAddress?.trim();
+  const pxeEnabled = opts.pxeDiscovery ?? false;
+  const ipLine = opts.ansibleHost?.trim() ? `        ip: "${opts.ansibleHost.trim()}"\n` : '';
+  const pxeBlock =
+    pxeEnabled || mac
+      ? `
+tempxe_discovery:
+  enabled: ${pxeEnabled ? 'true' : 'false'}
+uplinks:
+  - name: n0p0
+    physical_network: CHANGE_ME
+    mac_address: "${mac || 'aa:bb:cc:dd:ee:ff'}"
+    networks:
+      - zone: lab
+        network_name: CHANGE_ME
+        cloudinit: false
+        pxe: true
+        vm_network: false
+${ipLine}        default_route: true
+        tcp_open:
+          - 22
+        udp_open: []
+        services_open: []
+`
+      : '';
   return `---
 # Bare-metal cluster node ${name} (bare_metals.yml — not a libvirt guest).
 ${ansibleHostLine}os: ${os}
+legacy: false
+install_os: false
 configure_firewalld: false
-`;
+${pxeBlock}`;
 }
 
 export function mergeGuestIntoBareMetalsYaml(

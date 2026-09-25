@@ -31,6 +31,11 @@ hypervisors:
       ansible_host: 172.16.10.2
     virt02:
       ansible_host: 172.16.10.3
+EOF
+
+  cat >"${tmpdir}/bare_metals.yml" <<EOF
+bare_metals:
+  hosts:
     virt03:
       ansible_host: 172.16.10.4
 EOF
@@ -92,6 +97,7 @@ EOF
   run "$UMKIM site inventory migrate $SITE"
   run "$UMKIM site inventory files put $SITE --path guests.yml --file ${tmpdir}/guests.yml"
   run "$UMKIM site inventory files put $SITE --path hypervisors.yml --file ${tmpdir}/hypervisors.yml"
+  run "$UMKIM site inventory files put $SITE --path bare_metals.yml --file ${tmpdir}/bare_metals.yml"
   run "$UMKIM site inventory files put $SITE --path group_vars/all/all.yml --file ${tmpdir}/group_vars/all/all.yml"
   for guest in "$SINGLE_HOST" "$HA_CP0" "$HA_CP1" "$HA_CP2"; do
     run "$UMKIM site inventory files put $SITE --path host_vars/${guest}.yml --file ${tmpdir}/host_vars/${guest}.yml"

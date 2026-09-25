@@ -16,7 +16,7 @@ Full fresh install of site **`homelab`**, cluster **`lab-single-0`** (BM on virt
 - **virt03** (`172.16.10.4`) powered and reachable from jumphost before BM discover/install_bm
 - Base image **`/opt/local/rocky-10.qcow2`** on virt01/virt02 (YAIDAP `os: rocky-10` on guests)
 - Inventory **`group_vars/all/all.yml`** includes `alphabet`, `local_ssd` storage, and `networks` (see `examples/homelab/inventory/`)
-- Hypervisors **virt01**, **virt02**, **virt03** in **`hypervisors.yml`** (not `guests.hosts`); **`host_vars/virt01.yml`**, **`virt02.yml`**, **`virt03.yml`** with `os: rocky` (virt03 is a hypervisor host even when used for BM install testing)
+- Hypervisors **virt01**, **virt02** in **`hypervisors.yml`**; **virt03** (`lab-single-0` BM) in **`bare_metals.yml`** (not `guests.hosts`); **`host_vars/virt01.yml`**, **`virt02.yml`**, **`virt03.yml`** with `os: rocky-10` on virt03 for BM discover/install_bm
 
 Optional API URLs (defaults target console NodePort on hub):
 
@@ -108,13 +108,14 @@ umkim site provision set homelab --provider yaidap \
 
 umkim site inventory migrate homelab
 umkim site inventory files put homelab --path hypervisors.yml --file examples/homelab/inventory/hypervisors.yml
+umkim site inventory files put homelab --path bare_metals.yml --file examples/homelab/inventory/bare_metals.yml
 umkim site inventory files put homelab --path guests.yml --file examples/homelab/inventory/guests.yml
 umkim site inventory files put homelab --path group_vars/all/all.yml --file examples/homelab/inventory/group_vars/all/all.yml
 umkim site inventory files put homelab --path lab-ha-0.yml --file examples/homelab/inventory/lab-ha-0.yml
 umkim site inventory files put homelab --path group_vars/lab-ha-0.yml --file examples/homelab/inventory/group_vars/lab-ha-0.yml
 umkim site inventory files put homelab --path lab-ha-0-w1.yml --file examples/homelab/inventory/lab-ha-0-w1.yml
 umkim site inventory files put homelab --path group_vars/lab-ha-0-w1.yml --file examples/homelab/inventory/group_vars/lab-ha-0-w1.yml
-for f in lab-ha-0-cp1 lab-ha-0-cp2 lab-ha-0-cp3 lab-ha-0-w1 virt01 virt02 virt03; do
+for f in lab-ha-0-cp1 lab-ha-0-cp2 lab-ha-0-cp3 lab-ha-0-w1 virt01 virt02 virt03 gpu-bm-1; do
   umkim site inventory files put homelab --path "host_vars/${f}.yml" \
     --file "examples/homelab/inventory/host_vars/${f}.yml"
 done
@@ -127,7 +128,7 @@ umkim site inventory sync homelab --wait
 |------|---------|
 | Discover | `umkim site host provision homelab virt03 --action discover --wait` |
 | Promote | `umkim site inventory import preview homelab --wait` |
-| Apply | `umkim site inventory import apply homelab --confirm --paths host_vars/virt03.yml,hypervisors.yml` |
+| Apply | `umkim site inventory import apply homelab --confirm --paths host_vars/virt03.yml,bare_metals.yml` |
 | Reinstall | `umkim site host provision homelab virt03 --action install_bm --confirm --wait` |
 
 If virt03 is unreachable over SSH, enable `tempxe_discovery` + MAC in

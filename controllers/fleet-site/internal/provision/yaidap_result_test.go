@@ -56,6 +56,15 @@ func TestParseYaidapResultInvalid(t *testing.T) {
 	}
 }
 
+func TestActionUsesConnectionLocal(t *testing.T) {
+	if !ActionUsesConnectionLocal("discover_pxe") {
+		t.Fatal("discover_pxe should use connection local")
+	}
+	if ActionUsesConnectionLocal("install_bm") {
+		t.Fatal("install_bm must not force connection local on the whole playbook")
+	}
+}
+
 func TestYaidapIntegrationExtraVars(t *testing.T) {
 	base := YaidapIntegrationExtraVars("create_vm", false)
 	if len(base) != 2 || base[0] != "-e" || base[1] != "yaidap_emit_result=true" {

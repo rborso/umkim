@@ -41,16 +41,12 @@ func ValidateDiscoverPXEAction(ctx context.Context, c client.Client, ns, siteNam
 		return fmt.Errorf("inventory store is empty")
 	}
 	data = connectors.NormalizeMetaKeys(data)
-	hvRaw, ok := connectors.GetInventoryFile(data, "hypervisors.yml")
-	if !ok {
-		return fmt.Errorf("discover_pxe requires hypervisors.yml")
-	}
-	hvs, err := ParseHypervisorsYAML(hvRaw)
+	listed, err := pxeDiscoverySubjectListed(data, subject)
 	if err != nil {
 		return err
 	}
-	if !hypervisorInIndex(subject, hvs) {
-		return fmt.Errorf("discover_pxe requires %q in hypervisors.yml", subject)
+	if !listed {
+		return fmt.Errorf("discover_pxe requires %q in hypervisors.yml or bare_metals.yml", subject)
 	}
 	hostVars, ok := connectors.GetInventoryFile(data, "host_vars/"+subject+".yml")
 	if !ok || strings.TrimSpace(hostVars) == "" {
@@ -99,6 +95,28 @@ func hostVarsHasMAC(content string) bool {
 		}
 	}
 	return false
+}
+
+func pxeDiscoverySubjectListed(data map[string]string, subject string) (bool, error) {
+	if hvRaw, ok := connectors.GetInventoryFile(data, "hypervisors.yml"); ok && strings.TrimSpace(hvRaw) != "" {
+		hvs, err := ParseHypervisorsYAML(hvRaw)
+		if err != nil {
+			return false, err
+		}
+		if hypervisorInIndex(subject, hvs) {
+			return true, nil
+		}
+	}
+	if bmRaw, ok := connectors.GetInventoryFile(data, "bare_metals.yml"); ok && strings.TrimSpace(bmRaw) != "" {
+		bm, err := ParseBareMetalsYAML(bmRaw)
+		if err != nil {
+			return false, err
+		}
+		if bareMetalInIndex(subject, bm) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // DiscoverySuccessMessage returns the post-job hint for discovery actions.

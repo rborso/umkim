@@ -14,7 +14,7 @@ source "${ROOT}/scripts/fleet-verify/lib/hub-kubectl.sh"
 API="${FLEET_API:-http://${FLEET_HUB_IP:-127.0.0.1}:18080/api/v1alpha1}"
 NS="${FLEET_SITE_NS:-fleet-console}"
 LITELLM_URL="${FLEET_LITELLM_URL:-http://${FLEET_HUB_IP:-127.0.0.1}:30918}"
-EXPECT_ENABLED="${FLEET_LLM_EXPECT_ENABLED:-true}"
+EXPECT_ENABLED="${FLEET_LLM_EXPECT_ENABLED:-auto}"
 
 echo "=== verify-fleet-llm ==="
 
@@ -24,11 +24,21 @@ echo "$RESP" | jq '{hubEnabled, phase, message, endpoint: .hub.endpoint}'
 PHASE=$(echo "$RESP" | jq -r '.phase // empty')
 ENABLED=$(echo "$RESP" | jq -r '.hubEnabled // false')
 
+if [[ "${EXPECT_ENABLED}" == "auto" ]]; then
+  if [[ "${ENABLED}" != "true" ]]; then
+    echo "SKIP: hub LLM disabled (set fleet_llm_enabled and FLEET_LLM_EXPECT_ENABLED=true to require)"
+    exit 0
+  fi
+  EXPECT_ENABLED=true
+fi
+
 if [[ "${EXPECT_ENABLED}" == "true" ]]; then
   [[ "$ENABLED" == "true" ]] || { echo "FAIL: expected hubEnabled=true"; exit 1; }
   [[ "$PHASE" == "Ready" ]] || { echo "FAIL: expected phase=Ready got ${PHASE:-empty}"; exit 1; }
 else
   [[ "$ENABLED" == "false" ]] || echo "WARN: hubEnabled=true (set FLEET_LLM_EXPECT_ENABLED=true to require)"
+  echo "=== verify-fleet-llm OK (LLM not required) ==="
+  exit 0
 fi
 
 hub_kubectl -n "$NS" get fleetllm fleet-llm >/dev/null

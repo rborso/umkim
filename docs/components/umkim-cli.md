@@ -298,11 +298,16 @@ umkim site host provision homelab lab-ha-0-cp1 --wait   # recreate VM
 
 Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`, `hypervisors.yml`, `group_vars/all/all.yml`, `host_vars/*.yml`, root `{cluster}.yml`, and `group_vars/{cluster}.yml`). Put `ansible_host` in both `guests.yml` and `host_vars/{guest}.yml` when the guest needs a static address. Use `vm_location: least-utilized` (or `auto`) only before first placement; after a successful `create_vm`, the hub rewrites inventory to the resolved hypervisor and auto-syncs to the jumphost — `umkim site host get` then shows the concrete name (for example `hv01`). Reset to `least-utilized` explicitly to re-run placement.
 
-`install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`install_bm`**
-PXE-reinstalls the OS via TempXE; allowed on `bare_metal` (`bare_metals.yml`)
-and `hypervisor` (`hypervisors.yml`) hosts. Example:
+`install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`discover_pxe`**
+works on hosts in `hypervisors.yml` or `bare_metals.yml` when `host_vars` include
+`tempxe_discovery.enabled: true` and a MAC — keep **`install_os: false`** in inventory;
+the hub does not pass `install_os` for discovery. **`install_bm`**
+PXE-reinstalls the OS via TempXE; the hub injects **`-e install_os=true`** for that
+action only (inventory should stay `install_os: false`). Allowed on `bare_metal`
+(`bare_metals.yml`) and `hypervisor` (`hypervisors.yml`) hosts. Example:
 
 ```bash
+umkim site host provision SITE bm01 --action discover_pxe --confirm --wait
 umkim site host provision SITE hv01 --action install_bm --confirm --wait
 ```
 
@@ -310,16 +315,16 @@ umkim site host provision SITE hv01 --action install_bm --confirm --wait
 `bare_metals.yml`; hypervisors: `hypervisors.yml`. Console: *Add VM guest*,
 *Add bare metal node*, *Add hypervisor*.
 
-**Hardware discovery** — add a hypervisor in `hypervisors.yml` +
+**Hardware discovery** — add the host in `hypervisors.yml` or `bare_metals.yml` +
 `host_vars/{name}.yml`, sync, discover, then import promoted drafts:
 
 ```bash
 umkim site inventory sync SITE --wait
-umkim site host provision SITE new-hv01 --action discover --wait
+umkim site host provision SITE new-bm01 --action discover --wait
 # or PXE (TempXE; requires tempxe_discovery.enabled + MAC in host_vars):
-umkim site host provision SITE new-hv01 --action discover_pxe --confirm --wait
+umkim site host provision SITE new-bm01 --action discover_pxe --confirm --wait
 umkim site inventory import preview SITE --wait
-umkim site inventory import apply SITE --confirm --paths host_vars/new-hv01.yml,hypervisors.yml
+umkim site inventory import apply SITE --confirm --paths host_vars/new-bm01.yml,bare_metals.yml
 ```
 
 Import preview promotes jumphost `generated/host_vars/` and `generated/hosts/`

@@ -195,6 +195,8 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [addBmOpen, setAddBmOpen] = useState(false);
   const [bmHostName, setBmHostName] = useState('');
   const [bmAnsibleHost, setBmAnsibleHost] = useState('');
+  const [bmMac, setBmMac] = useState('');
+  const [bmPxeEnabled, setBmPxeEnabled] = useState(true);
 
   const resetAddVmForm = () => {
     setAddVmStep(1);
@@ -226,6 +228,8 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const resetAddBmForm = () => {
     setBmHostName('');
     setBmAnsibleHost('');
+    setBmMac('');
+    setBmPxeEnabled(true);
   };
 
   const openAddBmModal = () => {
@@ -411,6 +415,10 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       setError(new Error('Host name is required'));
       return;
     }
+    if (bmPxeEnabled && !bmMac.trim()) {
+      setError(new Error('MAC address is required for PXE discovery profile'));
+      return;
+    }
     setBusy(true);
     setError(null);
     setVmMessage('');
@@ -423,13 +431,15 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       const hostVarsYaml = bareMetalNodeHostVarsTemplate({
         name,
         ansibleHost: bmAnsibleHost.trim() || undefined,
+        macAddress: bmMac.trim() || undefined,
+        pxeDiscovery: bmPxeEnabled,
       });
       await putSiteInventoryFile(siteName, 'bare_metals.yml', bareMetalsYaml);
       await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
       setAddBmOpen(false);
       resetAddBmForm();
       setVmMessage(
-        `Saved bare_metals.yml and ${hostVarsPath}. Sync to jumphost, then Install bare metal or Apply cluster.`,
+        `Saved bare_metals.yml and ${hostVarsPath}. Sync to jumphost, then Discover (SSH/PXE) or Install bare metal.`,
       );
       await load();
       setSelectedPath(hostVarsPath);
@@ -924,6 +934,23 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
               value={bmAnsibleHost}
               onChange={(_e, v) => setBmAnsibleHost(v)}
               placeholder="172.16.10.50"
+            />
+          </FormGroup>
+          <FormGroup label="MAC address" fieldId="bmMac">
+            <TextInput
+              id="bmMac"
+              value={bmMac}
+              onChange={(_e, v) => setBmMac(v)}
+              placeholder="aa:bb:cc:dd:ee:ff"
+            />
+            <FormHelperText>Required for Discover (PXE).</FormHelperText>
+          </FormGroup>
+          <FormGroup label="PXE discovery profile" fieldId="bmPxeEnabled">
+            <Checkbox
+              id="bmPxeEnabled"
+              isChecked={bmPxeEnabled}
+              onChange={(_e, c) => setBmPxeEnabled(c)}
+              label="Enable tempxe_discovery in host_vars (required for Discover PXE)"
             />
           </FormGroup>
         </Form>

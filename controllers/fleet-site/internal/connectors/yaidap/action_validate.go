@@ -30,7 +30,7 @@ func actionAllowedForKind(action, kind string) bool {
 	case fleetv1alpha1.ProvisionActionDiscover:
 		return kind == fleetv1alpha1.SiteHostKindHypervisor || kind == fleetv1alpha1.SiteHostKindBareMetal
 	case fleetv1alpha1.ProvisionActionDiscoverPXE:
-		return kind == fleetv1alpha1.SiteHostKindHypervisor
+		return kind == fleetv1alpha1.SiteHostKindHypervisor || kind == fleetv1alpha1.SiteHostKindBareMetal
 	case fleetv1alpha1.ProvisionActionInstallBM:
 		return kind == fleetv1alpha1.SiteHostKindHypervisor || kind == fleetv1alpha1.SiteHostKindBareMetal
 	case fleetv1alpha1.ProvisionActionStatus:

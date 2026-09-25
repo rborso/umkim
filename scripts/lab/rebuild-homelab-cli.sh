@@ -236,12 +236,15 @@ fi
 
 # Phase 3 — BM virt03: discover → import → install_bm
 if ! skip_phase bm; then
-  step "inventory put hypervisors-full.yml for BM" $UMKIM site inventory files put "$SITE" --path hypervisors.yml --file "${ROOT}/examples/homelab/inventory/hypervisors-full.yml"
+  step "inventory put bare_metals + hypervisors for BM" \
+    $UMKIM site inventory files put "$SITE" --path bare_metals.yml --file "${ROOT}/examples/homelab/inventory/bare_metals.yml"
+  step "inventory put hypervisors (virt01/02)" \
+    $UMKIM site inventory files put "$SITE" --path hypervisors.yml --file "${ROOT}/examples/homelab/inventory/hypervisors.yml"
   step "site inventory sync before BM" $UMKIM site inventory sync "$SITE" --wait
   step "virt03 discover" $UMKIM site host provision "$SITE" "$BM_HOST" --action discover --wait
   step "import preview" $UMKIM site inventory import preview "$SITE" --wait
   step "import apply virt03" $UMKIM site inventory import apply "$SITE" --confirm \
-    --paths "host_vars/${BM_HOST}.yml,hypervisors.yml"
+    --paths "host_vars/${BM_HOST}.yml,bare_metals.yml"
   step "virt03 install_bm" $UMKIM site host provision "$SITE" "$BM_HOST" --action install_bm --confirm --wait
 else
   log "SKIP: bm phase"

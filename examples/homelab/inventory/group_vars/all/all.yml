@@ -4,6 +4,8 @@ cores: 2
 libvirt_dir: /opt/local
 alphabet: abcdefghijklmnopqrstuvwxyz
 domain: lab.local
+# Jumphost lab bridge (n0p1_lab_nw); required for PXE next-server / TFTP bind when localhost facts lack lab IPv4.
+tempxe_server_ip: 172.16.10.5
 configure_firewalld: false
 ssh_pubkey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICc1HPI+d2zS/vgGc7pNvRUvB0GIEGJzAkENvMwEoUvI linux@bck.otthol.local"
 ssh_pubkeys:

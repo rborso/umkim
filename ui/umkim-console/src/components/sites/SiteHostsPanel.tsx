@@ -398,7 +398,7 @@ export function SiteHostsPanel({ siteName }: Props) {
                 <Td>{host.vm_location || '—'}</Td>
                 <Td>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {host.kind === 'hypervisor' && (
+                    {(host.kind === 'hypervisor' || host.kind === 'bare_metal') && (
                       <>
                         <Button
                           variant="link"
@@ -414,19 +414,9 @@ export function SiteHostsPanel({ siteName }: Props) {
                       </>
                     )}
                     {host.kind === 'bare_metal' && (
-                      <>
-                        <Button
-                          variant="link"
-                          isInline
-                          isDisabled={!hostAnsibleAddr(host)}
-                          onClick={() => openDiscover(host, 'discover')}
-                        >
-                          Discover (SSH)
-                        </Button>
-                        <Button variant="link" isInline onClick={() => openInstallBm(host)}>
-                          Install bare metal
-                        </Button>
-                      </>
+                      <Button variant="link" isInline onClick={() => openInstallBm(host)}>
+                        Install bare metal
+                      </Button>
                     )}
                     {host.kind === 'vm' && (
                       <>

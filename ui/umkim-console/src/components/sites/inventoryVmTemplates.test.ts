@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bareMetalNodeHostVarsTemplate,
   guestHostVarsTemplate,
   mergeGuestIntoBareMetalsYaml,
   mergeGuestIntoGuestsYaml,
@@ -7,6 +8,17 @@ import {
 } from './inventoryVmTemplates';
 
 describe('inventoryVmTemplates', () => {
+  it('templates bare-metal host_vars with optional PXE profile', () => {
+    const body = bareMetalNodeHostVarsTemplate({
+      name: 'bm01',
+      ansibleHost: '172.16.10.6',
+      macAddress: '52:54:00:10:07:01',
+      pxeDiscovery: true,
+    });
+    expect(body).toContain('tempxe_discovery:');
+    expect(body).toContain('52:54:00:10:07:01');
+  });
+
   it('merges a bare-metal node into bare_metals.yml', () => {
     const out = mergeGuestIntoBareMetalsYaml(
       'bare_metals:\n  hosts: {}\n',

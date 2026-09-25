@@ -105,7 +105,7 @@ Provision status and cluster-apply progress are recorded in `_meta/status.json` 
 | Kind | Inventory source | Role |
 |------|------------------|------|
 | `vm` | `guests.yml` → `guests.hosts` | Libvirt workloads (`create_vm`, `destroy`, `plan_vm`) |
-| `bare_metal` | `bare_metals.yml` | Cluster members that are not libvirt guests (`install_bm`, `discover`) |
+| `bare_metal` | `bare_metals.yml` | Cluster members that are not libvirt guests (`install_bm`, `discover`, `discover_pxe`) |
 | `hypervisor` | `hypervisors.yml` | Placement / discovery / TempXE targets (`discover`, `discover_pxe`; optional `install_bm`) |
 
 **Site host phases** (per-guest `status.phase` in `_meta/status.json`):
@@ -156,10 +156,12 @@ before the progress POST marks `Validated`) so `cluster provision` is not
 blocked when local validate/provision-local already ran on the node.
 
 Destructive actions require `confirm=true`. **`install_bm`** runs a composite
-TempXE flow on the jumphost: arm kickstart (`install_os=true`), start PXE,
-UEFI network boot on the target host, wait for kickstart completion
-(non-empty `/root/ks-post.log` + new `boot_id`), then `tempxe_stop`. Allowed on
-`bare_metal` and `hypervisor` kinds. Greenfield
+TempXE flow on the jumphost: arm kickstart with hub-injected **`-e install_os=true`**
+(inventory should keep **`install_os: false`**), start PXE, UEFI network boot on
+the target host, wait for kickstart completion (non-empty `/root/ks-post.log` +
+new `boot_id`), then `tempxe_stop`. Allowed on `bare_metal` and `hypervisor`
+kinds. **`discover_pxe`** never sets `install_os`; PXE discovery is armed via
+`tempxe_discovery.enabled` only. Greenfield
 `POST /sites/{name}/provision` (site bootstrap) is unchanged and separate from
 the connector binding GET/PUT paths.
 
@@ -169,7 +171,7 @@ YAIDAP on the jumphost. Both actions auto-sync hub inventory before running.
 | Action | Requires | YAIDAP sketch |
 |--------|----------|---------------|
 | `discover` | `hypervisor` or `bare_metal` kind; reachable `ansible_host` | `discover-hosts.yml --tags check_host_details` |
-| `discover_pxe` | `confirm=true`; `hypervisor` kind in `hypervisors.yml`; `host_vars` with `tempxe_discovery.enabled: true` and uplink `mac_address` | TempXE arm → optional PXE reboot → wait for discovery tarball → `collect_discovery` → `tempxe_stop` |
+| `discover_pxe` | `confirm=true`; subject in `hypervisors.yml` or `bare_metals.yml`; `host_vars` with `tempxe_discovery.enabled: true` and uplink `mac_address` | TempXE arm → optional PXE reboot → wait for discovery tarball → `collect_discovery` → `tempxe_stop` |
 
 Discovery output lands under jumphost `generated/` (`host_vars/`, `hosts/`,
 `pxe-discovery/`). **Import preview** reads those drafts and promotes them into

@@ -1,0 +1,28 @@
+---
+# Bare-metal GPU node (bare_metals.yml — not a libvirt guest).
+ansible_host: 172.16.10.6
+os: rocky-10
+legacy: false
+install_os: false
+configure_firewalld: false
+tempxe_discovery:
+  enabled: true
+  reboot_after_discovery: false
+uplinks:
+  - name: n0p0
+    physical_network: lab_access_l1
+    mac_address: "70:85:c2:d4:5a:95"
+    networks:
+      - zone: lab
+        cloudinit: false
+        pxe: true
+        vm_network: true
+        network_name: lab_nw
+        tag: ""
+        bridge_name: n0p0_lab_nw
+        ip: "172.16.10.6"
+        default_route: true
+        tcp_open:
+          - 22
+        udp_open: []
+        services_open: []

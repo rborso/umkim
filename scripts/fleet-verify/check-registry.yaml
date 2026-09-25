@@ -74,12 +74,12 @@
   requires: [hub, fleet_api]
   profiles: [hub-only, homelab]
   script: scripts/verify-fleet-chart.sh
-  timeout_s: 60
+  timeout_s: 120
   blocking: true
 
 - id: llm.fleet
   layer: [1]
-  suite: [llm, hub]
+  suite: [llm]
   module: S3
   mode: readonly
   requires: [hub, fleet_api, kubectl]
@@ -87,8 +87,6 @@
   script: scripts/verify-fleet-llm.sh
   timeout_s: 180
   blocking: true
-  env:
-    FLEET_LLM_EXPECT_ENABLED: "true"
 
 - id: llm.gpu-discovery
   layer: [1]

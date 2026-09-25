@@ -146,7 +146,7 @@ Three surfaces share one store:
 `host_vars/{name}.yml` with optional `tempxe_discovery.enabled` and uplink MAC.
 
 **Bare-metal node (console):** **Add bare metal node** writes `bare_metals.yml` +
-minimal `host_vars/{name}.yml` (no libvirt profile).
+`host_vars/{name}.yml` (optional `tempxe_discovery.enabled` and uplink MAC for PXE discover).
 
 **Host kinds** on `GET /sites/{name}/hosts`: `vm` (`guests.hosts`), `bare_metal`
 (`bare_metals.yml`), `hypervisor` (`hypervisors.yml`). On jumphost sync, hub
@@ -191,7 +191,7 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 |--------|---------|-------------------|---------------------------|
 | `discover` | no | yes | `playbooks/discover-hosts.yml` · tags `check_host_details` · `-e yaidap_emit_result=true` |
 | `discover_pxe` | **yes** | yes | `playbooks/discover-pxe.yml` · tag `discover_pxe` · `--connection local` · `-e tempxe_confirm=true` |
-| `install_bm` | **yes** | yes | `playbooks/install-bare-metal.yml` · tag `install_bm` · `--connection local` · `-e tempxe_confirm=true` · `-e install_os=true` |
+| `install_bm` | **yes** | yes | `playbooks/install-bare-metal.yml` · tag `install_bm` · SSH to target for reboot/wait; TempXE arm uses per-play `connection: local` · `-e tempxe_confirm=true` · `-e install_os=true` |
 | `create_vm` | no* | yes | `playbooks/provision-vms.yml` · tags `create`, `never` · `-e yaidap_emit_result=true` · `-e yaidap_recreate=true` when guest has concrete `vm_location` |
 | `plan_vm` | no | yes | `playbooks/plan-vm-placement.yml` · tag `plan` (dry-run; no VM, no inventory rewrite) |
 | `destroy` | **yes** | yes | `playbooks/provision-vms.yml` · tag `destroy` · `-e confirm_destroy=true` |
@@ -201,10 +201,18 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 sets `yaidap_recreate=true`. The console requires a confirm checkbox for this
 case; the API does not enforce `confirm` on `create_vm` today.
 
+**`install_os` in site inventory:** commit **`install_os: false`** (or omit; role
+default is false). Do not set `install_os: true` in `host_vars` for normal hosts.
+The hub connector adds **`-e install_os=true`** only for **`install_bm`**
+([site-provision-connector.yml](../../site-provision-connector.yml)). **`discover_pxe`**
+forces `install_os` off in YAIDAP and arms the discovery menu via
+`tempxe_discovery.enabled` (TempXE templates treat discovery separately from
+full kickstart install).
+
 **Validation highlights:**
 
 - `discover`: subject in inventory; reachable `ansible_host`.
-- `discover_pxe`: subject in `hypervisors.yml`; `host_vars` with
+- `discover_pxe`: subject in `hypervisors.yml` or `bare_metals.yml`; `host_vars` with
   `tempxe_discovery.enabled: true` and uplink `mac_address`.
 - `plan_vm`: existing guest in `guests.yml` (not external-only).
 - `create_vm` / `plan_vm`: `ansible_host` required in `host_vars` or sync extra
@@ -306,10 +314,10 @@ Console: **Provisioner inventory** → **Site hosts** → **Provision** → **Ap
 ### B. Bare metal hypervisor → single-node cluster
 
 ```text
-1. hypervisors.yml + host_vars stub (discovery stub or hand-authored)
+1. bare_metals.yml + host_vars stub (discovery stub or hand-authored)
 2. sync
 3. discover OR discover_pxe (confirm for PXE)
-4. import preview → import apply (promote generated/ → host_vars, hypervisors)
+4. import preview → import apply (promote generated/ → host_vars, bare_metals.yml)
 5. install_bm (confirm) — full OS reinstall via TempXE
 6. cluster create on BM host (may be external to guests.yml)
 7. bootstrap / provision as usual

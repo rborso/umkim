@@ -20,7 +20,7 @@ func TestValidateActionForKind(t *testing.T) {
 		{"discover", fleetv1alpha1.SiteHostKindBareMetal, true},
 		{"discover", fleetv1alpha1.SiteHostKindVM, false},
 		{"discover_pxe", fleetv1alpha1.SiteHostKindHypervisor, true},
-		{"discover_pxe", fleetv1alpha1.SiteHostKindBareMetal, false},
+		{"discover_pxe", fleetv1alpha1.SiteHostKindBareMetal, true},
 		{"install_bm", fleetv1alpha1.SiteHostKindBareMetal, true},
 		{"install_bm", fleetv1alpha1.SiteHostKindHypervisor, true},
 		{"install_bm", fleetv1alpha1.SiteHostKindVM, false},

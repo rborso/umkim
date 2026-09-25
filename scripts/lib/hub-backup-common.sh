@@ -315,6 +315,164 @@ PY
   hub_harbor_scale "${ns}" 1
 }
 
+# Hub platform PVCs (console LDAP, ingress auth) — not in Harbor namespace.
+# Format per spec: namespace:deployment:pvc_name
+HUB_PLATFORM_PVC_SPECS="${HUB_PLATFORM_PVC_SPECS:-fleet-console:lldap:lldap-data fleet-ingress-auth:authelia:authelia-data}"
+
+hub_scale_deployment() {
+  local ns="$1"
+  local deploy="$2"
+  local replicas="$3"
+  hub_kubectl -n "${ns}" scale "deployment/${deploy}" --replicas="${replicas}" >/dev/null 2>&1 || true
+}
+
+hub_backup_platform_pvcs() {
+  local dest="$1"
+  local spec ns deploy claim pvc_map all_rows tmp_rows scaled
+
+  hub_kubectl_ready || {
+    hub_warn "kubectl not ready — skip platform PVC backup"
+    return 1
+  }
+
+  mkdir -p "${dest}/platform/pvc"
+  all_rows="[]"
+  scaled=""
+
+  hub_log "platform PVC backup: quiesce workloads"
+  for spec in ${HUB_PLATFORM_PVC_SPECS}; do
+    IFS=: read -r ns deploy claim <<< "${spec}"
+    [[ -n "${ns}" && -n "${deploy}" && -n "${claim}" ]] || continue
+    hub_kubectl -n "${ns}" get "deployment/${deploy}" >/dev/null 2>&1 || {
+      hub_warn "skip platform PVC ${ns}/${claim} (deployment ${deploy} missing)"
+      continue
+    }
+    hub_scale_deployment "${ns}" "${deploy}" 0
+    scaled="${scaled} ${ns}:${deploy}"
+  done
+  sleep 5
+
+  for spec in ${HUB_PLATFORM_PVC_SPECS}; do
+    IFS=: read -r ns deploy claim <<< "${spec}"
+    [[ -n "${ns}" && -n "${deploy}" && -n "${claim}" ]] || continue
+    pvc_map="$(hub_harbor_pvc_map_json "${ns}")"
+    tmp_rows="$(python3 - "${claim}" "${pvc_map}" "${all_rows}" <<'PY'
+import json, sys
+claim, raw, existing = sys.argv[1], sys.argv[2], sys.argv[3]
+rows = json.loads(raw)
+picked = [r for r in rows if r.get("pvc") == claim]
+merged = json.loads(existing) + picked
+print(json.dumps(merged))
+PY
+)"
+    all_rows="${tmp_rows}"
+    python3 - "${dest}" "${claim}" "${ns}" "${pvc_map}" <<'PY'
+import json, os, subprocess, sys
+
+dest, claim, ns, raw = sys.argv[1:5]
+rows = [r for r in json.loads(raw) if r.get("pvc") == claim]
+pvc_dir = os.path.join(dest, "platform", "pvc")
+os.makedirs(pvc_dir, exist_ok=True)
+for row in rows:
+    path = row["host_path"]
+    if not os.path.isdir(path):
+        print(f"[hub-backup] WARN: missing host path for {ns}/{claim}: {path}", file=sys.stderr)
+        continue
+    out = os.path.join(pvc_dir, f"{ns}-{claim}.tgz")
+    subprocess.check_call(["tar", "-czf", out, "-C", path, "."])
+    print(f"[hub-backup] platform PVC {ns}/{claim} -> {out}")
+PY
+  done
+
+  echo "${all_rows}" > "${dest}/platform/platform-pvcs.json"
+  [[ "$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "${dest}/platform/platform-pvcs.json")" -gt 0 ]] || {
+    hub_warn "no platform PVC archives produced"
+    rm -rf "${dest}/platform"
+    for pair in ${scaled}; do
+      IFS=: read -r ns deploy <<< "${pair}"
+      hub_scale_deployment "${ns}" "${deploy}" 1
+    done
+    return 1
+  }
+
+  for pair in ${scaled}; do
+    IFS=: read -r ns deploy <<< "${pair}"
+    hub_scale_deployment "${ns}" "${deploy}" 1
+  done
+  hub_log "platform PVC backup complete"
+}
+
+hub_restore_platform_pvcs() {
+  local src="$1"
+  local map_file="${src}/platform/platform-pvcs.json"
+  local pvc_dir="${src}/platform/pvc"
+  local spec ns deploy claim scaled pair
+
+  [[ -f "${map_file}" ]] || {
+    hub_warn "no platform PVC map — skip platform restore"
+    return 1
+  }
+  hub_kubectl_ready || hub_die "kubectl not ready for platform PVC restore"
+
+  scaled=""
+  hub_log "platform PVC restore: quiesce workloads"
+  for spec in ${HUB_PLATFORM_PVC_SPECS}; do
+    IFS=: read -r ns deploy claim <<< "${spec}"
+    hub_kubectl -n "${ns}" get "deployment/${deploy}" >/dev/null 2>&1 || continue
+    hub_scale_deployment "${ns}" "${deploy}" 0
+    scaled="${scaled} ${ns}:${deploy}"
+  done
+  sleep 5
+
+  python3 - "${map_file}" "${pvc_dir}" <<'PY'
+import json, os, subprocess, sys
+
+map_file, pvc_dir = sys.argv[1:3]
+rows = json.load(open(map_file, encoding="utf-8"))
+live = {}
+try:
+    import subprocess as sp
+    out = sp.check_output(["kubectl", "get", "pv", "-o", "json"], text=True)
+    data = json.loads(out)
+    for pv in data.get("items", []):
+        ref = (pv.get("spec") or {}).get("claimRef") or {}
+        ns, claim = ref.get("namespace"), ref.get("name")
+        if not ns or not claim:
+            continue
+        path = None
+        spec = pv.get("spec") or {}
+        if "local" in spec:
+            path = (spec["local"] or {}).get("path")
+        elif "hostPath" in spec:
+            path = (spec["hostPath"] or {}).get("path")
+        if path:
+            live[f"{ns}/{claim}"] = path
+except Exception as exc:
+    print(f"[hub-backup] WARN: could not list live PV paths: {exc}", file=sys.stderr)
+
+for row in rows:
+    ns = row.get("namespace")
+    claim = row.get("pvc")
+    archive = os.path.join(pvc_dir, f"{ns}-{claim}.tgz")
+    if not os.path.isfile(archive):
+        print(f"[hub-backup] WARN: missing archive for {ns}/{claim}", file=sys.stderr)
+        continue
+    dest = live.get(f"{ns}/{claim}") or row.get("host_path")
+    if not dest:
+        print(f"[hub-backup] WARN: no restore path for {ns}/{claim}", file=sys.stderr)
+        continue
+    os.makedirs(dest, exist_ok=True)
+    subprocess.check_call(["tar", "-xzf", archive, "-C", dest])
+    print(f"[hub-backup] restored platform PVC {ns}/{claim} -> {dest}")
+PY
+
+  for pair in ${scaled}; do
+    IFS=: read -r ns deploy <<< "${pair}"
+    hub_scale_deployment "${ns}" "${deploy}" 1
+  done
+  hub_log "platform PVC workloads scaled up"
+}
+
 hub_write_manifest() {
   local dest="$1"
   shift

@@ -17,7 +17,7 @@ test.describe('Infrastructure', () => {
 
     const mgmtSite = hub.management_site_id as string | undefined;
     if (mgmtSite) {
-      await expect(page.getByRole('link', { name: mgmtSite })).toBeVisible();
+      await expect(page.getByRole('link', { name: mgmtSite, exact: true })).toBeVisible();
     }
 
     const servicesOrNodes =

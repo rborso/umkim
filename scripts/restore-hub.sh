@@ -17,6 +17,7 @@ SKIP_ETCD=false
 SKIP_WIREGUARD=false
 SKIP_ACME=false
 SKIP_HARBOR=false
+SKIP_PLATFORM=false
 SRC=""
 
 usage() {
@@ -30,6 +31,7 @@ Options:
   --skip-wireguard    skip WireGuard restore
   --skip-acme         skip ACME hostPath restore
   --skip-harbor       skip Harbor PVC restore
+  --skip-platform     skip console LDAP / ingress-auth PVC restore
   -h, --help          show this help
 
 Environment:
@@ -47,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --skip-wireguard) SKIP_WIREGUARD=true ;;
     --skip-acme) SKIP_ACME=true ;;
     --skip-harbor) SKIP_HARBOR=true ;;
+    --skip-platform) SKIP_PLATFORM=true ;;
     -h|--help)
       usage
       exit 0
@@ -93,6 +96,7 @@ plan() {
   [[ "${SKIP_ETCD}" != "true" && -n "${snap}" ]] && hub_log "  - k3s ${datastore_type} <- ${snap}"
   [[ "${SKIP_ACME}" != "true" && -f "${SRC}/host/traefik-acme.tgz" ]] && hub_log "  - ACME -> ${HUB_ACME_HOST_PATH}"
   [[ "${SKIP_HARBOR}" != "true" && -f "${SRC}/harbor/harbor-pvcs.json" ]] && hub_log "  - Harbor PVCs (${HARBOR_NAMESPACE})"
+  [[ "${SKIP_PLATFORM}" != "true" && -f "${SRC}/platform/platform-pvcs.json" ]] && hub_log "  - platform PVCs (lldap, authelia)"
 }
 
 plan
@@ -124,6 +128,10 @@ fi
 
 if [[ "${SKIP_HARBOR}" != "true" ]]; then
   hub_restore_harbor "${SRC}" || true
+fi
+
+if [[ "${SKIP_PLATFORM}" != "true" ]]; then
+  hub_restore_platform_pvcs "${SRC}" || true
 fi
 
 hub_log "restore complete"

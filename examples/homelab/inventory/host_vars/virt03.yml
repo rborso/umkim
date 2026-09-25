@@ -1,10 +1,9 @@
 ---
+# Bare-metal cluster node virt03 (lab-single-0; bare_metals.yml — not a libvirt guest).
 ansible_host: 172.16.10.4
 os: rocky-10
 legacy: false
 install_os: false
-provisioning_provider: libvirt
-vm_scheduling_pool: false
 configure_firewalld: false
 configure_cockpit: false
 allow_management_nic_rewire: true

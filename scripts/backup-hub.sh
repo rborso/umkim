@@ -14,6 +14,7 @@ source "${ROOT}/scripts/lib/hub-backup-common.sh"
 
 BACKUP_ACME="${BACKUP_ACME:-true}"
 BACKUP_HARBOR="${BACKUP_HARBOR:-false}"
+BACKUP_PLATFORM="${BACKUP_PLATFORM:-true}"
 
 usage() {
   cat <<EOF
@@ -25,6 +26,7 @@ Options:
   --without-harbor  skip Harbor (default)
   --with-acme       include Traefik ACME hostPath (default)
   --without-acme    skip ACME hostPath
+  --without-platform  skip console LDAP / ingress-auth PVC archives
   -h, --help        show this help
 
 Environment:
@@ -39,11 +41,13 @@ while [[ $# -gt 0 ]]; do
     --full)
       BACKUP_ACME=true
       BACKUP_HARBOR=true
+      BACKUP_PLATFORM=true
       ;;
     --with-harbor) BACKUP_HARBOR=true ;;
     --without-harbor) BACKUP_HARBOR=false ;;
     --with-acme) BACKUP_ACME=true ;;
     --without-acme) BACKUP_ACME=false ;;
+    --without-platform) BACKUP_PLATFORM=false ;;
     -h|--help)
       usage
       exit 0
@@ -86,6 +90,12 @@ fi
 if [[ "${BACKUP_HARBOR}" == "true" ]]; then
   if hub_backup_harbor "${DEST}"; then
     components+=("harbor")
+  fi
+fi
+
+if [[ "${BACKUP_PLATFORM}" == "true" ]]; then
+  if hub_backup_platform_pvcs "${DEST}"; then
+    components+=("platform-pvc")
   fi
 fi
 

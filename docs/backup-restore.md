@@ -18,6 +18,7 @@ for the full disaster-recovery design.
 | WireGuard | always | `wireguard/wg.tgz` from `/etc/wireguard` |
 | Hub ACME | on (`BACKUP_ACME=true`) | `host/traefik-acme.tgz` from `/var/lib/umkim/traefik-acme` |
 | Harbor | off (`BACKUP_HARBOR=false`) | `harbor/pvc/*.tgz`, `harbor/registry.sql`, `harbor/harbor-pvcs.json` |
+| Platform PVCs | on (`BACKUP_PLATFORM=true`) | `platform/pvc/*.tgz`, `platform/platform-pvcs.json` (LLDAP, Authelia) |
 
 **Not included:** Ansible inventory, vault password, spoke clusters, or Velero
 workload backups. Copy inventory and secrets off-host separately.

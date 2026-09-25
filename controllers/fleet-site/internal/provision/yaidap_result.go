@@ -145,11 +145,13 @@ func YaidapIntegrationExtraVars(action string, concreteVmLocation bool) []string
 	}
 }
 
-// ActionUsesConnectionLocal reports actions that run TempXE plays on the jumphost.
+// ActionUsesConnectionLocal reports actions whose YAIDAP playbook should run with
+// --connection local on the jumphost for every play. Do not include install_bm:
+// that playbook SSHs to the bare-metal target for reboot/wait while only TempXE
+// arm plays set connection: local per play.
 func ActionUsesConnectionLocal(action string) bool {
 	switch strings.TrimSpace(action) {
-	case fleetv1alpha1.ProvisionActionInstallBM,
-		fleetv1alpha1.ProvisionActionDiscoverPXE:
+	case fleetv1alpha1.ProvisionActionDiscoverPXE:
 		return true
 	default:
 		return false

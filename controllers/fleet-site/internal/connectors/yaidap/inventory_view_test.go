@@ -28,8 +28,8 @@ func TestListInventoryHostsIncludesHypervisors(t *testing.T) {
 `,
 			"file.hypervisors.yml": `hypervisors:
   hosts:
-    virt03:
-      ansible_host: 172.16.10.4
+    hv-test:
+      ansible_host: 172.16.10.2
 `,
 			"_meta.status.json": `{}`,
 		},
@@ -39,21 +39,21 @@ func TestListInventoryHostsIncludesHypervisors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var virt03 *InventoryHostView
+	var hv *InventoryHostView
 	for i := range hosts {
-		if hosts[i].Name == "virt03" {
-			virt03 = &hosts[i]
+		if hosts[i].Name == "hv-test" {
+			hv = &hosts[i]
 			break
 		}
 	}
-	if virt03 == nil {
-		t.Fatal("expected virt03 in host list")
+	if hv == nil {
+		t.Fatal("expected hv-test in host list")
 	}
-	if virt03.Kind != fleetv1alpha1.SiteHostKindHypervisor {
-		t.Fatalf("expected hypervisor kind, got %q", virt03.Kind)
+	if hv.Kind != fleetv1alpha1.SiteHostKindHypervisor {
+		t.Fatalf("expected hypervisor kind, got %q", hv.Kind)
 	}
-	if virt03.AnsibleHost != "172.16.10.4" {
-		t.Fatalf("unexpected ansible_host %q", virt03.AnsibleHost)
+	if hv.AnsibleHost != "172.16.10.2" {
+		t.Fatalf("unexpected ansible_host %q", hv.AnsibleHost)
 	}
 }
 
