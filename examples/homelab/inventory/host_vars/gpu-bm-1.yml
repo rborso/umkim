@@ -4,13 +4,25 @@ ansible_host: 172.16.10.6
 os: rocky-10
 legacy: false
 install_os: false
+raid: false
 configure_firewalld: false
+configure_cockpit: false
+
 tempxe_discovery:
-  enabled: true
-  reboot_after_discovery: false
+  enabled: false
+
+disks:
+  - name: bootdisk
+    disk: disk/by-id/ata-WDC_WDS500G2B0A-00SM50_20360F802744
+    bootdisk: true
+    device: 0
+    size: 466
+    use_full_disk: true
+
 uplinks:
   - name: n0p0
     physical_network: lab_access_l1
+    interface: enp2s0
     mac_address: "70:85:c2:d4:5a:95"
     networks:
       - zone: lab

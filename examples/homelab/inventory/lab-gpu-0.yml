@@ -1,0 +1,3 @@
+lab-gpu-0:
+  hosts:
+    gpu-bm-1:

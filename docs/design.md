@@ -67,7 +67,10 @@ Inventory examples live under [../examples/site-profiles/](../examples/site-prof
    see [components/fleet-kubevirt.md](components/fleet-kubevirt.md).
 
 The public lifecycle phases are `Pending`, `ScriptIssued`, `Enrolled`,
-`Validated`, `Provisioning`, and `Ready`. Cluster deletion defaults to **detach**:
+`Validated`, `Provisioning`, and `Ready`. **`Failed`** is reported on
+`FleetClusterJoin` with a status message; operators retry provision or inspect
+hub Jobs after partial success (see [components/fleet-site.md](components/fleet-site.md)).
+Cluster deletion defaults to **detach**:
 it removes hub-managed resources while preserving the cluster and workloads
 unless an operator explicitly requests Kubernetes cleanup
 (`cleanupKubernetes=true` on delete).

@@ -445,6 +445,7 @@ configured independently (`FleetSite.spec.jumphost`).
 | Placement still `least-utilized` after create | Job log missing result | Inspect YAIDAP logs; verify `YAIDAP_RESULT` includes concrete `vm_location` |
 | Sync stuck `syncing` | Failed push job | Job logs; jumphost disk permissions on `inventoryPath` |
 | BM install timeout | PXE / kickstart | TempXE status on jumphost; target power; firewall |
+| Cluster **Failed** but spoke joined | Hub provision Job or finalize error | `kubectl get fleetclusterjoin`; Job `fleet-cluster-provision-*`; retry `umkim cluster provision` |
 
 ## Implementation map
 

@@ -140,7 +140,7 @@ If virt03 is unreachable over SSH, enable `tempxe_discovery` + MAC in
 ```bash
 umkim cluster create -f examples/homelab/cluster-lab-single-0.json
 umkim cluster wait lab-single-0 --phase ScriptIssued --timeout 10m
-umkim cluster bootstrap lab-single-0 --ssh-user linux
+umkim cluster bootstrap lab-single-0 --bootstrap-host 172.16.10.4 --ssh-user linux
 umkim cluster wait lab-single-0 --phase Validated --timeout 45m
 umkim cluster provision lab-single-0
 umkim cluster wait lab-single-0 --phase Ready --timeout 45m
@@ -155,7 +155,7 @@ for h in lab-ha-0-cp1 lab-ha-0-cp2 lab-ha-0-cp3 lab-ha-0-w1; do
 done
 umkim cluster create -f examples/homelab/cluster-lab-ha-0.json
 umkim cluster wait lab-ha-0 --phase ScriptIssued --timeout 10m
-umkim cluster bootstrap lab-ha-0 --ssh-user linux
+umkim cluster bootstrap lab-ha-0 --bootstrap-host 172.16.10.101 --ssh-user linux
 umkim cluster wait lab-ha-0 --phase Validated --timeout 45m
 umkim cluster provision lab-ha-0
 umkim cluster wait lab-ha-0 --phase Ready --timeout 90m

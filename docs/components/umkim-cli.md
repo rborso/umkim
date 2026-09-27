@@ -73,7 +73,7 @@ umkim cluster patch NAME [--jumphost user@host:port] [--ingress-id ID] [-f patch
 umkim cluster provision NAME | wait NAME [--phase Ready] [--timeout 30m]
 umkim cluster validate NAME
 umkim cluster discover NAME [--wait 5m]
-umkim cluster bootstrap NAME [--ssh-user linux]
+umkim cluster bootstrap NAME --bootstrap-host MGMT_IP [--ssh-user linux] [--jumphost user@host:port]
 umkim cluster delete NAME [--cleanup-kubernetes]
 umkim cluster ingress-auth enable NAME --lldap-password-file FILE [--expose-lldap-webui]
 umkim cluster ingress-auth disable NAME
@@ -204,11 +204,22 @@ umkim cluster list -o json
 
 `get`, `create`, and mutation commands still emit JSON unless noted otherwise.
 
-### Jumphost flags
+### Bootstrap and jumphost
 
-`umkim cluster bootstrap` uses `--jumphost` when set; otherwise it reads
+`umkim cluster bootstrap` requires **`--bootstrap-host`**: the management LAN
+address of the first control node (same value as `bootstrapHost` in
+`cluster create -f` JSON). It downloads the hub bootstrap bundle, copies it to
+that host, and runs `bootstrap.sh` over SSH.
+
+Optional **`--jumphost`** overrides the SSH bastion. When omitted, the CLI reads
 `GET /clusters/{name}` (`jumphost` field) and falls back to the parent site's
 `spec.jumphost`.
+
+`GET /clusters/{name}` exposes **`provisioning_phase`** and nested job status
+fields, but not the FCJ **`status.message`** string. For Ansible finalize
+failures, inspect **`FleetClusterJoin`** on the hub
+(`kubectl get fleetclusterjoin -n fleet-console NAME -o yaml`) or Job logs
+`fleet-cluster-provision-NAME` in the fleet-site namespace.
 
 Example patch files: [examples/umkim/site-patch-jumphost.json](../../examples/umkim/site-patch-jumphost.json),
 [examples/umkim/cluster-patch-jumphost.json](../../examples/umkim/cluster-patch-jumphost.json).
@@ -301,7 +312,9 @@ Add guests and cluster intent via `umkim site inventory files put` (`guests.yml`
 `install_bm` / `destroy` / **`discover_pxe`** require `--confirm`. **`discover_pxe`**
 works on hosts in `hypervisors.yml` or `bare_metals.yml` when `host_vars` include
 `tempxe_discovery.enabled: true` and a MAC — keep **`install_os: false`** in inventory;
-the hub does not pass `install_os` for discovery. **`install_bm`**
+the hub does not pass `install_os` for discovery. Before **`install_bm`**, set
+**`tempxe_discovery.enabled: false`** so TempXE uses the install kickstart, not
+discovery. **`install_bm`**
 PXE-reinstalls the OS via TempXE; the hub injects **`-e install_os=true`** for that
 action only (inventory should stay `install_os: false`). Allowed on `bare_metal`
 (`bare_metals.yml`) and `hypervisor` (`hypervisors.yml`) hosts. Example:

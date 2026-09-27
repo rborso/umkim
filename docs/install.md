@@ -173,7 +173,9 @@ After the hub is ready and your WireGuard client can reach the overlay:
 4. Download its bootstrap bundle through the authenticated UMKIM console and treat
    the archive as a secret.
 5. Copy the bundle to a Rocky Linux 10 control node, run `sudo ./bootstrap.sh`,
-   wait for **Validated**, then select **Provision**.
+   wait for **Validated**, then select **Provision**. With the CLI:
+   `umkim cluster bootstrap NAME --bootstrap-host MGMT_IP` (management address of
+   node 1; see `bootstrapHost` in cluster JSON examples).
 6. When the cluster is **Ready**, it joins the management overlay and receives
    platform ManifestWorks (OLM, cert-manager, spoke Traefik). The spoke remains
    an independent K3s cluster. Helm installs use FleetApp onto that Ready
