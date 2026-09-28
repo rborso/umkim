@@ -41,3 +41,30 @@
   changed_when: true
   notify: GPU host | Restart K3s agent
   tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Restart K3s after NVIDIA containerd configure
+  ansible.builtin.systemd:
+    name: "{{ 'k3s' if (ansible_facts['systemd']['exists'] | default(true)) else 'k3s-agent' }}"
+    state: restarted
+  register: gpu_host_k3s_restart
+  failed_when: false
+  when: gpu_host_configure_k3s_runtime | bool
+  tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Wait for K3s API after restart
+  ansible.builtin.wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    state: present
+    timeout: 120
+  when:
+    - gpu_host_configure_k3s_runtime | bool
+    - gpu_host_k3s_restart is changed
+  tags: [gpu_host, gpu_host_container_toolkit]
+
+- name: GPU host | Pause for K3s control plane
+  ansible.builtin.pause:
+    seconds: 30
+  when:
+    - gpu_host_configure_k3s_runtime | bool
+    - gpu_host_k3s_restart is changed
+  tags: [gpu_host, gpu_host_container_toolkit]

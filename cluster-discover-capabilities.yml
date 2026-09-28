@@ -19,6 +19,45 @@
         fleet_discover_host_kvm: "{{ fleet_discover_kvm_dev.stat.exists | default(false) | bool }}"
       when: ansible_connection != 'local'
 
+    - name: Fleet discover | NVIDIA PCI device from sysfs
+      ansible.builtin.shell: |
+        set -euo pipefail
+        for d in /sys/bus/pci/devices/*; do
+          [[ -f "$d/vendor" ]] || continue
+          [[ "$(cat "$d/vendor")" == "0x10de" ]] || continue
+          cls="$(cat "$d/class" 2>/dev/null || true)"
+          case "$cls" in
+            0x030000|0x030200|0x038000) ;;
+            *) continue ;;
+          esac
+          dev="$(cat "$d/device")"
+          printf '10de:%s\n' "${dev#0x}"
+          exit 0
+        done
+      args:
+        executable: /bin/bash
+      register: fleet_discover_nvidia_pci
+      changed_when: false
+      failed_when: false
+      when: ansible_connection != 'local'
+
+    - name: Fleet discover | Record host NVIDIA PCI ID
+      ansible.builtin.set_fact:
+        fleet_discover_host_nvidia_pci: "{{ fleet_discover_nvidia_pci.stdout | default('') | trim }}"
+      when: ansible_connection != 'local'
+
+    - name: Fleet discover | Host nvidia-smi present
+      ansible.builtin.command: nvidia-smi -L
+      register: fleet_discover_nvidia_smi
+      changed_when: false
+      failed_when: false
+      when: ansible_connection != 'local'
+
+    - name: Fleet discover | Record host driver loaded
+      ansible.builtin.set_fact:
+        fleet_discover_host_driver_loaded: "{{ fleet_discover_nvidia_smi.rc | default(1) | int == 0 }}"
+      when: ansible_connection != 'local'
+
 - name: Fleet discover | Kubernetes probes on bootstrap
   hosts: site_bootstrap
   gather_facts: false
@@ -177,6 +216,8 @@
             {
               'name': item.metadata.name,
               'gpu_count': (node_gpu_count | int),
+              'nvidia_pci_id': (fleet_discover_host_nvidia_pci | default('')),
+              'driver_loaded': (fleet_discover_host_driver_loaded | default(false) | bool),
               'capabilities': {
                 'kvm': (fleet_discover_bootstrap_kvm | default(false) | bool),
                 'gpu': ((node_gpu_count | int) > 0)

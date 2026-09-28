@@ -5,11 +5,11 @@
 # Set fleet_flow_cleanup_kubernetes=true to reset K3s on all nodes.
 #
 #   ansible-playbook $INV playbooks/flows/cluster-delete.yml \
-#     -e fleet_flow_cluster_name=lab-gpu03 \
+#     -e fleet_flow_cluster_name=lab-gpu-0 \
 #     -e fleet_flow_cleanup_kubernetes=true
 #
 #   ansible-playbook $INV playbooks/flows/cluster-delete.yml \
-#     -e @playbooks/flows/examples/lab-gpu03.yml \
+#     -e @playbooks/flows/examples/lab-gpu-0.yml \
 #     -e fleet_flow_cleanup_kubernetes=true
 
 - name: Fleet flow | Cluster delete

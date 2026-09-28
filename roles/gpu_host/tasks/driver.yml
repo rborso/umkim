@@ -8,11 +8,46 @@
     mode: "0644"
   tags: [gpu_host, gpu_host_driver]
 
+- ansible.builtin.import_tasks: catalog.yml
+  when: gpu_host_use_module_stream is not defined
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Install kernel modules for running kernel (EL10+ netfilter / K3s)
+  ansible.builtin.dnf:
+    name:
+      - "kernel-modules-{{ ansible_kernel }}"
+      - "kernel-modules-extra-{{ ansible_kernel }}"
+    state: present
+  when: (gpu_host_os_major | default('9') | int) >= 10
+  tags: [gpu_host, gpu_host_driver]
+
 - name: GPU host | Install EPEL (DKMS builds)
   ansible.builtin.dnf:
     name: epel-release
     state: present
-  when: gpu_host_use_dkms | default(true) | bool
+  when: gpu_host_use_dkms_effective | default(gpu_host_use_dkms | default(true) | bool) | bool
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Enable CRB on EL10+ (EGL deps for CUDA driver packages)
+  ansible.builtin.command:
+    cmd: dnf config-manager --set-enabled crb
+  register: gpu_host_crb_enable
+  changed_when: gpu_host_crb_enable.rc == 0
+  failed_when: >-
+    gpu_host_crb_enable.rc != 0
+    and 'No matching repo' not in (gpu_host_crb_enable.stderr | default(''))
+    and 'Error: No matching' not in (gpu_host_crb_enable.stderr | default(''))
+  when: (gpu_host_os_major | default('9') | int) >= 10
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Install EGL packages for NVIDIA driver libs on EL10+
+  ansible.builtin.dnf:
+    name:
+      - egl-gbm
+      - egl-wayland2
+      - egl-x11
+    state: present
+  when: (gpu_host_os_major | default('9') | int) >= 10
   tags: [gpu_host, gpu_host_driver]
 
 - name: GPU host | Driver prerequisites
@@ -30,7 +65,7 @@
           'pciutils',
           'elfutils-libelf-devel'
         ]
-        + (['dkms'] if (gpu_host_use_dkms | default(true) | bool) else [])
+        + (['dkms'] if (gpu_host_use_dkms_effective | default(gpu_host_use_dkms | default(true) | bool) | bool) else [])
       }}
   tags: [gpu_host, gpu_host_driver]
 
@@ -54,15 +89,41 @@
   register: gpu_host_module_reset
   changed_when: "'Nothing to do' not in gpu_host_module_reset.stdout"
   failed_when: false
+  when: gpu_host_use_module_stream | default(false) | bool
   tags: [gpu_host, gpu_host_driver]
 
 - name: GPU host | Enable NVIDIA driver module stream
   ansible.builtin.command:
     cmd: >-
       dnf module enable -y
-      nvidia-driver:{{ gpu_host_driver_branch }}{{ '-dkms' if (gpu_host_use_dkms | default(true) | bool) else '' }}
+      nvidia-driver:{{ gpu_host_driver_branch }}{{ '-dkms' if (gpu_host_use_dkms_effective | default(gpu_host_use_dkms | default(true) | bool) | bool) else '' }}
   register: gpu_host_module_enable
   changed_when: "'Nothing to do' not in gpu_host_module_enable.stdout"
+  when: gpu_host_use_module_stream | default(false) | bool
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Remove open DKMS when EL10 proprietary stack is required
+  ansible.builtin.dnf:
+    name: kmod-nvidia-open-dkms
+    state: absent
+  when:
+    - (gpu_host_os_major | default('9') | int) >= 10
+    - (gpu_host_el10_kmod_flavor | default('open')) == 'proprietary'
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Install NVIDIA driver packages (EL10 proprietary stack)
+  ansible.builtin.dnf:
+    name:
+      - "kmod-nvidia-latest-dkms-3:{{ gpu_host_el10_driver_version }}-1.el10"
+      - "nvidia-driver-3:{{ gpu_host_el10_driver_version }}-1.el10"
+      - "nvidia-driver-cuda-3:{{ gpu_host_el10_driver_version }}-1.el10"
+    state: present
+    disable_gpg_check: false
+  register: gpu_host_driver_install
+  when:
+    - (gpu_host_os_major | default('9') | int) >= 10
+    - (gpu_host_el10_kmod_flavor | default('open')) == 'proprietary'
+    - gpu_host_el10_driver_version | default('') | length > 0
   tags: [gpu_host, gpu_host_driver]
 
 - name: GPU host | Install NVIDIA driver packages
@@ -73,7 +134,20 @@
     state: present
     disable_gpg_check: false
   register: gpu_host_driver_install
+  when: gpu_host_driver_install is not defined
   tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Build DKMS modules after driver package install
+  ansible.builtin.command:
+    cmd: dkms autoinstall
+  register: gpu_host_dkms_autoinstall
+  changed_when: gpu_host_dkms_autoinstall.rc == 0
+  failed_when: false
+  when: gpu_host_use_dkms_effective | default(gpu_host_use_dkms | default(true) | bool) | bool
+  tags: [gpu_host, gpu_host_driver]
+
+- name: GPU host | Flush handlers before reboot (initramfs / nouveau blacklist)
+  ansible.builtin.meta: flush_handlers
 
 - name: GPU host | Reboot after driver install when required
   ansible.builtin.reboot:
@@ -81,7 +155,7 @@
     msg: "Reboot to load NVIDIA kernel module (gpu_host)"
   when:
     - gpu_host_reboot_after_driver | bool
-    - gpu_host_driver_install.changed or (gpu_host_module_enable.changed | default(false))
+    - gpu_host_driver_install.changed or (gpu_host_module_enable.changed | default(false) | bool)
   tags: [gpu_host, gpu_host_driver]
 
 - name: GPU host | Wait for nvidia-smi
@@ -134,7 +208,7 @@
     - "'already in the MOK' not in (gpu_host_mok_import.stderr | default(''))"
   when:
     - gpu_host_mok_enroll | default(true) | bool
-    - gpu_host_use_dkms | default(true) | bool
+    - gpu_host_use_dkms_effective | default(gpu_host_use_dkms | default(true) | bool) | bool
     - gpu_host_sb_state.stdout is search('enabled', ignorecase=true)
     - gpu_host_nvidia_smi.rc | default(0) != 0
   no_log: true

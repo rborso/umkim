@@ -1,4 +1,8 @@
 ---
+- name: GPU host | Apply K3s runtime handler before device plugin
+  ansible.builtin.meta: flush_handlers
+  tags: [gpu_host, gpu_host_device_plugin]
+
 - name: GPU host | Require K3s kubeconfig for device plugin
   ansible.builtin.stat:
     path: /etc/rancher/k3s/k3s.yaml

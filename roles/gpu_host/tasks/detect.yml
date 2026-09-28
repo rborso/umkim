@@ -33,10 +33,16 @@
   failed_when: false
   tags: [gpu_host, gpu_host_detect]
 
+- ansible.builtin.import_tasks: catalog.yml
+  tags: [gpu_host, gpu_host_detect]
+
 - name: GPU host | Running kernel
   ansible.builtin.debug:
     msg:
       kernel: "{{ ansible_kernel }}"
+      pci_id: "{{ gpu_host_pci_id | default('unknown') }}"
+      marketing_name: "{{ gpu_host_marketing_name | default('unknown') }}"
+      driver_branch: "{{ gpu_host_driver_branch_effective | default(gpu_host_driver_branch) }}"
       nvidia_pci: "{{ gpu_host_lspci.stdout_lines | select('search', 'NVIDIA|nvidia|10de:', ignorecase=true) | list }}"
       secure_boot: "{{ gpu_host_secure_boot.stdout | default('unknown') }}"
   tags: [gpu_host, gpu_host_detect]

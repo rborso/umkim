@@ -14,6 +14,7 @@ public tag was `v0.1.0`.
 | OCM bundle and clusteradm | `inventory/group_vars/hub/main.yml` |
 | Harbor chart version | `roles/harbor/defaults/main.yml` |
 | Public bootstrap defaults | `examples/inventory/hub-only/` |
+| NVIDIA driver branch for GPU catalog / Fleet LLM | `data/gpu/catalog.yaml` (`driver_branches.535`) |
 
 Run `./scripts/fleet-version.sh` to print resolved pins from the active
 inventory.

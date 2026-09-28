@@ -265,6 +265,16 @@ func ConfigureKubevirtJob(ns, jobName, clusterName, siteID, runnerImage, sshSecr
 	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 5400)
 }
 
+func ConfigureGpuHostJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string) *batchv1.Job {
+	args := ansiblePlaybookArgs("/ansible/cluster-gpu-host-prep.yml", clusterName, siteID)
+	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 3600)
+}
+
+func ConfigureGpuEnableJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string) *batchv1.Job {
+	args := ansiblePlaybookArgs("/ansible/cluster-gpu-enable.yml", clusterName, siteID)
+	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 3600)
+}
+
 func ValidateStorageJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, extraArgs []string) *batchv1.Job {
 	args := ansiblePlaybookArgs("/ansible/cluster-validate-storage.yml", clusterName, siteID)
 	args = append(args, extraArgs...)

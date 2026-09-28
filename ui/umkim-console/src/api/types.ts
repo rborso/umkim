@@ -542,6 +542,8 @@ export interface FleetClusterIngressAuthStatus {
 export interface CapabilityDiscoveryNode {
   name: string;
   gpu_count?: number;
+  nvidia_pci_id?: string;
+  driver_loaded?: boolean;
   capabilities?: Record<string, boolean>;
 }
 

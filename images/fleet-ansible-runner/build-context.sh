@@ -5,7 +5,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DST="$(dirname "$0")"
 for f in site-validate.yml site-provision.yml site-provision-connector.yml cluster-validate.yml cluster-provision.yml \
   cluster-provision-local.yml cluster-provision-hub.yml cluster-discover-capabilities.yml \
-  cluster-delete-hub.yml cluster-configure-storage.yml cluster-configure-kubevirt.yml cluster-validate-storage.yml \
+  cluster-delete-hub.yml cluster-configure-storage.yml cluster-configure-kubevirt.yml \
+  cluster-gpu-host-prep.yml cluster-gpu-enable.yml cluster-validate-storage.yml \
   cluster-overlay-recover.yml \
   ingress-auth-reconcile.yml acme-reconcile.yml llm-reconcile.yml wireguard-install.yml \
   ansible.cfg; do
@@ -28,7 +29,10 @@ cp -a "${ROOT}/roles/fleet_site_validate" "${ROOT}/roles/fleet_site" "${ROOT}/ro
   "${ROOT}/roles/olm" "${ROOT}/roles/kubevirt_stack" \
   "${ROOT}/roles/kubevirt_bridge_nad" "${ROOT}/roles/kubevirt_host_bridge" \
   "${ROOT}/roles/spoke_ingress" "${ROOT}/roles/fleet_ingress_auth" "${ROOT}/roles/fleet_acme" "${ROOT}/roles/fleet_llm" "${ROOT}/roles/fleet_hub_firewall" "${ROOT}/roles/fleet_edge" \
-  "${ROOT}/roles/fleet_edge_controller" "${DST}/roles/"
+  "${ROOT}/roles/fleet_edge_controller" "${ROOT}/roles/gpu_host" "${DST}/roles/"
+mkdir -p "${DST}/data/gpu"
+cp -f "${ROOT}/data/gpu/catalog.yaml" "${DST}/data/gpu/"
+cp -f "${ROOT}/cluster-gpu-host-prep.yml" "${ROOT}/cluster-gpu-enable.yml" "${DST}/"
 cp -a "${ROOT}/charts/fleet-ingress-auth" "${DST}/charts/"
 cp -f "${ROOT}/deploy/fleet-edge/rbac.yaml" "${DST}/deploy/fleet-edge/"
 mkdir -p "${DST}/inventory/group_vars/all"

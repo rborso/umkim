@@ -27,7 +27,9 @@ spec:
       labels:
         name: nvidia-device-plugin-ds
     spec:
+{% if gpu_host_device_plugin_use_runtime_class | default(false) | bool %}
       runtimeClassName: {{ gpu_host_device_plugin_runtime_class | default('nvidia') }}
+{% endif %}
       tolerations:
         - key: nvidia.com/gpu
           operator: Exists

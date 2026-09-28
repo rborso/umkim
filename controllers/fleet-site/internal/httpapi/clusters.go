@@ -179,6 +179,12 @@ func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, nam
 		s.handleClusterPlatform(w, r, name, rest)
 		return
 	}
+	if sub == "gpu" || strings.HasPrefix(sub, "gpu/") {
+		rest := strings.TrimPrefix(sub, "gpu")
+		rest = strings.TrimPrefix(rest, "/")
+		s.handleClusterGpu(w, r, name, rest)
+		return
+	}
 	if sub == "ingress-auth" || strings.HasPrefix(sub, "ingress-auth/") {
 		rest := strings.TrimPrefix(sub, "ingress-auth")
 		rest = strings.TrimPrefix(rest, "/")

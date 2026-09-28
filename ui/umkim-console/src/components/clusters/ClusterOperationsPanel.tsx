@@ -14,7 +14,10 @@ import {
 import {
   addFleetClusterWorker,
   configureFleetClusterStorage,
+  enableFleetClusterGpu,
   enableFleetClusterKubevirt,
+  getFleetClusterGpuStatus,
+  prepFleetClusterGpuHost,
   fetchFleetClusterNodeOperationLogs,
   listFleetClusterNodeOperations,
   removeFleetClusterNode,
@@ -45,6 +48,8 @@ const OP_LABELS: Record<string, string> = {
   replaceControlPlane: 'Replace control plane',
   configureStorage: 'Configure storage',
   configureKubevirt: 'Configure KubeVirt',
+  configureGpuHost: 'Prepare GPU host',
+  configureGpuEnable: 'Enable GPU runtime',
 };
 
 function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {
@@ -300,7 +305,11 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const storageBusy = storageOpBusy(storagePhase);
   const kubevirtPhaseEarly = cluster.providers?.kubevirt?.phase || '';
   const kubevirtBusy = kubevirtPhaseEarly === 'Installing' || kubevirtPhaseEarly === 'Pending';
-  const busy = nodeOpBusy(nodeOp) || storageBusy || kubevirtBusy;
+  const [gpuHostPhase, setGpuHostPhase] = useState('');
+  const [gpuRuntimePhase, setGpuRuntimePhase] = useState('');
+  const gpuBusy =
+    gpuHostPhase === 'Applying' || gpuRuntimePhase === 'Applying';
+  const busy = nodeOpBusy(nodeOp) || storageBusy || kubevirtBusy || gpuBusy;
   const singleNode = isSingleNodeCluster(cluster);
   const nfsLocalApplied = cluster.storage?.backend === 'nfs_local' && storagePhase === 'Applied';
 
@@ -337,6 +346,19 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
     const interval = setInterval(() => void onUpdated(), 8000);
     return () => clearInterval(interval);
   }, [busy, onUpdated]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const st = await getFleetClusterGpuStatus(clusterName);
+        setGpuHostPhase(st.hostPhase || '');
+        setGpuRuntimePhase(st.runtimePhase || '');
+      } catch {
+        setGpuHostPhase('');
+        setGpuRuntimePhase('');
+      }
+    })();
+  }, [clusterName, busy, historyRefreshKey, cluster.provisioning_phase]);
 
   useEffect(() => {
     if (workerNodes.length > 0 && !workerNodes.some((n) => n.name === removeNode)) {
@@ -541,6 +563,32 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const kubevirtReady = kubevirtPhase === 'Ready' || !!cluster.capabilities?.kubevirt;
   const multusL2 = !!cluster.capabilities?.['network.multus_l2'];
 
+  const prepGpuHost = async () => {
+    setActing(true);
+    setActionError(null);
+    try {
+      await prepFleetClusterGpuHost(clusterName, { force: clusterReady });
+      await onUpdated();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const enableGpuRuntime = async () => {
+    setActing(true);
+    setActionError(null);
+    try {
+      await enableFleetClusterGpu(clusterName);
+      await onUpdated();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setActing(false);
+    }
+  };
+
   const enableKubevirt = async (opts?: { lanBridge?: boolean }) => {
     setActing(true);
     setActionError(null);
@@ -617,6 +665,21 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           ) : null}
         </div>
       )}
+      {(gpuHostPhase || gpuRuntimePhase) &&
+        (gpuBusy || gpuHostPhase === 'Failed' || gpuRuntimePhase === 'Failed' || gpuHostPhase === 'Ready') && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {gpuHostPhase ? (
+            <Label color={phaseColor(gpuHostPhase === 'Ready' ? 'Succeeded' : gpuHostPhase)}>
+              host: {gpuHostPhase}
+            </Label>
+          ) : null}
+          {gpuRuntimePhase ? (
+            <Label color={phaseColor(gpuRuntimePhase === 'Ready' ? 'Succeeded' : gpuRuntimePhase)}>
+              runtime: {gpuRuntimePhase}
+            </Label>
+          ) : null}
+        </div>
+      )}
       {busy && (
         <Alert
           variant="info"
@@ -669,6 +732,37 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           </Button>
         </Form>
       )}
+
+      <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
+        <Title headingLevel="h3" size="md">
+          GPU (NVIDIA)
+        </Title>
+        <p style={{ marginTop: '0.35rem', fontSize: '0.875rem' }}>
+          Host driver prep then container runtime + device plugin. Same as{' '}
+          <code>umkim cluster gpu host-prep</code> and <code>umkim cluster gpu enable</code>. On Ready
+          clusters, host prep uses <code>force</code> automatically.
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <Button
+            variant="secondary"
+            isLoading={acting}
+            isDisabled={!canMutate || gpuHostPhase === 'Applying'}
+            onClick={() => void prepGpuHost()}
+            data-testid="op-gpu-host-prep"
+          >
+            {gpuHostPhase === 'Failed' ? 'Retry GPU host prep' : 'Prepare GPU host'}
+          </Button>
+          <Button
+            variant="primary"
+            isLoading={acting}
+            isDisabled={!canMutate || gpuRuntimePhase === 'Applying' || gpuHostPhase !== 'Ready'}
+            onClick={() => void enableGpuRuntime()}
+            data-testid="op-gpu-enable"
+          >
+            {gpuRuntimePhase === 'Failed' ? 'Retry GPU runtime' : 'Enable GPU runtime'}
+          </Button>
+        </div>
+      </Form>
 
       <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>
         <Title headingLevel="h3" size="md">

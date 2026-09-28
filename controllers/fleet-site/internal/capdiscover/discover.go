@@ -29,18 +29,22 @@ const (
 
 // NodeResult is per-node discovered capabilities.
 type NodeResult struct {
-	Name     string          `json:"name"`
-	Caps     map[string]bool `json:"capabilities"`
-	GPUCount int             `json:"gpu_count,omitempty"`
+	Name         string          `json:"name"`
+	Caps         map[string]bool `json:"capabilities"`
+	GPUCount     int             `json:"gpu_count,omitempty"`
+	NvidiaPciID  string          `json:"nvidia_pci_id,omitempty"`
+	DriverLoaded bool            `json:"driver_loaded,omitempty"`
 }
 
 // UnmarshalJSON accepts both numeric JSON values and numeric strings. Older
 // runner images emitted the latter from nested Ansible templates.
 func (n *NodeResult) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Name     string          `json:"name"`
-		Caps     map[string]bool `json:"capabilities"`
-		GPUCount json.RawMessage `json:"gpu_count"`
+		Name         string          `json:"name"`
+		Caps         map[string]bool `json:"capabilities"`
+		GPUCount     json.RawMessage `json:"gpu_count"`
+		NvidiaPciID  string          `json:"nvidia_pci_id"`
+		DriverLoaded bool            `json:"driver_loaded"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -52,6 +56,8 @@ func (n *NodeResult) UnmarshalJSON(data []byte) error {
 	n.Name = raw.Name
 	n.Caps = raw.Caps
 	n.GPUCount = count
+	n.NvidiaPciID = raw.NvidiaPciID
+	n.DriverLoaded = raw.DriverLoaded
 	return nil
 }
 

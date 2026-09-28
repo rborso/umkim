@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Label, Title } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { discoverFleetClusterCapabilities } from '../../api/client';
+import { discoverFleetClusterCapabilities, getFleetClusterGpuStatus } from '../../api/client';
+import type { FleetClusterGpuStatus } from '../../api/client';
 import type { CapabilityDiscovery, FleetCluster } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
 
@@ -48,6 +49,13 @@ function phaseColor(phase: string): 'green' | 'blue' | 'orange' | 'red' | 'grey'
 export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, onUpdated }: Props) {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [gpuInfo, setGpuInfo] = useState<FleetClusterGpuStatus | null>(null);
+
+  useEffect(() => {
+    void getFleetClusterGpuStatus(clusterName)
+      .then(setGpuInfo)
+      .catch(() => setGpuInfo(null));
+  }, [clusterName, cluster.capability_discovery?.completed_at]);
 
   const discovery: CapabilityDiscovery | undefined = cluster.capability_discovery;
   const caps = cluster.capabilities || {};
@@ -77,6 +85,18 @@ export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, o
         GPU resources, control-plane count). Re-run after hardware or storage changes.
       </p>
       <ErrorAlert error={error} />
+      {gpuInfo?.pciId ? (
+        <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', maxWidth: '42rem' }}>
+          Detected hardware: <strong>{gpuInfo.marketingName || gpuInfo.pciId}</strong>
+          {gpuInfo.recommendedDriverBranch || gpuInfo.driverBranch ? (
+            <>
+              {' '}
+              — driver branch <code>{gpuInfo.recommendedDriverBranch || gpuInfo.driverBranch}</code>
+            </>
+          ) : null}
+          {gpuInfo.driverLoaded ? ' (driver loaded on host)' : ' (host driver not loaded)'}
+        </p>
+      ) : null}
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: '0.75rem', flexWrap: 'wrap' }}>
         <Button
           variant="primary"
@@ -135,6 +155,7 @@ export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, o
                 <Th>KVM</Th>
                 <Th>GPU</Th>
                 <Th>GPU count</Th>
+                <Th>PCI / driver</Th>
               </Tr>
             </Thead>
             <Tbody>
@@ -154,6 +175,10 @@ export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, o
                     </Label>
                   </Td>
                   <Td>{n.gpu_count != null && n.gpu_count > 0 ? n.gpu_count : '—'}</Td>
+                  <Td style={{ fontSize: '0.85rem' }}>
+                    {n.nvidia_pci_id ? <code>{n.nvidia_pci_id}</code> : '—'}
+                    {n.driver_loaded ? ' · driver ok' : n.nvidia_pci_id ? ' · no driver' : ''}
+                  </Td>
                 </Tr>
               ))}
             </Tbody>

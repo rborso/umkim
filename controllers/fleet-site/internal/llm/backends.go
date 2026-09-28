@@ -40,7 +40,7 @@ func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, e
 	}
 
 	for _, app := range apps.Items {
-		if !isLlamaChart(app.Spec.Chart) {
+		if !IsLlamaChart(app.Spec.Chart) {
 			continue
 		}
 		if app.Status.Phase != fleetv1alpha1.AppPhaseReady && app.Status.Phase != "" {
@@ -71,7 +71,8 @@ func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, e
 	return out, nil
 }
 
-func isLlamaChart(chart string) bool {
+// IsLlamaChart reports whether a FleetApp chart name refers to llama-cpp-helm.
+func IsLlamaChart(chart string) bool {
 	c := strings.ToLower(strings.TrimSpace(chart))
 	return strings.Contains(c, "llama-cpp")
 }

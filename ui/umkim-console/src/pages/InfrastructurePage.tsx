@@ -15,10 +15,12 @@ import {
   Toolbar,
   ToolbarContent,
   ToolbarItem,
+  TextArea,
   TextInput,
 } from '@patternfly/react-core';
 import { SyncIcon } from '@patternfly/react-icons';
-import { patchIngressAuth, patchAcme, patchLLM } from '../api/client';
+import { patchIngressAuth, patchAcme, patchLLM, reconcileLLM } from '../api/client';
+import type { FleetLLMBackend } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { ClusterNodesPanel } from '../components/clusters/ClusterNodesPanel';
 import { ErrorAlert } from '../components/ErrorAlert';
@@ -58,6 +60,8 @@ export function InfrastructurePage() {
   const [savingAuth, setSavingAuth] = useState(false);
   const [savingAcme, setSavingAcme] = useState(false);
   const [savingLlm, setSavingLlm] = useState(false);
+  const [reconcilingLlm, setReconcilingLlm] = useState(false);
+  const [llmBackendsJson, setLlmBackendsJson] = useState('');
   const [authError, setAuthError] = useState<unknown>(null);
   const [acmeError, setAcmeError] = useState<unknown>(null);
   const [llmError, setLlmError] = useState<unknown>(null);
@@ -79,6 +83,7 @@ export function InfrastructurePage() {
     if (llm) {
       setHubLlmEnabled(!!llm.hubEnabled);
       setHubLlmPublicHost(llm.publicHost ?? '');
+      setLlmBackendsJson(JSON.stringify(llm.backends ?? [], null, 2));
     }
   }, [llm]);
 
@@ -116,21 +121,55 @@ export function InfrastructurePage() {
     }
   };
 
+  const parseBackendsOverride = (): FleetLLMBackend[] | undefined => {
+    const raw = llmBackendsJson.trim();
+    if (!raw || raw === '[]') {
+      return undefined;
+    }
+    const parsed = JSON.parse(raw) as FleetLLMBackend[];
+    if (!Array.isArray(parsed)) {
+      throw new Error('Backends must be a JSON array');
+    }
+    return parsed;
+  };
+
   const saveLlm = async () => {
     setSavingLlm(true);
     setLlmError(null);
     try {
+      let backends: FleetLLMBackend[] | undefined;
+      try {
+        backends = parseBackendsOverride();
+      } catch (e) {
+        setLlmError(e);
+        return;
+      }
       const updated = await patchLLM({
         hubEnabled: hubLlmEnabled,
         ...(hubLlmPublicHost.trim() ? { publicHost: hubLlmPublicHost.trim() } : {}),
+        ...(backends !== undefined ? { backends } : {}),
       });
       setHubLlmEnabled(!!updated.hubEnabled);
       setHubLlmPublicHost(updated.publicHost ?? hubLlmPublicHost.trim());
+      setLlmBackendsJson(JSON.stringify(updated.backends ?? [], null, 2));
       load();
     } catch (e) {
       setLlmError(e);
     } finally {
       setSavingLlm(false);
+    }
+  };
+
+  const runLlmReconcile = async () => {
+    setReconcilingLlm(true);
+    setLlmError(null);
+    try {
+      await reconcileLLM();
+      load();
+    } catch (e) {
+      setLlmError(e);
+    } finally {
+      setReconcilingLlm(false);
     }
   };
 
@@ -394,7 +433,25 @@ export function InfrastructurePage() {
                   <DescriptionListDescription>{llm.publicHost}</DescriptionListDescription>
                 </DescriptionListGroup>
               )}
+              {(llm?.backends?.length ?? 0) > 0 && (
+                <DescriptionListGroup>
+                  <DescriptionListTerm>LiteLLM backends</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                      {llm!.backends!.map((b) => (
+                        <li key={`${b.model}-${b.apiBase}`}>
+                          <code>{b.model}</code> → <code>{b.apiBase}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+              )}
             </DescriptionList>
+            <p style={{ marginTop: '0.5rem', maxWidth: '52rem', fontSize: '0.875rem' }}>
+              Ready <code>llama-cpp-helm</code> FleetApps can auto-populate backends when reconcile
+              runs.
+            </p>
             {user?.dcAdmin && (
               <div style={{ marginTop: '1rem', maxWidth: '36rem' }}>
                 <Form>
@@ -424,14 +481,35 @@ export function InfrastructurePage() {
                       onChange={(_e, checked) => setHubLlmEnabled(checked)}
                     />
                   </LabeledField>
+                  <LabeledField
+                    label="LiteLLM backends (JSON override)"
+                    fieldId="hubLlmBackends"
+                    help="Optional manual backends array: [{\"model\":\"...\",\"apiBase\":\"http://.../v1\"}]"
+                  >
+                    <TextArea
+                      id="hubLlmBackends"
+                      value={llmBackendsJson}
+                      onChange={(_e, value) => setLlmBackendsJson(value)}
+                      placeholder='[{"model":"Qwen3.5-2B-UD","apiBase":"http://10.10.0.x:8080/v1"}]'
+                      isDisabled={!hubLlmEnabled}
+                      rows={4}
+                    />
+                  </LabeledField>
                 </Form>
                 <Button
                   variant="primary"
-                  style={{ marginTop: '0.75rem' }}
+                  style={{ marginTop: '0.75rem', marginRight: '0.5rem' }}
                   isLoading={savingLlm}
                   onClick={() => void saveLlm()}
                 >
                   Apply LLM platform
+                </Button>
+                <Button
+                  variant="secondary"
+                  isLoading={reconcilingLlm}
+                  onClick={() => void runLlmReconcile()}
+                >
+                  Reconcile LiteLLM
                 </Button>
               </div>
             )}

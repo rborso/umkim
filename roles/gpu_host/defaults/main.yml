@@ -1,10 +1,12 @@
 ---
 # Host NVIDIA driver prep before FCJ bootstrap (see docs/components/gpu-host-prep.md).
 gpu_host_driver_branch: "535"
-gpu_host_use_dkms: true
-gpu_host_pin_boot_kernel: true
-gpu_host_cuda_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"
-gpu_host_cuda_repo_filename: cuda-rhel9.repo
+gpu_host_driver_branch_override: false
+gpu_host_require_catalog_match: true
+# Set by catalog.yml from data/gpu/catalog.yaml when empty.
+gpu_host_catalog_path: ""
+gpu_host_cuda_repo_url: ""
+gpu_host_cuda_repo_filename: cuda.repo
 gpu_host_blacklist_nouveau: true
 gpu_host_reboot_after_driver: true
 gpu_host_install_container_toolkit: false
@@ -13,6 +15,8 @@ gpu_host_install_device_plugin: false
 gpu_host_k3s_config_dir: /var/lib/rancher/k3s/agent/etc/containerd
 gpu_host_device_plugin_image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
 gpu_host_device_plugin_runtime_class: nvidia
+# Device plugin uses the cluster default runtime after nvidia-ctk (no RuntimeClass required).
+gpu_host_device_plugin_use_runtime_class: false
 gpu_host_device_plugin_discovery_strategy: nvml
 gpu_host_device_plugin_wait_retries: 30
 gpu_host_device_plugin_wait_delay: 10

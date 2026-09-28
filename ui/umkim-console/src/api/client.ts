@@ -208,6 +208,12 @@ export async function patchLLM(
   });
 }
 
+export async function reconcileLLM(): Promise<import('./types').FleetLLM> {
+  return fleetSiteRequest<import('./types').FleetLLM>('/llm/reconcile', {
+    method: 'POST',
+  });
+}
+
 export async function listFleetClusters(): Promise<FleetCluster[]> {
   const data = await fleetSiteRequest<{ clusters?: FleetCluster[] }>('/clusters');
   return data.clusters ?? [];
@@ -616,6 +622,56 @@ export async function getFleetClusterKubevirtStatus(
   bridgeName?: string;
 }> {
   return fleetSiteRequest('/clusters/' + encodeURIComponent(name) + '/platform/kubevirt');
+}
+
+export type FleetClusterGpuStatus = {
+  hostPhase?: string;
+  hostJobName?: string;
+  hostMessage?: string;
+  runtimePhase?: string;
+  runtimeJobName?: string;
+  runtimeMessage?: string;
+  pciId?: string;
+  marketingName?: string;
+  driverBranch?: string;
+  driverLoaded?: boolean;
+  clusterGpuCapability?: boolean;
+  gpuTotal?: number;
+  gpuAvailable?: number;
+  recommendedDriverBranch?: string;
+};
+
+export async function getFleetClusterGpuStatus(name: string): Promise<FleetClusterGpuStatus> {
+  return fleetSiteRequest<FleetClusterGpuStatus>(
+    '/clusters/' + encodeURIComponent(name) + '/gpu',
+  );
+}
+
+export async function prepFleetClusterGpuHost(
+  name: string,
+  body: { force?: boolean } = {},
+): Promise<{ phase?: string; message?: string }> {
+  return fleetSiteRequest<{ phase?: string; message?: string }>(
+    '/clusters/' + encodeURIComponent(name) + '/gpu/host-prep',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export async function enableFleetClusterGpu(
+  name: string,
+): Promise<{ phase?: string; message?: string }> {
+  return fleetSiteRequest<{ phase?: string; message?: string }>(
+    '/clusters/' + encodeURIComponent(name) + '/gpu/enable',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    },
+  );
 }
 
 export async function validateFleetClusterStorage(

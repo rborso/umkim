@@ -40,8 +40,25 @@ device-plugin-reported capacity, and successful capability discovery. See
 
 ## Verify
 
-Run the LLM and GPU checks through [fleet-verify.md](../fleet-verify.md) after
-an authenticated deployment.
+Prerequisites on at least one spoke cluster:
+
+1. GPU host driver and runtime via the fleet API ([gpu-host-prep.md](gpu-host-prep.md)) —
+   `umkim cluster gpu host-prep` / `umkim cluster gpu enable` (or console), then
+   `umkim cluster gpu discover` until `fleet.capability/gpu=true`.
+2. Hub LiteLLM enabled — `umkim llm set --hub-enabled`, then
+   `umkim llm reconcile --wait` (or console **Infrastructure → LLM platform**).
+3. Install `llama-cpp-helm` with FleetApp on the GPU cluster (for example
+   `deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml` on ~4GB GPUs). Ready
+   llama-cpp apps auto-populate `FleetLLM` backends; override with
+   `umkim llm set --backends-file …` or console JSON override if needed, then
+   `umkim llm reconcile`.
+4. Create a scoped API key: `umkim auth llm-api-keys create` (or console
+   **Access control → LLM API keys**). Call `POST …/llm/v1/chat/completions`
+   with `Authorization: Bearer <token>`.
+5. Run `scripts/verify-fleet-llm.sh` and
+   `FLEET_LLM_CLUSTER=<cluster> FLEET_LLM_MODEL=Qwen3.5-2B-UD scripts/verify-llm-inference-e2e.sh`.
+
+See [fleet-verify.md](../fleet-verify.md) for the full check registry.
 
 Enable the hub proxy with `fleet-llm.yml` (set `fleet_llm_enabled: true` in
 `inventory/group_vars/hub/main.yml` or pass `-e fleet_llm_enabled=true`):

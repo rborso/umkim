@@ -2,6 +2,11 @@
 - name: Fleet LLM | Hub apply or teardown
   when: fleet_llm_hub_enabled | default(false) | bool
   block:
+    - name: Fleet LLM | Ensure namespace
+      ansible.builtin.command:
+        cmd: kubectl create namespace {{ fleet_llm_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: true
+
     - name: Fleet LLM | Ensure master key secret
       ansible.builtin.shell: |
         set -euo pipefail

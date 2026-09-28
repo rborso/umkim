@@ -68,7 +68,7 @@ fi
 
 if [[ -n "${PRESET}" ]] && python3 -c "import yaml; d=yaml.safe_load(open('${FRAMEWORK}/presets/clusters.yaml')); exit(0 if d.get('${PRESET}',{}).get('gpu_host_prep') else 1)" 2>/dev/null; then
   if [[ "${FV_SKIP_GPU_HOST_PREP:-0}" != "1" ]]; then
-    log "gpu host prep via ${FLOW_YML}"
+    log "gpu host prep via ${FLOW_YML} (fleet-verify preset; uses flow playbook before FCJ exists)"
     ansible-playbook ${INV} "${ANSIBLE_EXTRA[@]}" "${ROOT}/playbooks/flows/gpu-host-prep.yml" \
       -e "@${FLOW_YML}" "${VAULT_ARGS[@]}"
   else
@@ -151,9 +151,10 @@ if [[ -n "${PRESET}" ]]; then
       -d "{\"lldapAdminPassword\":\"${pass:-ChangeMe-Min12Chars}\"}" >/dev/null || log "WARN ingress-auth enable"
   fi
   if python3 -c "import yaml; d=yaml.safe_load(open('${FRAMEWORK}/presets/clusters.yaml')); exit(0 if d.get('${PRESET}',{}).get('post_ready',{}).get('gpu_cluster_enable') else 1)" 2>/dev/null; then
-    log "gpu cluster enable via ${FLOW_YML}"
-    ansible-playbook ${INV} "${ANSIBLE_EXTRA[@]}" "${ROOT}/playbooks/flows/gpu-cluster-enable.yml" \
-      -e "@${FLOW_YML}" "${VAULT_ARGS[@]}"
+    log "gpu runtime enable via fleet API"
+    code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${API}/clusters/${CLUSTER}/gpu/enable" \
+      -H 'Content-Type: application/json' -d '{}' || echo 000)
+    [[ "${code}" == "200" || "${code}" == "202" || "${code}" == "409" ]] || fail "gpu enable HTTP ${code}"
   fi
 fi
 

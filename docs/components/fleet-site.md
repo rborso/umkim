@@ -243,7 +243,8 @@ When a cluster is `Ready`, operators use the console **Operations** panel,
 
 Node lifecycle, storage configure, and KubeVirt install share one job queue
 (mutual exclusion). Completed storage and KubeVirt runs are recorded in
-`nodeOperationHistory` as `configureStorage` / `configureKubevirt`.
+`nodeOperationHistory` as `configureStorage` / `configureKubevirt` /
+`configureGpuHost` / `configureGpuEnable`.
 
 Hub Ansible jobs (provision, storage, KubeVirt, node operations) reach cluster
 nodes through `FleetClusterJoin.spec.jumphost`, or `FleetSite.spec.jumphost` for

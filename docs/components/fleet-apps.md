@@ -31,7 +31,8 @@ a `-local` suffix.
 
 Seeded hub charts (`whoami`, `pet-clinic-helm`, `llama-cpp-helm`, `rocky-10-vm`)
 appear in the library after Harbor publish and a Harbor import by
-fleet-site-controller.
+fleet-site-controller. For GPU inference sizing, see
+`deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml` and [fleet-llm.md](fleet-llm.md).
 
 Deleting a library row removes the `FleetChart` record only. Harbor artifacts
 stay until an operator prunes them.

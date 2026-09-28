@@ -88,15 +88,20 @@ provision_cluster() {
 provision_cluster_if_needed playbooks/flows/examples/acme-lab01.yml
 provision_cluster_if_needed playbooks/flows/examples/beta-lab02.yml
 
-GPU_EXAMPLE=playbooks/flows/examples/lab-gpu03.yml
-if ! curl -sf "${API}/clusters/lab-gpu03" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('provisioning_phase')=='Ready' or d.get('available') else 1)" 2>/dev/null; then
-  log "GPU host prep for lab-gpu03"
-  ansible-playbook ${INV} playbooks/flows/gpu-host-prep.yml -e @"${GPU_EXAMPLE}" "${VAULT_ARGS[@]}"
+GPU_EXAMPLE=playbooks/flows/examples/lab-gpu-0.yml
+GPU_CLUSTER="${FLEET_GPU_CLUSTER:-lab-gpu-0}"
+if ! curl -sf "${API}/clusters/${GPU_CLUSTER}" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('provisioning_phase')=='Ready' or d.get('available') else 1)" 2>/dev/null; then
+  log "GPU host prep for ${GPU_CLUSTER} (umkim API)"
+  $UMKIM cluster gpu host-prep "$GPU_CLUSTER" --wait 45m || fail "GPU host prep failed for ${GPU_CLUSTER}"
   provision_cluster "${GPU_EXAMPLE}"
-  log "GPU cluster enable for lab-gpu03"
-  ansible-playbook ${INV} playbooks/flows/gpu-cluster-enable.yml -e @"${GPU_EXAMPLE}" "${VAULT_ARGS[@]}"
+  log "GPU runtime enable for ${GPU_CLUSTER}"
+  $UMKIM cluster gpu enable "$GPU_CLUSTER" --wait 30m || fail "GPU enable failed for ${GPU_CLUSTER}"
+  $UMKIM cluster gpu discover "$GPU_CLUSTER" || true
 else
-  log "lab-gpu03 already Ready — skip provision"
+  log "${GPU_CLUSTER} already Ready — ensure GPU via umkim API"
+  $UMKIM cluster gpu host-prep "$GPU_CLUSTER" --force --wait 45m || true
+  $UMKIM cluster gpu enable "$GPU_CLUSTER" --wait 30m || true
+  $UMKIM cluster gpu discover "$GPU_CLUSTER" || true
 fi
 
 if [[ "${SKIP_CLUSTER_ACME}" != "1" ]]; then

@@ -1,8 +1,9 @@
 ---
-# Enable GPU workloads on a Ready FCJ cluster (container toolkit + device plugin).
+# Enable GPU workloads on a Ready FCJ cluster (hub Ansible runner / legacy flow).
+# Operators: use `umkim cluster gpu enable NAME` or the console — not this playbook.
 #
 #   ansible-playbook $INV playbooks/flows/gpu-cluster-enable.yml \
-#     -e @playbooks/flows/examples/lab-gpu03.yml
+#     -e @playbooks/flows/examples/lab-gpu-0.yml
 
 - name: GPU cluster enable | Register target node
   hosts: localhost
@@ -14,7 +15,7 @@
       ansible.builtin.assert:
         that:
           - fleet_flow_bootstrap_host | length > 0
-        fail_msg: Set fleet_flow_bootstrap_host (e.g. -e @playbooks/flows/examples/lab-gpu03.yml).
+        fail_msg: Set fleet_flow_bootstrap_host (e.g. -e @playbooks/flows/examples/lab-gpu-0.yml).
 
     - name: Parse jumphost user@host:port
       ansible.builtin.set_fact:
@@ -46,6 +47,7 @@
   become: true
   gather_facts: true
   vars:
+    gpu_host_catalog_path: "{{ playbook_dir }}/../../data/gpu/catalog.yaml"
     gpu_host_install_container_toolkit: true
     gpu_host_configure_k3s_runtime: true
     gpu_host_install_device_plugin: true

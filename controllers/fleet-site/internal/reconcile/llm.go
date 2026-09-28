@@ -47,6 +47,10 @@ func (r *LLMReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if backends, err := llm.SyncBackendsFromFleetApps(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName, fl.Spec.Backends); err == nil && len(backends) > 0 {
 		if !backendsEqual(fl.Spec.Backends, backends) {
 			fl.Spec.Backends = backends
+			if fl.Annotations == nil {
+				fl.Annotations = map[string]string{}
+			}
+			fl.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
 			if err := r.Update(ctx, fl); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -123,6 +127,11 @@ func (r *LLMReconciler) needsLLMReconcile(fl *fleetv1alpha1.FleetLLM, desired fl
 	if !desired.GlobalEnabled && fl.Status.Phase != fleetv1alpha1.LLMPhaseDisabled {
 		return true
 	}
+	if desired.GlobalEnabled && fl.Status.Phase == fleetv1alpha1.LLMPhaseReady {
+		if fleetllm.BackendsHash(desired.Backends) != fleetllm.AppliedBackendsHash(fl) {
+			return true
+		}
+	}
 	return false
 }
 
@@ -159,6 +168,9 @@ func (r *LLMReconciler) completeLLM(ctx context.Context, fl *fleetv1alpha1.Fleet
 	fl.Status.LastJobName = ""
 	fl.Status.ObservedGeneration = fl.Generation
 	if err := r.Status().Update(ctx, fl); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := fleetllm.SetAppliedBackendsHash(ctx, r.Client, fl, desired.Backends); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: time.Duration(r.Cfg.RequeueIntervalSec) * time.Second}, nil

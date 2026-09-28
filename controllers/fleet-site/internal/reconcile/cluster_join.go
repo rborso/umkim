@@ -102,6 +102,11 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		} else if res.Requeue || res.RequeueAfter > 0 {
 			return res, nil
 		}
+		if res, err := r.reconcileClusterGpu(ctx, &fcj, clusterName); err != nil {
+			return ctrl.Result{}, err
+		} else if res.Requeue || res.RequeueAfter > 0 {
+			return res, nil
+		}
 		if res, err := r.reconcileCapabilityDiscover(ctx, &fcj, clusterName); err != nil {
 			return ctrl.Result{}, err
 		} else if res.Requeue || res.RequeueAfter > 0 {

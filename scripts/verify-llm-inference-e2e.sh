@@ -12,7 +12,9 @@
 #   FLEET_CONSOLE_URL=http://10.10.0.1:30912
 #   FLEET_LLM_CLUSTER=example-gpu        optional spoke cluster for real inference
 #   FLEET_LLM_RELEASE=llama-cpp
-#   FLEET_LLM_MODEL=Qwen2.5-0.5B-Instruct
+#   FLEET_LLM_MODEL=Qwen3.5-2B-UD   (default when FLEET_LLM_CLUSTER is set)
+#   FLEET_LLM_APP_NAME=llama-cpp-lab
+#   FLEET_LLM_VALUES_FILE=deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml
 #   SKIP_LLM_DEPLOY=1                    skip spoke llama-cpp deploy; use healthy backend or mock
 #   LLM_E2E_USE_MOCK_FALLBACK=1          hub mock when spoke deploy unavailable (default without GPU)
 #   LLM_E2E_REQUIRE_INFERENCE_DEPLOY=1   fail instead of mock fallback
@@ -37,6 +39,9 @@ NS="${FLEET_CONSOLE_NS:-fleet-console}"
 LLM_NS="${FLEET_LLM_NAMESPACE:-fleet-llm}"
 KEY_NAME="${FLEET_LLM_APIKEY_NAME:-llm-e2e-test}"
 MODEL="${FLEET_LLM_MODEL:-Qwen2.5-0.5B-Instruct}"
+APP_NAME="${FLEET_LLM_APP_NAME:-llama-cpp-e2e}"
+VALUES_FILE="${FLEET_LLM_VALUES_FILE:-${ROOT}/deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml}"
+CHART="${FLEET_LLM_CHART:-llama-cpp-helm}"
 PUBLIC_HOST="${FLEET_LLM_PUBLIC_HOST:-}"
 PUBLIC_URL="${FLEET_LLM_PUBLIC_URL:-}"
 LLM_PORT="${FLEET_LLM_INFERENCE_PORT:-8080}"
@@ -46,6 +51,8 @@ if [[ -z "${CLUSTER}" ]]; then
   SKIP_LLM_DEPLOY="${SKIP_LLM_DEPLOY:-1}"
   LLM_E2E_USE_MOCK_FALLBACK="${LLM_E2E_USE_MOCK_FALLBACK:-1}"
   MODEL="${FLEET_LLM_MODEL:-llm-e2e-mock}"
+else
+  MODEL="${FLEET_LLM_MODEL:-Qwen3.5-2B-UD}"
 fi
 INV="${INV:--i ${ROOT}/inventory/hosts.yml}"
 VAULT_ARGS=()
@@ -82,45 +89,94 @@ cluster_upstream() {
   curl -sf "${FLEET_API}/clusters/${CLUSTER}" | jq -r '.upstream_host // empty'
 }
 
-wait_helm_provider() {
-  local phase="" rounds="${FLEET_LLM_HELM_WAIT_ROUNDS:-12}"
+wait_fleetapp_ready() {
+  local name="$1"
+  local phase="" rounds="${FLEET_LLM_APP_WAIT_ROUNDS:-60}"
   for _ in $(seq 1 "$rounds"); do
-    phase=$(curl -sf "${FLEET_API}/clusters/${CLUSTER}/providers" \
-      | jq -r '.providers[] | select(.kind=="helm") | .phase // empty')
+    phase=$(curl -sf "${FLEET_API}/apps/${name}" 2>/dev/null | jq -r '.phase // empty' || true)
     [[ "$phase" == "Ready" ]] && return 0
     [[ "$phase" == "Failed" ]] && return 1
-    sleep 10
+    sleep 15
   done
-  log "WARN: helm provider on ${CLUSTER} not Ready (last phase=${phase:-unknown})"
+  log "WARN: FleetApp ${name} not Ready (last phase=${phase:-unknown})"
   return 1
 }
 
-ensure_helm_provider() {
-  local phase
-  phase=$(curl -sf "${FLEET_API}/clusters/${CLUSTER}/providers" \
-    | jq -r '.providers[] | select(.kind=="helm") | .phase // empty')
-  case "$phase" in
-    Ready) log "helm provider Ready on ${CLUSTER}"; return 0 ;;
-    NotInstalled|"")
-      log "installing helm provider on ${CLUSTER}"
-      curl -sf -X POST "${FLEET_API}/clusters/${CLUSTER}/providers/helm/install" >/dev/null
-      ;;
-    *)
-      log "helm provider phase=${phase}; waiting"
-      ;;
-  esac
-  wait_helm_provider
+deploy_llama_fleetapp() {
+  local values_yaml phase
+  [[ -f "${VALUES_FILE}" ]] || fail "values file not found: ${VALUES_FILE}"
+  values_yaml="$(cat "${VALUES_FILE}")"
+  phase=$(curl -sf "${FLEET_API}/apps/${APP_NAME}" 2>/dev/null | jq -r '.phase // empty' || true)
+  if [[ "$phase" == "Ready" ]]; then
+    log "FleetApp ${APP_NAME} already Ready on ${CLUSTER}"
+    return 0
+  fi
+  if [[ -n "$phase" && "$phase" != "Failed" ]]; then
+    log "FleetApp ${APP_NAME} phase=${phase}; waiting"
+    wait_fleetapp_ready "${APP_NAME}"
+    return $?
+  fi
+  log "install FleetApp ${APP_NAME} (${CHART}) on ${CLUSTER}"
+  if command -v umkim >/dev/null 2>&1; then
+    umkim app create \
+      --cluster "${CLUSTER}" \
+      --chart "${CHART}" \
+      --name "${APP_NAME}" \
+      --release "${RELEASE}" \
+      --namespace llm \
+      --route-mode none \
+      --values-file "${VALUES_FILE}"
+  else
+    local payload
+    payload="$(jq -n \
+      --arg cluster "${CLUSTER}" \
+      --arg chart "${CHART}" \
+      --arg name "${APP_NAME}" \
+      --arg release "${RELEASE}" \
+      --arg ns llm \
+      --arg values "${values_yaml}" \
+      '{clusterName:$cluster,chart:$chart,name:$name,releaseName:$release,namespace:$ns,valuesYaml:$values,route:{mode:"none"}}')"
+    curl -sf -X POST "${FLEET_API}/apps" \
+      -H 'Content-Type: application/json' \
+      -d "${payload}" >/dev/null
+  fi
+  wait_fleetapp_ready "${APP_NAME}"
 }
 
-deploy_llama_via_hub() {
-  log "deploy llama-cpp-helm ${RELEASE} on ${CLUSTER} via ansible flow"
-  ansible-playbook ${INV} "${ROOT}/playbooks/flows/llama-cpp-helm-deploy.yml" \
-    "${VAULT_ARGS[@]}" \
-    -e "fleet_flow_cluster=${CLUSTER}" \
-    -e "fleet_flow_release_name=${RELEASE}" \
-    -e "fleet_flow_model=${MODEL}" \
-    -e "fleet_flow_ctx_size=${FLEET_LLM_CTX_SIZE:-2048}" \
-    ${FLEET_LLM_HF_REPO:+-e "fleet_flow_hf_repo=${FLEET_LLM_HF_REPO}"}
+wait_llm_reconcile() {
+  log "trigger FleetLLM reconcile"
+  if command -v umkim >/dev/null 2>&1; then
+    umkim llm reconcile --wait --timeout 600 || return 1
+  else
+    curl -sf -X POST "${FLEET_API}/llm/reconcile" >/dev/null
+    for _ in $(seq 1 120); do
+      if curl -sf "${FLEET_API}/llm" | jq -e '.phase == "Ready"' >/dev/null 2>&1; then
+        return 0
+      fi
+      sleep 5
+    done
+    return 1
+  fi
+}
+
+ensure_litellm_backend_from_fleetllm() {
+  local upstream="$1"
+  local api_base="http://${upstream}:${LLM_PORT}/v1"
+  log "wait for LiteLLM backends via FleetLLM (expect ${MODEL} at ${api_base})"
+  for _ in $(seq 1 24); do
+    if curl -sf "${FLEET_API}/llm" \
+      | jq -e --arg m "${MODEL}" --arg b "${api_base}" \
+        '.backends[]? | select(.model==$m and .apiBase==$b)' >/dev/null 2>&1; then
+      wait_llm_reconcile || true
+      if litellm_health_ok; then
+        return 0
+      fi
+    fi
+    curl -sf -X POST "${FLEET_API}/llm/reconcile" >/dev/null 2>&1 || true
+    sleep 10
+  done
+  log "WARN: FleetLLM backends missing ${MODEL}; falling back to ConfigMap patch"
+  apply_litellm_backend "${api_base}"
 }
 
 wait_inference_health() {
@@ -274,22 +330,21 @@ ensure_inference_backend() {
   fi
 
   local deployed=false
-  if ensure_helm_provider; then
-    if deploy_llama_via_hub; then
-      local upstream
-      upstream="$(cluster_upstream)"
-      [[ -n "$upstream" ]] || fail "no upstream_host for ${CLUSTER}"
-      if wait_inference_health "$upstream" "$LLM_PORT"; then
-        apply_litellm_backend "http://${upstream}:${LLM_PORT}/v1"
+  if deploy_llama_fleetapp; then
+    local upstream
+    upstream="$(cluster_upstream)"
+    [[ -n "$upstream" ]] || fail "no upstream_host for ${CLUSTER}"
+    if wait_inference_health "$upstream" "$LLM_PORT"; then
+      if ensure_litellm_backend_from_fleetllm "$upstream"; then
         deployed=true
       else
-        log "WARN: inference health timeout on ${upstream}:${LLM_PORT}"
+        log "WARN: LiteLLM backend wiring failed"
       fi
     else
-      log "WARN: inference deploy failed"
+      log "WARN: inference health timeout on ${upstream}:${LLM_PORT}"
     fi
   else
-    log "WARN: helm provider not available on ${CLUSTER}"
+    log "WARN: FleetApp deploy failed on ${CLUSTER}"
   fi
 
   if [[ "$deployed" == "true" ]]; then
@@ -324,9 +379,21 @@ rebuild_auth_if_requested() {
 
 create_api_key() {
   local token secret_name
+  log "create FleetLLMApiKey ${KEY_NAME}"
+  if command -v umkim >/dev/null 2>&1; then
+    local models_arg=()
+    [[ -n "${MODEL}" ]] && models_arg=(--models "${MODEL}")
+    token="$(umkim auth llm-api-keys create \
+      --name "${KEY_NAME}" \
+      --display-name "LLM E2E test key" \
+      "${models_arg[@]}" \
+      -o json 2>/dev/null | jq -r '.token // empty' || true)"
+    [[ -n "$token" ]] || fail "umkim auth llm-api-keys create did not return token"
+    export FLEET_LLM_TEST_TOKEN="$token"
+    return 0
+  fi
   token="${FLEET_LLM_APIKEY_TOKEN:-$(openssl rand -hex 24)}"
   secret_name="fleet-llm-apikey-${KEY_NAME}"
-  log "create FleetLLMApiKey ${KEY_NAME}"
   hub_k -n "$NS" create secret generic "$secret_name" \
     --from-literal=api_key="$token" \
     --dry-run=client -o yaml | hub_k apply -f -
@@ -337,9 +404,10 @@ metadata:
   name: ${KEY_NAME}
   namespace: ${NS}
 spec:
-  org: default
   displayName: LLM E2E test key
   secretRef: ${secret_name}
+  models:
+    - ${MODEL}
 EOF
   hub_k -n "$NS" patch fleetllmapikey "${KEY_NAME}" --subresource=status --type=merge \
     -p '{"status":{"active":true}}' 2>/dev/null \

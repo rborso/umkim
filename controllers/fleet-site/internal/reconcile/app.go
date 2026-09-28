@@ -13,6 +13,7 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/appchart"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/llm"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -153,6 +154,12 @@ func (r *AppReconciler) pollInstall(ctx context.Context, app *fleetv1alpha1.Flee
 	}
 	if err := r.Status().Update(ctx, app); err != nil {
 		return ctrl.Result{}, err
+	}
+	if llm.IsLlamaChart(app.Spec.Chart) {
+		if err := r.requestFleetLLMReconcile(ctx); err != nil {
+			logger := log.FromContext(ctx)
+			logger.Error(err, "request FleetLLM reconcile after llama-cpp app ready")
+		}
 	}
 	return ctrl.Result{}, nil
 }

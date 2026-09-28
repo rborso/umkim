@@ -1,4 +1,4 @@
-# llama.cpp CUDA on lab-gpu03 (virt03, GTX 1050 Ti 4GB).
+# llama.cpp CUDA on lab-gpu-0 (gpu-bm-1, RTX 2060 SUPER).
 replicaCount: 1
 
 hfRepo: Qwen/Qwen2.5-0.5B-Instruct-GGUF

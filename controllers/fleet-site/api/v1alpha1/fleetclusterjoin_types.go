@@ -53,6 +53,20 @@ const (
 	NodeOpTypeConfigureStorage = "configureStorage"
 	// NodeOpTypeConfigureKubevirt is a cluster-level KubeVirt platform install job.
 	NodeOpTypeConfigureKubevirt = "configureKubevirt"
+	// NodeOpTypeConfigureGpuHost installs the NVIDIA host driver on cluster nodes.
+	NodeOpTypeConfigureGpuHost = "configureGpuHost"
+	// NodeOpTypeConfigureGpuEnable installs container toolkit and device plugin.
+	NodeOpTypeConfigureGpuEnable = "configureGpuEnable"
+
+	GpuHostPhaseNotPrepared = "NotPrepared"
+	GpuHostPhaseApplying    = "Applying"
+	GpuHostPhaseReady       = "Ready"
+	GpuHostPhaseFailed      = "Failed"
+
+	GpuRuntimePhaseNotEnabled = "NotEnabled"
+	GpuRuntimePhaseApplying   = "Applying"
+	GpuRuntimePhaseReady      = "Ready"
+	GpuRuntimePhaseFailed     = "Failed"
 
 	NodeOpPhasePending   = "Pending"
 	NodeOpPhaseRunning   = "Running"
@@ -153,6 +167,19 @@ type ClusterProviderStatus struct {
 	ProviderName string `json:"providerName,omitempty"`
 }
 
+type ClusterGpuStatus struct {
+	HostPhase      string `json:"hostPhase,omitempty"`
+	HostJobName    string `json:"hostJobName,omitempty"`
+	HostMessage    string `json:"hostMessage,omitempty"`
+	RuntimePhase   string `json:"runtimePhase,omitempty"`
+	RuntimeJobName string `json:"runtimeJobName,omitempty"`
+	RuntimeMessage string `json:"runtimeMessage,omitempty"`
+	PciID          string `json:"pciId,omitempty"`
+	MarketingName  string `json:"marketingName,omitempty"`
+	DriverBranch   string `json:"driverBranch,omitempty"`
+	DriverLoaded   bool   `json:"driverLoaded,omitempty"`
+}
+
 type ClusterStorageStatus struct {
 	Phase   string `json:"phase,omitempty"`
 	JobName string `json:"jobName,omitempty"`
@@ -234,6 +261,7 @@ type FleetClusterJoinStatus struct {
 	DeletionStartedAt       *metav1.Time `json:"deletionStartedAt,omitempty"`
 	ManagedClusterAvailable bool                            `json:"managedClusterAvailable,omitempty"`
 	Providers               map[string]ClusterProviderStatus `json:"providers,omitempty"`
+	Gpu                     ClusterGpuStatus                 `json:"gpu,omitempty"`
 	Storage                 ClusterStorageStatus             `json:"storage,omitempty"`
 	IngressAuth             FleetClusterJoinIngressAuthStatus `json:"ingressAuth,omitempty"`
 	Acme                    FleetClusterJoinAcmeStatus        `json:"acme,omitempty"`

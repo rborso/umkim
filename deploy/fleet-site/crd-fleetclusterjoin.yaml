@@ -273,6 +273,29 @@ spec:
                       type: string
                     message:
                       type: string
+                gpu:
+                  type: object
+                  properties:
+                    hostPhase:
+                      type: string
+                    hostJobName:
+                      type: string
+                    hostMessage:
+                      type: string
+                    runtimePhase:
+                      type: string
+                    runtimeJobName:
+                      type: string
+                    runtimeMessage:
+                      type: string
+                    pciId:
+                      type: string
+                    marketingName:
+                      type: string
+                    driverBranch:
+                      type: string
+                    driverLoaded:
+                      type: boolean
                 ingressAuth:
                   type: object
                   properties:
@@ -321,7 +344,7 @@ spec:
                       type: string
                     type:
                       type: string
-                      enum: [addWorker, removeWorker, replaceControlPlane, configureStorage, configureKubevirt]
+                      enum: [addWorker, removeWorker, replaceControlPlane, configureStorage, configureKubevirt, configureGpuHost, configureGpuEnable]
                     node:
                       type: string
                     phase:
@@ -349,7 +372,7 @@ spec:
                         type: string
                       type:
                         type: string
-                        enum: [addWorker, removeWorker, replaceControlPlane, configureStorage, configureKubevirt]
+                        enum: [addWorker, removeWorker, replaceControlPlane, configureStorage, configureKubevirt, configureGpuHost, configureGpuEnable]
                       node:
                         type: string
                       phase:

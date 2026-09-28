@@ -30,6 +30,7 @@ func clusterCmd() *cobra.Command {
 	cmd.AddCommand(clusterBootstrapCmd())
 	cmd.AddCommand(clusterStorageCmd())
 	cmd.AddCommand(clusterPlatformCmd())
+	cmd.AddCommand(clusterGpuCmd())
 	cmd.AddCommand(clusterEdgeCmd())
 	cmd.AddCommand(clusterAcmeCmd())
 	cmd.AddCommand(clusterValidateCmd())

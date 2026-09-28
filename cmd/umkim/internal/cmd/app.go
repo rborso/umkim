@@ -63,8 +63,8 @@ func appGetCmd() *cobra.Command {
 
 func appCreateCmd() *cobra.Command {
 	var (
-		jsonFile, cluster, chart, version, release, namespace, valuesFile string
-		routeMode, routeHost                                                string
+		jsonFile, cluster, chart, version, release, namespace, valuesFile, appName string
+		routeMode, routeHost                                                        string
 	)
 	c := &cobra.Command{
 		Use:   "create",
@@ -89,6 +89,9 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 				}
 				if release != "" {
 					body["releaseName"] = release
+				}
+				if appName != "" {
+					body["name"] = strings.TrimSpace(appName)
 				}
 				if namespace != "" {
 					body["namespace"] = namespace
@@ -147,6 +150,7 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 	c.Flags().StringVar(&chart, "chart", "", "Chart name or oci:// URL")
 	c.Flags().StringVar(&version, "version", "", "Chart version")
 	c.Flags().StringVar(&release, "release", "", "Helm release name")
+	c.Flags().StringVar(&appName, "name", "", "FleetApp resource name (defaults to release)")
 	c.Flags().StringVar(&namespace, "namespace", "default", "Target namespace")
 	c.Flags().StringVar(&valuesFile, "values-file", "", "Helm values YAML file")
 	c.Flags().StringVar(&routeMode, "route-mode", "none", "Route mode: none|hub|site")

@@ -85,6 +85,11 @@ umkim cluster storage status NAME
 umkim cluster platform enable-kubevirt NAME [--lan-bridge] [--bridge NAME] [--force] [--wait 45m]
 umkim cluster platform status NAME
 
+umkim cluster gpu status NAME
+umkim cluster gpu host-prep NAME [--force] [--wait 45m]
+umkim cluster gpu enable NAME [--wait 30m]
+umkim cluster gpu discover NAME
+
 umkim vm list --cluster NAME
 umkim vm get NAME --cluster NAME [-n NS]
 umkim vm start|stop|restart NAME --cluster NAME [--force]
@@ -102,7 +107,8 @@ umkim app delete NAME
 umkim infra get hub
 umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
 umkim acme get | set [--hub-enabled] [--staging] [--email E]
-umkim llm get | set [--hub-enabled] [--public-host H]
+umkim llm get | set [--hub-enabled] [--public-host H] [--backends-file F] [--backend model=…,apiBase=…]
+umkim llm reconcile [--wait] [--timeout SEC]
 
 umkim edge dns validate --host FQDN [--expected-ip IP]
 umkim edge hostname check --host FQDN
@@ -154,6 +160,9 @@ umkim ingress-auth get
 umkim ingress-auth set --hub-enabled --hub-lldap-webui
 umkim acme set --hub-enabled
 umkim llm set --hub-enabled --public-host llm.example.com
+umkim llm set --backends-file backends.json
+umkim llm reconcile --wait
+umkim auth llm-api-keys create --name lab --display-name "Lab" --models Qwen3.5-2B-UD
 ```
 
 Per-cluster ingress auth and ACME:
