@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -32,14 +33,17 @@ func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, e
 		return existing, err
 	}
 
-	byModel := map[string]fleetv1alpha1.FleetLLMBackend{}
-	for _, b := range existing {
-		if b.Model != "" && b.APIBase != "" {
-			byModel[b.Model] = b
-		}
-	}
+	auto := DiscoverBackendsFromApps(apps.Items, edge)
+	out := MergeBackends(existing, auto)
+	return out, nil
+}
 
-	for _, app := range apps.Items {
+// DiscoverBackendsFromApps returns one LiteLLM backend per Ready llama-cpp FleetApp.
+// The same model alias may appear multiple times (load balancing across clusters).
+func DiscoverBackendsFromApps(apps []fleetv1alpha1.FleetApp, edge map[string]string) []fleetv1alpha1.FleetLLMBackend {
+	var out []fleetv1alpha1.FleetLLMBackend
+	seen := map[string]struct{}{}
+	for _, app := range apps {
 		if !IsLlamaChart(app.Spec.Chart) {
 			continue
 		}
@@ -61,14 +65,62 @@ func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, e
 		}
 		port := intVal(vals, 8080, "service", "port")
 		apiBase := fmt.Sprintf("http://%s:%d/v1", upstream, port)
-		byModel[model] = fleetv1alpha1.FleetLLMBackend{Model: model, APIBase: apiBase}
+		key := model + "\x00" + apiBase
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, fleetv1alpha1.FleetLLMBackend{Model: model, APIBase: apiBase})
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Model != out[j].Model {
+			return out[i].Model < out[j].Model
+		}
+		return out[i].APIBase < out[j].APIBase
+	})
+	return out
+}
 
-	out := make([]fleetv1alpha1.FleetLLMBackend, 0, len(byModel))
-	for _, b := range byModel {
+// MergeBackends keeps manual FleetLLM backends that are not auto-discovered, then appends auto entries.
+func MergeBackends(existing, auto []fleetv1alpha1.FleetLLMBackend) []fleetv1alpha1.FleetLLMBackend {
+	autoKeys := map[string]struct{}{}
+	autoBases := map[string]struct{}{}
+	for _, b := range auto {
+		if b.Model == "" || b.APIBase == "" {
+			continue
+		}
+		autoKeys[b.Model+"\x00"+b.APIBase] = struct{}{}
+		autoBases[b.APIBase] = struct{}{}
+	}
+	var out []fleetv1alpha1.FleetLLMBackend
+	seen := map[string]struct{}{}
+	for _, b := range existing {
+		if b.Model == "" || b.APIBase == "" {
+			continue
+		}
+		key := b.Model + "\x00" + b.APIBase
+		if _, ok := autoKeys[key]; ok {
+			continue
+		}
+		// Drop superseded llama aliases at the same spoke apiBase as a discovered backend.
+		if _, onAutoBase := autoBases[b.APIBase]; onAutoBase {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
 		out = append(out, b)
 	}
-	return out, nil
+	for _, b := range auto {
+		key := b.Model + "\x00" + b.APIBase
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, b)
+	}
+	return out
 }
 
 // IsLlamaChart reports whether a FleetApp chart name refers to llama-cpp-helm.

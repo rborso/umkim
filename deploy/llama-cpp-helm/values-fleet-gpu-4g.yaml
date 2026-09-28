@@ -11,6 +11,9 @@ model: Qwen3.5-2B-UD
 ctxSize: 8192
 nGpuLayers: 99
 
+jinja: true
+chatTemplateKwargs: '{"enable_thinking":false}'
+
 image:
   repository: 10.10.0.1:30443/ghcr-proxy/ggml-org/llama.cpp
   tag: server-cuda

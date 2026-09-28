@@ -10,6 +10,11 @@ ctxSize: 2048
 nGpuLayers: 99
 parallel: 1
 
+# Qwen3 / thinking templates: disable reasoning-only replies (content stays in message.content).
+jinja: true
+chatTemplateKwargs: '{"enable_thinking":false}'
+extraArgs: []
+
 image:
   repository: ghcr.io/ggml-org/llama.cpp
   tag: server-cuda

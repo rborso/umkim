@@ -18,3 +18,8 @@ model_list:
 litellm_settings:
   drop_params: true
   set_verbose: false
+
+# Multiple model_list rows with the same model_name are load-balanced by LiteLLM.
+# Clients can pass OpenAI "user" for optional affinity when Redis routing is enabled later.
+router_settings:
+  routing_strategy: simple-shuffle

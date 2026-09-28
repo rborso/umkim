@@ -51,6 +51,16 @@ spec:
             - {{ .Values.nGpuLayers | quote }}
             - -np
             - {{ .Values.parallel | quote }}
+            {{- if .Values.jinja }}
+            - --jinja
+            {{- end }}
+            {{- if .Values.chatTemplateKwargs }}
+            - --chat-template-kwargs
+            - {{ .Values.chatTemplateKwargs | quote }}
+            {{- end }}
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080

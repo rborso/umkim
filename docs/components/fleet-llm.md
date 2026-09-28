@@ -20,6 +20,19 @@ model source. Its model alias, context size, parallelism, GPU-layer setting,
 resource requests, persistence, and runtime class are chart values that must
 be reviewed for each deployment.
 
+Use the same chart `model` value (OpenAI alias) on multiple GPU clusters when
+you want one logical model id on the hub. Ready `llama-cpp-helm` FleetApps are
+synced as **multiple LiteLLM backends** with the same `model_name`; LiteLLM
+load-balances across them (`router_settings.routing_strategy: simple-shuffle` in
+the hub config). OpenAI-compatible clients already send full message history each
+request, so **sticky sessions are usually unnecessary** for chat; add Redis-backed
+routing on the hub later only if you need per-`user` affinity to the same spoke.
+
+For **Qwen3.x** GGUFs, set chart values `jinja: true` and
+`chatTemplateKwargs: '{"enable_thinking":false}'` so replies land in
+`message.content` instead of filling `reasoning_content` (see
+`deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml`).
+
 ## Access control
 
 The public LLM API requires authenticated access. The proxy accepts a
