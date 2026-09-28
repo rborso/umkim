@@ -1,0 +1,11 @@
+---
+# GPU / inference spokes: keep firewalld on while allowing hub WireGuard overlay.
+fleet_spoke_firewall_enabled: "{{ configure_firewalld | default(false) | bool }}"
+fleet_spoke_firewall_wireguard_interface: "{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
+fleet_spoke_firewall_overlay_subnet: "{{ wireguard_subnet | default('10.10.0.0/16') }}"
+fleet_spoke_firewall_llm_inference_tcp_port: 8080
+fleet_spoke_firewall_k3s_tcp_ports:
+  - 6443
+  - 10250
+# Calico IPIP (tunl0) between overlay nodes when firewalld filters forward/input.
+fleet_spoke_firewall_allow_calico_ipip: true

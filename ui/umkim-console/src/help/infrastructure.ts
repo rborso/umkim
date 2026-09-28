@@ -32,4 +32,10 @@ export const INFRASTRUCTURE_FIELD_HELP: Record<string, FieldHelpContent> = {
     example: 'llm.example.com',
     learnMoreUrl: DOCS.fleetLlm,
   },
+  'infra.hubLlmBackends': {
+    description:
+      'Optional override for LiteLLM model backends. JSON array with model (OpenAI alias) and apiBase (spoke HTTP URL ending in /v1). Ready llama-cpp FleetApps can auto-populate backends when you reconcile.',
+    example: '[{"model":"Qwen3.5-2B-UD","apiBase":"http://10.10.0.x:8080/v1"}]',
+    learnMoreUrl: DOCS.fleetLlm,
+  },
 };

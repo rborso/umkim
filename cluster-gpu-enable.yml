@@ -24,3 +24,9 @@
         name: gpu_host
         tasks_from: device_plugin
       tags: [gpu_host, gpu_host_device_plugin]
+    - ansible.builtin.import_role:
+        name: fleet_spoke_firewall
+      tags: [fleet_spoke_firewall, gpu_firewall]
+      vars:
+        configure_firewalld: true
+        fleet_spoke_firewall_enabled: true

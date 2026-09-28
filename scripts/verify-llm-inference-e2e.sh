@@ -380,17 +380,24 @@ rebuild_auth_if_requested() {
 create_api_key() {
   local token secret_name
   log "create FleetLLMApiKey ${KEY_NAME}"
-  if command -v umkim >/dev/null 2>&1; then
-    local models_arg=()
+  if command -v umkim >/dev/null 2>&1 && [[ -n "${UMKIM_TOKEN:-}" ]]; then
+    local models_arg=() auth_url
     [[ -n "${MODEL}" ]] && models_arg=(--models "${MODEL}")
+    auth_url="${UMKIM_AUTH_URL:-}"
+    if [[ -z "$auth_url" && -n "${CONSOLE}" ]]; then
+      auth_url="${CONSOLE%/}/fleet/auth/v1alpha1"
+      export UMKIM_AUTH_URL="$auth_url"
+    fi
     token="$(umkim auth llm-api-keys create \
       --name "${KEY_NAME}" \
       --display-name "LLM E2E test key" \
       "${models_arg[@]}" \
       -o json 2>/dev/null | jq -r '.token // empty' || true)"
-    [[ -n "$token" ]] || fail "umkim auth llm-api-keys create did not return token"
-    export FLEET_LLM_TEST_TOKEN="$token"
-    return 0
+    if [[ -n "$token" ]]; then
+      export FLEET_LLM_TEST_TOKEN="$token"
+      return 0
+    fi
+    log "WARN: umkim auth llm-api-keys create failed; using kubectl FleetLLMApiKey"
   fi
   token="${FLEET_LLM_APIKEY_TOKEN:-$(openssl rand -hex 24)}"
   secret_name="fleet-llm-apikey-${KEY_NAME}"

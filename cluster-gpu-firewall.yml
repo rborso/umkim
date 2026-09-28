@@ -1,0 +1,16 @@
+---
+# firewalld on GPU cluster nodes: hub overlay (wg-umkim) → K3s + hostNetwork LLM :8080.
+#
+#   ansible-playbook cluster-gpu-firewall.yml -e fleet_cluster_name=lab-gpu-0 \
+#     -i /inventory/inventory.ini
+
+- name: Fleet cluster GPU | Spoke firewall for inference overlay
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: true
+  vars:
+    configure_firewalld: true
+    fleet_spoke_firewall_enabled: true
+  roles:
+    - role: fleet_spoke_firewall
+      tags: [fleet_spoke_firewall, gpu_firewall]

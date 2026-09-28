@@ -63,6 +63,12 @@ Hub-side implementation: annotations on `FleetClusterJoin` trigger Ansible runne
 jobs (`cluster-gpu-host-prep.yml`, `cluster-gpu-enable.yml`) with inventory from
 the cluster ConfigMap — same pattern as storage and KubeVirt platform install.
 
+`cluster-gpu-enable.yml` also applies `fleet_spoke_firewall` when
+`configure_firewalld: true` on cluster nodes: trust `wg-umkim`, allow the hub
+overlay (`wireguard_subnet`) to reach K3s API ports and hostNetwork LLM
+inference (`:8080`). Standalone:
+`playbooks/flows/gpu-cluster-firewall.yml` with the cluster flow example vars.
+
 ## Inference terminology and runtime
 
 The deployed GPU inference chart is **llama.cpp**, using the CUDA

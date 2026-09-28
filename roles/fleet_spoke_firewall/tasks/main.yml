@@ -1,0 +1,70 @@
+---
+- name: Fleet spoke firewall | Ensure firewalld package
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.builtin.package:
+    name: firewalld
+    state: present
+
+- name: Fleet spoke firewall | Detect firewalld
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.builtin.command:
+    cmd: firewall-cmd --state
+  register: fleet_spoke_firewall_state
+  changed_when: false
+  failed_when: false
+
+- name: Fleet spoke firewall | Allow hub overlay to K3s API ports
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family="ipv4" source address="{{ fleet_spoke_firewall_overlay_subnet }}"
+      port port="{{ item }}" protocol="tcp" accept
+    permanent: true
+    state: enabled
+  loop: "{{ fleet_spoke_firewall_k3s_tcp_ports }}"
+  notify: Fleet spoke firewall | Reload firewalld
+
+- name: Fleet spoke firewall | Allow hub overlay to LLM inference (hostNetwork)
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family="ipv4" source address="{{ fleet_spoke_firewall_overlay_subnet }}"
+      port port="{{ fleet_spoke_firewall_llm_inference_tcp_port }}" protocol="tcp" accept
+    permanent: true
+    state: enabled
+  notify: Fleet spoke firewall | Reload firewalld
+
+- name: Fleet spoke firewall | Allow Calico IPIP from overlay
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family="ipv4" source address="{{ fleet_spoke_firewall_overlay_subnet }}"
+      protocol value="ipv4" accept
+    permanent: true
+    state: enabled
+  when:
+    - fleet_spoke_firewall_enabled | default(false) | bool
+    - fleet_spoke_firewall_allow_calico_ipip | bool
+  notify: Fleet spoke firewall | Reload firewalld
+
+- name: Fleet spoke firewall | Trust fleet WireGuard interface
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.posix.firewalld:
+    interface: "{{ fleet_spoke_firewall_wireguard_interface }}"
+    zone: trusted
+    permanent: true
+    state: enabled
+  notify: Fleet spoke firewall | Reload firewalld
+
+- name: Fleet spoke firewall | Unmask and start firewalld
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.builtin.systemd:
+    name: firewalld
+    masked: false
+    enabled: true
+    state: started
+
+- name: Fleet spoke firewall | Apply permanent rules immediately
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.builtin.command:
+    cmd: firewall-cmd --reload
+  changed_when: false

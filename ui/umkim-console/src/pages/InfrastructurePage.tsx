@@ -484,7 +484,7 @@ export function InfrastructurePage() {
                   <LabeledField
                     label="LiteLLM backends (JSON override)"
                     fieldId="hubLlmBackends"
-                    help="Optional manual backends array: [{\"model\":\"...\",\"apiBase\":\"http://.../v1\"}]"
+                    help={getFieldHelp('infra.hubLlmBackends')}
                   >
                     <TextArea
                       id="hubLlmBackends"
