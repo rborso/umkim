@@ -139,8 +139,15 @@ func (s *Server) handleGpuHostPrep(ctx context.Context, w http.ResponseWriter, r
 		return
 	}
 	if fcj.Status.Gpu.HostPhase == fleetv1alpha1.GpuHostPhaseApplying {
-		http.Error(w, "GPU host prep already running", http.StatusConflict)
-		return
+		// API sets Applying before the Job exists; only block when a job is actually tracked.
+		if strings.TrimSpace(fcj.Status.Gpu.HostJobName) != "" {
+			http.Error(w, "GPU host prep already running", http.StatusConflict)
+			return
+		}
+		if fcj.Annotations != nil && strings.TrimSpace(fcj.Annotations[configureGpuHostJobAnnotation]) != "" {
+			http.Error(w, "GPU host prep already running", http.StatusConflict)
+			return
+		}
 	}
 	if fcj.Status.Phase == fleetv1alpha1.JoinPhaseReady && !req.Force {
 		http.Error(w, "cluster is Ready; set force=true for post-bootstrap GPU host prep", http.StatusBadRequest)

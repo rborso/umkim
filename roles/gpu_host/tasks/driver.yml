@@ -134,7 +134,9 @@
     state: present
     disable_gpg_check: false
   register: gpu_host_driver_install
-  when: gpu_host_driver_install is not defined
+  when: >-
+    gpu_host_driver_install is not defined
+    or (gpu_host_driver_install.skipped | default(false))
   tags: [gpu_host, gpu_host_driver]
 
 - name: GPU host | Build DKMS modules after driver package install

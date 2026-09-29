@@ -5,7 +5,8 @@
 
 Fleet bootstrap does not install GPU drivers automatically during cluster
 provision. Prepare every GPU node before FleetClusterJoin bootstrap when
-possible, then enable the container runtime and device plugin after the cluster
+possible (`umkim cluster gpu host-prep` while the cluster is still
+`ScriptIssued`), then enable the container runtime and device plugin after the cluster
 is ready. Post-Ready repair is supported with `force` (CLI or console).
 
 ## Hardware catalog

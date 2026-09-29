@@ -273,6 +273,14 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
+	// GPU host prep is allowed before bootstrap (ScriptIssued/Enrolled/…); reconcileClusterGpu
+	// otherwise runs only on Ready clusters and would leave hostPhase Applying forever.
+	if res, err := r.reconcileClusterGpu(ctx, &fcj, clusterName); err != nil {
+		return ctrl.Result{}, err
+	} else if res.Requeue || res.RequeueAfter > 0 {
+		return res, nil
+	}
+
 	logger.Info("cluster join idle", "cluster", clusterName, "phase", fcj.Status.Phase)
 	return ctrl.Result{RequeueAfter: time.Duration(r.Cfg.RequeueIntervalSec) * time.Second}, nil
 }
