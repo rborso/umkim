@@ -23,6 +23,7 @@ import {
   removeFleetClusterNode,
   replaceFleetClusterControlPlane,
   validateFleetClusterNodeOperation,
+  type FleetClusterGpuStatus,
 } from '../../api/client';
 import type {
   ClusterNodeOperation,
@@ -110,6 +111,17 @@ function nodeOpBusy(op?: ClusterNodeOperation): boolean {
 
 function storageOpBusy(phase?: string): boolean {
   return phase === 'Pending' || phase === 'Applying';
+}
+
+function gpuRuntimeReady(phase?: string): boolean {
+  return phase === 'Ready';
+}
+
+/** Host prep may be unset on older clusters while runtime or discovery already show a GPU driver. */
+function gpuHostPrepared(status: FleetClusterGpuStatus | null): boolean {
+  if (!status) return false;
+  if (status.hostPhase === 'Ready' || gpuRuntimeReady(status.runtimePhase)) return true;
+  return Boolean(status.driverLoaded && status.clusterGpuCapability);
 }
 
 function isSingleNodeCluster(cluster: FleetCluster): boolean {
@@ -305,8 +317,11 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const storageBusy = storageOpBusy(storagePhase);
   const kubevirtPhaseEarly = cluster.providers?.kubevirt?.phase || '';
   const kubevirtBusy = kubevirtPhaseEarly === 'Installing' || kubevirtPhaseEarly === 'Pending';
-  const [gpuHostPhase, setGpuHostPhase] = useState('');
-  const [gpuRuntimePhase, setGpuRuntimePhase] = useState('');
+  const [gpuStatus, setGpuStatus] = useState<FleetClusterGpuStatus | null>(null);
+  const gpuHostPhase = gpuStatus?.hostPhase ?? '';
+  const gpuRuntimePhase = gpuStatus?.runtimePhase ?? '';
+  const gpuRuntimeEnabled = gpuRuntimeReady(gpuRuntimePhase);
+  const gpuHostReady = gpuHostPrepared(gpuStatus);
   const gpuBusy =
     gpuHostPhase === 'Applying' || gpuRuntimePhase === 'Applying';
   const busy = nodeOpBusy(nodeOp) || storageBusy || kubevirtBusy || gpuBusy;
@@ -347,17 +362,16 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
     return () => clearInterval(interval);
   }, [busy, onUpdated]);
 
+  const refreshGpuStatus = async () => {
+    try {
+      setGpuStatus(await getFleetClusterGpuStatus(clusterName));
+    } catch {
+      setGpuStatus(null);
+    }
+  };
+
   useEffect(() => {
-    void (async () => {
-      try {
-        const st = await getFleetClusterGpuStatus(clusterName);
-        setGpuHostPhase(st.hostPhase || '');
-        setGpuRuntimePhase(st.runtimePhase || '');
-      } catch {
-        setGpuHostPhase('');
-        setGpuRuntimePhase('');
-      }
-    })();
+    void refreshGpuStatus();
   }, [clusterName, busy, historyRefreshKey, cluster.provisioning_phase]);
 
   useEffect(() => {
@@ -569,6 +583,7 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
     try {
       await prepFleetClusterGpuHost(clusterName, { force: clusterReady });
       await onUpdated();
+      await refreshGpuStatus();
     } catch (e) {
       setActionError(e);
     } finally {
@@ -582,6 +597,7 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
     try {
       await enableFleetClusterGpu(clusterName);
       await onUpdated();
+      await refreshGpuStatus();
     } catch (e) {
       setActionError(e);
     } finally {
@@ -666,11 +682,21 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
         </div>
       )}
       {(gpuHostPhase || gpuRuntimePhase) &&
-        (gpuBusy || gpuHostPhase === 'Failed' || gpuRuntimePhase === 'Failed' || gpuHostPhase === 'Ready') && (
+        (gpuBusy ||
+          gpuHostPhase === 'Failed' ||
+          gpuRuntimePhase === 'Failed' ||
+          gpuHostReady ||
+          gpuRuntimeEnabled) && (
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {gpuHostPhase ? (
-            <Label color={phaseColor(gpuHostPhase === 'Ready' ? 'Succeeded' : gpuHostPhase)}>
-              host: {gpuHostPhase}
+            <Label
+              color={phaseColor(
+                gpuHostPhase === 'Ready' || (gpuHostReady && gpuHostPhase === 'NotPrepared')
+                  ? 'Succeeded'
+                  : gpuHostPhase,
+              )}
+            >
+              host: {gpuHostPhase === 'NotPrepared' && gpuHostReady ? 'Ready (inferred)' : gpuHostPhase}
             </Label>
           ) : null}
           {gpuRuntimePhase ? (
@@ -742,6 +768,17 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           <code>umkim cluster gpu host-prep</code> and <code>umkim cluster gpu enable</code>. On Ready
           clusters, host prep uses <code>force</code> automatically.
         </p>
+        {gpuRuntimeEnabled ? (
+          <Label color="green" style={{ marginTop: '0.5rem' }}>
+            GPU runtime enabled
+            {gpuStatus?.runtimeMessage ? ` — ${gpuStatus.runtimeMessage}` : ''}
+          </Label>
+        ) : null}
+        {!gpuRuntimeEnabled && gpuHostReady && gpuHostPhase !== 'Ready' ? (
+          <Label color="green" style={{ marginTop: '0.5rem' }}>
+            GPU host driver detected — you can enable the runtime
+          </Label>
+        ) : null}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
           <Button
             variant="secondary"
@@ -750,18 +787,37 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
             onClick={() => void prepGpuHost()}
             data-testid="op-gpu-host-prep"
           >
-            {gpuHostPhase === 'Failed' ? 'Retry GPU host prep' : 'Prepare GPU host'}
+            {gpuHostPhase === 'Failed'
+              ? 'Retry GPU host prep'
+              : gpuHostReady
+                ? 'Re-run GPU host prep'
+                : 'Prepare GPU host'}
           </Button>
           <Button
-            variant="primary"
+            variant={gpuRuntimeEnabled ? 'secondary' : 'primary'}
             isLoading={acting}
-            isDisabled={!canMutate || gpuRuntimePhase === 'Applying' || gpuHostPhase !== 'Ready'}
+            isDisabled={
+              !canMutate ||
+              gpuRuntimePhase === 'Applying' ||
+              gpuRuntimeEnabled ||
+              (!gpuHostReady && gpuHostPhase !== 'Ready')
+            }
             onClick={() => void enableGpuRuntime()}
             data-testid="op-gpu-enable"
           >
-            {gpuRuntimePhase === 'Failed' ? 'Retry GPU runtime' : 'Enable GPU runtime'}
+            {gpuRuntimePhase === 'Failed'
+              ? 'Retry GPU runtime'
+              : gpuRuntimeEnabled
+                ? 'Runtime enabled'
+                : 'Enable GPU runtime'}
           </Button>
         </div>
+        {!gpuRuntimeEnabled && !gpuHostReady && gpuHostPhase !== 'Ready' ? (
+          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', maxWidth: '36rem' }}>
+            Enable GPU runtime after host prep reaches <strong>Ready</strong>, or run capability
+            discovery on the Capabilities tab when the driver is already installed.
+          </p>
+        ) : null}
       </Form>
 
       <Form style={{ maxWidth: '36rem', marginTop: '1rem' }}>

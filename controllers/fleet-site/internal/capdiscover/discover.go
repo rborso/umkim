@@ -161,6 +161,9 @@ func setDiscoveryPhase(ctx context.Context, hubClient client.Client, mc *unstruc
 	} else {
 		ann[AnnPhase] = phase
 		ann[AnnMsg] = msg
+		if phase == PhaseRunning {
+			delete(ann, AnnAt)
+		}
 	}
 	mc.SetAnnotations(ann)
 	return hubClient.Update(ctx, mc)

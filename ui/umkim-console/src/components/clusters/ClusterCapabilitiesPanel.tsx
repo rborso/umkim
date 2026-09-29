@@ -134,7 +134,7 @@ export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, o
         {discovery?.phase ? (
           <Label color={phaseColor(discovery.phase)}>{discovery.phase}</Label>
         ) : null}
-        {discovery?.completed_at ? (
+        {discovery?.completed_at && phase !== 'Running' ? (
           <span style={{ fontSize: '0.85rem', color: 'var(--pf-v6-global--Color--200)' }}>
             Last run: {new Date(discovery.completed_at).toLocaleString()}
           </span>

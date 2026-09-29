@@ -9,6 +9,15 @@ vi.mock('../../api/client', () => ({
   addFleetClusterWorker: vi.fn(),
   configureFleetClusterStorage: vi.fn(),
   enableFleetClusterKubevirt: vi.fn(),
+  getFleetClusterGpuStatus: vi.fn(async () => ({
+    hostPhase: 'NotPrepared',
+    runtimePhase: 'Ready',
+    runtimeMessage: 'NVIDIA GPU runtime enabled',
+    driverLoaded: true,
+    clusterGpuCapability: true,
+  })),
+  prepFleetClusterGpuHost: vi.fn(),
+  enableFleetClusterGpu: vi.fn(),
   fetchFleetClusterNodeOperationLogs: vi.fn(),
   removeFleetClusterNode: vi.fn(),
   replaceFleetClusterControlPlane: vi.fn(),
@@ -42,5 +51,16 @@ describe('ClusterOperationsPanel hooks', () => {
 
     expect(screen.getByLabelText('Host bridge name')).toBeInTheDocument();
     expect(screen.getByDisplayValue('n0p0_mgmt_nw')).toBeInTheDocument();
+  });
+
+  it('shows GPU runtime enabled when runtime is Ready but host phase was not recorded', async () => {
+    const onUpdated = vi.fn();
+    render(
+      <ClusterOperationsPanel cluster={cluster('Ready')} nodes={[]} onUpdated={onUpdated} />,
+    );
+    expect(await screen.findByText(/GPU runtime enabled —/)).toBeInTheDocument();
+    const enableBtn = screen.getAllByTestId('op-gpu-enable')[0];
+    expect(enableBtn).toHaveTextContent('Runtime enabled');
+    expect(enableBtn).toBeDisabled();
   });
 });

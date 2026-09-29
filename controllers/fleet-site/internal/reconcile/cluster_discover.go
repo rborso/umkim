@@ -93,7 +93,8 @@ func (r *ClusterJoinReconciler) reconcileCapabilityDiscover(ctx context.Context,
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	done, ok, msg := r.jobDone(ctx, fcj.Namespace, jobAnn)
+	// Use jobPollState so a missing Job is terminal (GC/expiry); jobDone waits forever on NotFound.
+	done, ok, msg := r.jobPollState(ctx, fcj.Namespace, jobAnn, false)
 	if !done {
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
