@@ -22,6 +22,14 @@
           "description": "Port-forward to virt03 (lab-single-0): 80→30080, 443→30443"
         },
         {
+          "id": "homelab-gpu-pf",
+          "method": "port_forward",
+          "wanAddressMode": "dns",
+          "zone": "homelab.otthol.hu",
+          "wildcard": "*.gpu.homelab.otthol.hu",
+          "description": "Port-forward to gpu-bm-1 (lab-gpu-0): 80→30080, 443→30443"
+        },
+        {
           "id": "edge-rp",
           "method": "reverse_proxy",
           "operatorNotes": "External reverse proxy terminates TLS; operator configures vhosts"

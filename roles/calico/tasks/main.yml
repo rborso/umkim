@@ -30,6 +30,10 @@
   when: calico_ds.rc != 0
   tags: [calico, ocm]
 
+- name: Calico | Break k3s multus-shim bootstrap deadlock
+  ansible.builtin.import_tasks: k3s_multus_bootstrap.yml
+  tags: [calico, ocm]
+
 - name: Calico | Set IP autodetection on calico-node
   ansible.builtin.command:
     cmd: >-
@@ -100,12 +104,10 @@
   failed_when: false
   tags: [calico, ocm]
 
-- name: Calico | Wait for calico-kube-controllers after recycle
+- name: Calico | Wait for calico-kube-controllers rollout
   ansible.builtin.command:
     cmd: kubectl -n kube-system rollout status deployment/calico-kube-controllers --timeout={{ calico_rollout_timeout }}s
   environment:
     KUBECONFIG: "{{ calico_kubeconfig }}"
   changed_when: false
-  failed_when: false
-  when: calico_apply is changed or (calico_ippool_patch is defined and calico_ippool_patch is changed)
   tags: [calico, ocm]
