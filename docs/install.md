@@ -218,22 +218,32 @@ Hub-routed apps require a healthy hub. `site` and `none` apps can remain
 reachable when the hub is down if site ingress is healthy. Details:
 [components/fleet-apps.md](components/fleet-apps.md).
 
+Optional GPU inference (`llama-cpp-helm`) and the hub LiteLLM proxy are **not**
+installed by `install-hub.sh`. After a GPU-capable cluster is Ready, see
+[components/gpu-host-prep.md](components/gpu-host-prep.md) and
+[components/fleet-llm.md](components/fleet-llm.md) (`fleet-llm.yml` /
+`umkim llm set --hub-enabled`).
+
 For the model and lifecycle, see [design.md](design.md) and
 [components/fleet-site.md](components/fleet-site.md).
 
 ## 7. Teardown and reinstall from zero
 
-Hub teardown is destructive on the **hub host** only. It uninstalls hub K3s,
-Harbor, controllers, Traefik, the nftables `fleet_hub` table, and WireGuard
-so `./scripts/install-hub.sh` can run on a clean host. Detached workload
-clusters keep running independently. Inventory and encrypted vault under
-`inventory/` are kept.
+`./scripts/teardown-hub.sh --confirm` is destructive on the **hub** and, by
+default, on **every console-provisioned workload cluster** (Fleet API delete with
+`cleanupKubernetes=true`, then hub K3s, Harbor, controllers, Traefik, the
+nftables `fleet_hub` table, and WireGuard). Use that path only when a full
+greenfield reset is intended. Inventory and encrypted vault under `inventory/`
+are kept.
+
+To wipe the hub while leaving joined clusters running on their nodes (detach
+without K3s reset), use `--skip-cluster-delete`:
 
 ```bash
 export INV="-i inventory/hosts.yml -i inventory/hosts-from-hub.yml"
 export ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass
 ./scripts/teardown-hub.sh --confirm
-# Optional: hub-only wipe if no workload clusters exist
+# Hub-only: spokes keep independent K3s (no fleet API cluster delete)
 # ./scripts/teardown-hub.sh --confirm --skip-cluster-delete
 test ! -f /etc/rancher/k3s/k3s.yaml && echo OK
 ./scripts/install-hub.sh

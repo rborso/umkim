@@ -374,6 +374,7 @@ and `fleet_provision_action=sync_inventory` or `import_inventory_preview`.
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET`/`PUT`/`PATCH` | `/sites/{name}/provision` | Connector binding |
+| `POST` | `/sites/{name}/provision/yaidap/sync` | Clone/update YAIDAP checkout on jumphost |
 | `POST` | `/sites/{name}/provision/actions` | Start action |
 | `GET` | `/sites/{name}/provision/actions[/{id}]` | Poll / history |
 | `GET` | `/sites/{name}/provision/inventory` | Meta + file index |
