@@ -24,13 +24,16 @@ Use the same chart `model` value (OpenAI alias) on multiple GPU clusters when
 you want one logical model id on the hub. Ready `llama-cpp-helm` FleetApps are
 synced as **multiple LiteLLM backends** with the same `model_name`; LiteLLM
 load-balances across them (`router_settings.routing_strategy: simple-shuffle` in
-the hub config). Hub LiteLLM also enables **`deployment_affinity`** (sticky routing):
-send a stable OpenAI **`user`** string on each `chat/completions` call in a
-conversation so repeat requests hit the same spoke for up to
-`deployment_affinity_ttl_seconds` (default 3600). **`session_affinity`** uses the
-same pin when clients send header `x-litellm-session-id` (or `metadata.session_id`
-in the JSON body). A small **Redis** deployment in `fleet-llm` backs the router
-cache so pins survive LiteLLM restarts.
+the hub config). **`deployment_affinity` is not enabled** on the hub proxy: LiteLLM
+pins that mode by **API key hash**, which would send all traffic for one Fleet LLM
+key to a single spoke. For sticky multi-turn chats, use **`session_affinity`**
+(Redis-backed): send header `x-litellm-session-id` or `metadata.session_id` in the
+JSON body on each `chat/completions` call in a conversation (TTL
+`deployment_affinity_ttl_seconds` in LiteLLM config, default 3600). A small
+**Redis** deployment in `fleet-llm` backs the router cache so pins survive LiteLLM
+restarts. Hub reconcile clears legacy `deployment_affinity:*` Redis keys when
+`fleet_llm_deployment_affinity` is false so load balancing is not pinned to one
+spoke by API key.
 
 **Auto backends** (`backendsSource: auto`) are rebuilt only from Ready registered
 llama-cpp FleetApps. Removing the last app on a spoke drops that `apiBase` from

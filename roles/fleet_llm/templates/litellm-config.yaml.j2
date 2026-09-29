@@ -24,16 +24,13 @@ litellm_settings:
   set_verbose: false
 
 # Multiple model_list rows with the same model_name are load-balanced by LiteLLM.
-# deployment_affinity keeps the same OpenAI "user" (or virtual key) on one spoke for TTL seconds.
+# session_affinity pins a conversation when clients send x-litellm-session-id or metadata.session_id.
 router_settings:
   routing_strategy: simple-shuffle
-{% if fleet_llm_deployment_affinity | default(true) | bool or fleet_llm_session_affinity | default(true) | bool %}
-  optional_pre_call_checks:
+  redis_host: {{ fleet_llm_redis_host | quote }}
+  redis_port: {{ fleet_llm_redis_port | quote }}
 {% if fleet_llm_session_affinity | default(true) | bool %}
+  optional_pre_call_checks:
     - session_affinity
-{% endif %}
-{% if fleet_llm_deployment_affinity | default(true) | bool %}
-    - deployment_affinity
-{% endif %}
-  deployment_affinity_ttl_seconds: {{ fleet_llm_deployment_affinity_ttl_seconds | default(3600) }}
+  deployment_affinity_ttl_seconds: {{ fleet_llm_session_affinity_ttl_seconds | default(fleet_llm_deployment_affinity_ttl_seconds | default(3600)) }}
 {% endif %}

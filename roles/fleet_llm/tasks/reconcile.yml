@@ -59,6 +59,22 @@
         KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
       changed_when: true
 
+    - name: Fleet LLM | Clear stale deployment_affinity keys in Redis
+      when: not (fleet_llm_deployment_affinity | default(false) | bool)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        NS="{{ fleet_llm_namespace }}"
+        if ! kubectl -n "$NS" get deploy redis >/dev/null 2>&1; then
+          exit 0
+        fi
+        kubectl -n "$NS" exec deploy/redis -- sh -c \
+          'redis-cli --scan --pattern "deployment_affinity:*" | xargs -r redis-cli DEL' || true
+      args:
+        executable: /bin/bash
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      changed_when: false
+
     - name: Fleet LLM | Render deployment manifest
       ansible.builtin.template:
         src: litellm-deployment.yaml.j2

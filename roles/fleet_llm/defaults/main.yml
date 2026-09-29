@@ -1,10 +1,10 @@
 ---
 fleet_llm_namespace: fleet-llm
 fleet_llm_release_name: litellm
-# Pin a release tag — floating :main leaked to multi-GiB on the hub.
-# v1.82.3-stable supports session_affinity + deployment_affinity (~300Mi RSS; 512Mi limit).
+# Pin a PEP 440 release tag (immutable; avoid :main / rolling latest on the hub).
+# v1.100.x: session_affinity for sticky chats; budget ~1Gi RSS under load.
 fleet_llm_image_repo: ghcr.io/berriai/litellm
-fleet_llm_image_tag: "v1.82.3-stable"
+fleet_llm_image_tag: "v1.100.3"
 fleet_llm_image: "{{ fleet_llm_image_repo }}:{{ fleet_llm_image_tag }}"
 fleet_llm_service_port: 4000
 fleet_llm_nodeport: 30918
@@ -14,9 +14,10 @@ fleet_llm_traefik_fragment_cm: fleet-traefik-llm-routes
 # Pod network cannot route to WireGuard spokes; use hostNetwork so LiteLLM reaches vLLM upstreams.
 fleet_llm_host_network: true
 # Cap RSS — without a limit, floating :main OOM-killed the hub at ~3–4GiB.
-# Steady state for v1.74.3-stable is ~280Mi; 256Mi is below that floor.
-fleet_llm_memory_request: 256Mi
-fleet_llm_memory_limit: 512Mi
+fleet_llm_memory_request: 512Mi
+fleet_llm_memory_limit: 1Gi
+fleet_llm_readiness_initial_delay_seconds: 45
+fleet_llm_readiness_failure_threshold: 18
 fleet_llm_cpu_request: 50m
 fleet_llm_cpu_limit: "1"
 fleet_console_namespace: fleet-console
@@ -26,7 +27,8 @@ fleet_llm_traefik_dynamic_file: llm-routes.yaml
 fleet_llm_redis_image: redis:7-alpine
 fleet_llm_redis_host: "redis.{{ fleet_llm_namespace }}.svc.cluster.local"
 fleet_llm_redis_port: "6379"
-# Sticky routing (requires Redis for shared pins across LiteLLM restarts / future replicas).
-fleet_llm_deployment_affinity: true
-fleet_llm_deployment_affinity_ttl_seconds: 3600
+# Sticky routing via session id (requires Redis). Do not enable deployment_affinity on the
+# hub proxy: it pins by API key hash and prevents load balancing across spokes for one key.
+fleet_llm_deployment_affinity: false
+fleet_llm_session_affinity_ttl_seconds: 3600
 fleet_llm_session_affinity: true

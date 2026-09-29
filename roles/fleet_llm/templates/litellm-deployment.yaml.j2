@@ -59,10 +59,10 @@ spec:
             httpGet:
               path: /health/liveliness
               port: http
-            initialDelaySeconds: 20
+            initialDelaySeconds: {{ fleet_llm_readiness_initial_delay_seconds | default(45) }}
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: {{ fleet_llm_readiness_failure_threshold | default(18) }}
       volumes:
         - name: config
           configMap:

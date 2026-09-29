@@ -34,7 +34,7 @@ export const INFRASTRUCTURE_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'infra.hubLlmBackends': {
     description:
-      'Optional override for LiteLLM model backends (sets source to manual). JSON array with model and apiBase. Use Sync backends from FleetApps to rebuild from Ready llama-cpp installs (drops stale model names). LiteLLM uses deployment_affinity: pass a stable OpenAI user field per conversation for sticky routing to one spoke.',
+      'Optional override for LiteLLM model backends (sets source to manual). JSON array with model and apiBase. Use Sync backends from FleetApps to rebuild from Ready llama-cpp installs (drops stale model names). For sticky routing across turns, send x-litellm-session-id (or metadata.session_id) per conversation; load balancing uses simple-shuffle across spokes with the same model alias.',
     example: '[{"model":"Qwen3.5-2B-UD","apiBase":"http://10.10.0.x:8080/v1"}]',
     learnMoreUrl: DOCS.fleetLlm,
   },
