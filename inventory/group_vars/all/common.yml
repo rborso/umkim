@@ -31,6 +31,8 @@ harbor_proxy_project_ghcr: ghcr-proxy
 harbor_fleet_project: fleet
 harbor_fleet_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}"
 harbor_fleet_image_prefix: "{{ harbor_fleet_registry }}/{{ harbor_fleet_project }}"
+# llama-cpp-helm CUDA image via Harbor ghcr-proxy (deploy/llama-cpp-helm, render-llama-cpp-values.sh).
+fleet_llama_cpp_image_repository: "{{ harbor_fleet_registry }}/{{ harbor_proxy_project_ghcr }}/ggml-org/llama.cpp"
 
 # Helm OCI allowlist (comma-separated). Harbor charts + public external registries.
 # Private charts: mirror into Harbor, then use Harbor prefix. Override with "*" for any oci://.

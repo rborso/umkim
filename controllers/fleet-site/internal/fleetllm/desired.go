@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	ReconcileAnnotation = "fleet.umkim.com/llm-reconcile"
-	InventoryCMName     = "fleet-llm-inventory"
+	ReconcileAnnotation      = "fleet.umkim.com/llm-reconcile"
+	BackendsManualAnnotation = "fleet.umkim.com/llm-backends-manual"
+	InventoryCMName          = "fleet-llm-inventory"
 )
 
 type DesiredState struct {

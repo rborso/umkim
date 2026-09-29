@@ -1,0 +1,35 @@
+---
+# Fleet GPU hardware catalog — PCI ID to driver branch and workload compatibility.
+# Update VERSIONS.md when changing default driver branches or workload pins.
+
+driver_branches:
+  "535":
+    min_host_driver_version: "535.104.05"
+    # EL9: DNF module stream nvidia-driver:535-dkms. EL10+: direct cuda-rhel10 packages (no module).
+    el10_direct_packages: true
+    cuda_repo:
+      el9:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+        filename: cuda-rhel9.repo
+      el10:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/rhel10/x86_64/cuda-rhel10.repo
+        filename: cuda-rhel10.repo
+
+pci_devices:
+  "10de:1c8c":
+    marketing_name: NVIDIA GeForce GTX 1050 Ti
+    driver_branch: "535"
+    vram_gb: 4
+    # Pascal mobile: not in open 615 module; needs proprietary 580.xx legacy on EL10 CUDA repo.
+    el10_kmod_flavor: proprietary
+    el10_driver_version: "580.178.04"
+  "10de:1f82":
+    marketing_name: NVIDIA GeForce GTX 1650 / TU117 family
+    driver_branch: "535"
+    vram_gb: 4
+
+workloads:
+  llama_cpp_server_cuda:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    driver_branch: "535"
+    notes: Fleet LLM default llama.cpp CUDA backend

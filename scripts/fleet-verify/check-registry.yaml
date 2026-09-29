@@ -570,6 +570,32 @@
     SKIP_LLM_DEPLOY: "0"
     LLM_E2E_USE_MOCK_FALLBACK: "0"
 
+- id: llm.fleetapp-lifecycle
+  layer: [2]
+  suite: [llm, apps]
+  module: S3
+  mode: mutating
+  requires: [hub, fleet_api, gpu]
+  profiles: [homelab]
+  script: scripts/verify-fleet-llama-app-lifecycle.sh
+  timeout_s: 2400
+  blocking: false
+  env:
+    FLEET_LLM_CLUSTER: lab-gpu-0
+
+- id: llm.profile-verify
+  layer: [2]
+  suite: [llm, apps]
+  module: S3
+  mode: mutating
+  requires: [hub, fleet_api, gpu]
+  profiles: [homelab]
+  script: scripts/verify-fleet-llama-profile.sh
+  timeout_s: 3600
+  blocking: false
+  env:
+    FLEET_LLM_CLUSTER: lab-gpu-0
+
 - id: llm.inference-e2e-hub
   layer: [2]
   suite: [llm, hub]

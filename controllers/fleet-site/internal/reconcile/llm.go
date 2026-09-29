@@ -50,6 +50,7 @@ func (r *LLMReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			if fl.Annotations == nil {
 				fl.Annotations = map[string]string{}
 			}
+			fl.Annotations[fleetllm.BackendsManualAnnotation] = "false"
 			fl.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
 			if err := r.Update(ctx, fl); err != nil {
 				return ctrl.Result{}, err

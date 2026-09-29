@@ -21,6 +21,24 @@ func TestMapFleetApps(t *testing.T) {
 	if got.Resource != "apps" || got.Verb != "delete" {
 		t.Fatalf("DELETE /apps/whoami => %+v", got)
 	}
+	req, _ = http.NewRequest(http.MethodPatch, "/api/v1alpha1/apps/whoami", nil)
+	got = MapRequest(req, "fleet")
+	if got.Resource != "apps" || got.Verb != "update" {
+		t.Fatalf("PATCH /apps/whoami => %+v", got)
+	}
+}
+
+func TestMapFleetLlamaProfiles(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1alpha1/llama-profiles/qwen35-2b-ud-4g/verify", nil)
+	got := MapRequest(req, "fleet")
+	if got.Resource != "llama-profiles" || got.Verb != "create" {
+		t.Fatalf("POST verify => %+v", got)
+	}
+	req, _ = http.NewRequest(http.MethodPost, "/api/v1alpha1/llama-profiles/tests/t1/chat/completions", nil)
+	got = MapRequest(req, "fleet")
+	if got.Resource != "llama-profiles" || got.Verb != "create" {
+		t.Fatalf("POST chat => %+v", got)
+	}
 }
 
 func TestMapFleetCharts(t *testing.T) {

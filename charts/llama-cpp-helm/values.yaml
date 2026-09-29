@@ -33,6 +33,8 @@ resources:
     memory: 4Gi
 
 hostNetwork: true
+# Default uses the node's resolv.conf (required when cluster CoreDNS cannot forward to the internet).
+dnsPolicy: Default
 
 # Use runtimeClassName when the device plugin does not advertise nvidia.com/gpu.
 useRuntimeClass: true

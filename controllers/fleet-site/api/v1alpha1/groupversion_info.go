@@ -53,4 +53,6 @@ func init() {
 	SchemeBuilder.Register(&FleetInstanceRestore{}, &FleetInstanceRestoreList{})
 	SchemeBuilder.Register(&FleetApp{}, &FleetAppList{})
 	SchemeBuilder.Register(&FleetChart{}, &FleetChartList{})
+	SchemeBuilder.Register(&FleetLlamaProfile{}, &FleetLlamaProfileList{})
+	SchemeBuilder.Register(&FleetLlamaProfileTest{}, &FleetLlamaProfileTestList{})
 }

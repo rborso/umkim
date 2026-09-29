@@ -10,6 +10,7 @@ import {
   Form,
   PageSection,
   PageSectionVariants,
+  Label,
   Spinner,
   Title,
   Toolbar,
@@ -19,7 +20,7 @@ import {
   TextInput,
 } from '@patternfly/react-core';
 import { SyncIcon } from '@patternfly/react-icons';
-import { patchIngressAuth, patchAcme, patchLLM, reconcileLLM } from '../api/client';
+import { patchIngressAuth, patchAcme, patchLLM, reconcileLLM, syncLLMBackendsFromApps } from '../api/client';
 import type { FleetLLMBackend } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { ClusterNodesPanel } from '../components/clusters/ClusterNodesPanel';
@@ -61,6 +62,7 @@ export function InfrastructurePage() {
   const [savingAcme, setSavingAcme] = useState(false);
   const [savingLlm, setSavingLlm] = useState(false);
   const [reconcilingLlm, setReconcilingLlm] = useState(false);
+  const [syncingLlmBackends, setSyncingLlmBackends] = useState(false);
   const [llmBackendsJson, setLlmBackendsJson] = useState('');
   const [authError, setAuthError] = useState<unknown>(null);
   const [acmeError, setAcmeError] = useState<unknown>(null);
@@ -170,6 +172,20 @@ export function InfrastructurePage() {
       setLlmError(e);
     } finally {
       setReconcilingLlm(false);
+    }
+  };
+
+  const runSyncLlmBackends = async () => {
+    setSyncingLlmBackends(true);
+    setLlmError(null);
+    try {
+      const updated = await syncLLMBackendsFromApps();
+      setLlmBackendsJson(JSON.stringify(updated.backends ?? [], null, 2));
+      load();
+    } catch (e) {
+      setLlmError(e);
+    } finally {
+      setSyncingLlmBackends(false);
     }
   };
 
@@ -433,6 +449,16 @@ export function InfrastructurePage() {
                   <DescriptionListDescription>{llm.publicHost}</DescriptionListDescription>
                 </DescriptionListGroup>
               )}
+              {llm?.backendsSource && (
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Backends source</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <Label color={llm.backendsSource === 'manual' ? 'orange' : 'green'}>
+                      {llm.backendsSource}
+                    </Label>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+              )}
               {(llm?.backends?.length ?? 0) > 0 && (
                 <DescriptionListGroup>
                   <DescriptionListTerm>LiteLLM backends</DescriptionListTerm>
@@ -510,6 +536,14 @@ export function InfrastructurePage() {
                   onClick={() => void runLlmReconcile()}
                 >
                   Reconcile LiteLLM
+                </Button>
+                <Button
+                  variant="secondary"
+                  style={{ marginLeft: '0.5rem' }}
+                  isLoading={syncingLlmBackends}
+                  onClick={() => void runSyncLlmBackends()}
+                >
+                  Sync backends from FleetApps
                 </Button>
               </div>
             )}

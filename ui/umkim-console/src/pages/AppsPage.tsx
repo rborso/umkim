@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   Form,
@@ -28,8 +29,12 @@ import {
   deleteFleetApp,
   deleteFleetChart,
   fleetSiteEffectiveId,
+  getLlamaCppProfileValues,
+  listLlamaCppProfiles,
+  patchFleetApp,
   uploadFleetChart,
 } from '../api/client';
+import { isLlamaCppChart } from '../apps/llamaCpp';
 import type {
   FleetApp,
   FleetAppCreate,
@@ -173,6 +178,11 @@ export function AppsPage() {
   const [rockyCpu, setRockyCpu] = useState('2');
   const [rockyMemory, setRockyMemory] = useState('2Gi');
   const [rockyDisk, setRockyDisk] = useState('20Gi');
+  const [llamaProfiles, setLlamaProfiles] = useState<{ id: string; description?: string }[]>([]);
+  const [llamaProfileId, setLlamaProfileId] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<FleetApp | null>(null);
+  const [editForm, setEditForm] = useState({ version: '', valuesYaml: '', routeMode: 'none', routeHost: '' });
 
   const readyClusters = useMemo(
     () =>
@@ -214,8 +224,27 @@ export function AppsPage() {
     void invalidateSites();
   };
 
+  const loadLlamaProfiles = async () => {
+    try {
+      const list = await listLlamaCppProfiles();
+      setLlamaProfiles(list);
+      if (list.length && !llamaProfileId) {
+        setLlamaProfileId(list[0].id);
+      }
+    } catch {
+      setLlamaProfiles([]);
+    }
+  };
+
+  const applyLlamaProfile = async (profileId: string) => {
+    if (!profileId) return;
+    const yaml = await getLlamaCppProfileValues(profileId);
+    setForm((f) => ({ ...f, valuesYaml: yaml, namespace: f.namespace === 'default' ? 'llm' : f.namespace }));
+  };
+
   const openInstall = () => {
     setActionError(null);
+    void loadLlamaProfiles();
     const first = readyCharts[0]?.name || 'whoami';
     const rocky = isRocky10VmChart(first);
     setRockyCpu('2');
@@ -344,6 +373,7 @@ export function AppsPage() {
   const onLibrarySelect = (name: string) => {
     const c = readyCharts.find((x) => x.name === name);
     const rocky = isRocky10VmChart(name);
+    const llama = isLlamaCppChart(name);
     if (rocky) {
       setRockyCpu('2');
       setRockyMemory('2Gi');
@@ -354,9 +384,51 @@ export function AppsPage() {
       chart: name,
       version: c?.version || f.version,
       releaseName: f.releaseName && f.releaseName !== f.chart ? f.releaseName : name,
-      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : f.valuesYaml,
-      route: rocky ? { mode: 'none' } : f.route,
+      namespace: llama ? 'llm' : f.namespace,
+      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : llama ? f.valuesYaml : f.valuesYaml,
+      route: rocky || llama ? { mode: 'none' } : f.route,
     }));
+    if (llama && llamaProfileId) {
+      void applyLlamaProfile(llamaProfileId).catch((e) => setActionError(e));
+    }
+  };
+
+  const openEdit = (app: FleetApp) => {
+    setActionError(null);
+    setEditTarget(app);
+    setEditForm({
+      version: app.version || '',
+      valuesYaml: app.valuesYaml || '',
+      routeMode: app.route?.mode || 'none',
+      routeHost: app.route?.hubHost || app.route?.siteHost || '',
+    });
+    setEditOpen(true);
+  };
+
+  const submitEdit = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    setActionError(null);
+    try {
+      const route =
+        editForm.routeMode === 'hub'
+          ? { mode: 'hub' as FleetAppRouteMode, hubHost: editForm.routeHost.trim() || undefined }
+          : editForm.routeMode === 'site'
+            ? { mode: 'site' as FleetAppRouteMode, siteHost: editForm.routeHost.trim() || undefined }
+            : { mode: 'none' as FleetAppRouteMode };
+      await patchFleetApp(editTarget.name, {
+        version: editForm.version || undefined,
+        valuesYaml: editForm.valuesYaml || undefined,
+        route,
+      });
+      setEditOpen(false);
+      setEditTarget(null);
+      load();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const applyRockySizing = (cpu: string, memory: string, disk: string) => {
@@ -393,6 +465,9 @@ export function AppsPage() {
               <Button variant="secondary" icon={<SyncIcon />} onClick={() => void load()} isDisabled={fetching || loading}>
                 Refresh
               </Button>
+            </ToolbarItem>
+            <ToolbarItem>
+              <Link to="/apps/llama-profiles">Llama profiles</Link>
             </ToolbarItem>
           </ToolbarContent>
         </Toolbar>
@@ -447,6 +522,9 @@ export function AppsPage() {
                       ) : null}
                     </Td>
                     <Td>
+                      <Button variant="link" onClick={() => openEdit(app)} isDisabled={app.phase === 'Installing' || app.phase === 'Deleting'}>
+                        Edit
+                      </Button>
                       <Button variant="link" icon={<TrashIcon />} onClick={() => setDeleteTarget(app)} isDanger>
                         Remove
                       </Button>
@@ -592,6 +670,23 @@ export function AppsPage() {
               </LabeledField>
             </>
           ) : null}
+          {isLlamaCppChart(form.chart) ? (
+            <LabeledField label="Llama values profile" fieldId="app-llama-profile" help={getFieldHelp('apps.llamaProfile')}>
+              <FormSelect
+                id="app-llama-profile"
+                value={llamaProfileId}
+                onChange={(_e, v) => {
+                  setLlamaProfileId(v);
+                  void applyLlamaProfile(v).catch((e) => setActionError(e));
+                }}
+              >
+                <FormSelectOption value="" label="Select a profile" />
+                {llamaProfiles.map((p) => (
+                  <FormSelectOption key={p.id} value={p.id} label={p.description ? `${p.id} — ${p.description}` : p.id} />
+                ))}
+              </FormSelect>
+            </LabeledField>
+          ) : null}
           <LabeledField label="Version" fieldId="app-version" help={getFieldHelp('apps.version')}>
             <TextInput
               id="app-version"
@@ -659,6 +754,40 @@ export function AppsPage() {
               value={form.valuesYaml || ''}
               onChange={(_e, v) => setForm((f) => ({ ...f, valuesYaml: v }))}
               rows={6}
+            />
+          </LabeledField>
+        </Form>
+      </Modal>
+
+      <Modal
+        variant={ModalVariant.medium}
+        title={editTarget ? `Edit ${editTarget.name}` : 'Edit app'}
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        actions={[
+          <Button key="save" variant="primary" onClick={() => void submitEdit()} isLoading={saving} isDisabled={!editTarget}>
+            Save changes
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setEditOpen(false)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <Form>
+          <ErrorAlert error={actionError} />
+          <LabeledField label="Version" fieldId="edit-version" help={getFieldHelp('apps.version')}>
+            <TextInput
+              id="edit-version"
+              value={editForm.version}
+              onChange={(_e, v) => setEditForm((f) => ({ ...f, version: v }))}
+            />
+          </LabeledField>
+          <LabeledField label="Values (YAML)" fieldId="edit-values" help={getFieldHelp('apps.editInstall')}>
+            <TextArea
+              id="edit-values"
+              value={editForm.valuesYaml}
+              onChange={(_e, v) => setEditForm((f) => ({ ...f, valuesYaml: v }))}
+              rows={8}
             />
           </LabeledField>
         </Form>

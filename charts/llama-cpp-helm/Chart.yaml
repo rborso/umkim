@@ -2,5 +2,5 @@ apiVersion: v2
 name: llama-cpp-helm
 description: llama.cpp OpenAI-compatible inference for UMKIM GPU clusters
 type: application
-version: 0.1.3
+version: 0.1.4
 appVersion: "b5000"

@@ -774,3 +774,107 @@ func (in *FleetChartList) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
+
+func (in *FleetLlamaProfile) DeepCopyInto(out *FleetLlamaProfile) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	out.Status = in.Status
+}
+
+func (in *FleetLlamaProfile) DeepCopy() *FleetLlamaProfile {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetLlamaProfile)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetLlamaProfile) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *FleetLlamaProfileList) DeepCopyInto(out *FleetLlamaProfileList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		out.Items = make([]FleetLlamaProfile, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	}
+}
+
+func (in *FleetLlamaProfileList) DeepCopy() *FleetLlamaProfileList {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetLlamaProfileList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetLlamaProfileList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *FleetLlamaProfileTest) DeepCopyInto(out *FleetLlamaProfileTest) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	out.Status = in.Status
+}
+
+func (in *FleetLlamaProfileTest) DeepCopy() *FleetLlamaProfileTest {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetLlamaProfileTest)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetLlamaProfileTest) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *FleetLlamaProfileTestList) DeepCopyInto(out *FleetLlamaProfileTestList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		out.Items = make([]FleetLlamaProfileTest, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	}
+}
+
+func (in *FleetLlamaProfileTestList) DeepCopy() *FleetLlamaProfileTestList {
+	if in == nil {
+		return nil
+	}
+	out := new(FleetLlamaProfileTestList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *FleetLlamaProfileTestList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}

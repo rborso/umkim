@@ -42,6 +42,16 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'Optional Helm values YAML merged at install time.',
     example: 'replicaCount: 1',
   },
+  'apps.llamaProfile': {
+    description:
+      'Built-in llama-cpp-helm values profile from the hub API (runtime + model + registry image). You can edit the generated YAML before install.',
+    example: 'qwen35-2b-ud-4g',
+  },
+  'apps.editInstall': {
+    description:
+      'Patch chart version and Helm values on an existing FleetApp. Triggers helm upgrade --install on the spoke when the spec changes.',
+    example: 'ctxSize: 8192',
+  },
   'apps.rockyCpu': {
     description: 'vCPU cores for the Rocky Linux 10 guest (writes cpu in values).',
     example: '2',

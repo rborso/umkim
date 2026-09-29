@@ -89,14 +89,23 @@ func (s *Server) Handler() http.Handler {
 		s.handleAppByName(w, r, name)
 	})
 	mux.HandleFunc("/api/v1alpha1/charts", s.handleCharts)
+	mux.HandleFunc("/api/v1alpha1/llama-profiles", s.handleLlamaProfiles)
+	mux.HandleFunc("/api/v1alpha1/llama-profiles/", func(w http.ResponseWriter, r *http.Request) {
+		sub := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/llama-profiles/")
+		s.handleLlamaProfilesSub(w, r, sub)
+	})
 	mux.HandleFunc("/api/v1alpha1/charts/", func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/charts/")
-		name = strings.Trim(name, "/")
-		if name == "" {
+		sub := strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/charts/")
+		sub = strings.Trim(sub, "/")
+		if sub == "" {
 			s.handleCharts(w, r)
 			return
 		}
-		s.handleChartByName(w, r, name)
+		if strings.HasPrefix(sub, "llama-cpp-helm/profiles") {
+			s.handleLlamaCppProfiles(w, r, sub)
+			return
+		}
+		s.handleChartByName(w, r, sub)
 	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux

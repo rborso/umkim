@@ -102,12 +102,18 @@ umkim chart add -f chart.json
 umkim chart delete NAME
 
 umkim app list | get NAME | create [--cluster C --chart CHART …] [-f app.json]
+umkim app update NAME [--version V] [--values-file F] [--route-mode …]
+umkim app create … --llama-profile qwen35-2b-ud-4g
 umkim app delete NAME
 
 umkim infra get hub
 umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
 umkim acme get | set [--hub-enabled] [--staging] [--email E]
 umkim llm get | set [--hub-enabled] [--public-host H] [--backends-file F] [--backend model=…,apiBase=…]
+umkim llm backends sync-from-apps
+umkim llm profile list|get NAME|create|update|delete|values NAME
+umkim llm profile verify NAME --cluster C [--extended] [--wait]
+umkim llm profile test list|get ID|end ID|chat ID --message "…"
 umkim llm reconcile [--wait] [--timeout SEC]
 
 umkim edge dns validate --host FQDN [--expected-ip IP]
@@ -143,6 +149,9 @@ Install Helm charts onto a Ready cluster (console **Apps → Install**):
 umkim app list
 umkim app create --cluster lab-ha-0 --chart whoami --version 0.1.0 --route-mode none
 umkim app create -f examples/umkim/app-create-whoami.json
+umkim app create --cluster lab-gpu-0 --chart llama-cpp-helm --version 0.1.4 \
+  --llama-profile qwen35-2b-ud-4g --namespace llm --release llama-cpp --name llama-cpp-lab
+umkim app update llama-cpp-lab --version 0.1.4 --values-file deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml
 umkim app get whoami
 umkim app delete whoami
 ```

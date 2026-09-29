@@ -218,3 +218,63 @@
         PATH: "{{ k3s_command_path }}"
       changed_when: false
       tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet llama profile | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetllamaprofile.yaml"
+        dest: /tmp/fleetllamaprofile-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet llama profile | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetllamaprofile-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_llama_profile_crd_apply
+      changed_when: >-
+        'created' in fleet_llama_profile_crd_apply.stdout
+        or 'configured' in fleet_llama_profile_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet llama profile | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetllamaprofiles.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet llama profile test | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-site/crd-fleetllamaprofiletest.yaml"
+        dest: /tmp/fleetllamaprofiletest-crd.yaml
+        mode: "0644"
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet llama profile test | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetllamaprofiletest-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_llama_profile_test_crd_apply
+      changed_when: >-
+        'created' in fleet_llama_profile_test_crd_apply.stdout
+        or 'configured' in fleet_llama_profile_test_crd_apply.stdout
+      tags: [fleet_site_crd, fleet_site]
+
+    - name: Fleet llama profile test | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetllamaprofiletests.fleet.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false
+      tags: [fleet_site_crd, fleet_site]

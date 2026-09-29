@@ -29,6 +29,10 @@ rules:
       - fleetapps/status
       - fleetcharts
       - fleetcharts/status
+      - fleetllamaprofiles
+      - fleetllamaprofiles/status
+      - fleetllamaprofiletests
+      - fleetllamaprofiletests/status
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets", "configmaps"]

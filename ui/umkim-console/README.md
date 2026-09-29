@@ -26,6 +26,10 @@ npm test
 npm run test:e2e
 ```
 
+**Apps → Install** supports a llama-cpp-helm values profile picker (hub-merged YAML)
+and **Edit** patches version/values on existing FleetApps. **Infrastructure → LLM**
+can sync LiteLLM backends from Ready llama FleetApps.
+
 Package scripts in [package.json](package.json) are the current contract.
 End-to-end tests require deployment-specific access and credentials, so review
 their configuration before running them.
@@ -34,7 +38,7 @@ their configuration before running them.
 
 | Browser path | Contract |
 |--------------|----------|
-| `/fleet/api/` | Fleet-site API (sites, clusters, FleetApp `/apps`, chart library `/charts`) |
+| `/fleet/api/` | Fleet-site API (sites, clusters, FleetApp `/apps` including PATCH, chart library `/charts`, llama profiles `/llama-profiles` and legacy `/charts/llama-cpp-helm/profiles`) |
 | `/fleet/auth/` | Console authentication proxy |
 | `/llm/` | Optional authenticated LLM proxy |
 

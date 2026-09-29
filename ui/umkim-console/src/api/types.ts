@@ -632,6 +632,53 @@ export interface FleetLLM {
   hub?: { phase?: string; message?: string; endpoint?: string };
   lastJobName?: string;
   backends?: FleetLLMBackend[];
+  backendsSource?: 'auto' | 'manual' | string;
+}
+
+export interface LlamaCppProfileMeta {
+  id: string;
+  description?: string;
+}
+
+export interface FleetLlamaProfile {
+  name: string;
+  description?: string;
+  profileYaml?: string;
+  chart?: string;
+  chartVersion?: string;
+  system?: boolean;
+}
+
+export interface FleetLlamaProfileCreate {
+  id: string;
+  description?: string;
+  profileYaml?: string;
+  chartVersion?: string;
+}
+
+export interface FleetLlamaProfilePatch {
+  description?: string;
+  profileYaml?: string;
+  chartVersion?: string;
+}
+
+export interface FleetLlamaProfileTest {
+  id: string;
+  profileName: string;
+  clusterName: string;
+  mode: 'quick' | 'extended' | string;
+  phase?: string;
+  apiBase?: string;
+  model?: string;
+  message?: string;
+  fleetAppName?: string;
+}
+
+export interface FleetAppPatch {
+  version?: string;
+  valuesYaml?: string;
+  namespace?: string;
+  route?: FleetAppRoute;
 }
 
 export interface FleetLLMPatch {

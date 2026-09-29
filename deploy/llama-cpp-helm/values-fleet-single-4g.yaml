@@ -1,4 +1,5 @@
-# lab-single-0 (~4GB GPU): same weights and model alias as values-fleet-gpu-4g.yaml (LiteLLM LB).
+# Same as values-fleet-gpu-4g.yaml — use one profile per model alias for hub LiteLLM LB.
+# Prefer: scripts/render-llama-cpp-values.sh (see values-fleet-gpu-4g.yaml header).
 replicaCount: 1
 parallel: 1
 

@@ -23,7 +23,28 @@ func llmCmd() *cobra.Command {
 	cmd.AddCommand(llmGetCmd())
 	cmd.AddCommand(llmSetCmd())
 	cmd.AddCommand(llmReconcileCmd())
+	backends := &cobra.Command{Use: "backends", Short: "LiteLLM backend discovery"}
+	backends.AddCommand(llmBackendsSyncFromAppsCmd())
+	cmd.AddCommand(backends)
+	cmd.AddCommand(llmProfileCmd())
 	return cmd
+}
+
+func llmBackendsSyncFromAppsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "sync-from-apps",
+		Short: "Rebuild FleetLLM backends from Ready llama-cpp FleetApps",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, code, err := api.Post("/llm/backends/sync-from-apps", map[string]interface{}{})
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code); err != nil {
+				return err
+			}
+			return printPatchOK("llm backends sync-from-apps", raw)
+		},
+	}
 }
 
 func llmGetCmd() *cobra.Command {

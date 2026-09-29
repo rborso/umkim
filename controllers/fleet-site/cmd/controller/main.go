@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/httpapi"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/llamaprofiles"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/reconcile"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -93,6 +95,10 @@ func main() {
 	if err := reconcile.SetupResourceMetricsSync(mgr, restConfig, cfg, resourceMetricsEnabled, resourceMetricsInterval); err != nil {
 		setupLog.Error(err, "resource metrics sync")
 		os.Exit(1)
+	}
+
+	if err := llamaprofiles.EnsureSystemProfiles(context.Background(), mgr.GetClient(), cfg.ConsoleNamespace); err != nil {
+		setupLog.Error(err, "llama profile seed")
 	}
 
 	api := &httpapi.Server{Client: mgr.GetClient(), Cfg: cfg, RESTConfig: restConfig}

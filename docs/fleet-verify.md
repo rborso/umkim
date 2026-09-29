@@ -35,7 +35,12 @@ The currently registered suite names include `hub`, `core`, `edge`, `backup`,
 For a Helm app smoke test on a Ready cluster, use
 `scripts/verify-fleet-app.sh` (set `FLEET_APP_CLUSTER`) or the console **Apps**
 page. `scripts/verify-fleet-chart.sh` checks that the hub library lists seeded
-charts. See [components/fleet-apps.md](components/fleet-apps.md).
+charts. For llama-cpp profile install, PATCH upgrade, and LLM backend sync, use
+`scripts/verify-fleet-llama-app-lifecycle.sh` (`FLEET_LLM_CLUSTER` on a GPU
+Ready cluster). Profile CRUD, quick/extended verify, and hub-proxied chat:
+`scripts/verify-fleet-llama-profile.sh` (check id `llm.profile-verify`). See
+[components/fleet-apps.md](components/fleet-apps.md) and
+[components/fleet-llama-profiles.md](components/fleet-llama-profiles.md).
 
 ## Cluster reinstall presets
 

@@ -40,6 +40,7 @@ installation guide take precedence. Keep design documentation topology-neutral.
 | Playbook workflow | [docs/design.md](docs/design.md) and [docs/install.md](docs/install.md) |
 | Controller API or CRD | Relevant file under [docs/components/](docs/components/) and its skill |
 | Helm apps (`FleetApp`) and chart library (`FleetChart`) | [docs/components/fleet-apps.md](docs/components/fleet-apps.md) |
+| Llama profiles (`FleetLlamaProfile`) and verify/chat | [docs/components/fleet-llama-profiles.md](docs/components/fleet-llama-profiles.md) |
 | KubeVirt / Multus platform | [docs/components/fleet-kubevirt.md](docs/components/fleet-kubevirt.md) |
 | Site exposure / ingress | [docs/components/fleet-edge.md](docs/components/fleet-edge.md), [examples/site-profiles/](examples/site-profiles/) |
 | Cluster lifecycle / detach | [docs/components/fleet-site.md](docs/components/fleet-site.md), [playbooks/flows/cluster-delete.yml](playbooks/flows/cluster-delete.yml) |

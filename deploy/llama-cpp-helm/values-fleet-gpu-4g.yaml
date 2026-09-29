@@ -1,5 +1,7 @@
-# ~4GB GPU lab profile (e.g. GTX 1050 Ti): Unsloth Qwen3.5-2B-UD Q8_K_XL, 8k context.
-# Chart passes: llama-server -hf {{ hfRepo }}:{{ hfQuant }} --alias {{ model }}
+# Pre-merged ~4GB Qwen3.5-2B-UD profile (runtime + profile + Harbor ghcr-proxy image).
+# Rebuild: scripts/render-llama-cpp-values.sh deploy/llama-cpp-helm/values-fleet-runtime.yaml \
+#   deploy/llama-cpp-helm/profiles/qwen35-2b-ud-4g.yaml examples/llama-cpp-helm/overlay-harbor-ghcr-proxy.yaml.example
+# (set HARBOR_REGISTRY=host:port for placeholder substitution in the example overlay)
 replicaCount: 1
 parallel: 1
 

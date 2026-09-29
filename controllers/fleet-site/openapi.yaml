@@ -92,3 +92,39 @@ paths:
       responses:
         '202':
           description: Deleted
+  /llama-profiles:
+    get:
+      summary: List FleetLlamaProfile CRs (console namespace)
+      responses:
+        '200':
+          description: profiles array
+    post:
+      summary: Create a user llama profile overlay
+      responses:
+        '201':
+          description: Created
+  /llama-profiles/{name}:
+    get:
+      summary: Get a profile
+    patch:
+      summary: Update description, profileYaml, or chartVersion
+    delete:
+      summary: Delete profile (system profiles require force=true)
+  /llama-profiles/{name}/values:
+    get:
+      summary: Merged llama-cpp-helm valuesYaml preview
+  /llama-profiles/{name}/verify:
+    post:
+      summary: Quick or extended verify on a Ready GPU cluster
+      description: Creates FleetLlamaProfileTest and a temporary FleetApp; extended mode enables hub-proxied chat.
+  /llama-profiles/tests:
+    get:
+      summary: List verify sessions
+  /llama-profiles/tests/{id}:
+    get:
+      summary: Test status
+    delete:
+      summary: End extended test and remove FleetApp
+  /llama-profiles/tests/{id}/chat/completions:
+    post:
+      summary: Hub proxy to spoke llama-server OpenAI API (extended tests only)

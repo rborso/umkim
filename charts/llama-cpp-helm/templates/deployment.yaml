@@ -17,7 +17,8 @@ spec:
     spec:
       {{- if .Values.hostNetwork }}
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # Cluster DNS on some spokes cannot resolve public names (SERVFAIL); use node resolv.conf.
+      dnsPolicy: {{ .Values.dnsPolicy | default "Default" }}
       {{- end }}
       {{- if .Values.useRuntimeClass }}
       runtimeClassName: {{ .Values.runtimeClassName }}

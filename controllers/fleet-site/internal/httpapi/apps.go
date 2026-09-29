@@ -14,6 +14,14 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+type appPatchBody struct {
+	Version    string                            `json:"version"`
+	Values     json.RawMessage                   `json:"values"`
+	ValuesYAML string                            `json:"valuesYaml"`
+	Namespace  string                            `json:"namespace"`
+	Route      fleetv1alpha1.FleetAppRouteIntent `json:"route"`
+}
+
 type appCreateBody struct {
 	Name        string                            `json:"name"`
 	ClusterName string                            `json:"clusterName"`
@@ -67,6 +75,8 @@ func (s *Server) handleAppByName(w http.ResponseWriter, r *http.Request, name st
 		s.getApp(w, r, name)
 	case http.MethodDelete:
 		s.deleteApp(w, r, name)
+	case http.MethodPatch:
+		s.patchApp(w, r, name)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -210,6 +220,90 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, appToResponse(app))
+}
+
+func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
+	if _, ok := s.requireMutatingActor(w, r); !ok {
+		return
+	}
+	var body appPatchBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		return
+	}
+	var app fleetv1alpha1.FleetApp
+	if err := s.Client.Get(r.Context(), types.NamespacedName{Namespace: s.Cfg.Namespace, Name: name}, &app); err != nil {
+		if apierrors.IsNotFound(err) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	switch app.Status.Phase {
+	case fleetv1alpha1.AppPhaseInstalling, fleetv1alpha1.AppPhaseDeleting:
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "app is " + app.Status.Phase + "; wait for a terminal phase before patching"})
+		return
+	}
+	changed := false
+	if v := strings.TrimSpace(body.Version); v != "" {
+		if !appchart.ValidVersion(v) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid chart version"})
+			return
+		}
+		if app.Spec.Version != v {
+			app.Spec.Version = v
+			changed = true
+		}
+	}
+	if ns := strings.TrimSpace(body.Namespace); ns != "" {
+		if !appchart.ValidDNS1123(ns) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "namespace must be a DNS-1123 label"})
+			return
+		}
+		if app.Spec.Namespace != ns {
+			app.Spec.Namespace = ns
+			changed = true
+		}
+	}
+	valuesYAML := strings.TrimSpace(body.ValuesYAML)
+	if valuesYAML == "" && len(body.Values) > 0 && string(body.Values) != "null" {
+		y, err := jsonValuesToYAML(body.Values)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "values: " + err.Error()})
+			return
+		}
+		valuesYAML = y
+	}
+	if valuesYAML != "" && app.Spec.ValuesYAML != valuesYAML {
+		app.Spec.ValuesYAML = valuesYAML
+		changed = true
+	}
+	if body.Route.Mode != "" {
+		if !appchart.ValidRouteMode(body.Route.Mode) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "route.mode must be none, hub, or site"})
+			return
+		}
+		app.Spec.Route = body.Route
+		changed = true
+	} else if body.Route.HubHost != "" || body.Route.SiteHost != "" {
+		if body.Route.HubHost != "" {
+			app.Spec.Route.HubHost = body.Route.HubHost
+		}
+		if body.Route.SiteHost != "" {
+			app.Spec.Route.SiteHost = body.Route.SiteHost
+		}
+		changed = true
+	}
+	if !changed {
+		writeJSON(w, http.StatusOK, appToResponse(&app))
+		return
+	}
+	if err := s.Client.Update(r.Context(), &app); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, appToResponse(&app))
 }
 
 func (s *Server) deleteApp(w http.ResponseWriter, r *http.Request, name string) {

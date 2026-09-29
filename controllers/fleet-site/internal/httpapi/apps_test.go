@@ -125,6 +125,48 @@ func TestCreateAppExpandsShortChartName(t *testing.T) {
 	}
 }
 
+func TestPatchAppUpdatesVersion(t *testing.T) {
+	app := &fleetv1alpha1.FleetApp{
+		ObjectMeta: metav1.ObjectMeta{Name: "whoami", Namespace: "fleet-console"},
+		Spec: fleetv1alpha1.FleetAppSpec{
+			ClusterName: "lab-single-0",
+			Chart:       "oci://10.10.0.1:30443/charts/whoami",
+			Version:     "0.1.0",
+			ReleaseName: "whoami",
+		},
+		Status: fleetv1alpha1.FleetAppStatus{Phase: fleetv1alpha1.AppPhaseReady},
+	}
+	s := testAppServer(t, app)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1alpha1/apps/whoami", bytes.NewBufferString(`{"version":"0.2.0"}`))
+	rec := httptest.NewRecorder()
+	s.handleAppByName(rec, req, "whoami")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var stored fleetv1alpha1.FleetApp
+	if err := s.Client.Get(req.Context(), client.ObjectKey{Namespace: "fleet-console", Name: "whoami"}, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.Spec.Version != "0.2.0" {
+		t.Fatalf("version=%q", stored.Spec.Version)
+	}
+}
+
+func TestPatchAppRejectsInstalling(t *testing.T) {
+	app := &fleetv1alpha1.FleetApp{
+		ObjectMeta: metav1.ObjectMeta{Name: "whoami", Namespace: "fleet-console"},
+		Spec:       fleetv1alpha1.FleetAppSpec{ClusterName: "lab-single-0", Chart: "whoami"},
+		Status:     fleetv1alpha1.FleetAppStatus{Phase: fleetv1alpha1.AppPhaseInstalling},
+	}
+	s := testAppServer(t, app)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1alpha1/apps/whoami", bytes.NewBufferString(`{"version":"0.2.0"}`))
+	rec := httptest.NewRecorder()
+	s.handleAppByName(rec, req, "whoami")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestListAppsIncludesDefaults(t *testing.T) {
 	s := testAppServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1alpha1/apps", nil)

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Button, Label, Title } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { discoverFleetClusterCapabilities, getFleetClusterGpuStatus } from '../../api/client';
+import {
+  discoverFleetClusterCapabilities,
+  discoverFleetClusterGpu,
+  getFleetClusterGpuStatus,
+} from '../../api/client';
 import type { FleetClusterGpuStatus } from '../../api/client';
 import type { CapabilityDiscovery, FleetCluster } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
@@ -75,6 +79,19 @@ export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, o
     }
   };
 
+  const runGpuDiscover = async () => {
+    setActing(true);
+    setError(null);
+    try {
+      await discoverFleetClusterGpu(clusterName);
+      await onUpdated();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setActing(false);
+    }
+  };
+
   return (
     <>
       <Title headingLevel="h2" size="lg" style={{ marginTop: '1.5rem' }}>
@@ -106,6 +123,13 @@ export function ClusterCapabilitiesPanel({ clusterName, cluster, clusterReady, o
           data-testid="discover-capabilities"
         >
           {phase === 'Succeeded' ? 'Re-discover capabilities' : 'Discover capabilities'}
+        </Button>
+        <Button
+          variant="secondary"
+          isDisabled={!clusterReady || busy}
+          onClick={() => void runGpuDiscover()}
+        >
+          Re-run GPU discovery
         </Button>
         {discovery?.phase ? (
           <Label color={phaseColor(discovery.phase)}>{discovery.phase}</Label>

@@ -247,6 +247,119 @@ export async function deleteFleetApp(name: string): Promise<void> {
   await fleetSiteRequest('/apps/' + encodeURIComponent(name), { method: 'DELETE' });
 }
 
+export async function patchFleetApp(
+  name: string,
+  body: import('./types').FleetAppPatch,
+): Promise<import('./types').FleetApp> {
+  return fleetSiteRequest<import('./types').FleetApp>('/apps/' + encodeURIComponent(name), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function listLlamaCppProfiles(): Promise<import('./types').LlamaCppProfileMeta[]> {
+  const data = await fleetSiteRequest<{ profiles?: import('./types').LlamaCppProfileMeta[] }>(
+    '/charts/llama-cpp-helm/profiles',
+  );
+  return data.profiles ?? [];
+}
+
+export async function getLlamaCppProfileValues(profileId: string): Promise<string> {
+  const data = await fleetSiteRequest<{ valuesYaml?: string }>(
+    '/llama-profiles/' + encodeURIComponent(profileId) + '/values',
+  );
+  return data.valuesYaml ?? '';
+}
+
+export async function listFleetLlamaProfiles(): Promise<import('./types').FleetLlamaProfile[]> {
+  const data = await fleetSiteRequest<{ profiles?: import('./types').FleetLlamaProfile[] }>(
+    '/llama-profiles',
+  );
+  return data.profiles ?? [];
+}
+
+export async function getFleetLlamaProfile(name: string): Promise<import('./types').FleetLlamaProfile> {
+  return fleetSiteRequest('/llama-profiles/' + encodeURIComponent(name));
+}
+
+export async function createFleetLlamaProfile(
+  body: import('./types').FleetLlamaProfileCreate,
+): Promise<import('./types').FleetLlamaProfile> {
+  return fleetSiteRequest('/llama-profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchFleetLlamaProfile(
+  name: string,
+  body: import('./types').FleetLlamaProfilePatch,
+): Promise<import('./types').FleetLlamaProfile> {
+  return fleetSiteRequest('/llama-profiles/' + encodeURIComponent(name), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteFleetLlamaProfile(name: string, force = false): Promise<void> {
+  const q = force ? '?force=true' : '';
+  await fleetSiteRequest('/llama-profiles/' + encodeURIComponent(name) + q, { method: 'DELETE' });
+}
+
+export async function previewFleetLlamaProfileValues(name: string): Promise<string> {
+  const data = await fleetSiteRequest<{ valuesYaml?: string }>(
+    '/llama-profiles/' + encodeURIComponent(name) + '/values',
+  );
+  return data.valuesYaml ?? '';
+}
+
+export async function verifyFleetLlamaProfile(
+  name: string,
+  body: { clusterName: string; mode: 'quick' | 'extended'; wait?: boolean; chartVersion?: string },
+): Promise<import('./types').FleetLlamaProfileTest> {
+  return fleetSiteRequest('/llama-profiles/' + encodeURIComponent(name) + '/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getFleetLlamaProfileTest(id: string): Promise<import('./types').FleetLlamaProfileTest> {
+  return fleetSiteRequest('/llama-profiles/tests/' + encodeURIComponent(id));
+}
+
+export async function endFleetLlamaProfileTest(id: string): Promise<void> {
+  await fleetSiteRequest('/llama-profiles/tests/' + encodeURIComponent(id), { method: 'DELETE' });
+}
+
+export async function chatFleetLlamaProfileTest(
+  id: string,
+  body: { messages: { role: string; content: string }[]; max_tokens?: number },
+): Promise<unknown> {
+  return fleetSiteRequest('/llama-profiles/tests/' + encodeURIComponent(id) + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function syncLLMBackendsFromApps(): Promise<import('./types').FleetLLM> {
+  return fleetSiteRequest<import('./types').FleetLLM>('/llm/backends/sync-from-apps', {
+    method: 'POST',
+  });
+}
+
+export async function discoverFleetClusterGpu(name: string): Promise<unknown> {
+  return fleetSiteRequest('/clusters/' + encodeURIComponent(name) + '/gpu/discover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+}
+
 export async function listFleetCharts(): Promise<import('./types').FleetChart[]> {
   const data = await fleetSiteRequest<{ charts?: import('./types').FleetChart[] }>('/charts');
   return data.charts ?? [];

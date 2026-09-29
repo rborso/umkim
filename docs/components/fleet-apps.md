@@ -31,8 +31,10 @@ a `-local` suffix.
 
 Seeded hub charts (`whoami`, `pet-clinic-helm`, `llama-cpp-helm`, `rocky-10-vm`)
 appear in the library after Harbor publish and a Harbor import by
-fleet-site-controller. For GPU inference sizing, see
-`deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml` and [fleet-llm.md](fleet-llm.md).
+fleet-site-controller. For GPU inference, compose chart values from
+`deploy/llama-cpp-helm/values-fleet-runtime.yaml` plus a file under
+`profiles/` (see `scripts/render-llama-cpp-values.sh`) or use
+`values-fleet-gpu-4g.yaml`; see [fleet-llm.md](fleet-llm.md).
 
 Deleting a library row removes the `FleetChart` record only. Harbor artifacts
 stay until an operator prunes them.
@@ -53,6 +55,24 @@ Required fields:
 
 Optional: `version`, `releaseName`, `namespace`, `values` / `valuesYaml`, and
 `route.mode` (`none`, `hub`, `site`).
+
+### Update (patch)
+
+`PATCH /fleet/api/v1alpha1/apps/{name}` updates `version`, `valuesYaml`,
+`namespace`, and `route` on an existing install. The controller runs
+`helm upgrade --install` when the spec hash changes. Returns **409** while
+phase is `Installing` or `Deleting`. Console **Apps → Edit** and
+`umkim app update` call this API.
+
+### llama-cpp-helm profiles
+
+`GET /llama-profiles` lists **FleetLlamaProfile** CRs; legacy
+`GET /charts/llama-cpp-helm/profiles` returns the same ids for the install picker.
+`GET /llama-profiles/{name}/values` (or the legacy chart path) returns merged Helm YAML (runtime +
+profile + Harbor `ghcr-proxy` image). Use on install via console profile picker
+or `umkim app create --llama-profile qwen35-2b-ud-4g`. Source YAML lives under
+`deploy/llama-cpp-helm/` and is embedded in fleet-site-controller. See
+[fleet-llama-profiles.md](fleet-llama-profiles.md) for CRUD, verify, and extended chat.
 
 ### Rocky Linux 10 guest (`rocky-10-vm`)
 

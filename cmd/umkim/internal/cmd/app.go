@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -17,6 +18,7 @@ func appCmd() *cobra.Command {
 	cmd.AddCommand(appListCmd())
 	cmd.AddCommand(appGetCmd())
 	cmd.AddCommand(appCreateCmd())
+	cmd.AddCommand(appUpdateCmd())
 	cmd.AddCommand(appDeleteCmd())
 	return cmd
 }
@@ -61,10 +63,36 @@ func appGetCmd() *cobra.Command {
 	}
 }
 
+func fetchLlamaProfileYAML(profileID string) (string, error) {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return "", fmt.Errorf("empty llama profile id")
+	}
+	raw, code, err := api.Get("/llama-profiles/" + profileID + "/values")
+	if err != nil {
+		return "", err
+	}
+	if err := mustOK(raw, code); err != nil {
+		return "", err
+	}
+	var doc struct {
+		ValuesYAML string `json:"valuesYaml"`
+		Name       string `json:"name"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(doc.ValuesYAML) == "" {
+		return "", fmt.Errorf("profile %q returned empty valuesYaml", profileID)
+	}
+	return doc.ValuesYAML, nil
+}
+
 func appCreateCmd() *cobra.Command {
 	var (
 		jsonFile, cluster, chart, version, release, namespace, valuesFile, appName string
 		routeMode, routeHost                                                        string
+		llamaProfile                                                                string
 	)
 	c := &cobra.Command{
 		Use:   "create",
@@ -115,6 +143,16 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 				}
 				body["route"] = route
 			}
+			if llamaProfile != "" && valuesFile != "" {
+				return fmt.Errorf("use either --llama-profile or --values-file, not both")
+			}
+			if llamaProfile != "" {
+				yaml, err := fetchLlamaProfileYAML(llamaProfile)
+				if err != nil {
+					return err
+				}
+				body["valuesYaml"] = yaml
+			}
 			if valuesFile != "" {
 				raw, err := os.ReadFile(valuesFile)
 				if err != nil {
@@ -153,8 +191,84 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 	c.Flags().StringVar(&appName, "name", "", "FleetApp resource name (defaults to release)")
 	c.Flags().StringVar(&namespace, "namespace", "default", "Target namespace")
 	c.Flags().StringVar(&valuesFile, "values-file", "", "Helm values YAML file")
+	c.Flags().StringVar(&llamaProfile, "llama-profile", "", "Built-in llama-cpp-helm values profile id (hub API)")
 	c.Flags().StringVar(&routeMode, "route-mode", "none", "Route mode: none|hub|site")
 	c.Flags().StringVar(&routeHost, "route-host", "", "Route hostname (hubHost or siteHost per mode)")
+	return c
+}
+
+func appUpdateCmd() *cobra.Command {
+	var version, valuesFile, namespace, routeMode, routeHost string
+	c := &cobra.Command{
+		Use:   "update [name]",
+		Short: "Update a FleetApp install (PATCH /apps/{name})",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			body := map[string]interface{}{}
+			if version != "" {
+				body["version"] = version
+			}
+			if namespace != "" {
+				body["namespace"] = namespace
+			}
+			if valuesFile != "" {
+				raw, err := os.ReadFile(valuesFile)
+				if err != nil {
+					return err
+				}
+				body["valuesYaml"] = string(raw)
+			}
+			if routeMode != "" || routeHost != "" {
+				route := map[string]interface{}{}
+				if routeMode != "" {
+					switch routeMode {
+					case "none", "hub", "site":
+					default:
+						return fmt.Errorf("--route-mode must be none, hub, or site")
+					}
+					route["mode"] = routeMode
+				}
+				if routeHost != "" {
+					switch routeMode {
+					case "hub", "":
+						if routeMode == "" {
+							route["hubHost"] = routeHost
+						} else if routeMode == "hub" {
+							route["hubHost"] = routeHost
+						}
+					case "site":
+						route["siteHost"] = routeHost
+					}
+				}
+				body["route"] = route
+			}
+			if len(body) == 0 {
+				return fmt.Errorf("no patch fields; use --version, --values-file, --namespace, or --route-mode")
+			}
+			raw, code, err := api.Patch("/apps/"+args[0], body)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200); err != nil {
+				return err
+			}
+			format, ferr := outputFormat()
+			if ferr != nil {
+				return ferr
+			}
+			if format == output.FormatJSON {
+				printJSON(raw)
+				return nil
+			}
+			fmt.Printf("OK: app %q update requested\n", args[0])
+			return nil
+		},
+	}
+	c.Flags().StringVar(&version, "version", "", "Chart version")
+	c.Flags().StringVar(&valuesFile, "values-file", "", "Helm values YAML file")
+	c.Flags().StringVar(&namespace, "namespace", "", "Target namespace")
+	c.Flags().StringVar(&routeMode, "route-mode", "", "Route mode: none|hub|site")
+	c.Flags().StringVar(&routeHost, "route-host", "", "Route hostname")
 	return c
 }
 

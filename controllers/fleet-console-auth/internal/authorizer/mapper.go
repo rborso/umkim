@@ -70,6 +70,11 @@ func mapFleet(path, method string) MappedRequest {
 			return MappedRequest{Resource: "charts", Verb: listVerb(method)}
 		}
 		return MappedRequest{Resource: "charts", Verb: verb}
+	case "llama-profiles":
+		if len(parts) == 1 {
+			return MappedRequest{Resource: "llama-profiles", Verb: listVerb(method)}
+		}
+		return MappedRequest{Resource: "llama-profiles", Verb: verb}
 	default:
 		return MappedRequest{Resource: parts[0], Verb: verb}
 	}

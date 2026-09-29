@@ -49,6 +49,8 @@ type Config struct {
 	HelmOCIPrefixes string
 	// ChartInboxDir is the hub hostPath for uploaded chart tarballs.
 	ChartInboxDir string
+	// LlamaCppImageRepo overrides the ggml-org/llama.cpp image for llama profile API merges.
+	LlamaCppImageRepo string
 }
 
 func FromEnv() Config {
@@ -92,6 +94,7 @@ func FromEnv() Config {
 		RequireIdentity:                   envBool("FLEET_SITE_REQUIRE_IDENTITY", true),
 		HelmOCIPrefixes:                   env("FLEET_HELM_OCI_PREFIXES", ""),
 		ChartInboxDir:                     env("FLEET_CHART_INBOX", "/var/lib/umkim/chart-inbox"),
+		LlamaCppImageRepo:                 env("FLEET_LLAMA_CPP_IMAGE_REPOSITORY", ""),
 	}
 }
 
@@ -195,6 +198,14 @@ func (c Config) HarborChartsProject() string {
 // HarborMirrorProject is the hosted project for copied chart images.
 func (c Config) HarborMirrorProject() string {
 	return "mirror"
+}
+
+// LlamaCppImageRepository is the container image repository (no tag) for llama-cpp-helm profiles.
+func (c Config) LlamaCppImageRepository() string {
+	if r := strings.TrimSpace(c.LlamaCppImageRepo); r != "" {
+		return r
+	}
+	return c.HarborRegistryHost() + "/ghcr-proxy/ggml-org/llama.cpp"
 }
 
 func (c Config) InboxDir() string {

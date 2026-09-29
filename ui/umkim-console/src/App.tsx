@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/AppLayout';
 import { AppsPage } from './pages/AppsPage';
+import { LlamaProfilesPage } from './pages/LlamaProfilesPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { SitesPage } from './pages/SitesPage';
 import { SiteDetailPage } from './pages/SiteDetailPage';
@@ -41,6 +42,7 @@ export function App() {
             <Route path="clusters/:name" element={<ClusterDetailPage />} />
             <Route path="clusters/:name/vms" element={<ClusterVMsPage />} />
             <Route path="apps" element={<AppsPage />} />
+            <Route path="apps/llama-profiles" element={<LlamaProfilesPage />} />
             <Route path="admin/users" element={<UsersPage />} />
             <Route path="admin/groups" element={<GroupsPage />} />
             <Route path="admin/role-bindings" element={<RoleBindingsPage />} />

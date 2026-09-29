@@ -1,0 +1,8 @@
+# Copy to inventory or pass to render-llama-cpp-values.sh as the last overlay.
+# Replace placeholders with values from inventory/group_vars/all/common.yml
+# (harbor_fleet_registry, harbor_proxy_project_ghcr).
+
+image:
+  repository: HARBOR_HOST:HARBOR_HTTPS_PORT/ghcr-proxy/ggml-org/llama.cpp
+  tag: server-cuda
+  pullPolicy: IfNotPresent

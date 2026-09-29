@@ -36,6 +36,9 @@ vi.mock('../api/client', () => ({
   fleetSiteById: () => undefined,
   patchFleetClusterNode: vi.fn(),
   provisionFleetCluster: vi.fn(),
+  discoverFleetClusterCapabilities: vi.fn(async () => ({})),
+  discoverFleetClusterGpu: vi.fn(async () => ({})),
+  getFleetClusterGpuStatus: vi.fn(async () => ({})),
 }));
 
 function cluster(jumphost: string): FleetCluster {

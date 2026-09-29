@@ -30,8 +30,20 @@ routing on the hub later only if you need per-`user` affinity to the same spoke.
 
 For **Qwen3.x** GGUFs, set chart values `jinja: true` and
 `chatTemplateKwargs: '{"enable_thinking":false}'` so replies land in
-`message.content` instead of filling `reasoning_content` (see
-`deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml`).
+`message.content` instead of filling `reasoning_content`. Shared pieces live
+under `deploy/llama-cpp-helm/`:
+
+| Layer | File |
+|---|---|
+| Fleet GPU runtime | `values-fleet-runtime.yaml` (hostNetwork, NVIDIA runtime, jinja kwargs) |
+| Model profile | `profiles/qwen35-2b-ud-4g.yaml` (HF repo, quant, OpenAI `model` alias) |
+| Registry overlay | `examples/llama-cpp-helm/overlay-harbor-ghcr-proxy.yaml.example` |
+
+Merge layers with `scripts/render-llama-cpp-values.sh` (later files override), or use the
+pre-merged `values-fleet-gpu-4g.yaml`. Ansible flow
+`playbooks/flows/llama-cpp-helm-deploy.yml` merges runtime + profile +
+`fleet_llama_cpp_image_repository` from inventory (`common.yml`).
+Install with `umkim app create --values-file` on the rendered YAML.
 
 ## Access control
 
@@ -60,16 +72,22 @@ Prerequisites on at least one spoke cluster:
    `umkim cluster gpu discover` until `fleet.capability/gpu=true`.
 2. Hub LiteLLM enabled — `umkim llm set --hub-enabled`, then
    `umkim llm reconcile --wait` (or console **Infrastructure → LLM platform**).
-3. Install `llama-cpp-helm` with FleetApp on the GPU cluster (for example
-   `deploy/llama-cpp-helm/values-fleet-gpu-4g.yaml` on ~4GB GPUs). Ready
-   llama-cpp apps auto-populate `FleetLLM` backends; override with
-   `umkim llm set --backends-file …` or console JSON override if needed, then
-   `umkim llm reconcile`.
-4. Create a scoped API key: `umkim auth llm-api-keys create` (or console
+3. Install `llama-cpp-helm` via console **Apps** (llama profile picker),
+   `umkim app create --llama-profile qwen35-2b-ud-4g`, or merged values from
+   `deploy/llama-cpp-helm/`. Upgrade with **Edit** / `umkim app update`.
+   Ready llama-cpp apps auto-populate `FleetLLM` backends; use
+   `umkim llm backends sync-from-apps` or console **Sync backends from FleetApps**
+   to rebuild from FleetApps. Manual JSON override sets `backendsSource: manual`.
+4. `umkim llm reconcile --wait` after backend changes.
+5. Create a scoped API key: `umkim auth llm-api-keys create` (or console
    **Access control → LLM API keys**). Call `POST …/llm/v1/chat/completions`
    with `Authorization: Bearer <token>`.
-5. Run `scripts/verify-fleet-llm.sh` and
-   `FLEET_LLM_CLUSTER=<cluster> FLEET_LLM_MODEL=Qwen3.5-2B-UD scripts/verify-llm-inference-e2e.sh`.
+6. Run `scripts/verify-fleet-llm.sh`,
+   `scripts/verify-fleet-llama-app-lifecycle.sh`,
+   `scripts/verify-fleet-llama-profile.sh`, and
+   `FLEET_LLM_CLUSTER=<cluster> FLEET_LLM_MODEL=Qwen3.5-2B-UD SKIP_LLM_DEPLOY=1 scripts/verify-llm-inference-e2e.sh`.
+
+Profile CRUD and verify/chat: [fleet-llama-profiles.md](fleet-llama-profiles.md).
 
 See [fleet-verify.md](../fleet-verify.md) for the full check registry.
 

@@ -13,7 +13,7 @@ metadata:
   name: site-admin
 spec:
   rules:
-    - resources: ["sites", "clusters", "apps", "charts", "infrastructure", "ingress-auth", "acme", "edge"]
+    - resources: ["sites", "clusters", "apps", "charts", "llama-profiles", "infrastructure", "ingress-auth", "acme", "edge"]
       verbs: ["get", "list", "create", "update", "delete", "patch"]
     - resources: ["health"]
       verbs: ["get"]
@@ -25,6 +25,8 @@ metadata:
 spec:
   rules:
     - resources: ["apps"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["llama-profiles"]
       verbs: ["get", "list", "create", "update", "patch", "delete"]
     - resources: ["charts"]
       verbs: ["get", "list"]
@@ -41,5 +43,5 @@ metadata:
   name: viewer
 spec:
   rules:
-    - resources: ["sites", "clusters", "apps", "charts", "infrastructure", "health"]
+    - resources: ["sites", "clusters", "apps", "charts", "llama-profiles", "infrastructure", "health"]
       verbs: ["get", "list"]
