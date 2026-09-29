@@ -28,6 +28,19 @@
         KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
       changed_when: true
 
+    - name: Fleet LLM | Render Redis manifest
+      ansible.builtin.template:
+        src: redis.yaml.j2
+        dest: /tmp/fleet-llm-redis.yaml
+        mode: "0644"
+
+    - name: Fleet LLM | Apply Redis for LiteLLM router cache
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleet-llm-redis.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      changed_when: true
+
     - name: Fleet LLM | Render LiteLLM config
       ansible.builtin.template:
         src: litellm-config.yaml.j2
@@ -128,7 +141,7 @@
   block:
     - name: Fleet LLM | Remove LiteLLM deployment
       ansible.builtin.command:
-        cmd: kubectl -n {{ fleet_llm_namespace }} delete deploy,svc,cm {{ fleet_llm_release_name }},{{ fleet_llm_release_name }},{{ fleet_llm_configmap }} --ignore-not-found
+        cmd: kubectl -n {{ fleet_llm_namespace }} delete deploy,svc,cm {{ fleet_llm_release_name }},{{ fleet_llm_release_name }},{{ fleet_llm_configmap }},redis --ignore-not-found
       environment:
         KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
       changed_when: true

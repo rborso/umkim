@@ -102,15 +102,15 @@ umkim chart add -f chart.json
 umkim chart delete NAME
 
 umkim app list | get NAME | create [--cluster C --chart CHART …] [-f app.json]
-umkim app update NAME [--version V] [--values-file F] [--route-mode …]
-umkim app create … --llama-profile qwen35-2b-ud-4g
+umkim app update NAME [--version V] [--values-file F] [--route-mode …] [--llm-backend true|false]
+umkim app create … --llama-profile qwen35-2b-ud-4g [--llm-backend true|false]
 umkim app delete NAME
 
 umkim infra get hub
 umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
 umkim acme get | set [--hub-enabled] [--staging] [--email E]
 umkim llm get | set [--hub-enabled] [--public-host H] [--backends-file F] [--backend model=…,apiBase=…]
-umkim llm backends sync-from-apps
+umkim llm backends sync-from-apps   # drops stale backends; clears manual override → auto
 umkim llm profile list|get NAME|create|update|delete|values NAME
 umkim llm profile verify NAME --cluster C [--extended] [--wait]
 umkim llm profile test list|get ID|end ID|chat ID --message "…"

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: {{ fleet_llm_namespace }}
+  labels:
+    app: fleet-llm-redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fleet-llm-redis
+  template:
+    metadata:
+      labels:
+        app: fleet-llm-redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ fleet_llm_redis_image | default('redis:7-alpine') }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: {{ fleet_llm_namespace }}
+  labels:
+    app: fleet-llm-redis
+spec:
+  selector:
+    app: fleet-llm-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis

@@ -155,7 +155,7 @@ func (r *AppReconciler) pollInstall(ctx context.Context, app *fleetv1alpha1.Flee
 	if err := r.Status().Update(ctx, app); err != nil {
 		return ctrl.Result{}, err
 	}
-	if llm.IsLlamaChart(app.Spec.Chart) {
+	if llm.IsLlamaChart(app.Spec.Chart) && app.RegistersLLMBackend() {
 		if err := r.requestFleetLLMReconcile(ctx); err != nil {
 			logger := log.FromContext(ctx)
 			logger.Error(err, "request FleetLLM reconcile after llama-cpp app ready")
@@ -208,9 +208,15 @@ func (r *AppReconciler) reconcileDelete(ctx context.Context, app *fleetv1alpha1.
 		}
 	}
 	_ = r.Delete(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: appValuesCMName(app.Name), Namespace: app.Namespace}})
+	llamaDeleted := llm.IsLlamaChart(app.Spec.Chart)
 	controllerutil.RemoveFinalizer(app, fleetv1alpha1.FleetAppFinalizer)
 	if err := r.Update(ctx, app); err != nil {
 		return ctrl.Result{}, err
+	}
+	if llamaDeleted {
+		if err := r.requestFleetLLMReconcile(ctx); err != nil {
+			log.FromContext(ctx).Error(err, "request FleetLLM reconcile after llama-cpp app delete")
+		}
 	}
 	return ctrl.Result{}, nil
 }

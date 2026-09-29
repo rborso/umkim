@@ -70,7 +70,9 @@ phase is `Installing` or `Deleting`. Console **Apps → Edit** and
 `GET /charts/llama-cpp-helm/profiles` returns the same ids for the install picker.
 `GET /llama-profiles/{name}/values` (or the legacy chart path) returns merged Helm YAML (runtime +
 profile + Harbor `ghcr-proxy` image). Use on install via console profile picker
-or `umkim app create --llama-profile qwen35-2b-ud-4g`. Source YAML lives under
+or `umkim app create --llama-profile qwen35-2b-ud-4g`. Optional hub LiteLLM registration
+uses `llmBackend` on `POST /apps` / `PATCH /apps/{name}` (console checkbox or
+`umkim app create --llm-backend true|false`). Source YAML lives under
 `deploy/llama-cpp-helm/` and is embedded in fleet-site-controller. See
 [fleet-llama-profiles.md](fleet-llama-profiles.md) for CRUD, verify, and extended chat.
 

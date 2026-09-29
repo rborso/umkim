@@ -17,6 +17,12 @@ paths:
     post:
       summary: Install an OCI chart on a selected Ready cluster
       description: clusterName is required. There is no placement engine.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FleetAppCreate'
       responses:
         '201':
           description: FleetApp created
@@ -36,8 +42,33 @@ paths:
       responses:
         '200':
           description: FleetApp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetApp'
         '404':
           description: Not found
+    patch:
+      summary: Update chart version, values, route, or llama-cpp LiteLLM registration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FleetAppPatch'
+      responses:
+        '200':
+          description: FleetApp updated
+        '404':
+          description: Not found
+        '409':
+          description: App is Installing or Deleting
     delete:
       summary: Uninstall the Helm release and delete the FleetApp
       parameters:
@@ -128,3 +159,92 @@ paths:
   /llama-profiles/tests/{id}/chat/completions:
     post:
       summary: Hub proxy to spoke llama-server OpenAI API (extended tests only)
+
+components:
+  schemas:
+    FleetAppRoute:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [none, hub, site]
+        hubHost:
+          type: string
+        siteHost:
+          type: string
+        requireAuth:
+          type: boolean
+        serviceName:
+          type: string
+        servicePort:
+          type: integer
+        serviceNamespace:
+          type: string
+        healthPath:
+          type: string
+    FleetApp:
+      type: object
+      properties:
+        name:
+          type: string
+        clusterName:
+          type: string
+        chart:
+          type: string
+        version:
+          type: string
+        releaseName:
+          type: string
+        namespace:
+          type: string
+        valuesYaml:
+          type: string
+        route:
+          $ref: '#/components/schemas/FleetAppRoute'
+        phase:
+          type: string
+        message:
+          type: string
+        routeName:
+          type: string
+        llmBackend:
+          type: boolean
+          description: |
+            When true, Ready llama-cpp installs are included in hub LiteLLM auto-discovery
+            (FleetApp annotation fleet.umkim.com/llm-backend). Omitted legacy apps default to true.
+    FleetAppCreate:
+      type: object
+      required: [clusterName, chart]
+      properties:
+        name:
+          type: string
+        clusterName:
+          type: string
+        chart:
+          type: string
+        version:
+          type: string
+        releaseName:
+          type: string
+        namespace:
+          type: string
+        valuesYaml:
+          type: string
+        route:
+          $ref: '#/components/schemas/FleetAppRoute'
+        llmBackend:
+          type: boolean
+          description: Llama-cpp only — opt in or out of hub LiteLLM backend discovery when Ready.
+    FleetAppPatch:
+      type: object
+      properties:
+        version:
+          type: string
+        valuesYaml:
+          type: string
+        namespace:
+          type: string
+        route:
+          $ref: '#/components/schemas/FleetAppRoute'
+        llmBackend:
+          type: boolean

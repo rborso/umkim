@@ -88,11 +88,27 @@ func fetchLlamaProfileYAML(profileID string) (string, error) {
 	return doc.ValuesYAML, nil
 }
 
+func applyOptionalLLMBackend(body map[string]interface{}, opt string) error {
+	opt = strings.TrimSpace(strings.ToLower(opt))
+	if opt == "" {
+		return nil
+	}
+	switch opt {
+	case "true", "1", "yes":
+		body["llmBackend"] = true
+	case "false", "0", "no":
+		body["llmBackend"] = false
+	default:
+		return fmt.Errorf("--llm-backend must be true or false")
+	}
+	return nil
+}
+
 func appCreateCmd() *cobra.Command {
 	var (
 		jsonFile, cluster, chart, version, release, namespace, valuesFile, appName string
 		routeMode, routeHost                                                        string
-		llamaProfile                                                                string
+		llamaProfile, llmBackendOpt                                                 string
 	)
 	c := &cobra.Command{
 		Use:   "create",
@@ -160,6 +176,9 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 				}
 				body["valuesYaml"] = string(raw)
 			}
+			if err := applyOptionalLLMBackend(body, llmBackendOpt); err != nil {
+				return err
+			}
 			raw, code, err := api.Post("/apps", body)
 			if err != nil {
 				return err
@@ -192,13 +211,14 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 	c.Flags().StringVar(&namespace, "namespace", "default", "Target namespace")
 	c.Flags().StringVar(&valuesFile, "values-file", "", "Helm values YAML file")
 	c.Flags().StringVar(&llamaProfile, "llama-profile", "", "Built-in llama-cpp-helm values profile id (hub API)")
+	c.Flags().StringVar(&llmBackendOpt, "llm-backend", "", "Llama-cpp only: register hub LiteLLM backend when Ready (true|false)")
 	c.Flags().StringVar(&routeMode, "route-mode", "none", "Route mode: none|hub|site")
 	c.Flags().StringVar(&routeHost, "route-host", "", "Route hostname (hubHost or siteHost per mode)")
 	return c
 }
 
 func appUpdateCmd() *cobra.Command {
-	var version, valuesFile, namespace, routeMode, routeHost string
+	var version, valuesFile, namespace, routeMode, routeHost, llmBackendOpt string
 	c := &cobra.Command{
 		Use:   "update [name]",
 		Short: "Update a FleetApp install (PATCH /apps/{name})",
@@ -242,8 +262,11 @@ func appUpdateCmd() *cobra.Command {
 				}
 				body["route"] = route
 			}
+			if err := applyOptionalLLMBackend(body, llmBackendOpt); err != nil {
+				return err
+			}
 			if len(body) == 0 {
-				return fmt.Errorf("no patch fields; use --version, --values-file, --namespace, or --route-mode")
+				return fmt.Errorf("no patch fields; use --version, --values-file, --namespace, --route-mode, or --llm-backend")
 			}
 			raw, code, err := api.Patch("/apps/"+args[0], body)
 			if err != nil {
@@ -269,6 +292,7 @@ func appUpdateCmd() *cobra.Command {
 	c.Flags().StringVar(&namespace, "namespace", "", "Target namespace")
 	c.Flags().StringVar(&routeMode, "route-mode", "", "Route mode: none|hub|site")
 	c.Flags().StringVar(&routeHost, "route-host", "", "Route hostname")
+	c.Flags().StringVar(&llmBackendOpt, "llm-backend", "", "Llama-cpp only: hub LiteLLM backend registration (true|false)")
 	return c
 }
 

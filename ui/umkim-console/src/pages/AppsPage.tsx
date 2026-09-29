@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Alert,
   Button,
+  Checkbox,
   Form,
-  FormSelect,
-  FormSelectOption,
   Label,
   Modal,
   ModalVariant,
@@ -45,6 +45,7 @@ import type {
   FleetSite,
 } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
+import { FleetModalSelect } from '../components/forms/FleetModalSelect';
 import { LabeledField } from '../components/forms/LabeledField';
 import { clusterIngressZone, isReverseProxyMethod } from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
@@ -52,6 +53,7 @@ import {
   useFleetAppsQuery,
   useFleetChartsQuery,
   useFleetClustersQuery,
+  useLLMQuery,
   useFleetSitesQuery,
   useInvalidateFleet,
 } from '../hooks/useFleetQueries';
@@ -182,7 +184,16 @@ export function AppsPage() {
   const [llamaProfileId, setLlamaProfileId] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<FleetApp | null>(null);
-  const [editForm, setEditForm] = useState({ version: '', valuesYaml: '', routeMode: 'none', routeHost: '' });
+  const [editForm, setEditForm] = useState({
+    version: '',
+    valuesYaml: '',
+    routeMode: 'none',
+    routeHost: '',
+    llmBackend: false,
+  });
+  const [registerLiteLLM, setRegisterLiteLLM] = useState(false);
+  const llmQuery = useLLMQuery();
+  const hubLlmEnabled = !!llmQuery.data?.hubEnabled;
 
   const readyClusters = useMemo(
     () =>
@@ -250,6 +261,7 @@ export function AppsPage() {
     setRockyCpu('2');
     setRockyMemory('2Gi');
     setRockyDisk('20Gi');
+    setRegisterLiteLLM(false);
     setForm({
       ...emptyForm(readyClusters[0]?.name || '', first),
       version: readyCharts[0]?.version || '0.1.0',
@@ -283,6 +295,7 @@ export function AppsPage() {
           ? { siteHost: form.route.siteHost.trim() }
           : {}),
       };
+      const llama = isLlamaCppChart(form.chart);
       const body: FleetAppCreate = {
         ...form,
         name: form.releaseName || form.name,
@@ -293,6 +306,7 @@ export function AppsPage() {
         namespace: form.namespace || 'default',
         valuesYaml: form.valuesYaml || undefined,
         route,
+        ...(llama ? { llmBackend: registerLiteLLM } : {}),
       };
       await createFleetApp(body);
       setModalOpen(false);
@@ -386,7 +400,7 @@ export function AppsPage() {
       releaseName: f.releaseName && f.releaseName !== f.chart ? f.releaseName : name,
       namespace: llama ? 'llm' : f.namespace,
       valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : llama ? f.valuesYaml : f.valuesYaml,
-      route: rocky || llama ? { mode: 'none' } : f.route,
+      route: rocky ? { mode: 'none' } : f.route,
     }));
     if (llama && llamaProfileId) {
       void applyLlamaProfile(llamaProfileId).catch((e) => setActionError(e));
@@ -401,6 +415,7 @@ export function AppsPage() {
       valuesYaml: app.valuesYaml || '',
       routeMode: app.route?.mode || 'none',
       routeHost: app.route?.hubHost || app.route?.siteHost || '',
+      llmBackend: app.llmBackend !== false,
     });
     setEditOpen(true);
   };
@@ -420,6 +435,7 @@ export function AppsPage() {
         version: editForm.version || undefined,
         valuesYaml: editForm.valuesYaml || undefined,
         route,
+        ...(isLlamaCppChart(editTarget.chart) ? { llmBackend: editForm.llmBackend } : {}),
       });
       setEditOpen(false);
       setEditTarget(null);
@@ -605,28 +621,31 @@ export function AppsPage() {
         <Form>
           <ErrorAlert error={actionError} />
           <LabeledField label="Cluster" fieldId="app-cluster" isRequired help={getFieldHelp('apps.clusterName')}>
-            <FormSelect
+            <FleetModalSelect
               id="app-cluster"
               value={form.clusterName}
-              onChange={(_e, v) => setForm((f) => ({ ...f, clusterName: v }))}
-            >
-              <FormSelectOption value="" label="Select a Ready cluster" />
-              {readyClusters.map((c) => (
-                <FormSelectOption key={c.name} value={c.name} label={c.name} />
-              ))}
-            </FormSelect>
+              placeholder="Select a Ready cluster"
+              onChange={(v) => setForm((f) => ({ ...f, clusterName: v }))}
+              options={[
+                { value: '', label: 'Select a Ready cluster' },
+                ...readyClusters.map((c) => ({ value: c.name, label: c.name })),
+              ]}
+            />
           </LabeledField>
           <LabeledField label="Chart" fieldId="app-chart" isRequired help={getFieldHelp('apps.libraryChart')}>
-            <FormSelect id="app-chart" value={form.chart} onChange={(_e, v) => onLibrarySelect(v)}>
-              <FormSelectOption value="" label="Select a library chart" />
-              {readyCharts.map((c) => (
-                <FormSelectOption
-                  key={c.name}
-                  value={c.name}
-                  label={`${c.name}${c.version ? ` (${c.version})` : ''}`}
-                />
-              ))}
-            </FormSelect>
+            <FleetModalSelect
+              id="app-chart"
+              value={form.chart}
+              placeholder="Select a library chart"
+              onChange={(v) => onLibrarySelect(v)}
+              options={[
+                { value: '', label: 'Select a library chart' },
+                ...readyCharts.map((c) => ({
+                  value: c.name,
+                  label: `${c.name}${c.version ? ` (${c.version})` : ''}`,
+                })),
+              ]}
+            />
           </LabeledField>
           <LabeledField label="Chart URL or short name" fieldId="app-chart-custom" help={getFieldHelp('apps.chart')}>
             <TextInput
@@ -672,20 +691,54 @@ export function AppsPage() {
           ) : null}
           {isLlamaCppChart(form.chart) ? (
             <LabeledField label="Llama values profile" fieldId="app-llama-profile" help={getFieldHelp('apps.llamaProfile')}>
-              <FormSelect
+              <FleetModalSelect
                 id="app-llama-profile"
                 value={llamaProfileId}
-                onChange={(_e, v) => {
+                placeholder="Select a profile"
+                onChange={(v) => {
                   setLlamaProfileId(v);
                   void applyLlamaProfile(v).catch((e) => setActionError(e));
                 }}
-              >
-                <FormSelectOption value="" label="Select a profile" />
-                {llamaProfiles.map((p) => (
-                  <FormSelectOption key={p.id} value={p.id} label={p.description ? `${p.id} — ${p.description}` : p.id} />
-                ))}
-              </FormSelect>
+                options={[
+                  { value: '', label: 'Select a profile' },
+                  ...llamaProfiles.map((p) => ({
+                    value: p.id,
+                    label: p.description ? `${p.id} — ${p.description}` : p.id,
+                  })),
+                ]}
+              />
             </LabeledField>
+          ) : null}
+          {isLlamaCppChart(form.chart) ? (
+            <div
+              style={{
+                margin: '0.75rem 0',
+                padding: '0.75rem 1rem',
+                border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+              }}
+            >
+              <Title headingLevel="h4" size="md" style={{ marginBottom: '0.5rem' }}>
+                Hub LiteLLM proxy
+              </Title>
+              <Checkbox
+                id="app-llm-backend"
+                label="Add to LiteLLM proxy when install is Ready"
+                isChecked={registerLiteLLM}
+                onChange={(_e, checked) => setRegisterLiteLLM(checked)}
+                description={
+                  hubLlmEnabled
+                    ? 'Optional. Registers this llama-cpp release as a hub LiteLLM backend after Helm reaches Ready.'
+                    : 'Hub LiteLLM is disabled — enable it under Infrastructure → LLM platform first.'
+                }
+              />
+              {registerLiteLLM && !hubLlmEnabled ? (
+                <Alert variant="warning" isInline title="LiteLLM proxy is off" style={{ marginTop: '0.5rem' }}>
+                  Enable the hub proxy on <Link to="/infrastructure">Infrastructure</Link> before clients can use this
+                  backend.
+                </Alert>
+              ) : null}
+            </div>
           ) : null}
           <LabeledField label="Version" fieldId="app-version" help={getFieldHelp('apps.version')}>
             <TextInput
@@ -708,19 +761,33 @@ export function AppsPage() {
               onChange={(_e, v) => setForm((f) => ({ ...f, namespace: v }))}
             />
           </LabeledField>
+          {isLlamaCppChart(form.chart) && (form.route?.mode || 'none') !== 'none' ? (
+            <Alert variant="warning" isInline title="Route vs hub LiteLLM" style={{ marginBottom: '0.75rem' }}>
+              {getFieldHelp('apps.llamaRoute')?.description}{' '}
+              <Link to="/infrastructure">LLM platform</Link> reaches the GPU spoke via WireGuard upstream, not this
+              hostname.
+            </Alert>
+          ) : null}
           <LabeledField label="Route" fieldId="app-route" help={getFieldHelp('apps.routeMode')}>
-            <FormSelect
+            <FleetModalSelect
               id="app-route"
               value={form.route?.mode || 'none'}
-              onChange={(_e, v) =>
+              onChange={(v) =>
                 setForm((f) => ({ ...f, route: { ...f.route, mode: v as FleetAppRouteMode } }))
               }
-            >
-              <FormSelectOption value="none" label="none — no fleet-managed ingress" />
-              <FormSelectOption value="hub" label="hub — Traefik on the hub" />
-              <FormSelectOption value="site" label="site — spoke ingress" />
-            </FormSelect>
+              options={[
+                { value: 'none', label: 'none — no fleet-managed ingress' },
+                { value: 'hub', label: 'hub — Traefik on the hub' },
+                { value: 'site', label: 'site — spoke ingress' },
+              ]}
+            />
           </LabeledField>
+          {isLlamaCppChart(form.chart) && (form.route?.mode || 'none') === 'none' ? (
+            <p style={{ fontSize: '0.85rem', marginTop: '0.35rem', maxWidth: '36rem' }}>
+              Recommended for llama-cpp: leave route <code>none</code> unless you expose the Service yourself. Hub
+              LiteLLM does not use FleetApp route hostnames.
+            </p>
+          ) : null}
           {form.route?.mode === 'hub' || form.route?.mode === 'site' ? (
             <LabeledField
               label={form.route?.mode === 'site' ? 'Site hostname' : 'Hub hostname'}
@@ -748,7 +815,15 @@ export function AppsPage() {
               ) : null}
             </LabeledField>
           ) : null}
-          <LabeledField label="Values (YAML)" fieldId="app-values" help={getFieldHelp('apps.valuesYaml')}>
+          <LabeledField
+            label="Values (YAML)"
+            fieldId="app-values"
+            help={
+              isLlamaCppChart(form.chart)
+                ? { ...getFieldHelp('llamaProfiles.profileYaml')!, popoverMaxWidth: '32rem' }
+                : getFieldHelp('apps.valuesYaml')
+            }
+          >
             <TextArea
               id="app-values"
               value={form.valuesYaml || ''}
@@ -790,6 +865,15 @@ export function AppsPage() {
               rows={8}
             />
           </LabeledField>
+          {editTarget && isLlamaCppChart(editTarget.chart) ? (
+            <Checkbox
+              id="edit-llm-backend"
+              label="Register in hub LiteLLM proxy"
+              isChecked={editForm.llmBackend}
+              onChange={(_e, checked) => setEditForm((f) => ({ ...f, llmBackend: checked }))}
+              description={getFieldHelp('apps.llmBackend')?.description}
+            />
+          ) : null}
         </Form>
       </Modal>
 
@@ -858,15 +942,16 @@ export function AppsPage() {
             <TextInput id="chart-version" value={chartVersion} onChange={(_e, v) => setChartVersion(v)} />
           </LabeledField>
           <LabeledField label="Images" fieldId="chart-images" help={getFieldHelp('charts.imagePolicy')}>
-            <FormSelect
+            <FleetModalSelect
               id="chart-images"
               value={chartPolicy}
-              onChange={(_e, v) => setChartPolicy(v as FleetChartImagePolicy)}
-            >
-              <FormSelectOption value="external" label="external — pull from upstream" />
-              <FormSelectOption value="proxy" label="proxy — Harbor pull-through" />
-              <FormSelectOption value="copy" label="copy — mirror images into Harbor" />
-            </FormSelect>
+              onChange={(v) => setChartPolicy(v as FleetChartImagePolicy)}
+              options={[
+                { value: 'external', label: 'external — pull from upstream' },
+                { value: 'proxy', label: 'proxy — Harbor pull-through' },
+                { value: 'copy', label: 'copy — mirror images into Harbor' },
+              ]}
+            />
           </LabeledField>
         </Form>
       </Modal>

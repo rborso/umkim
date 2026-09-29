@@ -34,6 +34,9 @@ func llmBackendsSyncFromAppsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "sync-from-apps",
 		Short: "Rebuild FleetLLM backends from Ready llama-cpp FleetApps",
+		Long: `POST /llm/backends/sync-from-apps — replaces auto backends with Ready registered
+llama-cpp FleetApps only (drops stale model names and removed spokes). Clears manual
+backend override (backendsSource returns to auto). Run umkim llm reconcile --wait after.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			raw, code, err := api.Post("/llm/backends/sync-from-apps", map[string]interface{}{})
 			if err != nil {

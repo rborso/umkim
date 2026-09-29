@@ -28,7 +28,8 @@ npm run test:e2e
 
 **Apps → Install** supports a llama-cpp-helm values profile picker (hub-merged YAML)
 and **Edit** patches version/values on existing FleetApps. **Infrastructure → LLM**
-can sync LiteLLM backends from Ready llama FleetApps.
+can optionally register llama-cpp installs for hub LiteLLM (install modal checkbox)
+and sync LiteLLM backends from Ready registered FleetApps.
 
 Package scripts in [package.json](package.json) are the current contract.
 End-to-end tests require deployment-specific access and credentials, so review

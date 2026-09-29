@@ -364,6 +364,8 @@ export interface FleetApp {
   phase?: FleetAppPhase;
   message?: string;
   routeName?: string;
+  /** When false, hub LiteLLM auto-discovery skips this llama-cpp app. */
+  llmBackend?: boolean;
 }
 
 export interface FleetAppCreate {
@@ -376,6 +378,8 @@ export interface FleetAppCreate {
   values?: Record<string, unknown>;
   valuesYaml?: string;
   route?: FleetAppRoute;
+  /** Llama-cpp only: register as a hub LiteLLM backend when Ready. */
+  llmBackend?: boolean;
 }
 
 export interface FleetAppDefaults {
@@ -679,6 +683,7 @@ export interface FleetAppPatch {
   valuesYaml?: string;
   namespace?: string;
   route?: FleetAppRoute;
+  llmBackend?: boolean;
 }
 
 export interface FleetLLMPatch {

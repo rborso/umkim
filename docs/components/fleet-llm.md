@@ -24,9 +24,18 @@ Use the same chart `model` value (OpenAI alias) on multiple GPU clusters when
 you want one logical model id on the hub. Ready `llama-cpp-helm` FleetApps are
 synced as **multiple LiteLLM backends** with the same `model_name`; LiteLLM
 load-balances across them (`router_settings.routing_strategy: simple-shuffle` in
-the hub config). OpenAI-compatible clients already send full message history each
-request, so **sticky sessions are usually unnecessary** for chat; add Redis-backed
-routing on the hub later only if you need per-`user` affinity to the same spoke.
+the hub config). Hub LiteLLM also enables **`deployment_affinity`** (sticky routing):
+send a stable OpenAI **`user`** string on each `chat/completions` call in a
+conversation so repeat requests hit the same spoke for up to
+`deployment_affinity_ttl_seconds` (default 3600). **`session_affinity`** uses the
+same pin when clients send header `x-litellm-session-id` (or `metadata.session_id`
+in the JSON body). A small **Redis** deployment in `fleet-llm` backs the router
+cache so pins survive LiteLLM restarts.
+
+**Auto backends** (`backendsSource: auto`) are rebuilt only from Ready registered
+llama-cpp FleetApps. Removing the last app on a spoke drops that `apiBase` from
+`FleetLLM` on the next reconcile; use `umkim llm backends sync-from-apps` to force
+a refresh. Manual JSON overrides are not auto-pruned.
 
 For **Qwen3.x** GGUFs, set chart values `jinja: true` and
 `chatTemplateKwargs: '{"enable_thinking":false}'` so replies land in
@@ -75,9 +84,13 @@ Prerequisites on at least one spoke cluster:
 3. Install `llama-cpp-helm` via console **Apps** (llama profile picker),
    `umkim app create --llama-profile qwen35-2b-ud-4g`, or merged values from
    `deploy/llama-cpp-helm/`. Upgrade with **Edit** / `umkim app update`.
-   Ready llama-cpp apps auto-populate `FleetLLM` backends; use
+   Ready llama-cpp apps with LiteLLM registration enabled auto-populate
+   `FleetLLM` backends (console **Register in hub LiteLLM proxy**, or omit the
+   `fleet.umkim.com/llm-backend: "false"` annotation on the FleetApp). Use
    `umkim llm backends sync-from-apps` or console **Sync backends from FleetApps**
    to rebuild from FleetApps. Manual JSON override sets `backendsSource: manual`.
+   FleetApp `route` (hub/site ingress) is separate: hub LiteLLM reaches spokes via
+   WireGuard `upstream_host`, not route hostnames.
 4. `umkim llm reconcile --wait` after backend changes.
 5. Create a scoped API key: `umkim auth llm-api-keys create` (or console
    **Access control → LLM API keys**). Call `POST …/llm/v1/chat/completions`

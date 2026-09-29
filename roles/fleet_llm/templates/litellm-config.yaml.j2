@@ -1,3 +1,7 @@
+general_settings:
+  redis_host: {{ fleet_llm_redis_host | quote }}
+  redis_port: {{ fleet_llm_redis_port | quote }}
+
 model_list:
 {% if fleet_llm_backends | default([]) | length > 0 %}
 {% for b in fleet_llm_backends %}
@@ -20,6 +24,16 @@ litellm_settings:
   set_verbose: false
 
 # Multiple model_list rows with the same model_name are load-balanced by LiteLLM.
-# Clients can pass OpenAI "user" for optional affinity when Redis routing is enabled later.
+# deployment_affinity keeps the same OpenAI "user" (or virtual key) on one spoke for TTL seconds.
 router_settings:
   routing_strategy: simple-shuffle
+{% if fleet_llm_deployment_affinity | default(true) | bool or fleet_llm_session_affinity | default(true) | bool %}
+  optional_pre_call_checks:
+{% if fleet_llm_session_affinity | default(true) | bool %}
+    - session_affinity
+{% endif %}
+{% if fleet_llm_deployment_affinity | default(true) | bool %}
+    - deployment_affinity
+{% endif %}
+  deployment_affinity_ttl_seconds: {{ fleet_llm_deployment_affinity_ttl_seconds | default(3600) }}
+{% endif %}

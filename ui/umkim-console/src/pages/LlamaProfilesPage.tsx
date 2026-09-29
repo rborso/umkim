@@ -33,6 +33,7 @@ import {
 import type { FleetLlamaProfile, FleetLlamaProfileTest } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
+import { getFieldHelp } from '../help/fieldHelp';
 import { useFleetClustersQuery } from '../hooks/useFleetQueries';
 
 export function LlamaProfilesPage() {
@@ -321,7 +322,11 @@ function ProfileFormModal({
       <LabeledField label="Description" fieldId="llama-prof-desc">
         <TextInput id="llama-prof-desc" value={description} onChange={(_e, v) => setDescription(v)} />
       </LabeledField>
-      <LabeledField label="Profile YAML overlay" fieldId="llama-prof-yaml">
+      <LabeledField
+        label="Profile YAML overlay"
+        fieldId="llama-prof-yaml"
+        help={{ ...getFieldHelp('llamaProfiles.profileYaml')!, popoverMaxWidth: '32rem' }}
+      >
         <TextArea id="llama-prof-yaml" value={profileYaml} onChange={(_e, v) => setProfileYaml(v)} rows={12} />
       </LabeledField>
       <LabeledField label="Chart version" fieldId="llama-prof-ver">

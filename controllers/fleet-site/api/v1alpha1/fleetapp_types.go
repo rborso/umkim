@@ -9,6 +9,10 @@ import (
 const (
 	FleetAppFinalizer = "fleet.umkim.com/helm"
 
+	// FleetAppAnnotationLLMBackend opts a llama-cpp FleetApp into hub LiteLLM backend discovery.
+	// Values: "true", "false". Absent means include (legacy installs and CLI without the flag).
+	FleetAppAnnotationLLMBackend = "fleet.umkim.com/llm-backend"
+
 	AppPhasePending    = "Pending"
 	AppPhaseInstalling = "Installing"
 	AppPhaseReady      = "Ready"
@@ -126,4 +130,31 @@ func (s FleetAppSpec) EffectiveHealthPath() string {
 		return p
 	}
 	return "/"
+}
+
+// RegistersLLMBackend reports whether a Ready llama-cpp FleetApp should appear in FleetLLM auto-discovery.
+func (app *FleetApp) RegistersLLMBackend() bool {
+	if app == nil {
+		return false
+	}
+	if app.Annotations == nil {
+		return true
+	}
+	v := strings.TrimSpace(app.Annotations[FleetAppAnnotationLLMBackend])
+	if v == "" {
+		return true
+	}
+	return v == "true"
+}
+
+// SetLLMBackendAnnotation records opt-in/out for hub LiteLLM backend discovery.
+func (app *FleetApp) SetLLMBackendAnnotation(enabled bool) {
+	if app.Annotations == nil {
+		app.Annotations = map[string]string{}
+	}
+	if enabled {
+		app.Annotations[FleetAppAnnotationLLMBackend] = "true"
+	} else {
+		app.Annotations[FleetAppAnnotationLLMBackend] = "false"
+	}
 }

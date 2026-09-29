@@ -133,7 +133,7 @@ func (s *Server) handleSyncLLMBackendsFromApps(ctx context.Context, w http.Respo
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	backends, err := llm.SyncBackendsFromFleetApps(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName, nil)
+	backends, err := llm.DiscoverBackendsFromFleetApps(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

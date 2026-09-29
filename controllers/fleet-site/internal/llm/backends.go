@@ -22,20 +22,26 @@ type edgeClustersFile struct {
 	Clusters map[string]edgeClusterEntry `yaml:"clusters"`
 }
 
-// SyncBackendsFromFleetApps discovers llama-cpp Helm releases and resolves OpenAI-compatible API bases.
-func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, edgeCM string, existing []fleetv1alpha1.FleetLLMBackend) ([]fleetv1alpha1.FleetLLMBackend, error) {
+// DiscoverBackendsFromFleetApps returns LiteLLM backends for Ready registered llama-cpp FleetApps only.
+func DiscoverBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, edgeCM string) ([]fleetv1alpha1.FleetLLMBackend, error) {
 	var apps fleetv1alpha1.FleetAppList
 	if err := k8s.List(ctx, &apps); err != nil {
-		return existing, err
+		return nil, err
 	}
 	edge, err := loadEdgeUpstream(ctx, k8s, edgeNS, edgeCM)
 	if err != nil {
+		return nil, err
+	}
+	return DiscoverBackendsFromApps(apps.Items, edge), nil
+}
+
+// SyncBackendsFromFleetApps discovers llama-cpp Helm releases and merges with existing manual backends.
+func SyncBackendsFromFleetApps(ctx context.Context, k8s client.Client, edgeNS, edgeCM string, existing []fleetv1alpha1.FleetLLMBackend) ([]fleetv1alpha1.FleetLLMBackend, error) {
+	auto, err := DiscoverBackendsFromFleetApps(ctx, k8s, edgeNS, edgeCM)
+	if err != nil {
 		return existing, err
 	}
-
-	auto := DiscoverBackendsFromApps(apps.Items, edge)
-	out := MergeBackends(existing, auto)
-	return out, nil
+	return MergeBackends(existing, auto), nil
 }
 
 // DiscoverBackendsFromApps returns one LiteLLM backend per Ready llama-cpp FleetApp.
@@ -45,6 +51,9 @@ func DiscoverBackendsFromApps(apps []fleetv1alpha1.FleetApp, edge map[string]str
 	seen := map[string]struct{}{}
 	for _, app := range apps {
 		if !IsLlamaChart(app.Spec.Chart) {
+			continue
+		}
+		if !app.RegistersLLMBackend() {
 			continue
 		}
 		if app.Status.Phase != fleetv1alpha1.AppPhaseReady && app.Status.Phase != "" {

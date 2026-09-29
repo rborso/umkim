@@ -44,8 +44,17 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'apps.llamaProfile': {
     description:
-      'Built-in llama-cpp-helm values profile from the hub API (runtime + model + registry image). You can edit the generated YAML before install.',
+      'Built-in llama-cpp-helm values profile from the hub API (runtime + model + registry image). You can edit the generated YAML before install. Open the help on Values (YAML) for extraArgs, top-p, and temp examples.',
     example: 'qwen35-2b-ud-4g',
+  },
+  'apps.llmBackend': {
+    description:
+      'When enabled, a Ready install is discovered as a hub LiteLLM backend (spoke WireGuard upstream, not the FleetApp route). Requires Infrastructure → LLM platform enabled. Uncheck for private or test installs.',
+    example: 'enabled after qwen35 profile on lab-gpu-0',
+  },
+  'apps.llamaRoute': {
+    description:
+      'Fleet Llama profiles use hostNetwork on the GPU node. Hub/site routes target the chart Service and usually do not reach llama-server; hub LiteLLM uses the spoke upstream address instead. Use route only if you customized networking.',
   },
   'apps.editInstall': {
     description:

@@ -7,6 +7,7 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/appchart"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/llm"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,6 +21,7 @@ type appPatchBody struct {
 	ValuesYAML string                            `json:"valuesYaml"`
 	Namespace  string                            `json:"namespace"`
 	Route      fleetv1alpha1.FleetAppRouteIntent `json:"route"`
+	LlmBackend *bool                             `json:"llmBackend,omitempty"`
 }
 
 type appCreateBody struct {
@@ -32,6 +34,7 @@ type appCreateBody struct {
 	Values      json.RawMessage                   `json:"values"`
 	ValuesYAML  string                            `json:"valuesYaml"`
 	Route       fleetv1alpha1.FleetAppRouteIntent `json:"route"`
+	LlmBackend  *bool                             `json:"llmBackend,omitempty"`
 }
 
 type appResponse struct {
@@ -46,6 +49,7 @@ type appResponse struct {
 	Phase       string                            `json:"phase"`
 	Message     string                            `json:"message,omitempty"`
 	RouteName   string                            `json:"routeName,omitempty"`
+	LlmBackend  bool                              `json:"llmBackend,omitempty"`
 }
 
 type appsListResponse struct {
@@ -211,6 +215,9 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 	if app.Spec.Route.Mode == "" {
 		app.Spec.Route.Mode = fleetv1alpha1.AppRouteModeNone
 	}
+	if body.LlmBackend != nil && llm.IsLlamaChart(chart) {
+		app.SetLLMBackendAnnotation(*body.LlmBackend)
+	}
 	if err := s.Client.Create(r.Context(), app); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "app " + name + " already exists"})
@@ -295,6 +302,10 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 		}
 		changed = true
 	}
+	if body.LlmBackend != nil && llm.IsLlamaChart(app.Spec.Chart) {
+		app.SetLLMBackendAnnotation(*body.LlmBackend)
+		changed = true
+	}
 	if !changed {
 		writeJSON(w, http.StatusOK, appToResponse(&app))
 		return
@@ -346,6 +357,7 @@ func appToResponse(app *fleetv1alpha1.FleetApp) appResponse {
 		Phase:       app.Status.Phase,
 		Message:     app.Status.Message,
 		RouteName:   app.Status.RouteName,
+		LlmBackend:  app.RegistersLLMBackend(),
 	}
 }
 

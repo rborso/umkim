@@ -44,8 +44,9 @@ func (r *LLMReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	desired := fleetllm.ComputeDesired(ctx, r.Cfg, fl)
 
-	if backends, err := llm.SyncBackendsFromFleetApps(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName, fl.Spec.Backends); err == nil && len(backends) > 0 {
-		if !backendsEqual(fl.Spec.Backends, backends) {
+	if !fleetllm.BackendsManual(fl) {
+		backends, err := llm.DiscoverBackendsFromFleetApps(ctx, r.Client, r.Cfg.EdgeClustersCMNamespace, r.Cfg.EdgeClustersCMName)
+		if err == nil && !backendsEqual(fl.Spec.Backends, backends) {
 			fl.Spec.Backends = backends
 			if fl.Annotations == nil {
 				fl.Annotations = map[string]string{}

@@ -7,6 +7,8 @@ const FORM_GROUP_LABEL_HELP_CLASS = 'pf-v5-c-form__group-label-help';
 
 export type FieldHelpProps = FieldHelpContent & {
   fieldId?: string;
+  /** Wider popover for multi-line YAML examples */
+  popoverMaxWidth?: string;
 };
 
 function ExampleBlock({ value }: { value: string }) {
@@ -40,6 +42,7 @@ export function FieldHelp({
   relatedFields,
   learnMoreUrl,
   fieldId,
+  popoverMaxWidth = '24rem',
 }: FieldHelpProps) {
   const allExamples = [
     ...(example ? [example] : []),
@@ -48,7 +51,7 @@ export function FieldHelp({
   const testId = fieldId ? `field-help-${fieldId}` : undefined;
 
   const body = (
-    <div style={{ maxWidth: '24rem' }}>
+    <div style={{ maxWidth: popoverMaxWidth }}>
       <p style={{ margin: '0 0 0.5rem' }}>{description}</p>
       {whenToUse ? (
         <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>
