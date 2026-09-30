@@ -9,8 +9,8 @@ _fleet_edge_registry_sites: >-
   {%- set _ = sites.append({
     'id': site_id,
     'display_name': site.display_name,
-    'zone': site.edge_domain,
-    'wildcard': site.edge_wildcard,
+    'zone': site.edge_domain | default(site.hub_zone | default('')),
+    'wildcard': site.edge_wildcard | default(site.hub_wildcard | default('')),
     'clusters': (fleet_site_cluster_hosts | default([])) if not (site.management_site | default(false) | bool) else [],
     'dns_target_note': site.dns_target_note | default('')
   }) -%}
