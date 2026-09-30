@@ -4,7 +4,7 @@ fleet_llm_release_name: litellm
 # Pin a PEP 440 release tag (immutable; avoid :main / rolling latest on the hub).
 # v1.100.x: session_affinity for sticky chats; budget ~1Gi RSS under load.
 fleet_llm_image_repo: ghcr.io/berriai/litellm
-fleet_llm_image_tag: "v1.100.3"
+fleet_llm_image_tag: "v1.102.2"
 fleet_llm_image: "{{ fleet_llm_image_repo }}:{{ fleet_llm_image_tag }}"
 fleet_llm_service_port: 4000
 fleet_llm_nodeport: 30918

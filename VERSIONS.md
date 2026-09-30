@@ -1,8 +1,25 @@
 # Versions and release pins
 
 This tree is UMKIM v0.2. Fleet-built images use `harbor_fleet_image_tag`,
-which normally follows `umkim_version` (currently `0.2.0`). The previous
+which normally follows `umkim_version` (currently `0.2.1`). The previous
 public tag was `v0.1.0`.
+
+## Greenfield platform pins (0.2.1)
+
+| Component | Pin | Source |
+| --- | --- | --- |
+| K3s channel | `v1.36` → `1.36.4+k3s1` | `roles/k3s/defaults/main.yml` |
+| Calico | `v3.31.3` | `roles/calico/defaults/main.yml` |
+| cert-manager | `1.20.4` | `inventory/group_vars/all/common.yml` |
+| OLM | `0.45.0` | `inventory/group_vars/all/common.yml` |
+| Traefik (hub + spoke) | `v3.6.25` @ digest | `roles/hub_ingress`, `roles/spoke_ingress`, `common.yml` |
+| Harbor Helm chart | `1.18.4` | `roles/harbor/defaults/main.yml` |
+| LiteLLM | `v1.102.2` | `roles/fleet_llm/defaults/main.yml` |
+| NVIDIA device plugin | `v0.19.3` | `roles/gpu_host/defaults/main.yml` |
+| ansible-runner kubectl | `v1.36.4` | `images/fleet-ansible-runner/Dockerfile` |
+| ansible-runner Helm | `v3.17.4` | `images/fleet-ansible-runner/Dockerfile` |
+| ansible-runner Ansible Core | `2.18.8` | `images/fleet-ansible-runner/Dockerfile` |
+| Fleet controllers client-go | `v0.36.4` / controller-runtime `v0.24.1` | `controllers/fleet-site/go.mod` |
 
 ## Authoritative files
 

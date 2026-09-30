@@ -17,6 +17,9 @@ through FleetClusterJoin. It does not create Ansible-managed spokes.
 - Private management connectivity for cluster enrollment
 - Workload nodes for join are Rocky Linux 10 as well
 
+Greenfield installs pin K3s channel **`v1.36`** (stable **1.36.4+k3s1** at time of
+release). Resolved platform versions are listed in [VERSIONS.md](../VERSIONS.md).
+
 ### Controller packages
 
 Install packages, clone UMKIM, then install Ansible collections:

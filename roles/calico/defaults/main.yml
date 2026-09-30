@@ -1,5 +1,5 @@
 ---
-calico_version: v3.29.0
+calico_version: v3.31.3
 calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
 # auto: detect management IPv4 interface per node (fleet cluster bundles).
 # Hub/spoke inventory may override (e.g. interface=wg0 on the management hub).

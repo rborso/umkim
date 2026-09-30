@@ -1,7 +1,7 @@
 ---
 harbor_namespace: harbor
 harbor_release: harbor
-harbor_chart_version: "1.16.2"
+harbor_chart_version: "1.18.4"
 harbor_helm_repo: https://helm.goharbor.io
 harbor_host: "10.10.0.1"
 harbor_external_url: "https://{{ harbor_host }}:{{ harbor_nodeport_https }}"

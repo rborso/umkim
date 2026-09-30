@@ -3,11 +3,11 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.source="https://github.com/rborso/umkim"
 LABEL org.opencontainers.image.vendor="Robert Borso"
 
-ARG HELM_VERSION=v3.16.3
-ARG HELM_SHA256=f5355c79190951eed23c5432a3b920e071f4c00a64f75e077de0dd4cb7b294ea
-ARG KUBECTL_VERSION=v1.30.1
-ARG KUBECTL_SHA256=5b86f0b06e1a5ba6f8f00e2b01e8ed39407729c4990aeda961f83a586f975e8a
-ARG ANSIBLE_CORE_VERSION=2.15.13
+ARG HELM_VERSION=v3.17.4
+ARG HELM_SHA256=c91e3d7293849eff3b4dc4ea7994c338bcc92f914864d38b5789bab18a1d775d
+ARG KUBECTL_VERSION=v1.36.4
+ARG KUBECTL_SHA256=8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a
+ARG ANSIBLE_CORE_VERSION=2.18.8
 ARG NETADDR_VERSION=1.3.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

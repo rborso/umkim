@@ -36,7 +36,7 @@ spec:
           effect: NoSchedule
       priorityClassName: system-node-critical
       containers:
-        - image: {{ gpu_host_device_plugin_image | default('nvcr.io/nvidia/k8s-device-plugin:v0.17.0') }}
+        - image: {{ gpu_host_device_plugin_image | default('nvcr.io/nvidia/k8s-device-plugin:v0.19.3') }}
           name: nvidia-device-plugin-ctr
           env:
             - name: CONFIG_FILE

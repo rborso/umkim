@@ -4,7 +4,7 @@
 
 domain: example.local
 
-umkim_version: "0.2.0"
+umkim_version: "0.2.1"
 harbor_fleet_image_tag: "{{ umkim_version }}"
 fleet_site_rocky_major: "10"
 
@@ -79,22 +79,22 @@ host_prepare_nm_ipv6_connection_types:
   - ethernet
 
 # Phase 4 — OLM + cert-manager (ManifestWork bootstrap on spokes; pins in VERSIONS.md).
-phase4_olm_version: "0.31.0"
+phase4_olm_version: "0.45.0"
 phase4_olm_crds_url: "https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v{{ phase4_olm_version }}/crds.yaml"
 phase4_olm_deploy_url: "https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v{{ phase4_olm_version }}/olm.yaml"
-phase4_cert_manager_version: "1.15.3"
+phase4_cert_manager_version: "1.20.4"
 phase4_cert_manager_manifest_url: "https://github.com/cert-manager/cert-manager/releases/download/v{{ phase4_cert_manager_version }}/cert-manager.yaml"
-phase4_operatorhub_catalog_image: quay.io/operatorhubio/catalog@sha256:5170451b0027875f1c4484e69f5c38a4ab99392ed7ddb6eeddbf17367162ac66
+phase4_operatorhub_catalog_image: quay.io/operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
 phase4_bootstrap_namespace: fleet-bootstrap
 phase4_manifestwork_name: phase4-platform-bootstrap
-phase4_bootstrap_image: docker.io/bitnami/kubectl@sha256:9e369df7ab3386b736d162348f167bcc02cb4ba3f5203e9151be854437d6e0af
+phase4_bootstrap_image: registry.k8s.io/kubectl:v1.36.4@sha256:b8d523e7b8cdc5e3caa0f8891ee9f504abf137dec786e6e0ddd33e4f272c2f13
 # Warm Harbor quay-proxy cache before spokes pull OLM/cert-manager (digest mismatch if skipped).
 phase4_harbor_warm_images:
-  - operator-framework/olm@sha256:f41fcb25b37a6f280b5929f419b393141f0d72edcafe3b98232fc8af4e8a8139
-  - operatorhubio/catalog@sha256:5170451b0027875f1c4484e69f5c38a4ab99392ed7ddb6eeddbf17367162ac66
-  - jetstack/cert-manager-controller:v1.15.3
-  - jetstack/cert-manager-webhook:v1.15.3
-  - jetstack/cert-manager-cainjector:v1.15.3
+  - operator-framework/olm@sha256:f228c7a6b8c53e32f21a7cb855d9bc1c8f355fa5124cfc6c82552502e0a8481e
+  - operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
+  - jetstack/cert-manager-controller:v1.20.4
+  - jetstack/cert-manager-webhook:v1.20.4
+  - jetstack/cert-manager-cainjector:v1.20.4
 
 # Fleet controllers — image tags follow umkim_version (harbor_fleet_image_tag).
 fleet_edge_controller_enabled: true
@@ -110,7 +110,7 @@ fleet_console_auth_image: "{{ harbor_fleet_image_prefix }}/fleet-console-auth:{{
 # Phase 6 — spoke Traefik ingress (ManifestWork on joined clusters).
 phase6_spoke_ingress_namespace: fleet-ingress
 phase6_manifestwork_name: phase6-spoke-ingress
-phase6_traefik_image: docker.io/traefik:v3.4@sha256:06ddf61ee653caf4f4211a604e657f084f4727f762c16f826c97aafbefcb279e
+phase6_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
 phase6_http_nodeport: 30080
 phase6_https_nodeport: 30443
 phase6_traefik_acme_storage_class: local-path

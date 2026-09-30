@@ -1,6 +1,6 @@
 ---
-phase4_cert_manager_version: "1.15.3"
+phase4_cert_manager_version: "1.20.4"
 phase4_cert_manager_manifest_url: "https://github.com/cert-manager/cert-manager/releases/download/v{{ phase4_cert_manager_version }}/cert-manager.yaml"
-phase4_operatorhub_catalog_image: quay.io/operatorhubio/catalog@sha256:5170451b0027875f1c4484e69f5c38a4ab99392ed7ddb6eeddbf17367162ac66
+phase4_operatorhub_catalog_image: quay.io/operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
 ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
 k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

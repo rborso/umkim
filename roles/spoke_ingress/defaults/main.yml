@@ -2,7 +2,7 @@
 phase6_spoke_ingress_namespace: fleet-ingress
 phase6_manifestwork_name: phase6-spoke-ingress
 
-phase6_traefik_image: docker.io/traefik:v3.4@sha256:06ddf61ee653caf4f4211a604e657f084f4727f762c16f826c97aafbefcb279e
+phase6_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
 phase6_http_nodeport: 30080
 phase6_https_nodeport: 30443
 spoke_ingress_hub_http_nodeport: 30081

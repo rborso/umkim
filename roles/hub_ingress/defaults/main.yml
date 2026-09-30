@@ -1,7 +1,7 @@
 ---
 hub_ingress_namespace: fleet-ingress
 hub_ingress_gateway_name: gateway
-hub_ingress_traefik_image: docker.io/traefik:v3.4@sha256:06ddf61ee653caf4f4211a604e657f084f4727f762c16f826c97aafbefcb279e
+hub_ingress_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
 hub_ingress_acme_host_path: /var/lib/umkim/traefik-acme
 hub_ingress_static_cm: fleet-traefik-static
 hub_ingress_dynamic_cm: fleet-traefik-dynamic

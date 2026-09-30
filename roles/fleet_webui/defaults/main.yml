@@ -19,7 +19,7 @@ ocm_lab_ui_replicas: 1
 ocm_console_enabled: false
 ocm_console_nodeport: 30915
 ocm_console_image: docker.io/library/nginx:1.27-alpine
-ocm_kubectl_image: docker.io/bitnami/kubectl@sha256:9e369df7ab3386b736d162348f167bcc02cb4ba3f5203e9151be854437d6e0af
+ocm_kubectl_image: registry.k8s.io/kubectl:v1.36.4@sha256:b8d523e7b8cdc5e3caa0f8891ee9f504abf137dec786e6e0ddd33e4f272c2f13
 
 # UMKIM console (PatternFly SPA; Harbor image umkim-console).
 umkim_console_enabled: true

@@ -13,7 +13,7 @@ gpu_host_install_container_toolkit: false
 gpu_host_configure_k3s_runtime: false
 gpu_host_install_device_plugin: false
 gpu_host_k3s_config_dir: /var/lib/rancher/k3s/agent/etc/containerd
-gpu_host_device_plugin_image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+gpu_host_device_plugin_image: nvcr.io/nvidia/k8s-device-plugin:v0.19.3
 gpu_host_device_plugin_runtime_class: nvidia
 # Device plugin uses the cluster default runtime after nvidia-ctk (no RuntimeClass required).
 gpu_host_device_plugin_use_runtime_class: false
@@ -21,7 +21,7 @@ gpu_host_device_plugin_discovery_strategy: nvml
 gpu_host_device_plugin_wait_retries: 30
 gpu_host_device_plugin_wait_delay: 10
 # Upstream static manifest uses auto discovery; kept for reference only.
-gpu_host_device_plugin_manifest_url: "https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.0/deployments/static/nvidia-device-plugin.yml"
+gpu_host_device_plugin_manifest_url: "https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.19.3/deployments/static/nvidia-device-plugin.yml"
 # MOK enrollment for DKMS + Secure Boot (console step still required after reboot)
 gpu_host_mok_enroll: true
 gpu_host_mok_password: "{{ vault_gpu_host_mok_password | default('umkim-mok') }}"
