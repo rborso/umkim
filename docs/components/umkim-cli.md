@@ -74,7 +74,7 @@ umkim cluster provision NAME | wait NAME [--phase Ready] [--timeout 30m]
 umkim cluster validate NAME
 umkim cluster discover NAME [--wait 5m]
 umkim cluster bootstrap NAME --bootstrap-host MGMT_IP [--ssh-user linux] [--jumphost user@host:port]
-umkim cluster delete NAME [--cleanup-kubernetes]
+umkim cluster delete NAME [--cleanup-kubernetes] [--wait] [--timeout 90m] [--interval 3m]
 umkim cluster ingress-auth enable NAME --lldap-password-file FILE [--expose-lldap-webui]
 umkim cluster ingress-auth disable NAME
 umkim cluster acme enable NAME
@@ -104,7 +104,7 @@ umkim chart delete NAME
 umkim app list | get NAME | create [--cluster C --chart CHART …] [-f app.json]
 umkim app update NAME [--version V] [--values-file F] [--route-mode …] [--llm-backend true|false]
 umkim app create … --llama-profile qwen35-2b-ud-4g [--llm-backend true|false]
-umkim app delete NAME
+umkim app delete NAME [NAME...]
 
 umkim infra get hub
 umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
@@ -274,6 +274,8 @@ umkim site provision set SITE --provider yaidap \
   --yaidap-ref main \
   --yaidap-git-secret fleet-site-SITE-yaidap-git
 umkim site provision yaidap-sync SITE
+
+When `provision.yaidapRepo` is unset (hub-managed inventory path only), sync returns **skipped** instead of an error.
 umkim site provision run SITE --action create_vm --subject vm01 --wait
 umkim site provision run SITE --action plan_vm --subject vm01 --wait
 umkim site provision run SITE --action create_vm --subject vm01 \

@@ -124,6 +124,40 @@
       changed_when: fleet_cluster_delete_mw_finalizer.stdout is search('patched')
       tags: [fleet_cluster_delete]
 
+    - name: Fleet cluster delete | List all ManifestWorks in cluster namespace
+      ansible.builtin.command:
+        cmd: kubectl get manifestwork -n {{ fleet_cluster_name }} -o name
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_mw_all
+      changed_when: false
+      failed_when: false
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - fleet_cluster_delete_mc_wait.rc == 0
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Force-clear all ManifestWork finalizers in cluster namespace
+      ansible.builtin.command:
+        cmd: >-
+          kubectl patch {{ item }}
+          -n {{ fleet_cluster_name }}
+          --type=json
+          -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      loop: "{{ fleet_cluster_delete_mw_all.stdout_lines | default([]) }}"
+      register: fleet_cluster_delete_mw_all_finalizer
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - fleet_cluster_delete_mc_wait.rc == 0
+        - fleet_cluster_delete_mw_all.stdout_lines | default([]) | length > 0
+      failed_when: false
+      changed_when: fleet_cluster_delete_mw_all_finalizer.stdout is search('patched')
+      tags: [fleet_cluster_delete]
+
     - name: Fleet cluster delete | Re-wait for ManagedCluster removal after finalizer cleanup
       ansible.builtin.command:
         cmd: kubectl get managedcluster {{ fleet_cluster_name }}
@@ -141,10 +175,47 @@
         - fleet_cluster_delete_mc_wait.rc == 0
       tags: [fleet_cluster_delete]
 
+    - name: Fleet cluster delete | Force-clear stuck ManagedCluster finalizers
+      ansible.builtin.command:
+        cmd: >-
+          kubectl patch managedcluster {{ fleet_cluster_name }}
+          --type=json
+          -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_mc_finalizer
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - (fleet_cluster_delete_mc_rewait.rc | default(fleet_cluster_delete_mc_wait.rc)) == 0
+      failed_when: false
+      changed_when: fleet_cluster_delete_mc_finalizer.stdout is search('patched')
+      tags: [fleet_cluster_delete]
+
+    - name: Fleet cluster delete | Confirm ManagedCluster absent after finalizer cleanup
+      ansible.builtin.command:
+        cmd: kubectl get managedcluster {{ fleet_cluster_name }}
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cluster_delete_mc_final_check
+      until: fleet_cluster_delete_mc_final_check.rc != 0
+      retries: 6
+      delay: 5
+      failed_when: false
+      changed_when: false
+      when:
+        - fleet_cluster_cleanup_mode == 'reset'
+        - fleet_cluster_delete_mc_finalizer is changed
+      tags: [fleet_cluster_delete]
+
     - name: Fleet cluster delete | Publish ManagedCluster removal state
       ansible.builtin.set_fact:
         fleet_cluster_mc_removed: >-
-          {{ (fleet_cluster_delete_mc_rewait.rc | default(fleet_cluster_delete_mc_wait.rc)) != 0 }}
+          {{
+            (fleet_cluster_delete_mc_final_check.rc | default(fleet_cluster_delete_mc_rewait.rc | default(fleet_cluster_delete_mc_wait.rc))) != 0
+            or (fleet_cluster_delete_mc_finalizer.changed | default(false))
+          }}
         cacheable: true
       when: fleet_cluster_cleanup_mode == 'reset'
       tags: [fleet_cluster_delete]

@@ -298,28 +298,30 @@ func appUpdateCmd() *cobra.Command {
 
 func appDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete [name]",
-		Short: "Uninstall a FleetApp (DELETE /apps/{name})",
-		Args:  cobra.ExactArgs(1),
+		Use:   "delete [name...]",
+		Short: "Uninstall one or more FleetApps (DELETE /apps/{name})",
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			raw, code, err := api.Delete("/apps/" + args[0])
-			if err != nil {
-				return err
-			}
-			if err := mustOK(raw, code, 202, 200, 204); err != nil {
-				return err
-			}
 			format, ferr := outputFormat()
 			if ferr != nil {
 				return ferr
 			}
-			if format == output.FormatJSON {
-				if len(raw) > 0 {
-					printJSON(raw)
+			for _, name := range args {
+				raw, code, err := api.Delete("/apps/" + name)
+				if err != nil {
+					return err
 				}
-				return nil
+				if err := mustOK(raw, code, 202, 200, 204); err != nil {
+					return err
+				}
+				if format == output.FormatJSON {
+					if len(raw) > 0 {
+						printJSON(raw)
+					}
+					continue
+				}
+				fmt.Printf("OK: app %q delete requested\n", name)
 			}
-			fmt.Printf("OK: app %q delete requested\n", args[0])
 			return nil
 		},
 	}

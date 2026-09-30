@@ -167,34 +167,38 @@ func PatchInventory(ctx context.Context, c client.Client, ns, siteName, provider
 
 func writeInventoryOnce(ctx context.Context, c client.Client, ns, siteName, provider string, data map[string]string) error {
 	name := InventoryCMName(siteName, provider)
-	var existing corev1.ConfigMap
-	err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, &existing)
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: ns,
-				Labels: map[string]string{
-					"app":        cmLabelApp,
-					"fleet-site": siteName,
-					"provider":   provider,
+	return retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return apierrors.IsConflict(err) || apierrors.IsAlreadyExists(err)
+	}, func() error {
+		var existing corev1.ConfigMap
+		err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, &existing)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ns,
+					Labels: map[string]string{
+						"app":        cmLabelApp,
+						"fleet-site": siteName,
+						"provider":   provider,
+					},
 				},
-			},
-			Data: data,
+				Data: data,
+			}
+			return c.Create(ctx, cm)
 		}
-		return c.Create(ctx, cm)
-	}
-	existing.Data = data
-	if existing.Labels == nil {
-		existing.Labels = map[string]string{}
-	}
-	existing.Labels["app"] = cmLabelApp
-	existing.Labels["fleet-site"] = siteName
-	existing.Labels["provider"] = provider
-	return c.Update(ctx, &existing)
+		existing.Data = data
+		if existing.Labels == nil {
+			existing.Labels = map[string]string{}
+		}
+		existing.Labels["app"] = cmLabelApp
+		existing.Labels["fleet-site"] = siteName
+		existing.Labels["provider"] = provider
+		return c.Update(ctx, &existing)
+	})
 }
 
 // ListRevisions returns revision items newest-first.

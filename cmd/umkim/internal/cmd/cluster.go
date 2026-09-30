@@ -187,13 +187,16 @@ func clusterCreateCmd() *cobra.Command {
 }
 
 func clusterDeleteCmd() *cobra.Command {
-	var cleanupK8s, force bool
+	var cleanupK8s, force, wait bool
+	var waitTimeout time.Duration
+	var waitInterval time.Duration
 	c := &cobra.Command{
 		Use:   "delete [name]",
 		Short: "Delete a cluster",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := "/clusters/" + args[0]
+			name := args[0]
+			path := "/clusters/" + name
 			q := map[string]string{}
 			if cleanupK8s {
 				q["cleanupKubernetes"] = "true"
@@ -208,12 +211,32 @@ func clusterDeleteCmd() *cobra.Command {
 			if err := mustOK(raw, code, http.StatusAccepted, http.StatusOK); err != nil {
 				return err
 			}
-			printJSON(raw)
-			return nil
+			if !wait {
+				printJSON(raw)
+				return nil
+			}
+			deadline := time.Now().Add(waitTimeout)
+			for {
+				_, getCode, err := api.Get(path)
+				if err != nil {
+					return err
+				}
+				if getCode == http.StatusNotFound {
+					printJSON(raw)
+					return nil
+				}
+				if time.Now().After(deadline) {
+					return fmt.Errorf("timeout waiting for cluster %q to be removed", name)
+				}
+				time.Sleep(waitInterval)
+			}
 		},
 	}
 	c.Flags().BoolVar(&cleanupK8s, "cleanup-kubernetes", false, "Run Kubernetes cleanup on spoke nodes")
 	c.Flags().BoolVar(&force, "force", false, "Force delete while provisioning")
+	c.Flags().BoolVar(&wait, "wait", false, "Poll until the cluster is removed from the API")
+	c.Flags().DurationVar(&waitTimeout, "timeout", 90*time.Minute, "With --wait, overall timeout")
+	c.Flags().DurationVar(&waitInterval, "interval", 3*time.Minute, "With --wait, poll interval")
 	return c
 }
 

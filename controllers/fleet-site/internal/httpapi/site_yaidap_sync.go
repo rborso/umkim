@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
@@ -20,6 +21,13 @@ func (s *Server) syncSiteYaidapRepo(ctx context.Context, w http.ResponseWriter, 
 	}
 	if fs.Spec.EffectiveProvisionProvider() != fleetv1alpha1.ProvisionProviderYaidap {
 		http.Error(w, "yaidap repo sync requires provider yaidap", http.StatusConflict)
+		return
+	}
+	if fs.Spec.Provision != nil && strings.TrimSpace(fs.Spec.Provision.YaidapRepo) == "" {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"phase":   "skipped",
+			"message": "provision.yaidapRepo not set; hub inventory path sync only",
+		})
 		return
 	}
 	if err := yaidap.ValidateYaidapRepoSync(fs.Spec.Provision); err != nil {

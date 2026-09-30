@@ -12,6 +12,8 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/llm"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type llmResponse struct {
@@ -78,34 +80,54 @@ func (s *Server) handlePatchLLM(ctx context.Context, w http.ResponseWriter, r *h
 		return
 	}
 
+	if _, err := fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.patchFleetLLM(ctx, func(latest *fleetv1alpha1.FleetLLM) {
+		if patch.HubEnabled != nil {
+			latest.Spec.HubEnabled = *patch.HubEnabled
+		}
+		if patch.PublicHost != "" {
+			latest.Spec.PublicHost = patch.PublicHost
+		}
+		if patch.Backends != nil {
+			latest.Spec.Backends = patch.Backends
+			if latest.Annotations == nil {
+				latest.Annotations = map[string]string{}
+			}
+			latest.Annotations[fleetllm.BackendsManualAnnotation] = "true"
+		}
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	fl, err := fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if patch.HubEnabled != nil {
-		fl.Spec.HubEnabled = *patch.HubEnabled
-	}
-	if patch.PublicHost != "" {
-		fl.Spec.PublicHost = patch.PublicHost
-	}
-	if patch.Backends != nil {
-		fl.Spec.Backends = patch.Backends
-		if fl.Annotations == nil {
-			fl.Annotations = map[string]string{}
-		}
-		fl.Annotations[fleetllm.BackendsManualAnnotation] = "true"
-	}
-	if fl.Annotations == nil {
-		fl.Annotations = map[string]string{}
-	}
-	fl.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
-
-	if err := s.Client.Update(ctx, fl); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	writeJSON(w, http.StatusOK, llmToResponse(fl, s.Cfg.HubEdgeDomain))
+}
+
+func (s *Server) patchFleetLLM(ctx context.Context, mutate func(*fleetv1alpha1.FleetLLM)) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var fl fleetv1alpha1.FleetLLM
+		if err := s.Client.Get(ctx, types.NamespacedName{Namespace: s.Cfg.Namespace, Name: fleetv1alpha1.FleetLLMName}, &fl); err != nil {
+			if apierrors.IsNotFound(err) {
+				_, err = fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg)
+				return err
+			}
+			return err
+		}
+		orig := fl.DeepCopy()
+		mutate(&fl)
+		return s.Client.Patch(ctx, &fl, client.MergeFrom(orig))
+	})
 }
 
 func (s *Server) handleForceLLMReconcile(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -128,23 +150,28 @@ func (s *Server) handleSyncLLMBackendsFromApps(ctx context.Context, w http.Respo
 	if _, ok := s.requireMutatingActor(w, r); !ok {
 		return
 	}
-	fl, err := fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	backends, err := llm.DiscoverBackendsFromFleetApps(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fl.Spec.Backends = backends
-	if fl.Annotations == nil {
-		fl.Annotations = map[string]string{}
+	if _, err := fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	fl.Annotations[fleetllm.BackendsManualAnnotation] = "false"
-	fl.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
-	if err := s.Client.Update(ctx, fl); err != nil {
+	if err := s.patchFleetLLM(ctx, func(latest *fleetv1alpha1.FleetLLM) {
+		latest.Spec.Backends = backends
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[fleetllm.BackendsManualAnnotation] = "false"
+		latest.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fl, err := fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -169,17 +196,13 @@ func llmToResponse(fl *fleetv1alpha1.FleetLLM, domain string) llmResponse {
 }
 
 func (s *Server) triggerLLMReconcile(ctx context.Context) error {
-	var fl fleetv1alpha1.FleetLLM
-	if err := s.Client.Get(ctx, types.NamespacedName{Namespace: s.Cfg.Namespace, Name: fleetv1alpha1.FleetLLMName}, &fl); err != nil {
-		if apierrors.IsNotFound(err) {
-			_, err = fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg)
-			return err
-		}
+	if _, err := fleetllm.EnsureCR(ctx, s.Client, s.Cfg.Namespace, s.Cfg); err != nil {
 		return err
 	}
-	if fl.Annotations == nil {
-		fl.Annotations = map[string]string{}
-	}
-	fl.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
-	return s.Client.Update(ctx, &fl)
+	return s.patchFleetLLM(ctx, func(latest *fleetv1alpha1.FleetLLM) {
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[fleetllm.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
+	})
 }
