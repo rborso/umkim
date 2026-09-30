@@ -227,7 +227,10 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		if ok {
 			if err := r.finishClusterReady(ctx, &fcj, clusterName); err != nil {
-				return r.failClusterJoin(ctx, &fcj, err)
+				fcj.Status.Phase = fleetv1alpha1.JoinPhaseFailed
+				fcj.Status.Message = "Provision finalize failed: " + err.Error()
+				_ = r.Status().Update(ctx, &fcj)
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			}
 			ensureProviderStatusDefaults(&fcj, clusterName)
 			fcj.Status.Phase = fleetv1alpha1.JoinPhaseReady
@@ -279,6 +282,23 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	} else if res.Requeue || res.RequeueAfter > 0 {
 		return res, nil
+	}
+
+	if fcj.Status.Phase == fleetv1alpha1.JoinPhaseFailed && r.clusterProvisionRecoverable(ctx, clusterName) {
+		if provisionFinalizeRetriable(fcj.Status.Message) {
+			if err := r.finishClusterReady(ctx, &fcj, clusterName); err != nil {
+				fcj.Status.Message = "Provision finalize failed: " + err.Error()
+				_ = r.Status().Update(ctx, &fcj)
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			}
+			ensureProviderStatusDefaults(&fcj, clusterName)
+			fcj.Status.Phase = fleetv1alpha1.JoinPhaseReady
+			fcj.Status.Message = "Cluster ready"
+			avail, _ := r.managedClusterAvailable(ctx, clusterName)
+			fcj.Status.ManagedClusterAvailable = avail
+			_ = r.Status().Update(ctx, &fcj)
+			return ctrl.Result{}, nil
+		}
 	}
 
 	logger.Info("cluster join idle", "cluster", clusterName, "phase", fcj.Status.Phase)
@@ -1385,6 +1405,18 @@ func (r *ClusterJoinReconciler) failClusterJoin(ctx context.Context, fcj *fleetv
 	fcj.Status.Message = err.Error()
 	_ = r.Status().Update(ctx, fcj)
 	return ctrl.Result{}, err
+}
+
+func provisionFinalizeRetriable(message string) bool {
+	if message == "" {
+		return false
+	}
+	if strings.Contains(message, "Provision finalize failed") {
+		return true
+	}
+	return strings.Contains(message, "object has been modified") ||
+		strings.Contains(message, "fleet-edge-domains") ||
+		strings.Contains(message, "fleet-edge-clusters")
 }
 
 func (r *ClusterJoinReconciler) clusterProvisionRecoverable(ctx context.Context, clusterName string) bool {

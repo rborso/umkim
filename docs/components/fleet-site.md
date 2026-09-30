@@ -25,10 +25,11 @@ secret `fleet-system/fleet-kubeconfig-{cluster}` exists, the controller may
 still run hub **finalize** (edge registry, labels, `fleet-edge-domains`) and mark
 **Ready** with message *Cluster ready (recovered after missing provision job)*.
 If finalize fails (for example a transient **`fleet-edge-domains` ConfigMap
-conflict**), the FCJ stays **Failed** while the spoke may already be joined —
+conflict**), the FCJ may show **Failed** while the spoke is already joined —
 retry **`POST /clusters/{name}/provision`** or `umkim cluster provision NAME`.
-A separate reconcile path retries finalize when the Job succeeded earlier but
-finalize failed once.
+The controller retries **`fleet-edge-domains` / `fleet-edge-clusters`**
+updates on optimistic-lock conflict and periodically re-runs hub finalize when
+the provision Job succeeded but finalize failed once.
 
 Do not assume a partial provisioning run is safe to repeat without inspection.
 

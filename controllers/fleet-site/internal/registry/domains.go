@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -64,6 +65,15 @@ func ReconcileEdgeDomains(ctx context.Context, c client.Client, cfg DomainConfig
 	if ns == "" || name == "" {
 		return nil
 	}
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return reconcileEdgeDomainsOnce(ctx, c, cfg)
+	})
+}
+
+func reconcileEdgeDomainsOnce(ctx context.Context, c client.Client, cfg DomainConfig) error {
+	ns := cfg.EdgeDomainsCMNamespace
+	name := cfg.EdgeDomainsCMName
 
 	if err := SyncSiteAssignedClusters(ctx, c, cfg); err != nil {
 		return err

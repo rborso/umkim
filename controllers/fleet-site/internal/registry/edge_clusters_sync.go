@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"gopkg.in/yaml.v3"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -96,22 +97,25 @@ func SyncEdgeClustersFromSiteIngress(ctx context.Context, c client.Client, cfg D
 	if err != nil {
 		return err
 	}
-	patchCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
-		},
-	}
-	_, err = controllerutil.CreateOrUpdate(ctx, c, patchCM, func() error {
-		if patchCM.Data == nil {
-			patchCM.Data = map[string]string{}
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		patchCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+			},
 		}
-		patchCM.Data["clusters.yaml"] = string(out)
-		if patchCM.Annotations == nil {
-			patchCM.Annotations = map[string]string{}
-		}
-		patchCM.Annotations[AnnotationConsoleManaged] = "true"
-		return nil
+		_, uerr := controllerutil.CreateOrUpdate(ctx, c, patchCM, func() error {
+			if patchCM.Data == nil {
+				patchCM.Data = map[string]string{}
+			}
+			patchCM.Data["clusters.yaml"] = string(out)
+			if patchCM.Annotations == nil {
+				patchCM.Annotations = map[string]string{}
+			}
+			patchCM.Annotations[AnnotationConsoleManaged] = "true"
+			return nil
+		})
+		return uerr
 	})
 	return err
 }

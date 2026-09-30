@@ -11,27 +11,29 @@ import (
 // and polls until phase Succeeded. When requireGPU is true, cluster capabilities.gpu must be true.
 func waitClusterCapabilityDiscovery(clusterName string, timeout time.Duration, requireGPU bool) error {
 	deadline := time.Now().Add(timeout)
+	started := false
 	for time.Now().Before(deadline) {
-		raw, code, err := api.Post("/clusters/"+clusterName+"/discover-capabilities", nil)
-		if err != nil {
-			return err
-		}
-		switch code {
-		case http.StatusOK:
-			if requireGPU {
-				if err := assertClusterGPUCapability(clusterName); err != nil {
+		if !started {
+			raw, code, err := api.Post("/clusters/"+clusterName+"/discover-capabilities", nil)
+			if err != nil {
+				return err
+			}
+			switch code {
+			case http.StatusOK:
+				if requireGPU {
+					if err := assertClusterGPUCapability(clusterName); err != nil {
+						return err
+					}
+				}
+				return nil
+			case http.StatusAccepted, http.StatusConflict:
+				// job started or already running; poll status only
+			default:
+				if err := mustOK(raw, code, http.StatusAccepted, http.StatusOK); err != nil {
 					return err
 				}
 			}
-			return nil
-		case http.StatusAccepted:
-			// started; poll below
-		case http.StatusConflict:
-			// already running
-		default:
-			if err := mustOK(raw, code, http.StatusAccepted, http.StatusOK); err != nil {
-				return err
-			}
+			started = true
 		}
 		phase, err := fetchClusterDiscoveryPhase(clusterName)
 		if err != nil {
