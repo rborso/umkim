@@ -87,7 +87,7 @@ umkim cluster platform status NAME
 
 umkim cluster gpu status NAME
 umkim cluster gpu host-prep NAME [--force] [--wait 45m]
-umkim cluster gpu enable NAME [--wait 30m]
+umkim cluster gpu enable NAME [--wait 30m]   # --wait also runs capability discovery and requires fleet.capability/gpu=true
 umkim cluster gpu discover NAME
 
 umkim vm list --cluster NAME

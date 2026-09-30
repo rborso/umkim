@@ -37,6 +37,9 @@ func (r *ClusterJoinReconciler) reconcileCapabilityDiscover(ctx context.Context,
 	if _, ok := fcj.Annotations[discoverAnnotation]; !ok {
 		return ctrl.Result{}, nil
 	}
+	if gpuCapabilityDiscoverDeferred(fcj) {
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	}
 
 	jobAnn := fcj.Annotations["fleet.umkim.com/capability-discover-job"]
 	if jobAnn == "" {

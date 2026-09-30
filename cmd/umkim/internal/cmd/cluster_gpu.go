@@ -140,6 +140,20 @@ func clusterGpuEnableCmd() *cobra.Command {
 					sawApplying = true
 				}
 				if phase == "Ready" {
+					discWait := d
+					if discWait > 10*time.Minute {
+						discWait = 10 * time.Minute
+					}
+					if err := waitClusterCapabilityDiscovery(args[0], discWait, true); err != nil {
+						return err
+					}
+					st, code, err := api.Get("/clusters/" + args[0] + "/gpu")
+					if err != nil {
+						return err
+					}
+					if err := mustOK(st, code); err != nil {
+						return err
+					}
 					printJSON(st)
 					return nil
 				}
@@ -151,7 +165,7 @@ func clusterGpuEnableCmd() *cobra.Command {
 			return fmt.Errorf("timeout waiting for GPU runtime enable")
 		},
 	}
-	c.Flags().StringVar(&wait, "wait", "", "Wait for runtime enable to finish (e.g. 30m)")
+	c.Flags().StringVar(&wait, "wait", "", "Wait for runtime enable and GPU capability discovery (e.g. 30m)")
 	return c
 }
 

@@ -303,9 +303,6 @@ func (r *ClusterJoinReconciler) finishGpuHostJob(ctx context.Context, fcj *fleet
 	}
 	delete(latest.Annotations, configureGpuHostAnnotation)
 	delete(latest.Annotations, configureGpuHostJobAnnotation)
-	if ok {
-		latest.Annotations[discoverAnnotation] = time.Now().UTC().Format(time.RFC3339)
-	}
 	if err := r.Update(ctx, &latest); err != nil {
 		if apierrors.IsConflict(err) {
 			return ctrl.Result{Requeue: true}, nil

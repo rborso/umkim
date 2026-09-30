@@ -33,7 +33,8 @@ and `el10_driver_version` pin the proprietary `kmod-nvidia-latest-dkms` stack
 2. Reboot and verify `nvidia-smi` on the node.
 3. Bootstrap the cluster (or use **force** host prep on an already Ready cluster).
 4. Enable GPU runtime (container toolkit + device plugin) on a Ready cluster.
-5. Re-run capability discovery and confirm `fleet.capability/gpu=true`.
+5. Confirm `fleet.capability/gpu=true` (automatic after `umkim cluster gpu enable --wait`,
+   which re-runs capability discovery when runtime enable succeeds).
 
 ## Operator interfaces (CLI and console)
 
@@ -45,7 +46,7 @@ Use the fleet API only — do not run `playbooks/flows/gpu-host-prep.yml` or
 | Status (PCI, driver branch, K8s GPU) | `umkim cluster gpu status NAME` | Cluster → Capabilities + Operations |
 | Host driver | `umkim cluster gpu host-prep NAME [--force] [--wait 45m]` | **Prepare GPU host** |
 | Runtime + device plugin | `umkim cluster gpu enable NAME [--wait 30m]` | **Enable GPU runtime** |
-| Re-discover | `umkim cluster gpu discover NAME` or `umkim cluster discover NAME` | **Discover capabilities** |
+| Re-discover | `umkim cluster gpu discover NAME` or `umkim cluster discover NAME` | **Discover capabilities** (also runs at end of `gpu enable --wait`) |
 
 On Ready clusters, host prep requires `--force` (the console sends `force: true`
 automatically).
@@ -56,7 +57,6 @@ Example:
 umkim cluster gpu status lab-gpu-0
 umkim cluster gpu host-prep lab-gpu-0 --force --wait 45m
 umkim cluster gpu enable lab-gpu-0 --wait 30m
-umkim cluster gpu discover lab-gpu-0
 umkim cluster list --require gpu
 ```
 

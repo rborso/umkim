@@ -1185,8 +1185,10 @@ func (r *ClusterJoinReconciler) finishClusterReady(ctx context.Context, fcj *fle
 	if err := r.triggerKubeconfigSync(ctx, fcj); err != nil {
 		return err
 	}
-	if err := r.triggerCapabilityDiscover(ctx, fcj); err != nil {
-		return err
+	if !gpuCapabilityDiscoverDeferred(fcj) {
+		if err := r.triggerCapabilityDiscover(ctx, fcj); err != nil {
+			return err
+		}
 	}
 	if err := r.upsertEdgeClusterEntry(ctx, fcj, clusterName); err != nil {
 		return err
