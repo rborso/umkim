@@ -1,8 +1,40 @@
 # YAIDAP and UMKIM — two homelab PoCs
 
-Hello to everyone reading this. I want to introduce two proof-of-concept projects I have been building for my lab: **YAIDAP** (Ansible-first metal and VM provisioning) and **UMKIM** (a hub-centric manager for several independent K3s clusters). They are separate codebases, but UMKIM can call YAIDAP on a site jumphost when you do not want to install nodes by hand.
+Hello to everyone reading this. I want to introduce two proof-of-concept projects I have been building for my lab: **YAIDAP** (**Yet Another Inventory-Driven Ansible Provisioner** — Ansible-first metal and VM provisioning) and **UMKIM** (a hub-centric manager for several independent K3s clusters). They are separate codebases, but UMKIM can call YAIDAP on a site jumphost when you do not want to install nodes by hand.
+
+**Who this is for:** homelab operators who like Ansible more than Terraform, people curious about multi-cluster K3s without a hyperscaler control plane, and anyone willing to read long YAML before clicking “provision.”
 
 Both are experiments, not production platforms. They exist because I wanted to see whether Ansible and a small hub can carry real multi-site Kubernetes operations in a weird home network—not because every problem needs this shape of solution.
+
+```mermaid
+flowchart TB
+  subgraph L0["L0 — YAIDAP ~/yaidap"]
+    Inv[Inventory YAML]
+    TempXE[TempXE / iPXE]
+    LV[libvirt / optional Proxmox]
+  end
+  subgraph L1["L1 — UMKIM hub"]
+    Console[Console + umkim CLI]
+    OCM[OCM + Harbor]
+    WG[WireGuard overlay]
+    Jobs[Connector Jobs]
+  end
+  subgraph Lab["Physical test lab"]
+    BCK[bck routing]
+    Iron[notebooks + desktop]
+    VPS[Netcup hub]
+  end
+  Inv --> TempXE --> Iron
+  Inv --> LV
+  Console --> Jobs --> Inv
+  Jobs --> LV
+  WG --> Iron
+  VPS --> L1
+  BCK --> Iron
+```
+
+> [!WARNING]
+> **v0.2 is a proof of concept.** Hub install and cluster delete flows can be destructive. Backup/restore, upgrades, HA, and tenancy are not production-grade. Validate on disposable hardware before trusting anything with data you care about.
 
 ---
 
@@ -19,7 +51,7 @@ For a long time it also deployed services inside VMs. I narrowed the scope to wh
 
 I never really got into Terraform, and I was curious whether bare-metal and libvirt lifecycle could live entirely in Ansible (whether it *should* is a different question).
 
-The YAIDAP source tree lives at **`~/yaidap`** on my machines. The schema contract is documented in **`~/yaidap/docs/inventory-model.md`** and mirrored in sanitized form under `inventory/example/`. Real lab data is in trees like `inventory/lab/` (Ansible controller **`bck`**).
+The YAIDAP source tree lives at **`~/yaidap`**. The schema contract is in **`~/yaidap/docs/inventory-model.md`** and mirrored in sanitized form under `inventory/example/`. Real lab data is in **`~/yaidap/inventory/lab/`** (network names **`mgmt_nw`** / **`lab_nw`** match my home CIDRs). The step-by-step tutorial uses fictional MACs in **`inventory/demo/`** — see **`~/yaidap/docs/lab-provisioning.md`**.
 
 ### Inventory directory layout
 
@@ -40,6 +72,18 @@ inventory/<site>/
 ```
 
 Playbooks are tag-driven under `playbooks/` (`validate-all`, `configure-hypervisors`, `configure-tempxe`, `provision-vms`, `discover-hosts`, …). Almost all behavior is data in the YAML above, not hard-coded host names.
+
+```mermaid
+flowchart LR
+  networks["networks[] in group_vars/all"]
+  uplinks["uplinks[] in host_vars"]
+  disks["disks[] + storages[]"]
+  networks --> uplinks
+  disks --> storages["storages[] catalog"]
+  uplinks --> prepare["prepare / bridges"]
+  disks --> tempxe["TempXE kickstart"]
+  storages --> create["create VM"]
+```
 
 ### Shared catalog (`group_vars/all/all.yml`)
 
@@ -139,6 +183,8 @@ Prefer **`disk/by-id/…`** on bare metal so `sda`/`sdb` swaps do not break kick
 
 Effective VLAN = attachment `tag` if set, else `networks[name].tag`. That is how **one L3 (`lab_nw`) on tagged trunk vs untagged access** works (`inventory/example/host_vars/hv-dual-l1.yml`).
 
+**Bond uplinks:** the example inventory includes **`hv-bond`** — management on one NIC, **`lab_nw`** on an **`active-backup`** bond (`inventory/example/host_vars/hv-bond.yml`). LACP is in the schema but only active-backup was soaked in my lab; see **`~/yaidap/KNOWN_LIMITATIONS.md`**.
+
 Truncated hypervisor example:
 
 ```yaml
@@ -156,7 +202,7 @@ uplinks:
         ip: "172.16.10.2"
 ```
 
-Guests add **`vm_location`** (hypervisor hostname or `least-utilized`), **`os`**, and often **`hypervisor_uplink`** when the HV exposes the same `network_name` on more than one bridge.
+Guests add **`vm_location`** (hypervisor hostname or `least-utilized`), **`os`**, and often **`hypervisor_uplink`** when the HV exposes the same `network_name` on more than one bridge. **`provisioning_provider: proxmox`** is supported (including nested Proxmox-on-libvirt lab paths and PXE install of PVE 8/9 in the demo walkthrough).
 
 ### Ansible groups (root YAML files)
 
@@ -167,11 +213,11 @@ Guests add **`vm_location`** (hypervisor hostname or `least-utilized`), **`os`**
 | `routers.yml` | `routers` | OpenWrt (`configure-routers.yml`) |
 | `controllers.yml` | `controllers` | Machine that runs TempXE / discovery output paths |
 
-Membership is plain Ansible: hostname under `hosts:` plus `host_vars/<hostname>.yml`. Cluster intent for UMKIM can also use root `{cluster}.yml` and `group_vars/{cluster}.yml` when the hub syncs inventory—but the YAIDAP-native core is still **hypervisors + guests + shared catalog**.
+Membership is plain Ansible: hostname under `hosts:` plus `host_vars/<hostname>.yml`. When UMKIM syncs inventory, it adds hub-side files (see **Together** below); the YAIDAP-native core is still **hypervisors + guests + shared catalog**.
 
 ### How inventory is built (discovery → validate → prepare → create)
 
-Most new bare-metal hosts follow the same pipeline documented in `docs/discovery-to-create.md`:
+Most new bare-metal hosts follow the same pipeline in **`~/yaidap/docs/discovery-to-create.md`**:
 
 1. **Seed** — Put the hostname in `hypervisors.yml` with at least a **MAC** (and `ansible_host` once you know management IP).
 2. **Discover** — Either SSH `discover-hosts.yml --tags check_host_details`, or PXE **`tempxe_discovery`** (Rocky Anaconda collector) and `configure-tempxe.yml --tags collect_discovery`. Output lands in **`generated/host_vars/<host>.yml`** plus **`.notes.json`** (hardware detail for humans, GPU PCI ids, NIC chipsets, …).
@@ -183,11 +229,15 @@ Most new bare-metal hosts follow the same pipeline documented in `docs/discovery
 
 PXE **OS install** and **discovery** share TempXE; after a successful install, post-install logic trims kickstart so the next boot chainloads disk. Discovery can run with **`reboot_after_discovery: false`** so a laptop without iLO stays in the live environment until you reboot manually.
 
-Beyond OS install, the same inventory drives **libvirt VM create/destroy**, optional **Proxmox**, **OpenWrt ZTP**, and **GPU passthrough** fields (`gpu_passthrough_host` / `gpu_passthrough`) documented in the YAIDAP repo.
+**Prepare safety:** bare-metal **`prepare`** rewires bridges and can **strand SSH** (especially dual-NIC bond mid-flight). Read **`~/yaidap/docs/prepare-safety.md`** and first soak with **`configure_firewalld: false`**.
+
+**OpenWrt in inventory:** YAIDAP can model OpenWrt as **`routers`** (DynDNS, reverse proxy, ACME via `configure-routers.yml`) or bootstrap **OpenWrt VM** images with **`tempxe_openwrt_ztp`** (PPPoE, VLAN lab bridge, LAN DHCP off while TempXE serves install DHCP). That is separate from “the router I actually run on **`bck`** hardware”—same schema, different deployment target.
+
+**GPU passthrough:** on the hypervisor, **`gpu_passthrough_host`** (VFIO bind, IOMMU args); on the guest, **`gpu_passthrough`** with PCI ids from **`notes.json`**. One GPU per guest. Lab path: **`~/yaidap/docs/gpu-passthrough.md`**.
 
 ### Provisioning flow (TempXE / iPXE)
 
-Many of my nodes are half-notebooks, so provisioning relies on **iPXE**. The internal lab LAN has **no DHCP** in steady state (install-time DHCP comes from the **TempXE Podman container** on the controller, not from OpenWrt).
+Many of my nodes are half-notebooks, so provisioning relies on **iPXE**. The internal lab LAN has **no DHCP** in steady state (install-time DHCP comes from the **TempXE Podman container** on the Ansible controller, not from OpenWrt).
 
 When install is armed for a host:
 
@@ -195,13 +245,29 @@ When install is armed for a host:
 2. The machine PXE-boots, installs Rocky (or discovery-only, or Proxmox on supported paths).
 3. When install is off, DHCP **chainloads local disk** so day-to-day reboots stay fast.
 
-That lines up with the **`networks` / `uplinks` / `tempxe_*`** fields above: you declare *which* bridge and VLAN TempXE binds to, *which* MAC gets an install menu, and *which* disk id kickstart must wipe.
+The TempXE role **builds** the container image but the operator still **starts** it (`tempxe_start` / confirm flows)—it is not fully hands-off. Fake bare-metal PXE guests sometimes need manual **`pxe-e1000.rom`** / **`/etc/qemu/bridge.conf`** steps documented in **`KNOWN_LIMITATIONS.md`**.
+
+### YAIDAP limitations (honest short list)
+
+- TempXE container lifecycle is operator-driven; SELinux labeling on ISO trees can bite on Fedora controllers.
+- HTTP-ISO NIC coverage and Proxmox dual-NIC edge cases are documented in **`~/yaidap/KNOWN_LIMITATIONS.md`**.
+- WireGuard/Authelia on OpenWrt are out of scope for the YAIDAP repo (homelab-only extras elsewhere).
+- Kubernetes addons are explicitly **out of scope** — that is UMKIM’s job.
 
 ---
 
 ## UMKIM (v0.2)
 
-UMKIM is a **management plane for multiple Kubernetes clusters**, not a single giant cluster with workers attached to one control plane. The design shifted a lot from v0.1 to **v0.2**; what follows is the current model.
+UMKIM is a **management plane for multiple Kubernetes clusters**, not a single giant cluster with workers attached to one control plane.
+
+### What changed from v0.1 to v0.2
+
+Early UMKIM tried to be a simpler “many clusters, one story” stack. **v0.2** reframed around:
+
+- **Per-site exposure** — each `FleetSite` carries its own `ingress[]` and optional **`hubGateway`**, instead of one global “how the world reaches the fleet” knob.
+- **Thin hub, fat spoke** — workload clusters are real independent K3s control planes; the hub registers them over WireGuard + OCM but does not run their pods.
+- **Console-first lifecycle** — `FleetSite`, `FleetClusterJoin`, bootstrap bundles, and hub Jobs for provision/finalize.
+- **Optional YAIDAP connector** — hub-native YAML inventory (`guests`, `bare_metals`, cluster `group_vars`) synced to a jumphost instead of re-encoding disk/VLAN semantics in Fleet CRDs.
 
 ### Hub
 
@@ -210,70 +276,152 @@ There is a **management hub**: a K3s cluster on a dedicated host (in my lab, oft
 - **Open Cluster Management (OCM)** — register and manage spoke clusters
 - **Harbor** — images and Helm charts
 - **WireGuard** — overlay between hub and sites
-- **Fleet console and edge routing** — operator UI and optional hub-gateway HTTP(S)
+- **Fleet console, fleet-edge routing, and optional ingress-auth** — operator UI, Traefik routes, optional Authelia on **app** URLs (separate from console login)
 
-Spoke clusters are **independent K3s control planes**. The hub does not run their workloads; it enrolls them, pushes platform pieces (OLM, cert-manager, ingress helpers), and installs **FleetApp** charts onto clusters you name explicitly.
+The **management site** (hub itself) is infrastructure — you do **not** target it with `FleetApp` or treat it as a workload `ManagedCluster`. Create a **non-management** `FleetSite` for the first real cluster.
+
+Spoke clusters are **independent K3s control planes**. After join, the hub applies platform pieces (OLM, cert-manager, spoke ingress helpers). Optional **KubeVirt** is a post-**Ready** platform operation on spokes with KVM, not a FleetApp.
+
+### Operator path (greenfield sketch)
+
+Mirrors [docs/install.md](docs/install.md) in blog form:
+
+1. Bootstrap hub inventory, vault, preflight; install hub K3s stack.
+2. Create a WireGuard client; open the **console** over the overlay.
+3. Create a **non-management site** and a **FleetClusterJoin** (or define cluster intent in provision inventory with **`autoApply`**).
+4. Run **bootstrap** on the first control node; wait for **Validated**, then hub **Provision** until **Ready**.
+5. Publish/install a chart with **FleetApp** on the cluster you select.
+
+The **`umkim`** CLI wraps the same API ([docs/components/umkim-cli.md](docs/components/umkim-cli.md)) — e.g. `site provision set`, `site provision yaidap-sync`, `cluster provision`, inventory sync — when you prefer scripts over the UI.
 
 ### Sites
 
-A **site** is a logical boundary: a datacenter corner, a room, or “everything behind the same jumphost.” Each site is a `FleetSite`. Sites can define **zero or more ingress methods** that describe how traffic from the Internet (or a WAN) reaches clusters in that site:
+A **site** is a logical boundary: a datacenter corner, a room, or “everything behind the same jumphost.” Each site is a `FleetSite`. Sites can define **zero or more ingress methods**:
 
 | Pattern | Idea |
 | --- | --- |
 | **Port forward** | Public IP ports 80/443 forwarded to a cluster VIP or single-node address |
-| **Reverse proxy** | An external reverse proxy terminates TLS and routes subdomains to the cluster |
-| **Hub gateway** | No site-local WAN ingress; HTTP(S) published on the hub and forwarded over WireGuard |
+| **Reverse proxy** | External reverse proxy terminates TLS and routes subdomains to the cluster |
+| **Hub gateway** | HTTP(S) published on the hub; hub forwards to spokes over WireGuard |
 | **Private** | No fleet-managed WAN path; clusters still join over the overlay |
 
-Each site can host **multiple clusters**.
+Clusters bind to a specific ingress row with **`FleetClusterJoin.spec.edge.ingressId`**. Examples: [examples/site-profiles/](examples/site-profiles/).
 
 ### Clusters
 
-Every cluster belongs to **exactly one site**. Supported shapes include **single-node** clusters and **three-node control-plane HA** (plus optional workers).
+Every cluster belongs to **exactly one site**. Shapes include **single-node** and **three-node control-plane HA** (plus workers).
 
-When you create a cluster in the console, the hub issues a **bootstrap bundle**: WireGuard client material, K3s install steps, and enrollment hooks so the spoke registers with the hub. After local validation, the hub **provisions** OCM registration and platform manifests until the cluster is **Ready**. Then you install applications with **FleetApp** (Helm from Harbor/OCI)—there is no automatic placement engine; you pick the cluster.
+The hub issues a **bootstrap bundle** (WireGuard + K3s + enroll). Lifecycle: Pending → ScriptIssued → Enrolled → Validated → Provisioning → **Ready** (**Failed** with retry/recovery documented in [docs/components/fleet-site.md](docs/components/fleet-site.md)).
 
-Lifecycle phases look like: Pending → ScriptIssued → Enrolled → Validated → Provisioning → **Ready** (with **Failed** and recovery paths documented in the UMKIM repo).
+**Cluster delete defaults to detach:** hub-managed objects go away; spoke K3s and workloads stay unless you opt into full Kubernetes cleanup.
 
-### YAIDAP integration
+### Workloads: FleetApp and routing
 
-You do not have to PXE or libvirt-provision from UMKIM. The default site provisioner is **`noop`**: you SSH to already-installed nodes and run the bootstrap bundle.
+`FleetApp` installs an OCI Helm chart onto **one cluster you name** — no placement engine, no hub-as-target.
 
-If a site uses **`provider: yaidap`**, UMKIM stores **intent and inventory on the hub**, SSHs to a **site jumphost**, and runs YAIDAP playbooks there (via hub Jobs). YAIDAP still owns kickstart, bridges, disks, and libvirt details; UMKIM owns cluster enrollment once guests are SSH-ready. That is how “provision the hosts over a jumphost” fits together.
+| `route.mode` | Behavior | Hub needed for public URL? |
+| --- | --- | --- |
+| `none` | No fleet-managed route; chart owns ingress | No |
+| `hub` | Hub gateway publishes and forwards over WireGuard | Yes (and site needs **`hubGateway`**) |
+| `site` | Spoke/site ingress exposes the app (`port_forward`, `reverse_proxy`, …) | No |
 
-For the full connector contract, see [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md) in the UMKIM repository.
+Match route mode to site edge (see [docs/components/fleet-apps.md](docs/components/fleet-apps.md)). Console authentication and optional **ingress-auth** on routes are separate concerns.
+
+### Optional hub features (experimental)
+
+- **Fleet LLM** — optional inference profile; needs explicit security review ([docs/components/fleet-llm.md](docs/components/fleet-llm.md)).
+- **Backup/restore** — exists but must be validated per app ([docs/backup-restore.md](docs/backup-restore.md)).
+- **YAIDAP provisioner** — below and in [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md).
+
+### YAIDAP integration (summary)
+
+Default site provisioner is **`noop`**: bring SSH-ready nodes, run the bootstrap bundle.
+
+With **`provider: yaidap`**, the hub stores inventory in ConfigMap **`fleet-site-{site}-yaidap-inventory`**, runs **`fleet-ansible-runner`** Jobs over SSH to the **jumphost**, and parses optional **`YAIDAP_RESULT=…`** JSON (handoff: `ansible_host`, `ansible_user`, `os_family`) from job logs when integration playbooks set **`yaidap_emit_result: true`**.
+
+---
+
+## Together: from iron to Ready cluster
+
+This is the combined story both repos were written for.
+
+### Hub provision inventory (YAIDAP-enabled site)
+
+| Path | Synced to jumphost? | Role |
+| --- | --- | --- |
+| `group_vars/all/all.yml` | Yes | `networks`, `storages`, TempXE defaults |
+| `hypervisors.yml` | Yes | Placement / discovery targets |
+| `guests.yml` | Yes | Libvirt guest index (`ansible_host`, `vm_location`) |
+| `bare_metals.yml` | **Hub only** | Bare-metal cluster members; merged into jumphost view on sync |
+| `{cluster}.yml` + `group_vars/{cluster}.yml` | Yes | Group membership + `topology`, `autoApply`, VIP / HA fields |
+| `host_vars/{guest}.yml` | Yes | Full YAIDAP profile per machine |
+| `_meta/status.json` | **Hub only** | Guest phases: Declared → Provisioning → Ready / Failed |
+| `controllers.yml`, `routers.yml`, `generated/` | **Jumphost only** | Preserved across sync (TempXE, discovery drafts) |
+
+Edit inventory via console, **`umkim`**, or API → **`POST …/provision/inventory/sync`** → connector actions on the jumphost.
+
+### End-to-end flow
+
+```text
+1. Edit hub inventory (guests, host_vars, cluster group_vars)
+2. inventory/sync → jumphost ~/…/inventory/<site>/
+3. discover / discover_pxe / create_vm / install_bm (YAIDAP playbooks via Job)
+4. Guest status Ready; handoff SSH address known
+5. cluster-apply → FleetClusterJoin (autoApply or manual)
+6. Download bootstrap bundle → bootstrap.sh on control node (via jumphost/SSH)
+7. Spoke Validated → umkim cluster provision → OCM + edge finalize → Ready
+8. FleetApp chart install + route.mode aligned with site ingress
+```
+
+```mermaid
+sequenceDiagram
+  participant Hub as UMKIM hub
+  participant JH as Site jumphost
+  participant Y as YAIDAP playbooks
+  participant Node as Cluster node
+  Hub->>Hub: inventory YAML + _meta
+  Hub->>JH: sync inventory
+  Hub->>JH: Job SSH create_vm / install_bm
+  JH->>Y: ansible-playbook
+  Y->>Node: VM or OS install
+  Y-->>Hub: YAIDAP_RESULT handoff optional
+  Hub->>Hub: FleetClusterJoin + bundle
+  Node->>Hub: enroll + Validated
+  Hub->>Node: provision OCM / edge
+  Hub->>Node: FleetApp Helm
+```
+
+UMKIM owns **intent and enrollment**; YAIDAP owns **kickstart, bridges, libvirt, TempXE semantics**. Do not copy full `networks` / uplink catalogs into Fleet CRDs — they stay in YAML ([docs/components/yaidap-integration.md](docs/components/yaidap-integration.md)).
 
 ---
 
 ## Test lab
 
-Everything above is tested on a deliberately odd home setup: one rented VPS, a pile of used notebooks, one desktop, and a management router built from spare hardware. This section is **my** lab layout (IPs and topology), not the topology-neutral design docs in the UMKIM tree.
+Everything above is tested on a deliberately odd home setup. This section is **my** layout (real IPs), not the topology-neutral design docs in the UMKIM tree.
 
 ### Hardware
 
 | Role | Machine | Notes |
 | --- | --- | --- |
-| **External hub / WAN-facing services** | Netcup VPS | 4 vCPU, 8 GiB RAM; runs UMKIM hub pieces that need a stable public footprint |
+| **External hub / WAN-facing services** | Netcup VPS | 4 vCPU, 8 GiB RAM; UMKIM hub |
 | **Compute node** | Notebook ×2 | Intel i5-8350U, 32 GiB RAM each |
 | **Compute + GPU** | Notebook ×1 | Intel i7-7700HQ, 16 GiB RAM, NVIDIA GTX 1050 Ti (4 GiB) |
 | **Compute + GPU** | Desktop | Intel i5-8400, 32 GiB RAM, NVIDIA GTX 1650 |
 | **Management / routing (`bck`)** | Notebook | OpenWrt; PPPoE passthrough, internal routing, jumphost-style access |
 
-The four compute nodes (two i5 notebooks, i7 notebook, desktop) hang off the same switch as **`bck`**. The VPS is outside this L2 domain and reaches the lab over VPN, SSH, and UMKIM’s WireGuard overlay.
+The four compute nodes hang off the same switch as **`bck`**. The VPS reaches the lab over VPN, SSH, port forwards, and WireGuard.
 
 ### Network topology
-
-Two logical networks share one physical unmanaged switch, with **`bck`** in the middle:
 
 ```text
                     ┌─────────────────┐
                     │ Provider router │
-                    │ 192.168.1.0/24  │  DHCP on
+                    │ 192.168.1.0/24  │  DHCP on  (= mgmt_nw)
                     └────────┬────────┘
                              │
               ┌──────────────┴──────────────┐
               │  VLAN 10 (on provider LAN) │
-              │  Internal: 172.16.10.0/24  │  No DHCP
+              │ 172.16.10.0/24            │  No DHCP  (= lab_nw)
               └──────────────┬──────────────┘
                              │
                     ┌────────┴────────┐
@@ -285,29 +433,18 @@ Two logical networks share one physical unmanaged switch, with **`bck`** in the 
                     (separate from other WAN)     └── (iPXE / lab traffic)
 ```
 
-**Provider network (`192.168.1.0/24`)**
+- **Provider `192.168.1.0/24`:** ISP router DHCP; maps to YAIDAP **`mgmt_nw`** in **`~/yaidap/inventory/lab/group_vars/all/all.yml`**.
+- **Internal `172.16.10.0/24`:** routed on **`bck`** VLAN 10; **no steady-state DHCP**; maps to **`lab_nw`**. TempXE on the controller binds here (`tempxe_server_ip`, `tempxe_bind_interface`).
+- **`bck` USB NIC** on the same dumb switch (untagged) with a **second public IP**, separate from the primary WAN path.
 
-- Behind the ISP router; **DHCP enabled**.
-- **`bck`** participates on this network (including **VLAN 10** carrying the internal subnet).
+### Roles of `bck` and inventory
 
-**Internal lab network (`172.16.10.0/24`)**
+- **`bck` (hardware)** runs **OpenWrt** for routing, PPPoE passthrough, and VLAN 10 — it is the gateway for the internal lab, not something I **`prepare`** with YAIDAP bridge logic on the live router image.
+- **YAIDAP** uses **`~/yaidap/inventory/lab/`** with the same **`mgmt_nw` / `lab_nw`** names; playbooks run from a controller that can reach hypervisors (in UMKIM homelab flows, often a **jumphost** SSH target synced from the hub, reachable via **`bck`** port forwards).
+- **UMKIM hub** on **Netcup**; a **homelab** `FleetSite` with **`provider: yaidap`** points connector Jobs at that jumphost and inventory path.
+- **GPU clusters** on the i7 + 1050 Ti and desktop + 1650; hub **`cluster-gpu-*`** playbooks run after the spoke is **Ready**.
 
-- Routed/served by **`bck`** on **VLAN 10** of the provider LAN.
-- **No DHCP** on this segment during normal operation—important for YAIDAP iPXE (install-time DHCP comes from the ephemeral Podman helper on the Ansible controller, not from the router).
-- The four compute nodes use their **onboard Ethernet** on the unmanaged switch.
-
-**Dual-WAN detail on `bck`**
-
-- **`bck`** uses an **USB NIC** cabled to the same unmanaged switch (untagged).
-- The **provider-facing** path and the **USB NIC** path each have their **own public IP** (PPPoE passthrough and separate addressing). That lets me expose or test WAN behavior without collapsing everything into one upstream profile.
-
-### How the pieces map
-
-- **YAIDAP** runs against inventory rooted on a jumphost (often reachable via **`bck`** and port forwards). PXE and kickstart target the **172.16.10.0/24** lab LAN; hypervisors and guests are the notebooks and desktop on the switch.
-- **UMKIM hub** often lives on the **Netcup VPS**, with **sites** representing “homelab behind `bck`” and clusters enrolled over **WireGuard** once nodes (whether hand-installed or YAIDAP-provisioned) are up.
-- **GPU clusters** use the i7 + 1050 Ti and the desktop + 1650 for device-plugin and workload experiments; the hub-side GPU enable playbooks assume the spoke already joined and validated storage/network.
-
-If you are reproducing any of this, treat the numbers as one operator’s lab—not a required UMKIM topology. Greenfield install steps live in [docs/install.md](docs/install.md); inventory templates under `examples/inventory/` stay separate from this write-up.
+If you reproduce any of this, treat the numbers as one operator’s lab. Greenfield UMKIM steps: [docs/install.md](docs/install.md). UMKIM inventory templates: [examples/inventory/hub-only/](examples/inventory/hub-only/). YAIDAP tutorial with fictional hardware: **`~/yaidap/inventory/demo/`**.
 
 ---
 
@@ -315,8 +452,8 @@ If you are reproducing any of this, treat the numbers as one operator’s lab—
 
 | Project | Starting point |
 | --- | --- |
-| **UMKIM** (this repo) | [README.md](README.md), [docs/design.md](docs/design.md), [docs/install.md](docs/install.md) |
-| **YAIDAP** (`~/yaidap`) | `README.md`, `docs/inventory-model.md`, `docs/discovery-to-create.md`, `inventory/example/` |
-| **YAIDAP + UMKIM connector** | [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md), `~/yaidap/docs/integrations/umkim.md`, [docs/components/fleet-site.md](docs/components/fleet-site.md) |
+| **UMKIM** (this repo) | [README.md](README.md), [docs/design.md](docs/design.md), [docs/install.md](docs/install.md), [docs/components/umkim-cli.md](docs/components/umkim-cli.md), [docs/components/fleet-apps.md](docs/components/fleet-apps.md) |
+| **YAIDAP** (`~/yaidap`) | `README.md`, `docs/inventory-model.md`, `docs/discovery-to-create.md`, `docs/lab-provisioning.md`, `docs/prepare-safety.md`, `KNOWN_LIMITATIONS.md`, `inventory/example/` |
+| **YAIDAP + UMKIM connector** | [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md), [docs/components/fleet-site.md](docs/components/fleet-site.md), `~/yaidap/docs/integrations/umkim.md` |
 
 Thanks for reading—both repos are PoCs, and I am still learning in public.
