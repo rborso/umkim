@@ -179,6 +179,9 @@ func TestBuildClusterInventoryINI_haHubRunnerJumphostUsesMgmtLAN(t *testing.T) {
 	if !strings.Contains(ini, "ProxyCommand") || !strings.Contains(ini, "jump.example.com") {
 		t.Fatal("jumphost hub runner should set ProxyCommand in ansible_ssh_common_args")
 	}
+	if !strings.Contains(ini, "ssh -i /root/.ssh/id_rsa") {
+		t.Fatal("jumphost ProxyCommand should pass cluster ansible key for bastion auth")
+	}
 	if !strings.Contains(ini, "umkim-hub ansible_host=127.0.0.1") {
 		t.Fatal("hub runner hub group must SSH to 127.0.0.1 on the hub host")
 	}

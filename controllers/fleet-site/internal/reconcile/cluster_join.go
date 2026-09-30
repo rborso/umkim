@@ -770,7 +770,7 @@ func (r *ClusterJoinReconciler) inventorySSH(ctx context.Context, fcj *fleetv1al
 	base := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 	jh := r.effectiveJumphost(ctx, fcj)
 	if hubRunner && jh != "" {
-		return ssh.AnsibleSSHCommonArgs(base, jh, r.Cfg.SSHUser), true
+		return ssh.AnsibleSSHCommonArgs(base, jh, r.Cfg.SSHUser, "/root/.ssh/id_rsa"), true
 	}
 	return base, false
 }

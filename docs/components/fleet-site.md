@@ -252,7 +252,9 @@ nodes through `FleetClusterJoin.spec.jumphost`, or `FleetSite.spec.jumphost` for
 the cluster's site when the cluster field is empty. Use `user@host:port` (port
 optional). When set, jobs SSH to management LAN addresses via `ProxyJump`
 instead of the WireGuard overlay — required for sites where only a bastion can
-reach lab nodes.
+reach lab nodes. The generated inventory `ProxyCommand` uses the same cluster
+Ansible private key (`/root/.ssh/id_rsa`) for the bastion hop so hub-runner
+jobs can authenticate to the jumphost before forwarding to guests.
 
 Edit jumphost (and site region / failure domain) in the console **Sites** detail
 (Edge and DNS → Connectivity) or via `umkim site patch`. Edit **ingress entries**

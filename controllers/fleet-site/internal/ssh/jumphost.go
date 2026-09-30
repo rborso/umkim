@@ -41,14 +41,20 @@ func ParseJumphost(raw, defaultUser string) (Jumphost, bool) {
 }
 
 // AnsibleSSHCommonArgs appends a ProxyCommand hop when jumphost is set.
-func AnsibleSSHCommonArgs(baseArgs, jumphost, defaultSSHUser string) string {
+// sshKeyFile is passed to the bastion hop so hub-runner jobs authenticate with the same
+// cluster Ansible key used for spoke nodes (nested ssh does not inherit ansible_ssh_private_key_file).
+func AnsibleSSHCommonArgs(baseArgs, jumphost, defaultSSHUser, sshKeyFile string) string {
 	j, ok := ParseJumphost(jumphost, defaultSSHUser)
 	if !ok {
 		return baseArgs
 	}
+	key := strings.TrimSpace(sshKeyFile)
+	if key == "" {
+		key = "/root/.ssh/id_rsa"
+	}
 	proxy := fmt.Sprintf(
-		`-o ProxyCommand="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -p %s -W %%h:%%p %s@%s"`,
-		j.Port, j.User, j.Host,
+		`-o ProxyCommand="ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -p %s -W %%h:%%p %s@%s"`,
+		key, j.Port, j.User, j.Host,
 	)
 	if strings.TrimSpace(baseArgs) == "" {
 		return proxy

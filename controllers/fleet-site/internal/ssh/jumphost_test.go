@@ -17,11 +17,11 @@ func TestParseJumphost(t *testing.T) {
 }
 
 func TestAnsibleSSHCommonArgs(t *testing.T) {
-	got := AnsibleSSHCommonArgs("-o StrictHostKeyChecking=no", "linux@jump.example.com:30200", "admin")
+	got := AnsibleSSHCommonArgs("-o StrictHostKeyChecking=no", "linux@jump.example.com:30200", "admin", "/root/.ssh/id_rsa")
 	if got == "-o StrictHostKeyChecking=no" {
 		t.Fatal("expected proxy args")
 	}
-	for _, part := range []string{"ProxyCommand", "jump.example.com", "30200", "linux@"} {
+	for _, part := range []string{"ProxyCommand", "-i /root/.ssh/id_rsa", "jump.example.com", "30200", "linux@"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("missing %q in %q", part, got)
 		}
