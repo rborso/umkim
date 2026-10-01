@@ -1,0 +1,8 @@
+hypervisors:
+  hosts:
+    virt01:
+      ansible_host: 172.16.10.2
+    virt02:
+      ansible_host: 172.16.10.3
+    virt04:
+      ansible_host: 172.16.10.6

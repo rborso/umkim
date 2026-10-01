@@ -1,0 +1,57 @@
+---
+# Example host_vars for virt04 after promoting bare metal → hypervisor (merge into host_vars/virt04.yml).
+ansible_host: 172.16.10.6
+os: rocky-10
+legacy: false
+install_os: false
+configure_firewalld: false
+configure_cockpit: false
+allow_management_nic_rewire: true
+provisioning_provider: libvirt
+
+tempxe_discovery:
+  enabled: false
+
+disks:
+  - name: bootdisk
+    disk: disk/by-id/ata-WDC_WDS500G2B0A-00SM50_20360F802744
+    bootdisk: true
+    device: 0
+    size: 466
+    use_full_disk: true
+
+uplinks:
+  - name: n0p0
+    physical_network: lab_access_l1
+    interface: enp2s0
+    mac_address: "70:85:c2:d4:5a:95"
+    networks:
+      - zone: lab
+        cloudinit: false
+        pxe: true
+        vm_network: true
+        network_name: lab_nw
+        tag: ""
+        bridge_name: n0p0_lab_nw
+        ip: "172.16.10.6"
+        default_route: true
+        tcp_open:
+          - 22
+        udp_open: []
+        services_open: []
+
+gpu_passthrough_host:
+  enabled: true
+  reboot_allowed: true
+  disable_nvidia_host_driver: true
+  auto_detect: false
+  include_audio_function: true
+  kernel_args:
+    - intel_iommu=on
+    - iommu=pt
+  pci_devices:
+    - "0000:01:00.0"
+    - "0000:01:00.1"
+  vfio_device_ids:
+    - "10de:1f82"
+    - "10de:10fa"
