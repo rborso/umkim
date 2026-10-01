@@ -57,4 +57,7 @@ func TestActionSyncsYaidapInventory(t *testing.T) {
 	if !ActionSyncsYaidapInventory("discover_pxe") {
 		t.Fatal("discover_pxe should sync inventory")
 	}
+	if !ActionSyncsYaidapInventory("prepare_hypervisor") {
+		t.Fatal("prepare_hypervisor should sync inventory")
+	}
 }

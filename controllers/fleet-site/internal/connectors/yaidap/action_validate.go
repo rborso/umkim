@@ -35,6 +35,10 @@ func actionAllowedForKind(action, kind string) bool {
 		return kind == fleetv1alpha1.SiteHostKindHypervisor || kind == fleetv1alpha1.SiteHostKindBareMetal
 	case fleetv1alpha1.ProvisionActionStatus:
 		return kind == fleetv1alpha1.SiteHostKindHypervisor || kind == fleetv1alpha1.SiteHostKindBareMetal
+	case fleetv1alpha1.ProvisionActionPrepareHypervisor,
+		fleetv1alpha1.ProvisionActionPrepareGPUPassthrough,
+		fleetv1alpha1.ProvisionActionPrepareHypervisorGPU:
+		return kind == fleetv1alpha1.SiteHostKindHypervisor
 	default:
 		return true
 	}

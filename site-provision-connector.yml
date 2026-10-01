@@ -289,6 +289,9 @@
             + (['-e', 'yaidap_recreate=true']
               if fleet_provision_action == 'create_vm' and (fleet_provision_yaidap_recreate | default(false) | bool)
               else [])
+            + (['-e', 'configure_firewalld=false']
+              if fleet_provision_action in ['prepare_hypervisor', 'prepare_gpu_passthrough', 'prepare_hypervisor_gpu']
+              else [])
           }}
 
     - name: Fail when playbook mapping missing
@@ -457,8 +460,14 @@
 
     - name: Run YAIDAP ansible-playbook on jumphost
       block:
-        - name: Resolve discover target ansible_host
-          when: fleet_provision_action == 'discover'
+        - name: Resolve provision subject ansible_host for SSH
+          when: fleet_provision_action in [
+              'discover',
+              'install_bm',
+              'prepare_hypervisor',
+              'prepare_gpu_passthrough',
+              'prepare_hypervisor_gpu',
+            ]
           ansible.builtin.shell: |
             set -euo pipefail
             HV="{{ fleet_provision_inventory_path }}/hypervisors.yml"
@@ -484,12 +493,18 @@
           changed_when: false
           failed_when: false
 
-        - name: Refresh known_hosts before discover SSH
+        - name: Refresh known_hosts before YAIDAP SSH to provision subject
           when:
-            - fleet_provision_action == 'discover'
+            - fleet_provision_action in [
+                'discover',
+                'install_bm',
+                'prepare_hypervisor',
+                'prepare_gpu_passthrough',
+                'prepare_hypervisor_gpu',
+              ]
             - fleet_disc_target_ip.stdout | default('') | trim | length > 0
           block:
-            - name: Remove stale discover target host key
+            - name: Remove stale provision subject host key
               ansible.builtin.command:
                 argv:
                   - ssh-keygen
@@ -498,7 +513,7 @@
               changed_when: true
               failed_when: false
 
-            - name: Seed discover target host key after refresh
+            - name: Seed provision subject host key after refresh
               ansible.builtin.shell: |
                 set -euo pipefail
                 ip="{{ fleet_disc_target_ip.stdout | trim }}"
@@ -525,9 +540,29 @@
             if [ "{{ fleet_provision_connection_local | default(false) | bool }}" = "True" ]; then
               CONN_ARGS=(--connection local)
             fi
+            export ANSIBLE_SSH_COMMON_ARGS="-o StrictHostKeyChecking=accept-new"
             LIMIT="{{ fleet_provision_subject }}"
             if [ "{{ fleet_provision_action }}" = "create_vm" ]; then
-              LIMIT="${LIMIT},hypervisors"
+              HV=$(python3 - <<'PY'
+            import pathlib, yaml
+            inv = pathlib.Path("{{ fleet_provision_inventory_path }}")
+            subj = "{{ fleet_provision_subject }}"
+            loc = ""
+            guests_path = inv / "guests.yml"
+            if guests_path.is_file():
+                doc = yaml.safe_load(guests_path.read_text()) or {}
+                loc = (doc.get("guests", {}).get("hosts", {}).get(subj) or {}).get("vm_location", "") or ""
+            if not loc:
+                hv_path = inv / "host_vars" / f"{subj}.yml"
+                if hv_path.is_file():
+                    for line in hv_path.read_text().splitlines():
+                        if line.startswith("vm_location:"):
+                            loc = line.split(":", 1)[1].strip()
+                            break
+            print(loc if loc else "hypervisors")
+            PY
+            )
+              LIMIT="${LIMIT},${HV}"
             fi
             HUB_EXTRA="{{ fleet_provision_extra | default('') }}"
             # shellcheck disable=SC2086

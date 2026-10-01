@@ -164,7 +164,7 @@ func siteProvisionRunCmd() *cobra.Command {
 			return waitProvisionAction(args[0], id)
 		},
 	}
-	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status")
+	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status | prepare_hypervisor | prepare_gpu_passthrough | prepare_hypervisor_gpu")
 	c.Flags().StringVar(&subject, "subject", "", "Host/guest name (--limit)")
 	c.Flags().BoolVar(&confirm, "confirm", false, "Required for install_bm / discover_pxe / destroy")
 	c.Flags().BoolVar(&wait, "wait", false, "Poll until Succeeded or Failed")

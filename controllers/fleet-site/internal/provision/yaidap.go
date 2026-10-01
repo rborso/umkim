@@ -27,7 +27,10 @@ func ValidateAction(action string) error {
 		fleetv1alpha1.ProvisionActionDestroy,
 		fleetv1alpha1.ProvisionActionDiscover,
 		fleetv1alpha1.ProvisionActionDiscoverPXE,
-		fleetv1alpha1.ProvisionActionStatus:
+		fleetv1alpha1.ProvisionActionStatus,
+		fleetv1alpha1.ProvisionActionPrepareHypervisor,
+		fleetv1alpha1.ProvisionActionPrepareGPUPassthrough,
+		fleetv1alpha1.ProvisionActionPrepareHypervisorGPU:
 		return nil
 	default:
 		return fmt.Errorf("unknown provision action %q", action)
@@ -39,7 +42,9 @@ func RequiresConfirm(action string) bool {
 	switch strings.TrimSpace(action) {
 	case fleetv1alpha1.ProvisionActionInstallBM,
 		fleetv1alpha1.ProvisionActionDiscoverPXE,
-		fleetv1alpha1.ProvisionActionDestroy:
+		fleetv1alpha1.ProvisionActionDestroy,
+		fleetv1alpha1.ProvisionActionPrepareGPUPassthrough,
+		fleetv1alpha1.ProvisionActionPrepareHypervisorGPU:
 		return true
 	default:
 		return false
@@ -103,6 +108,21 @@ func DefaultYaidapInvocation(action string, confirm bool) (YaidapInvocation, err
 		return YaidapInvocation{
 			Playbook: "playbooks/configure-tempxe.yml",
 			Tags:     []string{"tempxe_status"},
+		}, nil
+	case fleetv1alpha1.ProvisionActionPrepareHypervisor:
+		return YaidapInvocation{
+			Playbook: "playbooks/configure-hypervisors.yml",
+			Tags:     []string{"prepare"},
+		}, nil
+	case fleetv1alpha1.ProvisionActionPrepareGPUPassthrough:
+		return YaidapInvocation{
+			Playbook: "playbooks/configure-hypervisors.yml",
+			Tags:     []string{"prepare_gpu_passthrough"},
+		}, nil
+	case fleetv1alpha1.ProvisionActionPrepareHypervisorGPU:
+		return YaidapInvocation{
+			Playbook: "playbooks/configure-hypervisors.yml",
+			Tags:     []string{"prepare", "prepare_gpu_passthrough"},
 		}, nil
 	default:
 		return YaidapInvocation{}, fmt.Errorf("unsupported action %q", action)

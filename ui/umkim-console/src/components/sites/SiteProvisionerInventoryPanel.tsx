@@ -30,6 +30,7 @@ import {
 import type { SiteInventoryFileInfo, SiteInventoryImportChange, SiteInventoryRevision } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
 import {
+  gpuPassthroughGuestHostVarsTemplate,
   guestHostVarsTemplate,
   guestNameFromHostVarsPath,
   bareMetalNodeHostVarsTemplate,
@@ -186,6 +187,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [vmCores, setVmCores] = useState(2);
   const [vmMemory, setVmMemory] = useState(4096);
   const [vmDiskSize, setVmDiskSize] = useState(40);
+  const [vmGpuPassthrough, setVmGpuPassthrough] = useState(false);
   const [vmMessage, setVmMessage] = useState('');
   const [addDiscOpen, setAddDiscOpen] = useState(false);
   const [discHostName, setDiscHostName] = useState('');
@@ -206,6 +208,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
     setVmCores(2);
     setVmMemory(4096);
     setVmDiskSize(40);
+    setVmGpuPassthrough(false);
   };
 
   const openAddVmModal = () => {
@@ -361,24 +364,38 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       setError(new Error('Guest name is required'));
       return;
     }
+    const loc = vmLocation.trim() || 'least-utilized';
+    if (vmGpuPassthrough && (loc === 'least-utilized' || loc === 'auto' || !loc)) {
+      setError(new Error('GPU passthrough guests require a concrete hypervisor name in VM location'));
+      return;
+    }
     setBusy(true);
     setError(null);
     setVmMessage('');
     try {
       const guestsResult = await getSiteInventoryFileOptional(siteName, 'guests.yml');
       const guestsYaml = mergeGuestIntoGuestsYaml(guestsResult.content, name, {
-        vm_location: vmLocation.trim() || 'least-utilized',
+        vm_location: loc,
         ansible_host: vmIp.trim() || undefined,
       });
       const hostVarsPath = `host_vars/${name}.yml`;
-      const hostVarsYaml = guestHostVarsTemplate({
-        guestName: name,
-        vmLocation: vmLocation.trim() || 'least-utilized',
-        ip: vmIp.trim() || undefined,
-        cores: vmCores,
-        memory: vmMemory,
-        diskSizeGi: vmDiskSize,
-      });
+      const hostVarsYaml = vmGpuPassthrough
+        ? gpuPassthroughGuestHostVarsTemplate({
+            guestName: name,
+            hypervisorName: loc,
+            ip: vmIp.trim() || undefined,
+            cores: vmCores,
+            memory: vmMemory,
+            diskSizeGi: vmDiskSize,
+          })
+        : guestHostVarsTemplate({
+            guestName: name,
+            vmLocation: loc,
+            ip: vmIp.trim() || undefined,
+            cores: vmCores,
+            memory: vmMemory,
+            diskSizeGi: vmDiskSize,
+          });
       await putSiteInventoryFile(siteName, 'guests.yml', guestsYaml);
       await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
       setAddVmOpen(false);
@@ -842,6 +859,18 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
                   onPlus={() => setVmDiskSize((v) => v + 10)}
                   style={{ maxWidth: '10rem' }}
                 />
+              </FormGroup>
+              <FormGroup fieldId="vmGpuPassthrough">
+                <Checkbox
+                  id="vmGpuPassthrough"
+                  isChecked={vmGpuPassthrough}
+                  onChange={(_e, c) => setVmGpuPassthrough(c)}
+                  label="GPU passthrough guest"
+                />
+                <FormHelperText>
+                  Sets vm_location to the hypervisor and adds gpu_passthrough PCI placeholders — copy
+                  addresses from discover notes after host prep.
+                </FormHelperText>
               </FormGroup>
             </Form>
             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>

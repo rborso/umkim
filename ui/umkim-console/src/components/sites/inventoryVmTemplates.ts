@@ -106,6 +106,37 @@ export function mergeHypervisorIntoHypervisorsYaml(
   return stringify(doc).trimEnd() + '\n';
 }
 
+export type GpuPassthroughGuestTemplateOptions = VmGuestTemplateOptions & {
+  hypervisorName: string;
+  pciDevices?: string[];
+};
+
+/** Libvirt guest with GPU passthrough (PCI ids from hypervisor discover notes). */
+export function gpuPassthroughGuestHostVarsTemplate(opts: GpuPassthroughGuestTemplateOptions): string {
+  const hv = opts.hypervisorName.trim() || 'CHANGE_ME_HYPERVISOR';
+  const pci = opts.pciDevices?.length
+    ? opts.pciDevices
+    : ['0000:01:00.0', '0000:01:00.1'];
+  const base = guestHostVarsTemplate({
+    ...opts,
+    cores: opts.cores ?? 4,
+    memory: opts.memory ?? 4096,
+  });
+  const pciBlock = pci.map((d) => `    - "${d}"`).join('\n');
+  const vmLocLine = `vm_location: ${hv}\n`;
+  const gpuBlock = `gpu_passthrough:
+  enabled: true
+  auto_detect: false
+  include_audio_function: true
+  pci_devices:
+${pciBlock}
+`;
+  return base.replace(
+    'provisioning_provider: libvirt\n',
+    `${vmLocLine}provisioning_provider: libvirt\n${gpuBlock}`,
+  );
+}
+
 export function guestHostVarsTemplate(opts: VmGuestTemplateOptions): string {
   const memory = opts.memory ?? 4096;
   const cores = opts.cores ?? 2;

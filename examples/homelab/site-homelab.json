@@ -27,7 +27,7 @@
           "wanAddressMode": "dns",
           "zone": "homelab.otthol.hu",
           "wildcard": "*.gpu.homelab.otthol.hu",
-          "description": "Port-forward to gpu-bm-1 (lab-gpu-0): 80→30080, 443→30443"
+          "description": "Port-forward to virt04 (lab-gpu-0): 80→30080, 443→30443"
         },
         {
           "id": "edge-rp",

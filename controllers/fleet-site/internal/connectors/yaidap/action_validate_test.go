@@ -24,6 +24,10 @@ func TestValidateActionForKind(t *testing.T) {
 		{"install_bm", fleetv1alpha1.SiteHostKindBareMetal, true},
 		{"install_bm", fleetv1alpha1.SiteHostKindHypervisor, true},
 		{"install_bm", fleetv1alpha1.SiteHostKindVM, false},
+		{"prepare_hypervisor", fleetv1alpha1.SiteHostKindHypervisor, true},
+		{"prepare_hypervisor", fleetv1alpha1.SiteHostKindBareMetal, false},
+		{"prepare_gpu_passthrough", fleetv1alpha1.SiteHostKindHypervisor, true},
+		{"prepare_hypervisor_gpu", fleetv1alpha1.SiteHostKindHypervisor, true},
 	}
 	for _, tc := range cases {
 		err := ValidateActionForKind(tc.action, tc.kind)

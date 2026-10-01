@@ -1,0 +1,48 @@
+---
+# GPU passthrough VM on hypervisor virt04 / lab-gpu-0 (GTX 1650). Adjust PCI ids from discover notes.
+memory: 4096
+cores: 4
+os: rocky-10
+legacy: false
+configure_firewalld: false
+vm_location: virt04
+provisioning_provider: libvirt
+ansible_host: 172.16.10.141
+
+gpu_passthrough:
+  enabled: true
+  auto_detect: false
+  include_audio_function: true
+  pci_devices:
+    - "0000:01:00.0"
+    - "0000:01:00.1"
+
+disks:
+  - name: bootdisk
+    disk: vda
+    bootdisk: true
+    device: 0
+    format: qcow2
+    size: 40
+    storage: local
+
+uplinks:
+  - name: n0p0
+    physical_network: lab_access_l1
+    mac_address: "52:54:00:60:00:01"
+    networks:
+      - zone: lab
+        network_name: lab_nw
+        model: virtio
+        cloudinit: true
+        pxe: false
+        vm_network: false
+        hypervisor_uplink: n0p0
+        bridge_name: n0p0_lab_nw
+        tag: ""
+        ip: "172.16.10.141"
+        default_route: true
+        tcp_open:
+          - 22
+        udp_open: []
+        services_open: []

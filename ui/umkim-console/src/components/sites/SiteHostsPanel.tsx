@@ -27,6 +27,7 @@ type Props = {
 };
 
 type DiscoverMode = 'discover' | 'discover_pxe';
+type PrepareGpuMode = 'prepare_gpu_passthrough' | 'prepare_hypervisor_gpu';
 
 function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {
   switch (phase) {
@@ -71,6 +72,12 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [installBmTarget, setInstallBmTarget] = useState<SiteHostRecord | null>(null);
   const [installBmConfirm, setInstallBmConfirm] = useState(false);
   const [installingBm, setInstallingBm] = useState(false);
+  const [preparingHv, setPreparingHv] = useState<string | null>(null);
+  const [prepareGpuOpen, setPrepareGpuOpen] = useState(false);
+  const [prepareGpuTarget, setPrepareGpuTarget] = useState<SiteHostRecord | null>(null);
+  const [prepareGpuMode, setPrepareGpuMode] = useState<PrepareGpuMode>('prepare_gpu_passthrough');
+  const [prepareGpuConfirm, setPrepareGpuConfirm] = useState(false);
+  const [preparingGpu, setPreparingGpu] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importItems, setImportItems] = useState<SiteInventoryImportChange[]>([]);
@@ -271,6 +278,46 @@ export function SiteHostsPanel({ siteName }: Props) {
     setInstallBmOpen(true);
   };
 
+  const runPrepareHypervisor = async (host: SiteHostRecord) => {
+    setPreparingHv(host.name);
+    setActionError(null);
+    try {
+      await provisionSiteHost(siteName, host.name, { action: 'prepare_hypervisor' });
+      await load({ refreshHistory: true });
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setPreparingHv(null);
+    }
+  };
+
+  const openPrepareGpu = (host: SiteHostRecord, mode: PrepareGpuMode) => {
+    setPrepareGpuTarget(host);
+    setPrepareGpuMode(mode);
+    setPrepareGpuConfirm(false);
+    setPrepareGpuOpen(true);
+  };
+
+  const runPrepareGpu = async () => {
+    if (!prepareGpuTarget) return;
+    setPreparingGpu(true);
+    setActionError(null);
+    try {
+      await provisionSiteHost(siteName, prepareGpuTarget.name, {
+        action: prepareGpuMode,
+        confirm: true,
+      });
+      setPrepareGpuOpen(false);
+      setPrepareGpuTarget(null);
+      setPrepareGpuConfirm(false);
+      await load({ refreshHistory: true });
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setPreparingGpu(false);
+    }
+  };
+
   const runInstallBm = async () => {
     if (!installBmTarget) return;
     setInstallingBm(true);
@@ -413,6 +460,32 @@ export function SiteHostsPanel({ siteName }: Props) {
                         </Button>
                       </>
                     )}
+                    {host.kind === 'hypervisor' && (
+                      <>
+                        <Button
+                          variant="link"
+                          isInline
+                          isLoading={preparingHv === host.name}
+                          onClick={() => void runPrepareHypervisor(host)}
+                        >
+                          Prepare hypervisor
+                        </Button>
+                        <Button
+                          variant="link"
+                          isInline
+                          onClick={() => openPrepareGpu(host, 'prepare_gpu_passthrough')}
+                        >
+                          Prepare GPU passthrough
+                        </Button>
+                        <Button
+                          variant="link"
+                          isInline
+                          onClick={() => openPrepareGpu(host, 'prepare_hypervisor_gpu')}
+                        >
+                          Prepare libvirt + GPU
+                        </Button>
+                      </>
+                    )}
                     {host.kind === 'bare_metal' && (
                       <Button variant="link" isInline onClick={() => openInstallBm(host)}>
                         Install bare metal
@@ -507,6 +580,43 @@ export function SiteHostsPanel({ siteName }: Props) {
             label="I confirm this destructive or bare-metal install action"
           />
         )}
+      </Modal>
+
+      <Modal
+        title={
+          prepareGpuMode === 'prepare_hypervisor_gpu'
+            ? 'Prepare hypervisor and GPU passthrough'
+            : 'Prepare GPU passthrough host'
+        }
+        isOpen={prepareGpuOpen}
+        onClose={() => setPrepareGpuOpen(false)}
+        actions={[
+          <Button
+            key="run"
+            variant="danger"
+            onClick={() => void runPrepareGpu()}
+            isLoading={preparingGpu}
+            isDisabled={!prepareGpuConfirm}
+          >
+            Run prepare
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setPrepareGpuOpen(false)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          Run <code>{prepareGpuMode}</code> for <code>{prepareGpuTarget?.name}</code>. This may reboot the
+          host, remove the NVIDIA driver, and bind the GPU to VFIO. Ensure{' '}
+          <code>gpu_passthrough_host</code> is set in <code>host_vars</code> and libvirt bridges exist
+          {prepareGpuMode === 'prepare_gpu_passthrough' ? ' (run Prepare hypervisor first).' : '.'}
+        </p>
+        <Checkbox
+          id="prepareGpuConfirm"
+          isChecked={prepareGpuConfirm}
+          onChange={(_e, c) => setPrepareGpuConfirm(c)}
+          label="I confirm GPU passthrough host prepare (reboot and driver removal)"
+        />
       </Modal>
 
       <Modal

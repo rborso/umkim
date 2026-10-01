@@ -115,7 +115,7 @@ umkim site inventory files put homelab --path lab-ha-0.yml --file examples/homel
 umkim site inventory files put homelab --path group_vars/lab-ha-0.yml --file examples/homelab/inventory/group_vars/lab-ha-0.yml
 umkim site inventory files put homelab --path lab-ha-0-w1.yml --file examples/homelab/inventory/lab-ha-0-w1.yml
 umkim site inventory files put homelab --path group_vars/lab-ha-0-w1.yml --file examples/homelab/inventory/group_vars/lab-ha-0-w1.yml
-for f in lab-ha-0-cp1 lab-ha-0-cp2 lab-ha-0-cp3 lab-ha-0-w1 virt01 virt02 virt03 gpu-bm-1; do
+for f in lab-ha-0-cp1 lab-ha-0-cp2 lab-ha-0-cp3 lab-ha-0-w1 virt01 virt02 virt03 virt04; do
   umkim site inventory files put homelab --path "host_vars/${f}.yml" \
     --file "examples/homelab/inventory/host_vars/${f}.yml"
 done

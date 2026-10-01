@@ -195,6 +195,9 @@ on the jumphost (`cd $yaidapRoot && ansible-playbook …`).
 | `create_vm` | no* | yes | `playbooks/provision-vms.yml` · tags `create`, `never` · `-e yaidap_emit_result=true` · `-e yaidap_recreate=true` when guest has concrete `vm_location` |
 | `plan_vm` | no | yes | `playbooks/plan-vm-placement.yml` · tag `plan` (dry-run; no VM, no inventory rewrite) |
 | `destroy` | **yes** | yes | `playbooks/provision-vms.yml` · tag `destroy` · `-e confirm_destroy=true` |
+| `prepare_hypervisor` | no | yes | `playbooks/configure-hypervisors.yml` · tag `prepare` · `-e configure_firewalld=false` |
+| `prepare_gpu_passthrough` | **yes** | yes | `playbooks/configure-hypervisors.yml` · tag `prepare_gpu_passthrough` · `-e configure_firewalld=false` |
+| `prepare_hypervisor_gpu` | **yes** | yes | `configure-hypervisors.yml` · tags `prepare`, `prepare_gpu_passthrough` · `-e configure_firewalld=false` |
 | `status` | no | no | `playbooks/configure-tempxe.yml` · tag `tempxe_status` |
 
 \*Re-provision on an already-**Ready** VM guest with a concrete `vm_location`
@@ -426,7 +429,7 @@ configured independently (`FleetSite.spec.jumphost`).
 
 | Rule | Detail |
 |------|--------|
-| Confirm gate | `install_bm`, `discover_pxe`, `destroy` require `confirm=true` |
+| Confirm gate | `install_bm`, `discover_pxe`, `destroy`, `prepare_gpu_passthrough`, `prepare_hypervisor_gpu` require `confirm=true` |
 | TempXE | Never arm PXE without confirm; connector always runs `tempxe_stop` after BM install / PXE discovery |
 | Mutual exclusion | One site provision action at a time; inventory sync blocked while sync job runs |
 | Hub schema boundary | Do **not** import YAIDAP `networks` / `uplinks` / `storages` / disk catalogs into Fleet CRDs — they stay in `group_vars` / `host_vars` |

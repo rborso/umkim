@@ -1,12 +1,13 @@
 ---
-# Bare-metal GPU node (bare_metals.yml — not a libvirt guest).
+# Hypervisor virt04 — lab-gpu-0 / lab-gpu-pt-0 GPU host (172.16.10.6; promoted from bare metal).
 ansible_host: 172.16.10.6
 os: rocky-10
 legacy: false
 install_os: false
-raid: false
 configure_firewalld: false
 configure_cockpit: false
+allow_management_nic_rewire: true
+provisioning_provider: libvirt
 
 tempxe_discovery:
   enabled: false
@@ -38,3 +39,19 @@ uplinks:
           - 22
         udp_open: []
         services_open: []
+
+gpu_passthrough_host:
+  enabled: true
+  reboot_allowed: true
+  disable_nvidia_host_driver: true
+  auto_detect: false
+  include_audio_function: true
+  kernel_args:
+    - intel_iommu=on
+    - iommu=pt
+  pci_devices:
+    - "0000:01:00.0"
+    - "0000:01:00.1"
+  vfio_device_ids:
+    - "10de:1f82"
+    - "10de:10fa"

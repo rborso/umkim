@@ -21,6 +21,12 @@ func TestRequiresConfirm(t *testing.T) {
 	if !RequiresConfirm("discover_pxe") {
 		t.Fatal("discover_pxe should require confirm")
 	}
+	if !RequiresConfirm("prepare_gpu_passthrough") {
+		t.Fatal("prepare_gpu_passthrough should require confirm")
+	}
+	if RequiresConfirm("prepare_hypervisor") {
+		t.Fatal("prepare_hypervisor should not require confirm")
+	}
 }
 
 func TestDefaultYaidapInvocation(t *testing.T) {
@@ -62,5 +68,19 @@ func TestDefaultYaidapInvocation(t *testing.T) {
 		if arg == "install_os=true" {
 			t.Fatal("discover_pxe should not pass install_os")
 		}
+	}
+	prep, err := DefaultYaidapInvocation("prepare_hypervisor", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prep.Playbook != "playbooks/configure-hypervisors.yml" || prep.Tags[0] != "prepare" {
+		t.Fatalf("unexpected prepare_hypervisor: %+v", prep)
+	}
+	gpu, err := DefaultYaidapInvocation("prepare_hypervisor_gpu", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gpu.Tags) != 2 || gpu.Tags[0] != "prepare" || gpu.Tags[1] != "prepare_gpu_passthrough" {
+		t.Fatalf("unexpected prepare_hypervisor_gpu: %+v", gpu)
 	}
 }

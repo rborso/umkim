@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bareMetalNodeHostVarsTemplate,
+  gpuPassthroughGuestHostVarsTemplate,
   guestHostVarsTemplate,
   mergeGuestIntoBareMetalsYaml,
   mergeGuestIntoGuestsYaml,
@@ -53,6 +54,18 @@ describe('inventoryVmTemplates', () => {
       ip: '172.16.10.99',
     });
     expect(body).toContain('ip: "172.16.10.99"');
+  });
+
+  it('templates GPU passthrough guest host_vars', () => {
+    const body = gpuPassthroughGuestHostVarsTemplate({
+      guestName: 'gpu-vm1',
+      hypervisorName: 'gpu-hv-1',
+      ip: '172.16.10.50',
+      pciDevices: ['0000:01:00.0', '0000:01:00.1'],
+    });
+    expect(body).toContain('vm_location: gpu-hv-1');
+    expect(body).toContain('gpu_passthrough:');
+    expect(body).toContain('0000:01:00.0');
   });
 
   it('renders host_vars with custom sizing', () => {

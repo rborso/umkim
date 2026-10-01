@@ -16,14 +16,14 @@ hypervisors:
     ansible_host: 172.16.10.2
   virt02:
     ansible_host: 172.16.10.3
+  virt04:
+    ansible_host: 172.16.10.6
+    notes: lab-gpu-0 / lab-gpu-pt-0 GPU hypervisor (VFIO passthrough)
 
 bare_metals:
   virt03:
     ansible_host: 172.16.10.4
     notes: lab-single-0; TempXE discover → install_bm → cluster enroll
-  gpu-bm-1:
-    ansible_host: 172.16.10.6
-    mac: "70:85:c2:d4:5a:95"
 
 yaidap:
   jumphost_root: /home/linux/yaidap

@@ -61,6 +61,7 @@ umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--addre
 umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--wan-address-mode fixed|dns] [--zone …] [--wildcard …]
 umkim site ingress delete SITE ID
 umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--wait]
+umkim site host prepare SITE NAME [--gpu-passthrough] [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME
 
 umkim site delete NAME --confirm
@@ -362,6 +363,19 @@ umkim site inventory import apply SITE --confirm --paths host_vars/new-bm01.yml,
 
 Import preview promotes jumphost `generated/host_vars/` and `generated/hosts/`
 into canonical hub paths; `notes.json` stays on the jumphost for reference.
+
+**Hypervisor prepare and GPU passthrough (VFIO)** — hypervisor hosts only; set
+`gpu_passthrough_host` in `host_vars` before GPU prepare (see YAIDAP inventory model).
+Lab walkthrough: [examples/homelab/lab-gpu-passthrough-cli.md](../../examples/homelab/lab-gpu-passthrough-cli.md).
+
+```bash
+umkim site host prepare SITE hv01 --wait
+umkim site host prepare SITE hv01 --gpu-passthrough --confirm --wait
+# or:
+umkim site host provision SITE hv01 --action prepare_hypervisor --wait
+umkim site host provision SITE hv01 --action prepare_gpu_passthrough --confirm --wait
+umkim site provision run SITE --action prepare_hypervisor_gpu --subject hv01 --confirm --wait
+```
 
 See [fleet-site.md](fleet-site.md) for the FleetSite API and
 [yaidap-integration.md](yaidap-integration.md) for YAIDAP workflows, inventory

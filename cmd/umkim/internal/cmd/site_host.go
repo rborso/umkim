@@ -17,6 +17,7 @@ func siteHostCmd() *cobra.Command {
 	cmd.AddCommand(siteHostGetCmd())
 	cmd.AddCommand(siteHostProvisionCmd())
 	cmd.AddCommand(siteHostDestroyCmd())
+	cmd.AddCommand(siteHostPrepareCmd())
 	cmd.AddCommand(siteHostClusterApplyCmd())
 	return cmd
 }
@@ -90,8 +91,48 @@ func siteHostProvisionCmd() *cobra.Command {
 			return waitProvisionActionFromHostResponse(raw, args[0])
 		},
 	}
-	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status (default from kind)")
-	c.Flags().BoolVar(&confirm, "confirm", false, "Required for install_bm / discover_pxe / destroy")
+	c.Flags().StringVar(&action, "action", "", "install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status | prepare_hypervisor | prepare_gpu_passthrough | prepare_hypervisor_gpu (default from kind)")
+	c.Flags().BoolVar(&confirm, "confirm", false, "Required for install_bm / discover_pxe / destroy / prepare_gpu_passthrough / prepare_hypervisor_gpu")
+	c.Flags().BoolVar(&wait, "wait", false, "Poll until Succeeded or Failed")
+	return c
+}
+
+func siteHostPrepareCmd() *cobra.Command {
+	var gpuPassthrough, confirm, wait bool
+	c := &cobra.Command{
+		Use:   "prepare [site] [name]",
+		Short: "Prepare a hypervisor (libvirt; optional GPU passthrough / VFIO)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			action := "prepare_hypervisor"
+			if gpuPassthrough {
+				action = "prepare_hypervisor_gpu"
+				if !confirm {
+					return fmt.Errorf("--confirm is required when --gpu-passthrough is set (reboot and host NVIDIA removal)")
+				}
+			}
+			body := map[string]interface{}{
+				"action":  action,
+				"confirm": confirm,
+			}
+			raw, code, err := retryOnHTTP409(func() ([]byte, int, error) {
+				return api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/provision", body)
+			})
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200, 202); err != nil {
+				return err
+			}
+			if !wait {
+				printJSON(raw)
+				return nil
+			}
+			return waitProvisionActionFromHostResponse(raw, args[0])
+		},
+	}
+	c.Flags().BoolVar(&gpuPassthrough, "gpu-passthrough", false, "Run prepare + prepare_gpu_passthrough (requires --confirm)")
+	c.Flags().BoolVar(&confirm, "confirm", false, "Required with --gpu-passthrough")
 	c.Flags().BoolVar(&wait, "wait", false, "Poll until Succeeded or Failed")
 	return c
 }

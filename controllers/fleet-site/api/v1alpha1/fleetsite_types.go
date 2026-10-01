@@ -71,6 +71,9 @@ const (
 	ProvisionActionDiscover    = "discover"
 	ProvisionActionDiscoverPXE = "discover_pxe"
 	ProvisionActionStatus      = "status"
+	ProvisionActionPrepareHypervisor       = "prepare_hypervisor"
+	ProvisionActionPrepareGPUPassthrough   = "prepare_gpu_passthrough"
+	ProvisionActionPrepareHypervisorGPU    = "prepare_hypervisor_gpu"
 )
 
 // Provision action phases.

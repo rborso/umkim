@@ -124,6 +124,12 @@ func DiscoverySuccessMessage(action string) string {
 	switch strings.TrimSpace(action) {
 	case fleetv1alpha1.ProvisionActionDiscover, fleetv1alpha1.ProvisionActionDiscoverPXE:
 		return "YAIDAP discovery succeeded; run import preview to promote generated drafts (resolve CHANGE_ME placeholders before sync/provision)"
+	case fleetv1alpha1.ProvisionActionPrepareHypervisor:
+		return "Hypervisor prepare succeeded (libvirt bridges and packages)"
+	case fleetv1alpha1.ProvisionActionPrepareGPUPassthrough:
+		return "GPU passthrough host prepare succeeded (VFIO bind; host NVIDIA driver removed when configured)"
+	case fleetv1alpha1.ProvisionActionPrepareHypervisorGPU:
+		return "Hypervisor and GPU passthrough host prepare succeeded"
 	default:
 		return ""
 	}
