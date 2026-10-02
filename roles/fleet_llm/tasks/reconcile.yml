@@ -57,6 +57,15 @@
         executable: /bin/bash
       environment:
         KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+      register: fleet_llm_config_apply
+      changed_when: fleet_llm_config_apply.rc == 0
+
+    - name: Fleet LLM | Rollout restart LiteLLM after config change
+      when: fleet_llm_config_apply is changed
+      ansible.builtin.command:
+        cmd: kubectl -n {{ fleet_llm_namespace }} rollout restart deployment/{{ fleet_llm_release_name }}
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
       changed_when: true
 
     - name: Fleet LLM | Clear stale deployment_affinity keys in Redis

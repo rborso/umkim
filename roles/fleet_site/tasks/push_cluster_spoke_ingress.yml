@@ -117,19 +117,6 @@
   when: fleet_site_spoke_ingress_apply.changed | default(false) | bool
   changed_when: false
 
-- name: Fleet site | Probe spoke Traefik /ping locally on cluster node
-  ansible.builtin.command:
-    cmd: >-
-      curl -sf -o /dev/null -w "%{http_code}"
-      http://127.0.0.1:{{ fleet_site_spoke_http_port }}/ping
-  delegate_to: "{{ fleet_site_bootstrap_host }}"
-  become: true
-  register: fleet_site_spoke_ping_local
-  until: fleet_site_spoke_ping_local.stdout | trim == '200'
-  retries: 30
-  delay: 10
-  changed_when: false
-
 - name: Fleet site | Probe spoke Traefik /ping via overlay
   ansible.builtin.command:
     cmd: >-
@@ -140,3 +127,18 @@
   retries: 30
   delay: 10
   changed_when: false
+
+- name: Fleet site | Probe spoke Traefik /ping locally on cluster node (best-effort)
+  ansible.builtin.command:
+    cmd: >-
+      curl -sf -o /dev/null -w "%{http_code}"
+      http://127.0.0.1:{{ fleet_site_spoke_http_port }}/ping
+  delegate_to: "{{ fleet_site_bootstrap_host }}"
+  become: true
+  register: fleet_site_spoke_ping_local
+  until: fleet_site_spoke_ping_local.stdout | trim == '200'
+  retries: 5
+  delay: 5
+  changed_when: false
+  failed_when: false
+  when: fleet_site_spoke_ping.stdout | trim != '200'

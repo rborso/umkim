@@ -82,7 +82,7 @@ inventory path. On success the action returns a handoff host fragment
 | `POST/GET /sites/{name}/provision/inventory/import/preview` | Pull jumphost tree; per-file diff (no write) |
 | `POST /sites/{name}/provision/inventory/import/apply` | Merge selected preview paths into hub store |
 | `GET /sites/{name}/provision/inventory/revisions[/{id}]` | Timestamped revision log + diff |
-| `POST /sites/{name}/provision/inventory/sync` | Push synced YAML files to jumphost |
+| `POST /sites/{name}/provision/inventory/sync` | Push synced YAML files to jumphost (`confirm=true` when the hub store has fewer than two synced files, to block accidental wipe) |
 | `POST /sites/{name}/provision/yaidap/sync` | Clone or update YAIDAP git checkout on jumphost (`yaidapRepo`, `yaidapRoot`, optional deploy-key Secret) |
 | `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `discover_pxe`, `status` |
 | `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
@@ -238,6 +238,7 @@ When a cluster is `Ready`, operators use the console **Operations** panel,
 | Day-2 LAN Multus flow | [playbooks/flows/cluster-enable-kubevirt-lan.yml](../../playbooks/flows/cluster-enable-kubevirt-lan.yml) |
 | Site provisioner binding | `GET`/`PUT`/`PATCH /sites/{name}/provision` |
 | Site provision actions | `POST`/`GET /sites/{name}/provision/actions` |
+| Rediscover cluster capabilities | `POST /clusters/{name}/discover` (and `POST …/gpu/discover` for GPU-only); each call starts a fresh discovery run — a prior `Succeeded` result is ignored unless `completed_at` is at or after the request timestamp |
 | List VirtualMachines | `GET /clusters/{name}/vms` |
 | VM power (start/stop/restart) | `POST /clusters/{name}/vms/{ns}/{vm}/power` |
 | VM serial / VNC console | WebSocket `…/vms/{ns}/{vm}/console` or `…/vnc` |
@@ -274,10 +275,13 @@ Hub finalize inventory sets **`fleet_site_spoke_endpoint`** (WireGuard IP of the
 bootstrap control plane) in **`[site_bootstrap:vars]`**. Spoke ingress
 verification in Ansible runs two Traefik `/ping` checks
 ([push_cluster_spoke_ingress.yml](../../roles/fleet_site/tasks/push_cluster_spoke_ingress.yml)):
-first **`curl` on `127.0.0.1:{http_port}`** on the bootstrap node
-(`delegate_to` **`site_bootstrap[0]`**, SSH via jumphost when configured), then
-**`curl` to the overlay endpoint** and port from inventory vars. Jumphost SSH
-uses management LAN addresses; overlay probes use WireGuard. Custom inventory
+first **`curl` to the overlay endpoint** (`fleet_site_spoke_endpoint` and HTTP
+port from inventory vars), then an optional **local `127.0.0.1:{http_port}`**
+check on the bootstrap node (`delegate_to` **`site_bootstrap[0]`**). Provision
+succeeds when the overlay probe passes even if the local check is skipped (for
+example hub-runner inventory that only reaches the spoke via jumphost
+`ProxyCommand`). Jumphost SSH uses management LAN addresses; overlay probes use
+WireGuard. Custom inventory
 must preserve **`fleet_site_spoke_endpoint`** when `site_bootstrap` nodes use
 ProxyJump to lab addresses. Generated inventory keeps Ansible host names and
 group names distinct: a shared name makes `delegate_to` drop `ansible_host`, so
@@ -303,7 +307,9 @@ Each operation follows **validate → execute → validate**:
    state, duplicate addresses, or missing nodes.
 2. **Execute** — existing add/remove/replace APIs queue an Ansible job.
 3. **Post-validation** — controller and `?phase=post` confirm inventory and
-   spoke node state after the job completes.
+   spoke node state after the job completes. When a node is not yet `Ready` in
+   the API immediately after Ansible success, the controller retries post-validation
+   for several minutes before marking the operation failed.
 
 Completed operations are appended to `FleetClusterJoin.status.nodeOperationHistory`
 (newest first, capped at 20). Each record stores actor identity, timestamps, outcome,

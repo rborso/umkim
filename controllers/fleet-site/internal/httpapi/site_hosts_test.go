@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func seedInventoryCM(ns, site string) *corev1.ConfigMap {
@@ -48,7 +47,7 @@ func TestSiteHostCRUDRemoved(t *testing.T) {
 	ns := "fleet-console"
 	site := registrySite(ns, "homelab")
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 
@@ -108,7 +107,7 @@ func TestSiteHostProvisionUpdatesInventory(t *testing.T) {
 	site := registrySite(ns, "homelab")
 	site.Spec.Provision = &fleetv1alpha1.SiteProvisionSpec{Provider: fleetv1alpha1.ProvisionProviderNoop}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 
@@ -157,7 +156,7 @@ func TestSiteHostProvisionRoute(t *testing.T) {
 	site := registrySite(ns, "homelab")
 	site.Spec.Provision = &fleetv1alpha1.SiteProvisionSpec{Provider: fleetv1alpha1.ProvisionProviderNoop}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 

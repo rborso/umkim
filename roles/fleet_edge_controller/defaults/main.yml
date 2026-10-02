@@ -12,8 +12,8 @@ fleet_edge_cluster_configmap_name: fleet-edge-clusters
 fleet_routes_cm_namespace: "{{ hub_ingress_namespace | default('fleet-ingress') }}"
 fleet_routes_cm_name: "{{ hub_ingress_fleet_routes_cm | default('fleet-traefik-fleet-routes') }}"
 catalog_manager_api_url: ""
-fleet_edge_hub_gateway_url: "{{ 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
-fleet_edge_hub_gateway_http_url: "http://127.0.0.1:80"
+fleet_edge_hub_gateway_url: "{{ 'https://gateway.' ~ (hub_ingress_namespace | default('fleet-ingress')) ~ '.svc.cluster.local' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://gateway.' ~ (hub_ingress_namespace | default('fleet-ingress')) ~ '.svc.cluster.local:80' }}"
+fleet_edge_hub_gateway_http_url: "http://gateway.{{ hub_ingress_namespace | default('fleet-ingress') }}.svc.cluster.local:80"
 fleet_edge_route_health_interval_sec: 60
 fleet_edge_route_requeue_interval_sec: 60
 fleet_edge_route_health_failure_threshold: 3

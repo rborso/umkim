@@ -44,3 +44,26 @@
     name: kube_vip
     tasks_from: remove_vip.yml
   tags: [k3s, k3s_cleanup, kube_vip]
+
+- name: K3s cleanup | Stop fleet WireGuard interface
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [k3s, k3s_cleanup]
+
+- name: K3s cleanup | Remove fleet WireGuard config
+  ansible.builtin.file:
+    path: "/etc/wireguard/{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}.conf"
+    state: absent
+  failed_when: false
+  tags: [k3s, k3s_cleanup]
+
+- name: K3s cleanup | Bring down Calico IPIP interface when present
+  ansible.builtin.command:
+    cmd: ip link set tunl0 down
+  register: k3s_cleanup_tunl0
+  changed_when: k3s_cleanup_tunl0.rc == 0
+  failed_when: false
+  tags: [k3s, k3s_cleanup]

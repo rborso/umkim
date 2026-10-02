@@ -1,0 +1,4 @@
+== CHECK edge.route-hub-health ==
+=== verify-route-hub-health ===
+gateway replicas=1 ready=1 strategy=Recreate
+SKIP: no hub-routed FleetAppRoute in namespace fleet-system

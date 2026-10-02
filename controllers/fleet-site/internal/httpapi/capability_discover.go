@@ -10,6 +10,29 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
+const discoverCapabilitiesAnnotation = "fleet.umkim.com/discover-capabilities"
+
+// discoveryTerminalAfterRequest reports whether a terminal discovery result belongs to
+// the current request (not a stale Succeeded/Failed left on the ManagedCluster).
+func discoveryTerminalAfterRequest(st *capdiscover.Result, requestedAt time.Time) bool {
+	if st == nil {
+		return false
+	}
+	switch st.Phase {
+	case capdiscover.PhaseSucceeded, capdiscover.PhaseFailed:
+	default:
+		return false
+	}
+	if st.CompletedAt == "" {
+		return st.Phase == capdiscover.PhaseFailed
+	}
+	completed, err := time.Parse(time.RFC3339, st.CompletedAt)
+	if err != nil {
+		return false
+	}
+	return !completed.Before(requestedAt)
+}
+
 type capabilityDiscoverySummary struct {
 	Phase               string                   `json:"phase,omitempty"`
 	Message             string                   `json:"message,omitempty"`
@@ -68,10 +91,11 @@ func (s *Server) handleDiscoverCapabilities(ctx context.Context, w http.Response
 		return
 	}
 
+	requestedAt := time.Now().UTC()
 	if fcj.Annotations == nil {
 		fcj.Annotations = map[string]string{}
 	}
-	fcj.Annotations["fleet.umkim.com/discover-capabilities"] = time.Now().UTC().Format(time.RFC3339)
+	fcj.Annotations[discoverCapabilitiesAnnotation] = requestedAt.Format(time.RFC3339)
 	if err := s.Client.Update(ctx, fcj); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -88,14 +112,17 @@ func (s *Server) handleDiscoverCapabilities(ctx context.Context, w http.Response
 		if st == nil {
 			continue
 		}
-		switch st.Phase {
-		case capdiscover.PhaseSucceeded, capdiscover.PhaseFailed:
-			if st.Phase == capdiscover.PhaseSucceeded {
-				_ = s.syncEdgeCapabilities(ctx, clusterName, st.ClusterCapabilities)
-			}
-			writeJSON(w, http.StatusOK, st)
-			return
+		if st.Phase == capdiscover.PhaseRunning {
+			continue
 		}
+		if !discoveryTerminalAfterRequest(st, requestedAt) {
+			continue
+		}
+		if st.Phase == capdiscover.PhaseSucceeded {
+			_ = s.syncEdgeCapabilities(ctx, clusterName, st.ClusterCapabilities)
+		}
+		writeJSON(w, http.StatusOK, st)
+		return
 	}
 	http.Error(w, "capability discovery timed out", http.StatusGatewayTimeout)
 }

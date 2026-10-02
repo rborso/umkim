@@ -1,0 +1,7 @@
+== CHECK edge.gateway-ha ==
+=== verify-gateway-ha ===
+replicas=1 ready=1 strategy=Recreate maxUnavailable=n/a
+OK: single-replica gateway (lab/single-node hub)
+OK: 1 gateway pod(s) ready
+OK: gateway ping http://127.0.0.1:80/ping
+=== verify-gateway-ha OK ===

@@ -16,9 +16,23 @@ NS="${FLEET_SITE_NS:-fleet-console}"
 LITELLM_URL="${FLEET_LITELLM_URL:-http://${FLEET_HUB_IP:-127.0.0.1}:30918}"
 EXPECT_ENABLED="${FLEET_LLM_EXPECT_ENABLED:-auto}"
 
+API_CURL=(curl -sf)
+API_CURL+=(-H "X-Fleet-Subject-Kind: User" -H "X-Fleet-Subject-Name: fleet-verify" -H "X-Fleet-DC-Admin: true")
+if [[ -n "${UMKIM_TOKEN:-}" ]]; then
+  API_CURL+=(-H "Authorization: Bearer ${UMKIM_TOKEN}")
+fi
+
 echo "=== verify-fleet-llm ==="
 
-RESP=$(curl -sf "${API}/llm") || { echo "FAIL: Fleet API /llm unreachable at ${API}"; exit 1; }
+RESP=$("${API_CURL[@]}" "${API}/llm") || {
+  if command -v umkim >/dev/null 2>&1; then
+    RESP="$(umkim llm get -o json 2>/dev/null)" || true
+  fi
+  if [[ -z "${RESP:-}" ]]; then
+    echo "FAIL: Fleet API /llm unreachable at ${API} (set UMKIM_TOKEN or use fleet identity headers)"
+    exit 1
+  fi
+}
 echo "$RESP" | jq '{hubEnabled, phase, message, endpoint: .hub.endpoint}'
 
 PHASE=$(echo "$RESP" | jq -r '.phase // empty')

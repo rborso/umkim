@@ -1,5 +1,13 @@
 ---
 # Configure host Linux bridge + bridge CNI on each node (day-0 bootstrap or day-2).
+- name: KubeVirt host bridge | Ensure CNI bin directory
+  ansible.builtin.file:
+    path: "{{ kubevirt_bridge_cni_bin_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+  tags: [kubevirt, kubevirt_host_bridge, kubevirt_bridge_nad]
+
 - name: KubeVirt host bridge | Install bridge CNI plugin
   ansible.builtin.shell: |
     set -euo pipefail

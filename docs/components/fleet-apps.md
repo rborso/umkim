@@ -36,6 +36,9 @@ fleet-site-controller. For GPU inference, compose chart values from
 `profiles/` (see `scripts/render-llama-cpp-values.sh`) or use
 `values-fleet-gpu-4g.yaml`; see [fleet-llm.md](fleet-llm.md).
 
+Replacing a **Ready** chart with a different `origin` or `source` requires
+`force=true` on `POST /charts` (JSON `force: true`) or `umkim chart add --force`.
+
 Deleting a library row removes the `FleetChart` record only. Harbor artifacts
 stay until an operator prunes them.
 

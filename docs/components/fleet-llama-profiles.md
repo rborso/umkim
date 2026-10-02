@@ -12,8 +12,8 @@ fleet runtime values and Harbor image overlay, same as embedded files under
 | `FleetLlamaProfile` | `spec.profileYaml`, chart pin, optional `spec.system` for seeded built-ins |
 | `FleetLlamaProfileTest` | One verify session (quick or extended) |
 
-System profiles (for example `qwen35-2b-ud-4g`) are created on controller start
-when missing.
+System profiles (for example `qwen35-2b-ud-4g`, `qwen35-2b-ud-small` for guests
+with about 4–6 GiB RAM) are created on controller start when missing.
 
 ## HTTP API (`/llama-profiles`)
 

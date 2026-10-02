@@ -163,7 +163,7 @@ func (s *Server) provisionSiteHost(ctx context.Context, w http.ResponseWriter, r
 		return
 	}
 	if !hostFound {
-		http.Error(w, "host not found in inventory", http.StatusNotFound)
+		http.Error(w, "host not found in hub inventory store; PUT host_vars or run site inventory sync", http.StatusBadRequest)
 		return
 	}
 	addr, _ := yaidap.GuestAddress(ctx, s.Client, s.Cfg.Namespace, siteName, hostName)

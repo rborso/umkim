@@ -17,6 +17,7 @@
 #   INV, ANSIBLE_VAULT_PASSWORD_FILE
 #   FLEET_API              fleet-site API (default http://127.0.0.1:18080/api/v1alpha1)
 #   TEARDOWN_CLUSTER_TIMEOUT_SEC  per-cluster delete wait (default 1200)
+#   TEARDOWN_DELETE_JOB_MIN_AGE_SEC  min age before replacing a Running delete Job (default 1800)
 #
 # Options:
 #   --confirm              Required. Without this flag the script exits immediately.
@@ -35,6 +36,8 @@ export INV="${INV:--i inventory/hosts.yml -i inventory/hosts-from-hub.yml}"
 API="${FLEET_API:-http://127.0.0.1:18080/api/v1alpha1}"
 CLUSTER_TIMEOUT="${TEARDOWN_CLUSTER_TIMEOUT_SEC:-1200}"
 POLL_INTERVAL="${TEARDOWN_POLL_INTERVAL_SEC:-15}"
+DELETE_JOB_MIN_AGE_SEC="${TEARDOWN_DELETE_JOB_MIN_AGE_SEC:-1800}"
+FORCE_STUCK_AFTER_SEC="${TEARDOWN_FORCE_STUCK_AFTER_SEC:-$DELETE_JOB_MIN_AGE_SEC}"
 # Direct fleet-site API requires identity headers (FLEET_SITE_REQUIRE_IDENTITY=true).
 API_ID_HEADERS=(
   -H "X-Fleet-Subject-Kind: User"
@@ -133,6 +136,39 @@ managed_cluster_exists() {
   kubectl_cmd get managedcluster "$1" >/dev/null 2>&1
 }
 
+delete_job_age_sec() {
+  local job="$1"
+  local start
+  start="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.startTime}' 2>/dev/null || true)"
+  [[ -n "${start}" ]] || return 1
+  python3 - <<PY || return 1
+from datetime import datetime, timezone
+start = datetime.fromisoformat("${start}".replace("Z", "+00:00"))
+print(int((datetime.now(timezone.utc) - start).total_seconds()))
+PY
+}
+
+delete_job_permanently_failed() {
+  local job="$1"
+  local st
+  st="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || true)"
+  [[ "${st}" == "True" ]]
+}
+
+delete_job_considered_stuck() {
+  local job="$1"
+  local succeeded age
+  succeeded="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.succeeded}' 2>/dev/null || echo 0)"
+  if [[ "${succeeded}" == "1" ]]; then
+    return 1
+  fi
+  if delete_job_permanently_failed "${job}"; then
+    return 0
+  fi
+  age="$(delete_job_age_sec "${job}" 2>/dev/null || echo 0)"
+  [[ "${age}" -ge "${DELETE_JOB_MIN_AGE_SEC}" ]]
+}
+
 force_remove_stuck_cluster() {
   local name="$1"
   local phase jobs
@@ -157,14 +193,11 @@ force_remove_stuck_cluster() {
     local stuck=0
     while read -r job; do
       [[ -n "${job}" ]] || continue
-      local succeeded
-      succeeded="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.succeeded}' 2>/dev/null || echo 0)"
-      if [[ "${succeeded}" != "1" ]]; then
+      if delete_job_considered_stuck "${job}"; then
         local age
-        age="$(kubectl_cmd get "${job}" -n fleet-console -o jsonpath='{.status.startTime}' 2>/dev/null || true)"
-        if [[ -n "${age}" ]]; then
-          stuck=1
-        fi
+        age="$(delete_job_age_sec "${job}" 2>/dev/null || echo "?")"
+        log "Delete job ${job} considered stuck (age=${age}s min=${DELETE_JOB_MIN_AGE_SEC}s)"
+        stuck=1
       fi
     done <<< "${jobs//$' '/$'\n'}"
 
@@ -202,7 +235,7 @@ wait_cluster_gone() {
       log "Cluster ${name} removed from fleet API"
       return 0
     fi
-    if [[ "${elapsed}" -ge 60 ]]; then
+    if [[ "${elapsed}" -ge "${FORCE_STUCK_AFTER_SEC}" ]]; then
       force_remove_stuck_cluster "${name}"
     fi
     if [[ $((elapsed - last_log)) -ge 60 ]]; then
@@ -336,6 +369,14 @@ if [[ "${SKIP_CLUSTER_DELETE}" -eq 0 ]]; then
   fi
 else
   log "Skipping cluster delete (--skip-cluster-delete)"
+  log "WARN: remaining FleetClusterJoin / spoke K3s clusters are not removed — hub Ansible teardown may leave orphaned nodes; re-run without --skip-cluster-delete or delete FCJs manually"
+fi
+
+if [[ "${SKIP_CLUSTER_DELETE}" -eq 0 && "${DRY_RUN}" -eq 0 ]]; then
+  remaining="$(kubectl_cmd get fleetclusterjoins -n fleet-console -o name 2>/dev/null | wc -l || echo 0)"
+  if [[ "${remaining}" -gt 0 ]]; then
+    log "WARN: ${remaining} FleetClusterJoin(s) still present after cluster delete phase — inspect delete Jobs before Phase 3 hub wipe"
+  fi
 fi
 
 # --- Phase 3: Ansible hub teardown ---

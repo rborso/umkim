@@ -6,7 +6,7 @@ disk:
   # Must be >= virtual size of the cloud image (Rocky GenericCloud is typically 10Gi).
   size: 20Gi
   # Prefer a storage class with Immediate binding for CDI HTTP imports.
-  storageClass: longhorn
+  storageClass: local-path
   # Filesystem avoids Longhorn block-device permission issues with cdi-importer.
   volumeMode: Filesystem
   accessMode: ReadWriteOnce

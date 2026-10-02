@@ -1,0 +1,21 @@
+== CHECK preflight.v1 ==
+[preflight-v1] default hub install
+[preflight-secrets] strict=1
+[preflight-secrets] OK   vault file present and encrypted
+[preflight-secrets] OK   harbor_admin_password
+[preflight-secrets] OK   fleet_console_auth_session_secret
+[preflight-secrets] done
+[preflight-v1] OK   VERSIONS.md
+[preflight-v1] OK   ansible collections
+[preflight-v1] OK   hub SSH linux@10.10.0.1
+[WARNING]: No inventory was parsed, only implicit localhost is available
+[WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'
+[WARNING]: Could not match supplied host pattern, ignoring: hub
+
+PLAY [UMKIM hub preflight] *****************************************************
+skipping: no hosts matched
+
+PLAY RECAP *********************************************************************
+
+[preflight-v1] OK   ansible playbooks/preflight.yml
+[preflight-v1] passed

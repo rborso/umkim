@@ -177,6 +177,16 @@
     - fleet_image.repository in harbor_fleet_umkim_legal_images
   tags: [harbor, harbor_push_fleet]
 
+- name: Harbor | Sync cluster-delete playbook into ansible-runner build context
+  ansible.builtin.copy:
+    src: "{{ harbor_umkim_root }}/cluster-delete-hub.yml"
+    dest: "{{ (fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository)) }}/cluster-delete-hub.yml"
+    mode: "0644"
+  when:
+    - not harbor_fleet_skip_push | bool
+    - fleet_image.repository == 'fleet-ansible-runner'
+  tags: [harbor, harbor_push_fleet]
+
 - name: Harbor | Build image with podman
   ansible.builtin.command:
     cmd: >-

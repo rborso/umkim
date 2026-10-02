@@ -1,0 +1,7 @@
+== CHECK ops.umkim-management-site ==
+=== verify-umkim-management-site ===
+API=http://10.10.0.1:18080/api/v1alpha1
+OK: site management listed
+OK: GET /infrastructure/hub returns host + site id
+OK: GET /clusters does not contain umkim-hub
+Expected PATCH site ingress → 403, got 401

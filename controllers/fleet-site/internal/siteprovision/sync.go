@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -171,38 +172,43 @@ func enrichHandoffHost(ctx context.Context, c client.Client, ns, siteName string
 
 // CommitAction updates FleetSite provision status and syncs host inventory.
 func CommitAction(ctx context.Context, c client.Client, fs *fleetv1alpha1.FleetSite, rec fleetv1alpha1.SiteProvisionActionRecord, finished bool) error {
-	var latest fleetv1alpha1.FleetSite
-	if err := c.Get(ctx, types.NamespacedName{Namespace: fs.Namespace, Name: fs.Name}, &latest); err != nil {
-		return err
-	}
-	if latest.Status.Provision == nil {
-		latest.Status.Provision = &fleetv1alpha1.SiteProvisionStatus{}
-	}
-	st := latest.Status.Provision
-	st.Phase = rec.Phase
-	st.Message = rec.Message
-	st.LastActionID = rec.ID
-	st.LastActionType = rec.Action
-	if finished {
-		if st.Current != nil && st.Current.ID != rec.ID {
-			st.History = prependHistory(st.History, *st.Current)
-		}
-		st.History = prependHistory(st.History, rec)
-		st.Current = nil
-	} else {
-		if st.Current != nil && st.Current.ID != rec.ID {
-			st.History = prependHistory(st.History, *st.Current)
-		}
-		cp := rec
-		st.Current = &cp
-	}
-	if err := c.Status().Update(ctx, &latest); err != nil {
-		latest.Status.Provision = st
-		if err := c.Update(ctx, &latest); err != nil {
+	key := types.NamespacedName{Namespace: fs.Namespace, Name: fs.Name}
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var latest fleetv1alpha1.FleetSite
+		if err := c.Get(ctx, key, &latest); err != nil {
 			return err
 		}
+		if latest.Status.Provision == nil {
+			latest.Status.Provision = &fleetv1alpha1.SiteProvisionStatus{}
+		}
+		st := latest.Status.Provision
+		st.Phase = rec.Phase
+		st.Message = rec.Message
+		st.LastActionID = rec.ID
+		st.LastActionType = rec.Action
+		if finished {
+			if st.Current != nil && st.Current.ID != rec.ID {
+				st.History = prependHistory(st.History, *st.Current)
+			}
+			st.History = prependHistory(st.History, rec)
+			st.Current = nil
+		} else {
+			if st.Current != nil && st.Current.ID != rec.ID {
+				st.History = prependHistory(st.History, *st.Current)
+			}
+			cp := rec
+			st.Current = &cp
+		}
+		latest.Status.Provision = st
+		if err := c.Status().Update(ctx, &latest); err != nil {
+			return err
+		}
+		*fs = latest
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-	*fs = latest
 	SyncHostInventory(ctx, c, fs.Namespace, fs.Name, rec)
 	return nil
 }

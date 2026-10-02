@@ -86,6 +86,19 @@ Multi-cluster **hub** routing is active–backup behavior, not active–active
 load sharing. Per-site `port_forward` and `reverse_proxy` exposure is
 independent of hub-gateway failover.
 
+## Hub gateway health probes
+
+The fleet-edge controller can probe hub-routed gateway reachability from the pod.
+Defaults target the in-cluster Traefik Service (for example
+`http://gateway.<hub-ingress-namespace>.svc.cluster.local:80`) instead of
+loopback on the hub node. Override with inventory vars
+`fleet_edge_hub_gateway_url` and `fleet_edge_hub_gateway_http_url` when the hub
+ingress namespace or Service name differs.
+
+Disabling cluster ACME (`POST /clusters/{name}/acme/disable`) clears
+`tls_policy: acme_cluster` from that cluster's row in `fleet-edge-clusters` so
+edge staging queues stop treating the spoke as HTTP-01 eligible.
+
 ## Operate and verify
 
 Deploy and upgrade edge resources through the supported

@@ -34,6 +34,13 @@ func testSiteHTTPScheme(t *testing.T) *runtime.Scheme {
 	return scheme
 }
 
+func testSiteClientBuilder(t *testing.T) *fake.ClientBuilder {
+	t.Helper()
+	return fake.NewClientBuilder().
+		WithScheme(testSiteHTTPScheme(t)).
+		WithStatusSubresource(&fleetv1alpha1.FleetSite{})
+}
+
 func TestNormalizeSiteIDOnCreate(t *testing.T) {
 	fs := &fleetv1alpha1.FleetSite{
 		Spec: fleetv1alpha1.FleetSiteSpec{SiteName: "homelab", SiteId: "h"},

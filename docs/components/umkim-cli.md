@@ -97,7 +97,7 @@ umkim vm start|stop|restart NAME --cluster NAME [--force]
 umkim vm console NAME --cluster NAME [--type serial|vnc]
 
 umkim chart list | get NAME
-umkim chart add --origin oci://… [--version V] [--image-policy external|proxy|copy]
+umkim chart add --origin oci://… [--version V] [--image-policy external|proxy|copy] [--force]
 umkim chart add --chart package.tgz [--name N] [--version V] [--image-policy …]
 umkim chart add -f chart.json
 umkim chart delete NAME

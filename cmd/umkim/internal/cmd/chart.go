@@ -64,6 +64,7 @@ func chartGetCmd() *cobra.Command {
 func chartAddCmd() *cobra.Command {
 	var (
 		origin, name, version, imagePolicy, valuesFile, jsonFile, tgzPath string
+		force                                                              bool
 	)
 	c := &cobra.Command{
 		Use:   "add",
@@ -154,6 +155,9 @@ Image policy: external (default), proxy, or copy.`,
 			if valuesYAML != "" {
 				body["valuesYaml"] = valuesYAML
 			}
+			if force {
+				body["force"] = true
+			}
 			if _, ok := body["origin"]; !ok || strings.TrimSpace(fmt.Sprint(body["origin"])) == "" {
 				return fmt.Errorf("origin required (oci:// or https:// chart URL)")
 			}
@@ -176,6 +180,7 @@ Image policy: external (default), proxy, or copy.`,
 	c.Flags().StringVar(&version, "version", "", "Chart version (optional for upload; required for some OCI refs)")
 	c.Flags().StringVar(&imagePolicy, "image-policy", "external", "external | proxy | copy")
 	c.Flags().StringVar(&valuesFile, "values-file", "", "Optional default values YAML stored on FleetChart")
+	c.Flags().BoolVar(&force, "force", false, "Replace an existing Ready chart with a different source/origin")
 	return c
 }
 

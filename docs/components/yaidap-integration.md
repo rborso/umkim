@@ -53,7 +53,30 @@ Configure on `FleetSite.spec.provision` (API: `GET`/`PUT`/`PATCH /sites/{name}/p
 | `defaultExtraVars` | no | Safe non-secret `-e` pairs passed to every connector run |
 
 \*Required for `POST …/provision/yaidap/sync`.  
-\*\*Required when `yaidapRepo` uses SSH (`git@…`); omit for public HTTPS remotes.
+\*\*Required when `yaidapRepo` uses SSH (`git@…`) or private HTTPS (`https://…`
+without anonymous read). Public HTTPS remotes still need a deploy-key Secret when
+the hub cannot clone without credentials.
+
+### Fleet Ansible SSH key on new guests
+
+`create_vm` connector runs pass **`fleet_ansible_ssh_pubkey`** to YAIDAP (from hub
+Secret `fleet-site-ansible-ssh`, public key material). YAIDAP must install that
+key in guest `authorized_keys` alongside the jumphost provision key so hub
+cluster/node Ansible can SSH without manual steps. Minimum YAIDAP release for
+this contract is pinned in [VERSIONS.md](../../VERSIONS.md).
+
+### YAIDAP-side fixes (sibling repository)
+
+UMKIM does not vendor YAIDAP. The following behaviors are required in the YAIDAP
+checkout referenced by `yaidapRef` / the VERSIONS pin:
+
+| Area | Expected behavior |
+|------|-------------------|
+| `create_vm` | Idempotent when the libvirt domain is already running (success without reimage) |
+| Placement | Adopt running domains; improve free-memory accounting for plans |
+| `install_bm` / TempXE | Fail fast without UEFI netboot; separate `install_os` vs `tempxe_discovery` arming |
+| Cloud-init | Accept `fleet_ansible_ssh_pubkey` for hub fleet SSH |
+| Disk | Optional growpart when guest disk is below cluster `minRootDiskGi` |
 
 **Secret:** create before binding, e.g. `fleet-site-{site}-provision-ssh` with
 `id_ed25519` / `id_ed25519.pub` (or `id_rsa` / `id_rsa.pub`). The ansible-runner

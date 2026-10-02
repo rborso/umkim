@@ -9,16 +9,26 @@ import (
 
 func TestValidateYaidapRepoSync(t *testing.T) {
 	spec := &fleetv1alpha1.SiteProvisionSpec{
-		Provider:      fleetv1alpha1.ProvisionProviderYaidap,
-		Jumphost:      "linux@jumphost",
-		SSHSecretRef:  "fleet-site-homelab-provision-ssh",
-		InventoryPath: "/inventory/homelab",
-		YaidapRepo:    "https://github.com/rborso/yaidap.git",
+		Provider:           fleetv1alpha1.ProvisionProviderYaidap,
+		Jumphost:           "linux@jumphost",
+		SSHSecretRef:       "fleet-site-homelab-provision-ssh",
+		InventoryPath:      "/inventory/homelab",
+		YaidapRepo:         "https://github.com/rborso/yaidap.git",
+		YaidapGitSecretRef: "fleet-site-homelab-yaidap-git",
 	}
 	if err := ValidateYaidapRepoSync(spec); err != nil {
 		t.Fatal(err)
 	}
+	spec.YaidapGitSecretRef = ""
+	if err := ValidateYaidapRepoSync(spec); err == nil {
+		t.Fatal("expected error for https repo without git secret")
+	}
+	spec.YaidapGitSecretRef = "fleet-site-homelab-yaidap-git"
+	if err := ValidateYaidapRepoSync(spec); err != nil {
+		t.Fatal(err)
+	}
 	spec.YaidapRepo = "git@github.com:rborso/yaidap.git"
+	spec.YaidapGitSecretRef = ""
 	if err := ValidateYaidapRepoSync(spec); err == nil {
 		t.Fatal("expected error without git secret")
 	}

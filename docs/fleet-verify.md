@@ -32,6 +32,10 @@ The currently registered suite names include `hub`, `core`, `edge`, `backup`,
 `all`. The `verify-fleet.sh --help` text may list legacy names (`nested`,
 `catalog`); use `apps` for chart-library checks.
 
+For hub LiteLLM status, use `scripts/verify-fleet-llm.sh` with fleet identity
+headers (built in) or `UMKIM_TOKEN` when the Fleet API requires auth; it falls
+back to `umkim llm get` when curl fails.
+
 For a Helm app smoke test on a Ready cluster, use
 `scripts/verify-fleet-app.sh` (set `FLEET_APP_CLUSTER`) or the console **Apps**
 page. `scripts/verify-fleet-chart.sh` checks that the hub library lists seeded

@@ -45,6 +45,11 @@ if [[ -z "$resolved" ]]; then
 fi
 echo "OK: $SITE_HOST -> $resolved"
 
+if [[ -n "$NODE_IP" && "$resolved" != "$NODE_IP" ]]; then
+  echo "FAIL: $SITE_HOST resolves to $resolved but NODE_IP=$NODE_IP (site ACME needs DNS to hit the spoke WAN/VIP, not the hub)"
+  exit 1
+fi
+
 echo "== TCP reachability preflight (public DNS address)"
 for port in 80 443; do
   if timeout 5 bash -c "echo >/dev/tcp/${resolved}/${port}" 2>/dev/null; then

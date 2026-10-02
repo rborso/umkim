@@ -101,6 +101,10 @@ func (s *Server) handleDisableClusterAcme(ctx context.Context, w http.ResponseWr
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := s.clearClusterEdgeACMEPolicy(ctx, clusterName); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := s.triggerAcmeReconcile(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -112,6 +116,23 @@ func (s *Server) handleDisableClusterAcme(ctx context.Context, w http.ResponseWr
 		return
 	}
 	writeJSON(w, http.StatusOK, cs)
+}
+
+func (s *Server) clearClusterEdgeACMEPolicy(ctx context.Context, clusterName string) error {
+	edgeFile, err := loadEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName)
+	if err != nil {
+		return err
+	}
+	ent, ok := edgeFile.Clusters[clusterName]
+	if !ok {
+		return nil
+	}
+	if ent.TlsPolicy != fleetv1alpha1.TLSPolicyACMECluster {
+		return nil
+	}
+	ent.TlsPolicy = fleetv1alpha1.TLSPolicyExternal
+	edgeFile.Clusters[clusterName] = ent
+	return saveEdgeClusters(ctx, s.Client, s.Cfg.EdgeClustersCMNamespace, s.Cfg.EdgeClustersCMName, edgeFile)
 }
 
 func (s *Server) clusterAcmeEligible(ctx context.Context, clusterName string, fcj *fleetv1alpha1.FleetClusterJoin) bool {

@@ -26,6 +26,9 @@ func ValidateYaidapRepoSync(spec *fleetv1alpha1.SiteProvisionSpec) error {
 	if repoNeedsDeployKey(spec.YaidapRepo) && strings.TrimSpace(spec.YaidapGitSecretRef) == "" {
 		return fmt.Errorf("yaidap repo sync requires provision.yaidapGitSecretRef for SSH git URLs")
 	}
+	if strings.HasPrefix(strings.TrimSpace(spec.YaidapRepo), "https://") && strings.TrimSpace(spec.YaidapGitSecretRef) == "" {
+		return fmt.Errorf("yaidap repo sync requires provision.yaidapGitSecretRef for private HTTPS git URLs (or use a public repo / SSH deploy key)")
+	}
 	return nil
 }
 

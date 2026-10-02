@@ -9,7 +9,10 @@ cluster with `ingressId` set to that row's `id`.
 1. Start from [`fleet_sites.yml.snippet`](fleet_sites.yml.snippet).
 2. Replace the site, ingress address/zone, and TLS placeholders in local inventory.
 3. Configure the router and public DNS outside this repository, using the
-   approved destination and access policy for the deployment.
+   approved destination and access policy for the deployment. Public hostnames for
+   `route.mode: site` must resolve to the **spoke WAN or NodePort target**, not
+   the hub Traefik VIP — otherwise ACME HTTP-01 and `verify-fleet-edge-site-acme.sh`
+   preflight fail (compare `dig` output to the spoke `NODE_IP`).
 4. Validate the ingress configuration before applying the relevant playbook.
 
 [`openwrt-uci.example`](openwrt-uci.example) is a commented router example, not

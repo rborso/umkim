@@ -372,7 +372,11 @@ func validatePost(fcj *fleetv1alpha1.FleetClusterJoin, req *Request, nodes []Nod
 			add("control_replaced", CheckPass, fmt.Sprintf("replacement node %s is Ready", newHN))
 		}
 		if oldNode != newHN && nodeByName(nodes, oldNode) != nil {
-			add("old_node_removed", CheckWarn, fmt.Sprintf("old node %s still appears in Kubernetes", oldNode))
+			st := CheckFail
+			if req.Force {
+				st = CheckWarn
+			}
+			add("old_node_removed", st, fmt.Sprintf("old node %s still appears in Kubernetes", oldNode))
 		} else {
 			add("old_node_removed", CheckPass, "old control-plane node is gone or renamed")
 		}

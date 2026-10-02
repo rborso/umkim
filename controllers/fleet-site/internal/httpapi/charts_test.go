@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -129,6 +130,40 @@ func TestCreateChartRejectsBadImagePolicy(t *testing.T) {
 	s.handleCharts(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPutChartReadyRequiresForce(t *testing.T) {
+	existing := &fleetv1alpha1.FleetChart{
+		ObjectMeta: metav1.ObjectMeta{Name: "whoami", Namespace: "fleet-console"},
+		Spec: fleetv1alpha1.FleetChartSpec{
+			Source:  fleetv1alpha1.ChartSourceOCI,
+			Origin:  "oci://ghcr.io/example/whoami",
+			Version: "0.1.0",
+		},
+		Status: fleetv1alpha1.FleetChartStatus{Phase: fleetv1alpha1.ChartPhaseReady},
+	}
+	s := testChartServer(t, existing)
+	s.Cfg.HelmOCIPrefixes = "oci://ghcr.io"
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1alpha1/charts", strings.NewReader(`{
+		"name":"whoami","origin":"oci://ghcr.io/example/other","version":"0.2.0","source":"oci"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.handleCharts(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1alpha1/charts?force=true", strings.NewReader(`{
+		"name":"whoami","origin":"oci://ghcr.io/example/other","version":"0.2.0","source":"oci","force":true
+	}`))
+	req2.Header.Set("Content-Type", "application/json")
+	rec2 := httptest.NewRecorder()
+	s.handleCharts(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("force status=%d body=%s", rec2.Code, rec2.Body.String())
 	}
 }
 

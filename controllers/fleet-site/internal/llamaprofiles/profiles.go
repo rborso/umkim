@@ -22,7 +22,8 @@ type ProfileMeta struct {
 }
 
 var profileDescriptions = map[string]string{
-	"qwen35-2b-ud-4g": "~4GB GPU: Unsloth Qwen3.5-2B-UD Q8_K_XL, hub LiteLLM alias Qwen3.5-2B-UD",
+	"qwen35-2b-ud-4g":    "~4GB GPU: Unsloth Qwen3.5-2B-UD Q8_K_XL, hub LiteLLM alias Qwen3.5-2B-UD",
+	"qwen35-2b-ud-small": "Small-RAM guests (~4GiB VM): same model with reduced memory requests",
 }
 
 // List returns known profile ids sorted.

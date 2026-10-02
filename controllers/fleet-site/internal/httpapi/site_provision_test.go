@@ -12,7 +12,6 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestSiteProvisionNoopAction(t *testing.T) {
@@ -29,7 +28,7 @@ func TestSiteProvisionNoopAction(t *testing.T) {
 		},
 	}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 
@@ -79,7 +78,7 @@ func TestSiteProvisionRejectUnknownProvider(t *testing.T) {
 		},
 	}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 	body, _ := json.Marshal(map[string]string{"provider": "bogus"})
@@ -103,7 +102,7 @@ func TestSiteProvisionConfirmRequired(t *testing.T) {
 		},
 	}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site, seedInventoryCM(ns, "homelab")).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 	body, _ := json.Marshal(map[string]interface{}{
@@ -130,7 +129,7 @@ func TestGetSiteProvisionBindingDefaultNoop(t *testing.T) {
 		},
 	}
 	s := &Server{
-		Client: fake.NewClientBuilder().WithScheme(testSiteHTTPScheme(t)).WithObjects(site).Build(),
+		Client: testSiteClientBuilder(t).WithObjects(site).Build(),
 		Cfg:    config.Config{Namespace: ns, RequireIdentity: false},
 	}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1alpha1/sites/homelab/provision", nil)

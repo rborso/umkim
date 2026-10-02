@@ -1,0 +1,2 @@
+== CHECK fleet.infra.singletons ==
+OK fleet singletons (ingress-auth, acme, llm)

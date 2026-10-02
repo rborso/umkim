@@ -204,6 +204,7 @@ func (r *ClusterJoinReconciler) startNodeOperationJob(ctx context.Context, fcj *
 	if err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
+	nodeWG = r.nodeWGWithReplaceControlOld(fcj, op, nodeWG)
 	if err := r.ensureClusterInventoryCM(ctx, fcj, clusterName, nodeWG); err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
@@ -668,6 +669,48 @@ func nodeInternalIP(n *corev1.Node) string {
 	return ""
 }
 
+func (r *ClusterJoinReconciler) nodeWGWithReplaceControlOld(fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus, nodeWG []wg.NodeWG) []wg.NodeWG {
+	if op == nil || op.Type != fleetv1alpha1.NodeOpTypeReplaceControlPlane {
+		return nodeWG
+	}
+	req, err := r.nodeOperationRequestForJob(fcj, op)
+	if err != nil || req == nil {
+		return nodeWG
+	}
+	oldHN := strings.TrimSpace(req.OldNode)
+	if oldHN == "" {
+		oldHN = strings.TrimSpace(op.Node)
+	}
+	if oldHN == "" {
+		return nodeWG
+	}
+	for _, n := range nodeWG {
+		if n.Hostname == oldHN {
+			return nodeWG
+		}
+	}
+	addr := ""
+	for _, n := range fcj.Spec.Nodes {
+		if n.Hostname == oldHN {
+			addr = strings.TrimSpace(n.Address)
+			break
+		}
+	}
+	for _, st := range fcj.Status.Nodes {
+		if st.Hostname == oldHN && addr == "" {
+			addr = strings.TrimSpace(st.Address)
+		}
+	}
+	if addr == "" {
+		return nodeWG
+	}
+	return append(nodeWG, wg.NodeWG{
+		Hostname: oldHN,
+		Address:  addr,
+		Role:     fleetv1alpha1.NodeRoleControl,
+	})
+}
+
 func (r *ClusterJoinReconciler) syncNodeWGForSpec(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) error {
 	key := client.ObjectKeyFromObject(fcj)
 	var latest fleetv1alpha1.FleetClusterJoin
@@ -757,10 +800,22 @@ func (r *ClusterJoinReconciler) finishNodeOperation(ctx context.Context, fcj *fl
 			}
 		}
 		key := client.ObjectKeyFromObject(fcj)
-		if err := r.Get(ctx, key, fcj); err != nil {
-			return r.failNodeOperation(ctx, fcj, err)
+		postDeadline := time.Now().Add(12 * time.Minute)
+		var failMsg string
+		for time.Now().Before(postDeadline) {
+			if err := r.Get(ctx, key, fcj); err != nil {
+				return r.failNodeOperation(ctx, fcj, err)
+			}
+			failMsg = r.postValidateNodeOperation(ctx, fcj, clusterName, op)
+			if failMsg == "" {
+				break
+			}
+			if !strings.Contains(failMsg, "not Ready") {
+				break
+			}
+			time.Sleep(15 * time.Second)
 		}
-		if failMsg := r.postValidateNodeOperation(ctx, fcj, clusterName, op); failMsg != "" {
+		if failMsg != "" {
 			return r.finishNodeOperation(ctx, fcj, clusterName, false, failMsg)
 		}
 	}

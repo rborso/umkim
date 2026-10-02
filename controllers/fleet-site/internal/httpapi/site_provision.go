@@ -588,6 +588,11 @@ func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.
 	if provision.ActionUsesConnectionLocal(rec.Action) {
 		extra = append(extra, "-e", "fleet_provision_connection_local=true")
 	}
+	if rec.Action == fleetv1alpha1.ProvisionActionCreateVM {
+		if pub := s.hubFleetSSHPublicKey(ctx); pub != "" {
+			extra = append(extra, "-e", "fleet_provision_fleet_ansible_ssh_pubkey="+pub)
+		}
+	}
 	for k, v := range spec.DefaultExtraVars {
 		if strings.TrimSpace(k) == "" {
 			continue

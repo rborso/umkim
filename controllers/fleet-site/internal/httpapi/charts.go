@@ -27,6 +27,7 @@ type chartCreateBody struct {
 	Version     string `json:"version"`
 	ImagePolicy string `json:"imagePolicy"`
 	ValuesYAML  string `json:"valuesYaml"`
+	Force       bool   `json:"force"`
 }
 
 type chartResponse struct {
@@ -133,7 +134,7 @@ func (s *Server) createChart(w http.ResponseWriter, r *http.Request) {
 		ImagePolicy: strings.TrimSpace(body.ImagePolicy),
 		ValuesYAML:  body.ValuesYAML,
 	}
-	s.putChart(w, r, name, spec)
+	s.putChart(w, r, name, spec, body.Force || queryParamBool(r, "force"))
 }
 
 func (s *Server) createChartUpload(w http.ResponseWriter, r *http.Request) {
@@ -206,10 +207,23 @@ func (s *Server) createChartUpload(w http.ResponseWriter, r *http.Request) {
 		InboxFile:   base,
 		ValuesYAML:  r.FormValue("valuesYaml"),
 	}
-	s.putChart(w, r, name, spec)
+	force := strings.EqualFold(strings.TrimSpace(r.FormValue("force")), "true")
+	s.putChart(w, r, name, spec, force)
 }
 
-func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, spec fleetv1alpha1.FleetChartSpec) {
+func chartUpdateNeedsForce(existing *fleetv1alpha1.FleetChart, spec fleetv1alpha1.FleetChartSpec) bool {
+	if existing.Status.Phase == fleetv1alpha1.ChartPhaseReady {
+		if !strings.EqualFold(strings.TrimSpace(existing.Spec.Source), strings.TrimSpace(spec.Source)) {
+			return true
+		}
+		if strings.TrimSpace(existing.Spec.Origin) != strings.TrimSpace(spec.Origin) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, spec fleetv1alpha1.FleetChartSpec, force bool) {
 	if !appchart.ValidDNS1123(name) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name must be a DNS-1123 label (lowercase)"})
 		return
@@ -254,6 +268,12 @@ func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, s
 	var existing fleetv1alpha1.FleetChart
 	err := s.Client.Get(r.Context(), types.NamespacedName{Namespace: s.Cfg.Namespace, Name: name}, &existing)
 	if err == nil {
+		if !force && chartUpdateNeedsForce(&existing, spec) {
+			writeJSON(w, http.StatusConflict, map[string]string{
+				"error": "chart " + name + " is Ready with a different source/origin; set force=true to replace",
+			})
+			return
+		}
 		existing.Spec = spec
 		if err := s.Client.Update(r.Context(), &existing); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

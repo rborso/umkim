@@ -1,0 +1,12 @@
+== CHECK console.playwright.infrastructure ==
+
+Running 1 test using 1 worker
+
+(node:983522) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:983522) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/infrastructure.spec.ts:5:3 › Infrastructure › hub infrastructure page and API (547ms)
+
+  1 passed (1.6s)
+OK playwright infrastructure.spec.ts

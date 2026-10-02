@@ -236,6 +236,15 @@ func (s *Server) syncSiteInventory(ctx context.Context, w http.ResponseWriter, r
 		http.Error(w, "inventory sync not available for provider "+provider, http.StatusConflict)
 		return
 	}
+	files, err := yaidap.ListInventoryFiles(ctx, s.Client, s.Cfg.Namespace, siteName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(files) < 2 && !queryParamBool(r, "confirm") {
+		http.Error(w, "hub inventory store looks empty or incomplete; pass confirm=true to project to jumphost", http.StatusConflict)
+		return
+	}
 	jobName, err := s.startInventorySyncJob(ctx, fs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

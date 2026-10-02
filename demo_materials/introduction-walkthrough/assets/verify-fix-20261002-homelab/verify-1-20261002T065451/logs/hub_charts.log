@@ -1,0 +1,4 @@
+== CHECK hub.charts ==
+=== verify-fleet-chart ===
+library charts: llama-cpp-helm, pet-clinic-helm, rocky-10-vm, whoami
+OK whoami is in the chart library

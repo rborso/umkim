@@ -60,7 +60,7 @@ func TestRefreshRunningJobSuccess(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "fleet-site-prov-abc123", Namespace: ns},
 		Status:     batchv1.JobStatus{Succeeded: 1},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, invCM, job).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, invCM, job).Build()
 
 	if err := RefreshRunningJob(context.Background(), c, ns, site, nil, nil); err != nil {
 		t.Fatal(err)
@@ -122,7 +122,7 @@ func TestRepairStaleGuestProvisioning(t *testing.T) {
 			"_meta.status.json": `{"guests":{"lab-ha-0-cp1":{"phase":"Provisioning","message":"vm_location=virt01","vm_location":"virt01"}}}`,
 		},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, invCM).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, invCM).Build()
 
 	RepairStaleGuestProvisioning(context.Background(), c, ns, site)
 
@@ -192,7 +192,7 @@ func TestRefreshRunningJobDestroySuccess(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "fleet-site-prov-def456", Namespace: ns},
 		Status:     batchv1.JobStatus{Succeeded: 1},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, invCM, job).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, invCM, job).Build()
 
 	if err := RefreshRunningJob(context.Background(), c, ns, site, nil, nil); err != nil {
 		t.Fatal(err)
@@ -303,7 +303,7 @@ func TestRepairStaleGuestProvisioningDestroy(t *testing.T) {
 			"_meta.status.json": `{"guests":{"vm01":{"phase":"Provisioning"}}}`,
 		},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(site, invCM).Build()
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, invCM).Build()
 
 	RepairStaleGuestProvisioning(context.Background(), c, ns, site)
 
