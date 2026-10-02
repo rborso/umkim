@@ -419,17 +419,15 @@ func (r *RouteReconciler) markFleetRoutesRebuilt(ctx context.Context, route *fle
 	})
 }
 
-func (r *RouteReconciler) rebuildFleetRoutesCM(ctx context.Context) (ctrl.Result, error) {
-	r.fleetRoutesMu.Lock()
-	defer r.fleetRoutesMu.Unlock()
 
+func (r *RouteReconciler) renderFleetRoutesYAML(ctx context.Context) ([]byte, error) {
 	var list fleetv1alpha1.FleetAppRouteList
 	if err := r.List(ctx, &list); err != nil {
-		return ctrl.Result{}, err
+		return nil, err
 	}
 	reg, err := clusters.Load(ctx, r.Client, r.Config.ClusterConfigMapNS, r.Config.ClusterConfigMapName)
 	if err != nil {
-		return ctrl.Result{}, err
+		return nil, err
 	}
 	for clusterName, regCluster := range reg.Clusters {
 		r.advanceSpokeACMEQueue(ctx, clusterName, regCluster)
@@ -446,16 +444,27 @@ func (r *RouteReconciler) rebuildFleetRoutesCM(ctx context.Context) (ctrl.Result
 		CertsReady:             r.buildCertsReadyMap(ctx, routes),
 	})
 	if err != nil {
-		return ctrl.Result{}, err
+		return nil, err
 	}
 	if r.Config.ACMEEnabled {
 		if issuing := r.issuingHubHosts(routes); len(issuing) > 0 {
 			data, err = traefik.EnsureACMETLSRoutersWithMiddlewares(
 				data, issuing, traefik.CertResolverProduction, r.pendingTLSMiddlewares(routes, issuing))
 			if err != nil {
-				return ctrl.Result{}, err
+				return nil, err
 			}
 		}
+	}
+	return data, nil
+}
+
+func (r *RouteReconciler) rebuildFleetRoutesCM(ctx context.Context) (ctrl.Result, error) {
+	r.fleetRoutesMu.Lock()
+	defer r.fleetRoutesMu.Unlock()
+
+	data, err := r.renderFleetRoutesYAML(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 	prevRoutesYAML := r.fleetRoutesYAMLFromCM(ctx, r.Config.FleetRoutesCMNS, r.Config.FleetRoutesCMName, r.Config.FleetRoutesCMKey)
 

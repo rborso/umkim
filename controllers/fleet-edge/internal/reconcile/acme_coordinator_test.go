@@ -39,6 +39,11 @@ func (f *fakeACMEIssuer) onCertReady(ctx context.Context, hostname string) error
 	return nil
 }
 
+func (f *fakeACMEIssuer) ensurePublishedHubRoutes(ctx context.Context) error {
+	return nil
+}
+
+
 func (f *fakeACMEIssuer) issueHostname(ctx context.Context, hostname string, routesYAML []byte, skipStaging bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

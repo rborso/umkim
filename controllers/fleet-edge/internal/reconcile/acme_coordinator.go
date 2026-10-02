@@ -22,6 +22,9 @@ type acmeIssuer interface {
 	validateDNS(ctx context.Context, hostname string) (ok bool, msg string)
 	updateTLSPhase(ctx context.Context, hostname, phase, msg string) error
 	onCertReady(ctx context.Context, hostname string) error
+	// ensurePublishedHubRoutes publishes Authelia portal / app routers when missing
+	// (greenfield with ingress-auth and no FleetAppRoute yet).
+	ensurePublishedHubRoutes(ctx context.Context) error
 }
 
 type hostQueueState struct {
@@ -89,6 +92,12 @@ func (c *acmeCoordinator) Start(ctx context.Context) error {
 func (c *acmeCoordinator) rediscoverAndKick(ctx context.Context) {
 	if !c.cfg.ACMEEnabled {
 		return
+	}
+	// Publish portal/app routers before discover/issue so native ACME has TLS routers.
+	if !c.Issuing() {
+		if err := c.issuer.ensurePublishedHubRoutes(ctx); err != nil {
+			log.Log.WithName("acme-queue").Error(err, "ensurePublishedHubRoutes failed")
+		}
 	}
 	routesYAML := c.issuer.fleetRoutesYAML(ctx)
 	if len(routesYAML) == 0 {
@@ -258,17 +267,18 @@ func (c *acmeCoordinator) run() {
 			}
 
 			c.issuing.Store(true)
+			var issueErr error
 			func() {
 				defer c.issuing.Store(false)
 				_ = c.issuer.updateTLSPhase(ctx, host, fleetv1alpha1.TLSPhaseIssuing, "")
 				logger.Info("issuing ACME cert", "host", host)
 				routesYAML := c.issuer.fleetRoutesYAML(ctx)
 				issueCtx, cancel := context.WithTimeout(ctx, 25*time.Minute)
-				err := c.issuer.issueHostname(issueCtx, host, routesYAML, skipStaging)
+				issueErr = c.issuer.issueHostname(issueCtx, host, routesYAML, skipStaging)
 				cancel()
-				if err != nil {
-					class := classifyACMEError(err)
-					logger.Error(err, "ACME issuance failed", "host", host, "class", class)
+				if issueErr != nil {
+					class := classifyACMEError(issueErr)
+					logger.Error(issueErr, "ACME issuance failed", "host", host, "class", class)
 					c.mu.Lock()
 					st := c.hostState[host]
 					if st == nil {
@@ -288,7 +298,7 @@ func (c *acmeCoordinator) run() {
 					st.nextRetry = time.Now().Add(delay)
 					c.pushBackLocked(host, 0)
 					c.mu.Unlock()
-					_ = c.issuer.updateTLSPhase(ctx, host, phase, err.Error())
+					_ = c.issuer.updateTLSPhase(ctx, host, phase, issueErr.Error())
 					return
 				}
 				if !skipStaging && c.cfg.ACMEPreflightEnabled {
@@ -298,8 +308,11 @@ func (c *acmeCoordinator) run() {
 				}
 				logger.Info("ACME cert ready", "host", host)
 				c.markCertReady(host)
-				_ = c.issuer.onCertReady(ctx, host)
 			}()
+			// onCertReady rebuilds fleet-routes; must run after Issuing() clears.
+			if issueErr == nil {
+				_ = c.issuer.onCertReady(ctx, host)
+			}
 			continue
 		}
 	}

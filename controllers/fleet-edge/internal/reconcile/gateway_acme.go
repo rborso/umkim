@@ -114,6 +114,12 @@ func (r *RouteReconciler) issueHostnameLegacyGateway(ctx context.Context, hostna
 	// Single-replica hostNetwork hub: fleet routes already expose websecure+letsencrypt routers.
 	// Traefik native ACME obtains certs without coordinator-driven gateway rollouts.
 	if !gatewayNeedsACMEMode(dep) {
+		// Native ACME (hostNetwork single-replica) requires TLS routers with
+		// certResolver already in fleet-routes. Portal-only greenfield never
+		// triggers FleetAppRoute reconcile, so publish hub routes first.
+		if err := r.publishFleetRoutesForNativeACME(ctx, hostname); err != nil {
+			return err
+		}
 		return r.waitNativeACMECert(ctx, probeHost, hostname, skipStaging)
 	}
 
@@ -195,6 +201,33 @@ func (r *RouteReconciler) issueHostnameLegacyGateway(ctx context.Context, hostna
 		return fmt.Errorf("acme production issuance: %w", err)
 	}
 	return nil
+}
+
+
+// publishFleetRoutesForNativeACME writes full hub Traefik routes (including the
+// Authelia portal) and ensures a TLS router + certResolver for hostname.
+// Uses direct CM patch (not rebuildFleetRoutesCM) so it works while acme.Issuing().
+func (r *RouteReconciler) publishFleetRoutesForNativeACME(ctx context.Context, hostname string) error {
+	data, err := r.renderFleetRoutesYAML(ctx)
+	if err != nil {
+		return err
+	}
+	data, err = traefik.EnsureACMETLSRouters(data, []string{hostname}, traefik.CertResolverProduction)
+	if err != nil {
+		return fmt.Errorf("native acme ensure TLS routers: %w", err)
+	}
+	current := r.fleetRoutesYAML(ctx)
+	if bytes.Equal(data, current) {
+		return nil
+	}
+	if err := r.patchFleetRoutesData(ctx, data); err != nil {
+		return err
+	}
+	depKey := r.gatewayDeploymentKey()
+	if err := r.rolloutGatewayChecksum(ctx, depKey, data); err != nil {
+		return err
+	}
+	return r.waitGatewayRollout(ctx, depKey, 5*time.Minute)
 }
 
 func (r *RouteReconciler) waitNativeACMECert(ctx context.Context, probeHost, hostname string, skipStaging bool) error {
@@ -400,3 +433,33 @@ func (r *RouteReconciler) patchGatewayFleetRoutesChecksum(ctx context.Context, d
 	dep.Spec.Template.Annotations[gatewayFleetRoutesChecksumKey] = checksum
 	return r.Patch(ctx, dep, patch)
 }
+
+
+// ensurePublishedHubRoutes publishes Authelia portal (and any app) routers when the
+// fleet-routes ConfigMap is still a placeholder. Safe to call when not Issuing.
+func (r *RouteReconciler) ensurePublishedHubRoutes(ctx context.Context) error {
+	if !r.Config.AutheliaEnabled && !r.Config.ACMEEnabled {
+		return nil
+	}
+	current := r.fleetRoutesYAML(ctx)
+	needs := r.Config.AutheliaEnabled && !bytes.Contains(current, []byte("fleet-authelia-portal"))
+	if !needs {
+		return nil
+	}
+	data, err := r.renderFleetRoutesYAML(ctx)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(data, current) {
+		return nil
+	}
+	if err := r.patchFleetRoutesData(ctx, data); err != nil {
+		return err
+	}
+	depKey := r.gatewayDeploymentKey()
+	if err := r.rolloutGatewayChecksum(ctx, depKey, data); err != nil {
+		return err
+	}
+	return r.waitGatewayRollout(ctx, depKey, 5*time.Minute)
+}
+
