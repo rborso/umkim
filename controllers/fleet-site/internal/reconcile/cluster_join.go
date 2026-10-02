@@ -626,6 +626,9 @@ func (r *ClusterJoinReconciler) startClusterProvision(ctx context.Context, fcj *
 }
 
 func (r *ClusterJoinReconciler) ensureClusterInventoryCM(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, nodeWG []wg.NodeWG) error {
+	// Keep old CP in inventory for the whole replaceControlPlane job lifetime so
+	// concurrent Ready-path inventory refreshes cannot drop the leave host.
+	nodeWG = r.nodeWGWithReplaceControlOld(fcj, nil, nodeWG)
 	ini := r.buildClusterInventoryINI(ctx, fcj, clusterName, nodeWG, true)
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterInventoryCMName(clusterName), Namespace: fcj.Namespace},
@@ -777,7 +780,10 @@ func (r *ClusterJoinReconciler) inventorySSH(ctx context.Context, fcj *fleetv1al
 
 func nodeAnsibleHost(n wg.NodeWG, fallback string, hubRunner, useMgmtLAN bool) string {
 	if hubRunner && !useMgmtLAN {
-		return wg.HostIP(n.WGAddress)
+		if ip := wg.HostIP(n.WGAddress); ip != "" {
+			return ip
+		}
+		// Injected replace-old hosts may lack WG keys; fall back to management address.
 	}
 	if n.Address != "" {
 		return n.Address

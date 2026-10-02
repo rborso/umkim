@@ -34,11 +34,13 @@ type nodeOperationRequest struct {
 	Hostname string            `json:"hostname,omitempty"`
 	Role     string            `json:"role,omitempty"`
 	Labels   map[string]string `json:"labels,omitempty"`
-	OldNode    string            `json:"oldNode,omitempty"`
-	NewNode    *nodeOpNewNode    `json:"newNode,omitempty"`
-	Force      bool              `json:"force,omitempty"`
-	ActorKind  string            `json:"actorKind,omitempty"`
-	ActorName  string            `json:"actorName,omitempty"`
+	OldNode          string         `json:"oldNode,omitempty"`
+	OldNodeAddress   string         `json:"oldNodeAddress,omitempty"`
+	OldNodeWGAddress string         `json:"oldNodeWGAddress,omitempty"`
+	NewNode          *nodeOpNewNode `json:"newNode,omitempty"`
+	Force          bool           `json:"force,omitempty"`
+	ActorKind      string         `json:"actorKind,omitempty"`
+	ActorName      string         `json:"actorName,omitempty"`
 }
 
 type nodeOpNewNode struct {
@@ -129,6 +131,9 @@ func (r *ClusterJoinReconciler) acceptNodeOperationRequest(ctx context.Context, 
 			return fmt.Errorf("newNode.address is required to replace control plane")
 		}
 		node = req.OldNode
+		if err := r.captureReplaceOldNodeIdentity(ctx, fcj, clusterName, req); err != nil {
+			return err
+		}
 		if err := r.ensureReplaceControlSpec(ctx, fcj, clusterName, req); err != nil {
 			return err
 		}
@@ -196,15 +201,22 @@ func (r *ClusterJoinReconciler) startNodeOperationJob(ctx context.Context, fcj *
 	if err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
+	// Capture old CP from live WG records before syncNodeWGForSpec drops it.
+	if err := r.persistReplaceOldFromNodeWG(ctx, fcj, op, nodeWG); err != nil {
+		return r.failNodeOperation(ctx, fcj, err)
+	}
 	extraArgs, targetHost, err := r.prepareNodeOperation(ctx, fcj, clusterName, op, nodeWG)
 	if err != nil {
+		return r.failNodeOperation(ctx, fcj, err)
+	}
+	// Reload fcj so active annotation (with OldNodeAddress) is visible to inventory inject.
+	if err := r.Get(ctx, client.ObjectKeyFromObject(fcj), fcj); err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
 	nodeWG, err = r.clusterNodeWG(ctx, fcj, clusterName)
 	if err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
-	nodeWG = r.nodeWGWithReplaceControlOld(fcj, op, nodeWG)
 	if err := r.ensureClusterInventoryCM(ctx, fcj, clusterName, nodeWG); err != nil {
 		return r.failNodeOperation(ctx, fcj, err)
 	}
@@ -669,9 +681,133 @@ func nodeInternalIP(n *corev1.Node) string {
 	return ""
 }
 
+func (r *ClusterJoinReconciler) captureReplaceOldNodeIdentity(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, req *nodeOperationRequest) error {
+	if req == nil {
+		return fmt.Errorf("replace request is required")
+	}
+	oldHN, oldAddr := r.resolveSpecNodeIdentity(ctx, fcj, clusterName, req.OldNode)
+	if oldHN != "" {
+		req.OldNode = oldHN
+	}
+	if oldAddr == "" {
+		oldAddr = strings.TrimSpace(req.OldNodeAddress)
+	}
+	if oldAddr == "" {
+		for _, n := range fcj.Spec.Nodes {
+			if n.Hostname == req.OldNode {
+				oldAddr = strings.TrimSpace(n.Address)
+				break
+			}
+		}
+	}
+	if oldAddr == "" {
+		for _, st := range fcj.Status.Nodes {
+			if st.Hostname == req.OldNode {
+				oldAddr = strings.TrimSpace(st.Address)
+				break
+			}
+		}
+	}
+	if oldAddr == "" {
+		if nodeWG, err := r.clusterNodeWG(ctx, fcj, clusterName); err == nil {
+			for _, n := range nodeWG {
+				if n.Hostname == req.OldNode {
+					oldAddr = strings.TrimSpace(n.Address)
+					break
+				}
+			}
+		}
+	}
+	if oldAddr == "" {
+		return fmt.Errorf("cannot resolve management address for old control-plane node %s (required for graceful leave inventory)", req.OldNode)
+	}
+	req.OldNodeAddress = oldAddr
+	if strings.TrimSpace(req.OldNodeWGAddress) == "" {
+		for _, st := range fcj.Status.Nodes {
+			if st.Hostname == req.OldNode && strings.TrimSpace(st.WireguardAddress) != "" {
+				req.OldNodeWGAddress = strings.TrimSpace(st.WireguardAddress)
+				break
+			}
+		}
+	}
+	if strings.TrimSpace(req.OldNodeWGAddress) == "" {
+		if nodeWG, err := r.clusterNodeWG(ctx, fcj, clusterName); err == nil {
+			for _, n := range nodeWG {
+				if n.Hostname == req.OldNode && strings.TrimSpace(n.WGAddress) != "" {
+					req.OldNodeWGAddress = strings.TrimSpace(n.WGAddress)
+					break
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (r *ClusterJoinReconciler) persistReplaceOldFromNodeWG(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus, nodeWG []wg.NodeWG) error {
+	if op == nil || op.Type != fleetv1alpha1.NodeOpTypeReplaceControlPlane {
+		return nil
+	}
+	req, err := r.nodeOperationRequestForJob(fcj, op)
+	if err != nil || req == nil {
+		return err
+	}
+	oldHN := strings.TrimSpace(req.OldNode)
+	if oldHN == "" {
+		oldHN = strings.TrimSpace(op.Node)
+	}
+	if oldHN == "" {
+		return nil
+	}
+	if strings.TrimSpace(req.OldNodeAddress) != "" {
+		return nil
+	}
+	for _, n := range nodeWG {
+		if n.Hostname != oldHN {
+			continue
+		}
+		if addr := strings.TrimSpace(n.Address); addr != "" {
+			req.OldNode = oldHN
+			req.OldNodeAddress = addr
+			if wgAddr := strings.TrimSpace(n.WGAddress); wgAddr != "" {
+				req.OldNodeWGAddress = wgAddr
+			}
+			raw, mErr := json.Marshal(req)
+			if mErr != nil {
+				return mErr
+			}
+			key := client.ObjectKeyFromObject(fcj)
+			return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				var latest fleetv1alpha1.FleetClusterJoin
+				if err := r.Get(ctx, key, &latest); err != nil {
+					return err
+				}
+				if latest.Annotations == nil {
+					latest.Annotations = map[string]string{}
+				}
+				latest.Annotations[annotationNodeOperationActive] = string(raw)
+				return r.Update(ctx, &latest)
+			})
+		}
+	}
+	return nil
+}
+
 func (r *ClusterJoinReconciler) nodeWGWithReplaceControlOld(fcj *fleetv1alpha1.FleetClusterJoin, op *fleetv1alpha1.ClusterNodeOperationStatus, nodeWG []wg.NodeWG) []wg.NodeWG {
+	if fcj == nil {
+		return nodeWG
+	}
+	if op == nil {
+		op = fcj.Status.NodeOperation
+	}
 	if op == nil || op.Type != fleetv1alpha1.NodeOpTypeReplaceControlPlane {
 		return nodeWG
+	}
+	phase := op.Phase
+	if phase != fleetv1alpha1.NodeOpPhasePending && phase != fleetv1alpha1.NodeOpPhaseRunning && phase != "" {
+		// Still inject for empty phase during early accept races; skip terminal phases.
+		if phase == fleetv1alpha1.NodeOpPhaseSucceeded || phase == fleetv1alpha1.NodeOpPhaseFailed {
+			return nodeWG
+		}
 	}
 	req, err := r.nodeOperationRequestForJob(fcj, op)
 	if err != nil || req == nil {
@@ -689,25 +825,32 @@ func (r *ClusterJoinReconciler) nodeWGWithReplaceControlOld(fcj *fleetv1alpha1.F
 			return nodeWG
 		}
 	}
-	addr := ""
-	for _, n := range fcj.Spec.Nodes {
-		if n.Hostname == oldHN {
-			addr = strings.TrimSpace(n.Address)
-			break
+	addr := strings.TrimSpace(req.OldNodeAddress)
+	if addr == "" {
+		for _, n := range fcj.Spec.Nodes {
+			if n.Hostname == oldHN {
+				addr = strings.TrimSpace(n.Address)
+				break
+			}
 		}
 	}
-	for _, st := range fcj.Status.Nodes {
-		if st.Hostname == oldHN && addr == "" {
-			addr = strings.TrimSpace(st.Address)
+	if addr == "" {
+		for _, st := range fcj.Status.Nodes {
+			if st.Hostname == oldHN {
+				addr = strings.TrimSpace(st.Address)
+				break
+			}
 		}
 	}
 	if addr == "" {
 		return nodeWG
 	}
+	wgAddr := strings.TrimSpace(req.OldNodeWGAddress)
 	return append(nodeWG, wg.NodeWG{
-		Hostname: oldHN,
-		Address:  addr,
-		Role:     fleetv1alpha1.NodeRoleControl,
+		Hostname:  oldHN,
+		Address:   addr,
+		WGAddress: wgAddr,
+		Role:      fleetv1alpha1.NodeRoleControl,
 	})
 }
 
