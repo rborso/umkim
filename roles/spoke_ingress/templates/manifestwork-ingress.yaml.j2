@@ -129,8 +129,13 @@ spec:
                     - --certificatesresolvers.letsencrypt-staging.acme.email={{ fleet_edge_acme_email }}
                     - --certificatesresolvers.letsencrypt-staging.acme.storage=/data/acme-staging.json
                     - --certificatesresolvers.letsencrypt-staging.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+{% if phase6_spoke_acme_http_challenge %}
                     - --certificatesresolvers.letsencrypt-staging.acme.httpchallenge=true
                     - --certificatesresolvers.letsencrypt-staging.acme.httpchallenge.entrypoint=web
+{% else %}
+                    {# Match prod challenge; entrypoint HTTP→HTTPS redirect breaks HTTP-01 preflight (B7b). #}
+                    - --certificatesresolvers.letsencrypt-staging.acme.tlschallenge=true
+{% endif %}
 {% endif %}
 {% endif %}
                   ports:

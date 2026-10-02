@@ -313,6 +313,9 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 			ent := edgeClusters[name]
 			lines = append(lines, "  "+name+":")
 			lines = append(lines, "    direct_ingress: "+boolYAML(ent.DirectIngress))
+			if ent.Method != "" {
+				lines = append(lines, "    method: \""+yamlQuote(ent.Method)+"\"")
+			}
 		}
 	}
 	_ = fia

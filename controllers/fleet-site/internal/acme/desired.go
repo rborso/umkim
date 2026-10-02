@@ -30,6 +30,7 @@ const (
 
 type edgeClusterEntry struct {
 	DirectIngress bool   `yaml:"direct_ingress"`
+	Method        string `yaml:"method,omitempty"`
 	TlsPolicy     string `yaml:"tls_policy,omitempty"`
 	Management    bool   `yaml:"management,omitempty"`
 	ReadOnly      bool   `yaml:"read_only,omitempty"`
@@ -258,6 +259,9 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fa *fleetv1alph
 			}
 			lines = append(lines, "  "+name+":")
 			lines = append(lines, "    direct_ingress: "+boolYAML(ent.DirectIngress))
+			if ent.Method != "" {
+				lines = append(lines, "    method: \""+yamlQuote(ent.Method)+"\"")
+			}
 			if ent.TlsPolicy != "" {
 				lines = append(lines, "    tls_policy: \""+yamlQuote(ent.TlsPolicy)+"\"")
 			}
@@ -308,6 +312,10 @@ func EnsureInventoryCM(ctx context.Context, c client.Client, ns string, desired 
 	}
 	data := BuildInventoryYAML(cfg, desired, fa, hub, edge)
 	data += strings.Join(hubacme.InventoryYAMLLines(hubacme.Detect(ctx, c)), "\n") + "\n"
+	if len(desired.Phase6Clusters) > 0 {
+		// Spoke ACME queue needs letsencrypt-staging even when hub gateway is legacy.
+		data += "fleet_edge_acme_preflight_enabled: true\n"
+	}
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      InventoryCMName,

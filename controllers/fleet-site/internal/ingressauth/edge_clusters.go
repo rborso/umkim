@@ -14,6 +14,7 @@ import (
 // AnsibleEdgeCluster mirrors fleet-edge-clusters fields needed for phase6 rendering.
 type AnsibleEdgeCluster struct {
 	DirectIngress bool   `yaml:"direct_ingress"`
+	Method        string `yaml:"method,omitempty"`
 	ExposureMode  string `yaml:"exposure_mode,omitempty"`
 }
 
