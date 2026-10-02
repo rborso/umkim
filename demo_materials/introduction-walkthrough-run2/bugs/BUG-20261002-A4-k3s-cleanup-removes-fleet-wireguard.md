@@ -28,3 +28,10 @@ Restore conf from /tmp/bootstrap-*/wireguard/... as root:root 0600; systemctl en
 
 ## Follow-up
 Gate WireGuard removal in k3s cleanup behind k3s_cleanup_remove_wireguard (default false for provision-local; true for full teardown).
+
+
+## Follow-up (FIXED in tree + workaround applied)
+- Code: k3s cleanup gates WG removal on k3s_cleanup_remove_wireguard (default false); teardown-hub sets true. Commit d8bf63c.
+- Live: restored wg-umkim.conf from bootstrap tmp as root:root 0600; overlay OK; umkim cluster provision → Ready; ManagedCluster Available.
+- Evidence: cli-logs/A4-provision-start.txt, A4-wait-ready.txt
+- Note: fleet-site-controller image still embeds old static cleanup until rebuilt; static source under controllers/fleet-site/internal/bundle/static/ is fixed for next image push.

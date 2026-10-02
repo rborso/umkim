@@ -1,5 +1,11 @@
 # Introduction walkthrough
 
+> **Run 1 archive (complete).** Keep this tree for comparison.
+> Next run plan: [`../introduction-walkthrough-run2/PLAN.md`](../introduction-walkthrough-run2/PLAN.md).
+> Hub-only evidence for run 2 (not in git): `/home/linux/umkim-demo-materials/introduction-run2/`.
+> **Do not start run 2** until that plan’s remaining issues are fixed and go-ahead is given.
+
+
 Greenfield run started from operational-introduction-strategy.md (full hub wipe + reinstall from A1).
 
 Artifacts: `assets/`, bugs: `bugs/`.

@@ -1,6 +1,7 @@
 ---
 # Operator PCs — split-tunnel overlay access. Add names here or use scripts/wg-dev-client.sh.
 wireguard_operator_clients:
+  - name: qa-tester
   - name: my-laptop
   - name: my-notebook
   - name: notebook

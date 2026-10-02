@@ -28,6 +28,13 @@
 > [yaidap-integration.md](../docs/components/yaidap-integration.md),
 > [rebuild-homelab-cli.md](../examples/homelab/rebuild-homelab-cli.md).
 
+
+> **Run 2 plan (next introducible demo):**  
+> [`introduction-walkthrough-run2/PLAN.md`](introduction-walkthrough-run2/PLAN.md)  
+> — Archive run 1; hub-only evidence at `/home/linux/umkim-demo-materials/introduction-run2/`;  
+> bug workflow document→fix→rebuild/deploy→re-test; **do not start** Phase A/B until remaining
+> issues (ACME/redirect, YAIDAP pubkey push, …) are fixed and go-ahead is given.
+
 ---
 
 ## Overview (story arc)
@@ -123,6 +130,9 @@ Each report must include:
 | **Evidence** | Links to redacted logs/screenshots in `assets/` (`A6-failure-job-log.txt`) |
 | **Workaround** | Optional; mark as temporary |
 | **Follow-up** | GitHub issue URL or “fixed in commit …” when resolved |
+
+
+**Run 2 requirement:** Do not leave the stage on a workaround. After filing the bug, **fix it, rebuild/deploy the fix, and re-test** until Verify passes. Goal is an introducible demo, not a terminal buglist. See [`introduction-walkthrough-run2/PLAN.md`](introduction-walkthrough-run2/PLAN.md).
 
 Re-run the stage after a fix and add a **pass** artifact (`A6-whoami-curl.txt`) so the
 introduction shows both failure (optional) and success.

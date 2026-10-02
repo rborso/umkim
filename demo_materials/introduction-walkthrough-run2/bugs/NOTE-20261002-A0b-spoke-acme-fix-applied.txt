@@ -1,0 +1,11 @@
+Phase 0b ACME fix applied in-tree during A1 install (hub source checkout):
+File: roles/spoke_ingress/templates/manifestwork-ingress.yaml.j2
+Change: letsencrypt-staging preflight now uses tlschallenge when prod is TLS-ALPN
+  (entrypoint web→HTTPS redirect is enabled in that mode). Previously staging
+  always used HTTP-01 on web, which the permanent redirect broke → PendingStaging
+  queue stuck (BUG-20261002-B7b).
+When phase6_spoke_acme_http_challenge=true, no entrypoint redirect (existing) and
+  staging keeps HTTP-01.
+Redeploy path after hub install: enable spoke ACME / push spoke ingress so ManifestWork
+  picks up template; re-test B7/B7b.
+Public DNS→hub Traefik (B7) remains WAN PF / split-DNS ops (WAN PF stays per user).
