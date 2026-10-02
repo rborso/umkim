@@ -41,9 +41,10 @@ calico_ip_autodetection_method: interface=wg0
 
 # Fleet edge + Let's Encrypt on hub gateway (hostNetwork :80/:443).
 fleet_edge_acme_enabled: true
-fleet_edge_hub_gateway_url: "{{ 'https://127.0.0.1' if (fleet_ingress_auth_enabled | default(false) | bool) else 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
+# HostNetwork hub Traefik: probe via WG node IP (pod loopback 127.0.0.1 is wrong — A6).
+fleet_edge_hub_gateway_url: "https://{{ wireguard_address | ansible.utils.ipaddr('address') }}"
 # HTTP probe target for route health before ACME certs are Ready (Traefik hostNetwork :443 when ACME on).
-fleet_edge_hub_gateway_http_url: "{{ 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
+fleet_edge_hub_gateway_http_url: "http://{{ wireguard_address | ansible.utils.ipaddr('address') }}:80"
 
 # Fleet ingress auth (Authelia). Enabled at hub install; spokes opt-in per cluster via API.
 fleet_ingress_auth_enabled: true

@@ -1,0 +1,14 @@
+=== date ===
+2026-10-02T08:18:51+02:00
+=== fleet ansible pubkey fingerprint ===
+256 SHA256:ErQFP4ykUIz38HVD99+ohGAHMAS8FkcNHbLz0ryjuZk comment=linux@umkim-hub
+=== YAIDAP HEAD on jumphost ===
+63bd7c1ceb19c86d503e6fe3dc106d53716baed2
+63bd7c1 Accept UMKIM fleet_ansible_ssh_pubkey in guest cloud-init/kickstart.
+=== render user-data with real fleet key (scrubbed) ===
+authorized_key_lines 2
+  - comment= len_material=11
+  - comment= len_material=11
+has_fleet_material False
+=== SSH with fleet key to existing lab-ha-0-cp1 (expect fail pre-fix guests) ===
+OK

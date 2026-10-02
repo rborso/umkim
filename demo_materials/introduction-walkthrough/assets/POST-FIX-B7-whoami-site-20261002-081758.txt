@@ -1,0 +1,49 @@
+=== date ===
+2026-10-02T08:17:58+02:00
+=== public DNS (expect hub Traefik miss) ===
+84.1.215.254    STREAM ottholhu.ddns.net
+84.1.215.254    DGRAM  
+84.1.215.254    RAW    
+=== curl public :443 (document DNS issue) ===
+http_code=404 ssl=18 remote=84.1.215.254
+404 page not found
+
+=== curl -4 --resolve :30443:10.10.0.12 (B7 workaround) ===
+http_code=200 remote=10.10.0.12
+--- body ---
+Hostname: whoami-site-799f96b454-hvvl2
+IP: 127.0.0.1
+IP: ::1
+IP: 192.168.71.9
+IP: fe80::a85f:2cff:fe00:f27
+RemoteAddr: 192.168.140.194:48030
+GET / HTTP/1.1
+Host: whoami.homelab.otthol.hu:30443
+User-Agent: curl/8.12.1
+Accept: */*
+Accept-Encoding: gzip
+X-Forwarded-For: 172.16.10.100
+X-Forwarded-Host: whoami.homelab.otthol.hu:30443
+X-Forwarded-Port: 30443
+X-Forwarded-Proto: https
+X-Forwarded-Server: traefik-95cf57bcd-x8p8v
+X-Real-Ip: 172.16.10.100
+
+
+=== app get whoami-site ===
+{
+  "chart": "oci://10.10.0.1:30443/charts/whoami",
+  "clusterName": "lab-ha-0",
+  "llmBackend": true,
+  "message": "Helm release whoami-site installed on lab-ha-0",
+  "name": "whoami-site",
+  "namespace": "default",
+  "phase": "Ready",
+  "releaseName": "whoami-site",
+  "route": {
+    "mode": "site",
+    "siteHost": "whoami.homelab.otthol.hu"
+  },
+  "routeName": "whoami-site",
+  "version": "0.1.0"
+}

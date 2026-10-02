@@ -1,0 +1,14 @@
+{
+  "layer": "1",
+  "profile": "hub-only",
+  "suite": "all",
+  "git_sha": "3e2e8d0",
+  "umkim_version": "0.2",
+  "passed": 24,
+  "failed": 0,
+  "skipped": 12,
+  "warn": 0,
+  "duration_s": 31,
+  "blocking_failures": [],
+  "report_dir": "logs/verify-l1-postfix-20261002-081853"
+}

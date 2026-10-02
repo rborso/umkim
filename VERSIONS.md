@@ -45,7 +45,7 @@ repository on the site jumphost at or above:
 
 | Component | Minimum pin | Notes |
 | --- | --- | --- |
-| YAIDAP | `main` @ **TBD** (set after YAIDAP PR merges) | `fleet_ansible_ssh_pubkey`, create_vm idempotency, install_bm/TempXE guards — see [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md) |
+| YAIDAP | `main` @ **63bd7c1** (jumphost local; push pending) | `fleet_ansible_ssh_pubkey` (+ `fleet_provision_fleet_ansible_ssh_pubkey`) in cloud-init/kickstart; placement+PXE already on jumphost — see [docs/components/yaidap-integration.md](docs/components/yaidap-integration.md) |
 
 Record the resolved git SHA in site `provision` status after
 `umkim site provision yaidap-sync`.
