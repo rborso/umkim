@@ -1,0 +1,21 @@
+Add an ingress entry (PATCH /sites/{name})
+
+Usage:
+  umkim site ingress add [site] [flags]
+
+Flags:
+      --address string            WAN address (required for port_forward with fixed mode)
+      --description string        Short description
+  -h, --help                      help for add
+      --id string                 Ingress entry id (required)
+      --method string             port_forward or reverse_proxy (required)
+      --notes string              Operator notes (reverse_proxy)
+      --wan-address-mode string   WAN validation mode: fixed or dns
+      --wildcard string           DNS wildcard (defaults to *.zone for port_forward)
+      --zone string               DNS zone (required for port_forward)
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)

@@ -1,0 +1,14 @@
+Error: cluster "lab-gpu-pt-0": fleet.capability/gpu is still false after discovery (device plugin may not be advertising nvidia.com/gpu)
+Usage:
+  umkim cluster gpu enable NAME [flags]
+
+Flags:
+  -h, --help          help for enable
+      --wait string   Wait for runtime enable and GPU capability discovery (e.g. 30m)
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

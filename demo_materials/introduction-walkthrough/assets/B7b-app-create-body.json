@@ -1,0 +1,13 @@
+{
+  "name": "whoami-site-auth",
+  "clusterName": "lab-ha-0",
+  "chart": "whoami",
+  "version": "0.1.0",
+  "releaseName": "whoami-site-auth",
+  "namespace": "default",
+  "route": {
+    "mode": "site",
+    "siteHost": "whoami-auth.homelab.otthol.hu",
+    "requireAuth": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "accessDomains": [
+    "*.demo.otthol.hu",
+    "demo.otthol.hu"
+  ],
+  "consoleLldapDeployed": true,
+  "cookieDomain": "demo.otthol.hu",
+  "hub": {
+    "autheliaServiceURL": "http://authelia.fleet-ingress-auth.svc.cluster.local:9091",
+    "lldapWebUIEnabled": true,
+    "lldapWebUIPhase": "Ready",
+    "lldapWebUIURL": "http://10.10.0.1:30917",
+    "phase": "Applying"
+  },
+  "hubEnabled": true,
+  "hubExposeLldapWebUI": true,
+  "lastJobName": "fleet-ingress-auth-1790882400",
+  "message": "Applying ingress auth",
+  "phase": "Applying",
+  "portalHost": "auth.demo.otthol.hu"
+}

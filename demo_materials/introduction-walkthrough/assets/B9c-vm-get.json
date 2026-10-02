@@ -1,0 +1,12 @@
+{
+  "creationTimestamp": "2026-10-01T23:46:16.000000Z",
+  "ip": "172.16.10.150",
+  "name": "rocky-kv-lan",
+  "namespace": "kubevirt",
+  "nodeName": "lab-ha-0-cp2",
+  "phase": "Running",
+  "printableStatus": "Running",
+  "ready": true,
+  "runnable": true,
+  "running": true
+}

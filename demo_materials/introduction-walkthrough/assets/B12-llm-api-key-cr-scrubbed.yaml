@@ -1,0 +1,17 @@
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetLLMApiKey
+metadata:
+  creationTimestamp: "2026-10-02T00:37:25Z"
+  generation: 1
+  name: intro-lab
+  namespace: fleet-console
+  resourceVersion: "66140"
+  uid: 04077e50-7064-47fc-8b03-3d1d22cac1c3
+spec:
+  displayName: Intro lab
+  models:
+  - Qwen3.5-2B-UD
+  secretRef: fleet-llm-apikey-intro-lab
+status:
+  active: true
+  keyPrefix: fleet_llm_5d…

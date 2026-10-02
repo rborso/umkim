@@ -1,0 +1,19 @@
+=== 2026-10-01T20:33:20+02:00 force-remove FCJ ===
+FCJ=lab-ha-0
+  bootstrapHost: 172.16.10.101
+  siteId: homelab
+  phase: ScriptIssued
+fleetclusterjoin.fleet.umkim.com/lab-ha-0 patched (no change)
+fleetclusterjoin.fleet.umkim.com "lab-ha-0" deleted from fleet-console namespace
+No resources found
+=== 2026-10-01T20:33:29+02:00 cleanup fleetapps/sites before hub wipe ===
+fleetapp.fleet.umkim.com "llama-qwen-gpu" deleted from fleet-console namespace
+fleetapp.fleet.umkim.com "llama-qwen-gpu-pt" deleted from fleet-console namespace
+fleetapp.fleet.umkim.com "llama-qwen-single" deleted from fleet-console namespace
+NAME         PHASE   WG    SITE         AGE
+homelab      Ready         homelab      35h
+management   Ready         management   35h
+NAME                                         CLUSTER        CHART                                         PHASE      AGE
+fleetapp.fleet.umkim.com/llama-qwen-gpu      lab-gpu-0      oci://10.10.0.1:30443/charts/llama-cpp-helm   Deleting   30h
+fleetapp.fleet.umkim.com/llama-qwen-gpu-pt   lab-gpu-pt-0   oci://10.10.0.1:30443/charts/llama-cpp-helm   Deleting   10h
+fleetapp.fleet.umkim.com/llama-qwen-single   lab-single-0   oci://10.10.0.1:30443/charts/llama-cpp-helm   Deleting   32h

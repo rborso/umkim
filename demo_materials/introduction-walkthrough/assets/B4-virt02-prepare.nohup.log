@@ -1,0 +1,16 @@
+Error: HTTP 500: Operation cannot be fulfilled on fleetsites.fleet.umkim.com "homelab": the object has been modified; please apply your changes to the latest version and try again
+Usage:
+  umkim site host prepare [site] [name] [flags]
+
+Flags:
+      --confirm           Required with --gpu-passthrough
+      --gpu-passthrough   Run prepare + prepare_gpu_passthrough (requires --confirm)
+  -h, --help              help for prepare
+      --wait              Poll until Succeeded or Failed
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

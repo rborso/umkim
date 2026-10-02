@@ -1,0 +1,13 @@
+==== virt01 virsh verify ====
+virt01.lab.local
+ Id   Name              State
+---------------------------------
+ 1    cli-test-ha-cp3   running
+ 3    lab-single-1-0    running
+ 4    cli-test-ha-cp1   running
+ 6    lab-ha-0-cp1      running
+ 7    lab-ha-0-cp2      running
+
+virsh_rc=0
+n0p1_mgmt_nw     UP             00:0e:c6:af:26:49 <BROADCAST,MULTICAST,UP,LOWER_UP> 
+n0p0_lab_nw      UP             e8:6a:64:56:e3:93 <BROADCAST,MULTICAST,UP,LOWER_UP> 

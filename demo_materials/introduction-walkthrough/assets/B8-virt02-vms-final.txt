@@ -1,0 +1,8 @@
+ Id   Name              State
+---------------------------------
+ 1    cli-test-sn1      running
+ 2    cli-test-ha-cp2   running
+ 8    lab-ha-0-w1       running
+ 9    lab-ha-0-cp3      running
+ 10   lab-ha-0-w2       running
+

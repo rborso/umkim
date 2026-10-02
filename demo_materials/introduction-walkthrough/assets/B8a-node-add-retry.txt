@@ -1,0 +1,17 @@
+Error: HTTP 422: {"ok":false,"phase":"pre","type":"addWorker","checks":[{"id":"cluster_ready","status":"pass","message":"cluster is Ready"},{"id":"cluster_writable","status":"pass","message":"cluster accepts mutations"},{"id":"node_operation_idle","status":"pass","message":"no node operation in progress"},{"id":"spoke_api","status":"pass","message":"listed 3 spoke node(s)"},{"id":"address","status":"pass","message":"worker address provided"},{"id":"address_unique","status":"fail","message":"address 172.16.10.142 is already in cluster spec"}]}
+Usage:
+  umkim node add [flags]
+
+Flags:
+      --address string    Node management address
+      --cluster string    Cluster name
+  -h, --help              help for add
+      --hostname string   Optional hostname
+      --role string       Node role (worker only) (default "worker")
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

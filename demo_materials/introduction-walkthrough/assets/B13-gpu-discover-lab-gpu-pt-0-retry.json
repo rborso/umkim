@@ -1,0 +1,28 @@
+{
+  "cluster_capabilities": {
+    "gpu": false,
+    "ha_topology": false,
+    "kubevirt": false,
+    "kvm": true,
+    "network.multus_l2": false,
+    "storage.rwo": true,
+    "storage.rwx": false
+  },
+  "cluster_resources": {
+    "gpu.available": 0,
+    "gpu.total": 0
+  },
+  "completed_at": "2026-10-02T00:22:50Z",
+  "message": "Capabilities discovered",
+  "nodes": [
+    {
+      "capabilities": {
+        "gpu": false,
+        "kvm": true
+      },
+      "name": "lab-gpu-pt-0-cp1",
+      "nvidia_pci_id": "10de:1f82"
+    }
+  ],
+  "phase": "Succeeded"
+}

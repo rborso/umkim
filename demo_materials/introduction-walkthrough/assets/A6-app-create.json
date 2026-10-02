@@ -1,0 +1,14 @@
+{
+  "chart": "oci://10.10.0.1:30443/charts/whoami",
+  "clusterName": "intro-single-0",
+  "llmBackend": true,
+  "name": "whoami",
+  "namespace": "default",
+  "phase": "",
+  "releaseName": "whoami",
+  "route": {
+    "hubHost": "whoami.demo.otthol.hu",
+    "mode": "hub"
+  },
+  "version": "0.1.0"
+}

@@ -1,0 +1,23 @@
+cluster_ready	pass	cluster is Ready
+cluster_writable	pass	cluster accepts mutations
+node_operation_idle	fail	another node operation is in progress
+spoke_api	pass	listed 3 spoke node(s)
+address	pass	worker address provided
+address_unique	fail	address 172.16.10.142 is already in cluster spec
+Error: node operation validation failed
+Usage:
+  umkim node-op validate [flags]
+
+Flags:
+      --cluster string   Cluster name
+  -f, --file string      Validate request JSON body
+  -h, --help             help for validate
+      --phase string     Validation phase: pre|post (default "pre")
+      --type string      Operation type when not using --file
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

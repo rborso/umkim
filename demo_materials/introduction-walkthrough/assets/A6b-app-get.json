@@ -1,0 +1,17 @@
+{
+  "chart": "oci://10.10.0.1:30443/charts/whoami",
+  "clusterName": "intro-single-0",
+  "llmBackend": true,
+  "message": "Helm release whoami-auth installed on intro-single-0",
+  "name": "whoami-auth",
+  "namespace": "default",
+  "phase": "Ready",
+  "releaseName": "whoami-auth",
+  "route": {
+    "hubHost": "whoami-auth.demo.otthol.hu",
+    "mode": "hub",
+    "requireAuth": true
+  },
+  "routeName": "whoami-auth",
+  "version": "0.1.0"
+}

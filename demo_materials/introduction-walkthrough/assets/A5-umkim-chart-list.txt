@@ -1,0 +1,5 @@
+NAME             SOURCE  VERSION  PHASE  POLICY  
+whoami           harbor  0.1.0    Ready  external
+rocky-10-vm      harbor  0.1.3    Ready  external
+llama-cpp-helm   harbor  0.1.4    Ready  external
+pet-clinic-helm  harbor  0.1.1    Ready  external

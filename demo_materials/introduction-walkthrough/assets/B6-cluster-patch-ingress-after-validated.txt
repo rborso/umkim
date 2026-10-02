@@ -1,0 +1,16 @@
+Error: HTTP 409: cluster is not provisioned yet
+Usage:
+  umkim cluster patch [name] [flags]
+
+Flags:
+  -f, --file string         JSON patch body
+  -h, --help                help for patch
+      --ingress-id string   Site ingress row ID
+      --jumphost string     SSH jumphost override (user@host:port); empty clears
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

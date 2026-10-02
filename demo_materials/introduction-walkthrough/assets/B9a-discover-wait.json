@@ -1,0 +1,21 @@
+Error: HTTP 504: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.27.5</center>
+</body>
+</html>
+Usage:
+  umkim cluster discover [name] [flags]
+
+Flags:
+  -h, --help                help for discover
+      --interval duration   Poll interval when --wait is set (default 5s)
+      --wait duration       Wait for discovery to finish (e.g. 5m)
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

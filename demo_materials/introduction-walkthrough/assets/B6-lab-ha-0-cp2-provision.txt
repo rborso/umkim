@@ -1,0 +1,30 @@
+{
+  "action": "create_vm",
+  "actorKind": "User",
+  "actorName": "localadmin",
+  "endedAt": "2026-10-01T21:23:03Z",
+  "id": "6266b8db104d",
+  "jobName": "fleet-site-prov-6266b8db104d",
+  "logTail": "[WARNING]: Found both group and host with same name: jumphost\n\nPLAY [Fleet site provision connector | YAIDAP on jumphost] *********************\n\nTASK [Require action and subject] **********************************************\nok: [jumphost] =\u003e \n    changed: false\n    msg: All assertions passed\n\nTASK [Require subject for non-inventory actions] *******************************\nok: [jumphost] =\u003e \n    changed: false\n    msg: All assertions passed\n\nTASK [Require inventory bundle] ************************************************\nok: [jumphost] =\u003e \n    changed: false\n    msg: All assertions passed\n\nTASK [Write projected inventory atomically] ************************************\nchanged: [jumphost]\n\nTASK [Emit inventory sync marker] **********************************************\nok: [jumphost] =\u003e \n    msg: FLEET_INVENTORY_SYNCED=1\n\nTASK [Collect jumphost inventory as JSON] **************************************\nskipping: [jumphost]\n\nTASK [Emit import JSON for hub] ************************************************\nskipping: [jumphost]\n\nTASK [Stop after standalone inventory sync] ************************************\nskipping: [jumphost]\n\nTASK [Stop after standalone inventory import] **********************************\nskipping: [jumphost]\n\nTASK [Collect inventory files as JSON] *****************************************\nskipping: [jumphost]\n\nTASK [Emit import files JSON for hub] ******************************************\nskipping: [jumphost]\n\nTASK [Stop after standalone inventory import preview] **************************\nskipping: [jumphost]\n\nTASK [Require YAIDAP repo sync parameters] *************************************\nskipping: [jumphost]\n\nTASK [Stage YAIDAP git deploy key on jumphost] *********************************\nskipping: [jumphost]\n\nTASK [Ensure git host keys for SSH remotes] ************************************\nskipping: [jumphost]\n\nTASK [Clone or update YAIDAP checkout] *****************************************\nskipping: [jumphost]\n\nTASK [Emit YAIDAP sync revision marker] ****************************************\nskipping: [jumphost]\n\nTASK [Remove staged YAIDAP git deploy key from jumphost] ***********************\nskipping: [jumphost]\n\nTASK [Stop after YAIDAP repo sync] *********************************************\nskipping: [jumphost]\n\nTASK [Resolve YAIDAP playbook defaults] ****************************************\nok: [jumphost]\n\nTASK [Fail when playbook mapping missing] **************************************\nok: [jumphost] =\u003e \n    changed: false\n    msg: All assertions passed\n\nTASK [Check YAIDAP guest host_vars before legacy sync] *************************\nskipping: [jumphost]\n\nTASK [Create YAIDAP guest host_vars stub for legacy hub sync] ******************\nskipping: [jumphost]\n\nTASK [Sync vm_location into YAIDAP guest host_vars] ****************************\nskipping: [jumphost]\n\nTASK [Sync memory into YAIDAP guest host_vars] *********************************\nskipping: [jumphost]\n\nTASK [Sync cores into YAIDAP guest host_vars] **********************************\nskipping: [jumphost]\n\nTASK [Sync os into YAIDAP guest host_vars] *************************************\nskipping: [jumphost]\n\nTASK [Derive lab MAC from ansible_host when provided] **************************\nskipping: [jumphost]\n\nTASK [Sync ansible_host into YAIDAP guest host_vars] ***************************\nskipping: [jumphost]\n\nTASK [Require guest mgmt IP for VM create (legacy sync)] ***********************\nskipping: [jumphost]\n\nTASK [Require guest mgmt IP for VM create (connector store)] *******************\nfatal: [jumphost]: FAILED! =\u003e \n    changed: true\n    cmd: |-\n        set -euo pipefail\n        ip=\"\"\n        if [ -f \"/home/linux/yaidap/inventory/homelab/host_vars/lab-ha-0-cp2.yml\" ]; then\n          ip=$(awk '/^ansible_host:/ { sub(/^ansible_host:[[:space:]]*/, \"\"); print; exit }' \"/home/linux/yaidap/inventory/homelab/host_vars/lab-ha-0-cp2.yml\")\n        fi\n        test -n \"$ip\"\n    delta: '0:00:00.003740'\n    end: '2026-10-01 23:22:57.972820'\n    msg: non-zero return code\n    rc: 1\n    start: '2026-10-01 23:22:57.969080'\n    stderr: ''\n    stderr_lines: \u003comitted\u003e\n    stdout: ''\n    stdout_lines: \u003comitted\u003e\n\nPLAY RECAP *********************************************************************\njumphost                   : ok=7    changed=1    unreachable=0    failed=1    skipped=19   rescued=0    ignored=0   \n\n",
+  "message": "YAIDAP connector job failed",
+  "phase": "Failed",
+  "provider": "yaidap",
+  "startedAt": "2026-10-01T21:22:53Z",
+  "subject": "lab-ha-0-cp2"
+}
+Error: provision action failed
+Usage:
+  umkim site host provision [site] [name] [flags]
+
+Flags:
+      --action string   install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status | prepare_hypervisor | prepare_gpu_passthrough | prepare_hypervisor_gpu (default from kind)
+      --confirm         Required for install_bm / discover_pxe / destroy / prepare_gpu_passthrough / prepare_hypervisor_gpu
+  -h, --help            help for provision
+      --wait            Poll until Succeeded or Failed
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

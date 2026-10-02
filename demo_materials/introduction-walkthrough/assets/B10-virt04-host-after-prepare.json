@@ -1,0 +1,10 @@
+{
+  "ansible_host": "172.16.10.6",
+  "kind": "hypervisor",
+  "name": "virt04",
+  "status": {
+    "ansible_host": "172.16.10.6",
+    "message": "Hypervisor prepare succeeded (libvirt bridges and packages)",
+    "phase": "Ready"
+  }
+}

@@ -1,0 +1,37 @@
+apiVersion: edge.umkim.com/v1alpha1
+kind: FleetAppRoute
+metadata:
+  annotations:
+    edge.umkim.com/fleet-routes-rebuild-key: g2:f:a
+    edge.umkim.com/force-reconcile: "1790893464"
+  creationTimestamp: "2026-10-01T22:16:56Z"
+  finalizers:
+  - edge.umkim.com/route-cleanup
+  generation: 2
+  labels:
+    fleet.umkim.com/app: whoami-site-auth
+  name: whoami-site-auth
+  namespace: fleet-system
+  resourceVersion: "46351"
+  uid: 112da6f5-0970-4ec2-a159-9214581db414
+spec:
+  cluster: lab-ha-0
+  effectiveMode: site
+  healthPath: /
+  instanceId: whoami-site-auth
+  mode: site
+  requireAuth: true
+  service:
+    name: whoami-site-auth
+    namespace: default
+    port: 80
+  siteHost: whoami-auth.homelab.otthol.hu
+status:
+  conditions:
+  - message: waiting for spoke ACME queue
+    reason: Pending
+    status: "False"
+    type: CertificateReady
+  phase: Applied
+  tlsMessage: requesting Let's Encrypt staging certificate (dry-run)
+  tlsPhase: PendingStaging

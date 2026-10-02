@@ -1,0 +1,9 @@
+Rocky Linux release 10.2 (Red Quartz)
+virt03.lab.local
+ 20:14:46 up 2 days,  3:43,  1 user,  load average: 0.00, 0.02, 0.08
+NAME MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sda    8:0    0 238.5G  0 disk 
+lo               UNKNOWN        127.0.0.1/8 
+n0p0_mgmt_nw     UP             172.16.10.4/24 
+tunl0@NONE       UNKNOWN        192.168.252.128/32 
+wg-umkim         UNKNOWN        10.10.0.10/32 

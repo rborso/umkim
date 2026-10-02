@@ -1,0 +1,13 @@
+Error: HTTP 400: guest "lab-ha-0-cp2" is not a member of any inventory cluster group
+Usage:
+  umkim site host cluster-apply [site] [name] [flags]
+
+Flags:
+  -h, --help   help for cluster-apply
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+

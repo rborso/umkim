@@ -1,0 +1,112 @@
+{
+  "items": [
+    {
+      "ansible_host": "172.16.10.141",
+      "clusters": null,
+      "external": false,
+      "kind": "vm",
+      "name": "lab-gpu-pt-0-cp1",
+      "status": {
+        "ansible_host": "172.16.10.141",
+        "phase": "Declared"
+      },
+      "vm_location": "virt04"
+    },
+    {
+      "ansible_host": "172.16.10.101",
+      "clusters": null,
+      "external": false,
+      "kind": "vm",
+      "name": "lab-ha-0-cp1",
+      "status": {
+        "ansible_host": "172.16.10.101",
+        "phase": "Declared"
+      },
+      "vm_location": "least-utilized"
+    },
+    {
+      "ansible_host": "172.16.10.102",
+      "clusters": null,
+      "external": false,
+      "kind": "vm",
+      "name": "lab-ha-0-cp2",
+      "status": {
+        "ansible_host": "172.16.10.102",
+        "phase": "Declared"
+      },
+      "vm_location": "least-utilized"
+    },
+    {
+      "ansible_host": "172.16.10.103",
+      "clusters": null,
+      "external": false,
+      "kind": "vm",
+      "name": "lab-ha-0-cp3",
+      "status": {
+        "ansible_host": "172.16.10.103",
+        "phase": "Declared"
+      },
+      "vm_location": "least-utilized"
+    },
+    {
+      "ansible_host": "172.16.10.140",
+      "clusters": null,
+      "external": false,
+      "kind": "vm",
+      "name": "lab-ha-0-w1",
+      "status": {
+        "ansible_host": "172.16.10.140",
+        "phase": "Declared"
+      },
+      "vm_location": "least-utilized"
+    },
+    {
+      "ansible_host": "172.16.10.2",
+      "clusters": null,
+      "external": false,
+      "kind": "hypervisor",
+      "name": "virt01",
+      "status": {
+        "ansible_host": "172.16.10.2",
+        "phase": "Declared"
+      },
+      "vm_location": ""
+    },
+    {
+      "ansible_host": "172.16.10.3",
+      "clusters": null,
+      "external": false,
+      "kind": "hypervisor",
+      "name": "virt02",
+      "status": {
+        "ansible_host": "172.16.10.3",
+        "phase": "Declared"
+      },
+      "vm_location": ""
+    },
+    {
+      "ansible_host": "172.16.10.4",
+      "clusters": null,
+      "external": true,
+      "kind": "bare_metal",
+      "name": "virt03",
+      "status": {
+        "ansible_host": "172.16.10.4",
+        "phase": "Declared"
+      },
+      "vm_location": ""
+    },
+    {
+      "ansible_host": "172.16.10.6",
+      "clusters": null,
+      "external": false,
+      "kind": "hypervisor",
+      "name": "virt04",
+      "status": {
+        "ansible_host": "172.16.10.6",
+        "phase": "Declared"
+      },
+      "vm_location": ""
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+fleet-console                 lldap-65d45f87c6-b5w2z                                      1/1     Running     0             60m
+fleet-ingress-auth            authelia-68c9dd95c5-pzbjm                                   1/1     Running     0             42m

@@ -1,0 +1,14 @@
+{
+  "chart": "oci://10.10.0.1:30443/charts/llama-cpp-helm",
+  "clusterName": "lab-single-0",
+  "llmBackend": true,
+  "name": "llama-virt03",
+  "namespace": "llm",
+  "phase": "",
+  "releaseName": "llama-cpp",
+  "route": {
+    "mode": "none"
+  },
+  "valuesYaml": "chatTemplateKwargs: '{\"enable_thinking\":false}'\nctxSize: 8192\nhfQuant: UD-Q8_K_XL\nhfRepo: unsloth/Qwen3.5-2B-GGUF\nhostNetwork: true\nimage:\n  pullPolicy: IfNotPresent\n  repository: 10.10.0.1:30443/ghcr-proxy/ggml-org/llama.cpp\n  tag: server-cuda\njinja: true\nmodel: Qwen3.5-2B-UD\nnGpuLayers: 99\nparallel: 1\npersistence:\n  enabled: true\n  size: 12Gi\nreplicaCount: 1\nresources:\n  limits:\n    cpu: \"4\"\n    memory: 6Gi\n  requests:\n    cpu: \"2\"\n    memory: 4Gi\nruntimeClassName: nvidia\nservice:\n  port: 8080\n  type: ClusterIP\nuseGpuResource: false\nuseRuntimeClass: true",
+  "version": "0.1.4"
+}

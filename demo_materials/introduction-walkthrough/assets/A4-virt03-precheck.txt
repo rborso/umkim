@@ -1,0 +1,12 @@
+virt03.lab.local
+Rocky Linux release 10.2 (Red Quartz)
+lo               UNKNOWN        127.0.0.1/8 
+enp2s0           UP             
+n0p0_mgmt_nw     UP             172.16.10.4/24 
+tunl0@NONE       UNKNOWN        172.17.252.128/32 
+calid17acefe4bf@if3 UP             
+calieaa78e05de0@if3 UP             
+calib451bd393b9@if3 UP             
+calic44b2fc93c9@if3 UP             
+calica92667ea4d@if3 UP             
+cali89430e82574@if3 UP             

@@ -1,0 +1,49 @@
+======== SSH check virt01 (172.16.10.2) ========
+hostname=virt01.lab.local
+date=2026-10-01T21:08:59+00:00
+redhat=Rocky Linux release 10.2 (Red Quartz)
+--- virsh list --all ---
+ Id   Name              State
+---------------------------------
+ 1    cli-test-ha-cp3   running
+ 3    lab-single-1-0    running
+ 4    cli-test-ha-cp1   running
+ 6    lab-ha-0-cp1      running
+ 7    lab-ha-0-cp2      running
+
+virsh_rc=0
+--- libvirt service ---
+inactive
+inactive
+--- packages ---
+libvirt-11.10.0-12.4.el10_2.x86_64
+qemu-kvm-10.1.0-16.el10_2.5.x86_64
+--- efibootmgr (network/PXE) ---
+BootOrder: 0004,0001,001D,0003,0002,001A,0019,0000,001C,0017,0018,001B,001E,001F,0024
+Boot0000* Rocky Linux	HD(1,GPT,d8d9ca99-8096-48b4-ad45-877ec96746de,0x800,0x100000)/\EFI\rocky\shimx64.efi
+Boot0001* Windows Boot Manager	HD(1,GPT,bb644c7d-dfaf-4ed3-81b3-9828b4341c11,0x800,0x64000)/\EFI\Microsoft\Boot\bootmgfw.efi57494e444f5753000100000088000000780000004200430044004f0042004a004500430054003d007b00390064006500610038003600320063002d0035006300640064002d0034006500370030002d0061006300630031002d006600330032006200330034003400640034003700390035007d00000000000100000010000000040000007fff0400
+Boot0002* Fedora	HD(1,GPT,dae5b91c-c303-4234-abba-3556f19a119b,0x800,0x12c000)/\EFI\fedora\shimx64.efi
+Boot0003* rocky	HD(1,GPT,5b732ada-8584-49f1-aabc-98501d277ca6,0x800,0x100000)/\EFI\rocky\shimx64.efi
+Boot0004* Rocky Linux Minimal	HD(1,GPT,20b3e330-7782-4623-be14-532caf1d6e7b,0x800,0x100000)/\EFI\rocky\shimx64.efi
+Boot0010  Setup	FvFile(721c8b66-426c-4e86-8e99-3457c46ab0b9)
+Boot0011  Boot Menu	FvFile(126a762d-5758-4fca-8531-201a7f57f850)
+Boot0012  Diagnostic Splash Screen	FvFile(a7d8d9a6-6ab0-4aeb-ad9d-163e59a7a380)
+Boot0013  Lenovo Diagnostics	FvFile(3f7e615b-0d45-4f80-88dc-26b234958560)
+Boot0014  Startup Interrupt Menu	FvFile(f46ee6f4-4785-43a3-923d-7f786c3c8479)
+Boot0015  Rescue and Recovery	FvFile(665d3f60-ad3e-4cad-8e26-db46eee9f1b5)
+Boot0016  MEBx Hot Key	FvFile(ac6fd56a-3d41-4efd-a1b9-870293811a28)
+Boot0017* USB CD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,86701296aa5a7848b66cd49dd3ba6a55)
+Boot0018* USB FDD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,6ff015a28830b543a8b8641009461e49)
+Boot0019* NVMe1	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,001c199932d94c4eae9aa0b6e98eb8a401)
+Boot001A* NVMe0	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,001c199932d94c4eae9aa0b6e98eb8a400)
+Boot001B* ATA HDD0	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,91af625956449f41a7b91f4f892ab0f602)
+Boot001C* USB HDD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,33e821aaaf33bc4789bd419f88c50803)
+Boot001D* PCI LAN	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,78a84aaf2b2afc4ea79cf5cc8f3d3803)
+Boot001E  Other CD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,aea2090adfde214e8b3a5e471856a35406)
+Boot001F  Other HDD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,91af625956449f41a7b91f4f892ab0f606)
+Boot0020* USBR BOOT CDROM	PciRoot(0x0)/Pci(0x14,0x0)/USB(11,1)
+Boot0021* USBR BOOT Floppy	PciRoot(0x0)/Pci(0x14,0x0)/USB(11,0)
+Boot0022* ATA HDD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,91af625956449f41a7b91f4f892ab0f6)
+Boot0023* ATAPI CD	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,aea2090adfde214e8b3a5e471856a354)
+Boot0024* PCI LAN	VenMsg(bc7838d2-0f82-4d60-8316-c068ee79d25b,78a84aaf2b2afc4ea79cf5cc8f3d3803)
+efibootmgr_rc=0

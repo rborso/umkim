@@ -1,0 +1,9 @@
+{
+  "ansible_host": "172.16.10.3",
+  "kind": "hypervisor",
+  "name": "virt02",
+  "status": {
+    "ansible_host": "172.16.10.3",
+    "phase": "Declared"
+  }
+}

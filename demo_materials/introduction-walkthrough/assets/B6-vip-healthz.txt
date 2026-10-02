@@ -1,0 +1,23 @@
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {},
+  "status": "Failure",
+  "message": "Unauthorized",
+  "reason": "Unauthorized",
+  "code": 401
+}
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {},
+  "status": "Failure",
+  "message": "Unauthorized",
+  "reason": "Unauthorized",
+  "code": 401
+}
+HTTP/2 401 
+audit-id: ece5aec9-2384-4624-8ee0-a222ce59e4a5
+cache-control: no-cache, private
+content-type: application/json
+content-length: 157

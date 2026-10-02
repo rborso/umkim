@@ -1,0 +1,21 @@
+{
+  "action": "create_vm",
+  "actorKind": "User",
+  "actorName": "localadmin",
+  "endedAt": "2026-10-01T21:25:52Z",
+  "host": {
+    "ansible_host": "172.16.10.140",
+    "ansible_user": "linux",
+    "hostname": "lab-ha-0-w1",
+    "osFamily": "rocky-10",
+    "siteId": "homelab"
+  },
+  "id": "06bb00cf7e0d",
+  "jobName": "fleet-site-prov-06bb00cf7e0d",
+  "logTail": "b-ha-0-w1]\n\n        TASK [configure-provisioning : start proxmox vm] *******************************\n        skipping: [lab-ha-0-w1]\n\n        TASK [prepare create_vm integration result facts] ******************************\n        ok: [lab-ha-0-w1 -> localhost]\n\n        TASK [configure-common : build provision handoff from inventory hostvars] ******\n        ok: [lab-ha-0-w1 -> localhost]\n\n        TASK [configure-common : assemble YAIDAP integration result payload] ***********\n        ok: [lab-ha-0-w1 -> localhost]\n\n        TASK [configure-common : emit YAIDAP_RESULT integration line] ******************\n        ok: [lab-ha-0-w1 -> localhost] => {\n            \"msg\": \"YAIDAP_RESULT={\\\"schema\\\": \\\"yaidap.integration.v1\\\", \\\"action\\\": \\\"create_vm\\\", \\\"subject\\\": \\\"lab-ha-0-w1,least-utilized\\\", \\\"phase\\\": \\\"provisioned\\\", \\\"ok\\\": true, \\\"message\\\": \\\"VM created\\\", \\\"warnings\\\": [], \\\"errors\\\": [], \\\"handoff\\\": {\\\"hostname\\\": \\\"lab-ha-0-w1\\\", \\\"ansible_host\\\": \\\"172.16.10.140\\\", \\\"ansible_user\\\": \\\"linux\\\", \\\"os_family\\\": \\\"rocky-10\\\"}, \\\"vm_location\\\": \\\"virt02\\\"}\"\n        }\n\n        PLAY RECAP *********************************************************************\n        lab-ha-0-w1                : ok=68   changed=10   unreachable=0    failed=0    skipped=110  rescued=0    ignored=0\n\nPLAY RECAP *********************************************************************\njumphost                   : ok=10   changed=3    unreachable=0    failed=0    skipped=23   rescued=0    ignored=0   \n\n",
+  "message": "VM created",
+  "phase": "Succeeded",
+  "provider": "yaidap",
+  "startedAt": "2026-10-01T21:25:07Z",
+  "subject": "lab-ha-0-w1"
+}

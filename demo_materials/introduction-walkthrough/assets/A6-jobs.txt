@@ -1,0 +1,9 @@
+NAME                                            STATUS     COMPLETIONS   DURATION   AGE
+fa-i-whoami                                     Complete   1/1           5s         12s
+fc-p-whoami                                     Complete   1/1           5s         24s
+fleet-cluster-discover-intro-single-0           Complete   1/1           15s        3m45s
+fleet-cluster-provision-intro-single-0          Complete   1/1           4m57s      8m42s
+fleet-ingress-auth-1790881847                   Complete   1/1           73s        41m
+fleet-ingress-auth-1790881920                   Complete   1/1           23s        40m
+fleet-ingress-auth-1790882400                   Complete   1/1           24s        32m
+fleet-overlay-check-intro-single-0-1790884118   Running    0/1           3m30s      3m30s

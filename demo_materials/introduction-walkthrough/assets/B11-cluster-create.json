@@ -1,0 +1,17 @@
+{
+  "available": false,
+  "ingress_id": "homelab-gpu-pf",
+  "jumphost": "linux@jump.otthol.hu:30200",
+  "name": "lab-gpu-pt-0",
+  "provisioning_mode": "bundle",
+  "provisioning_phase": "Pending",
+  "site": "homelab",
+  "topology": {
+    "nest_depth": "0",
+    "provisioner": "k3s",
+    "region": "homelab",
+    "topology": "single_node"
+  },
+  "traefik_http_port": 30080,
+  "upstream_host": "172.16.10.141"
+}

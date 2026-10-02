@@ -1,0 +1,36 @@
+===VIRT01===
+ Id   Name              State
+---------------------------------
+ 1    cli-test-ha-cp3   running
+ 3    lab-single-1-0    running
+ 4    cli-test-ha-cp1   running
+ 8    lab-ha-0-cp1      running
+ 9    lab-ha-0-cp2      running
+
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi        12Gi       1.1Gi         9Mi        17Gi        18Gi
+Swap:             0B          0B          0B
+
+cli-test-ha-cp3 Max memory: 4194304 KiB
+lab-single-1-0 Max memory: 2097152 KiB
+cli-test-ha-cp1 Max memory: 4194304 KiB
+lab-ha-0-cp1 Max memory: 4194304 KiB
+lab-ha-0-cp2 Max memory: 4194304 KiB
+===VIRT02===
+ Id   Name              State
+---------------------------------
+ 1    cli-test-sn1      running
+ 2    cli-test-ha-cp2   running
+ 8    lab-ha-0-w1       running
+ 9    lab-ha-0-cp3      running
+ 10   lab-ha-0-w2       running
+
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi        10Gi        12Gi       9.8Mi       8.8Gi        20Gi
+Swap:             0B          0B          0B
+
+cli-test-sn1 Max memory: 4194304 KiB
+cli-test-ha-cp2 Max memory: 4194304 KiB
+lab-ha-0-w1 Max memory: 4194304 KiB
+lab-ha-0-cp3 Max memory: 4194304 KiB
+lab-ha-0-w2 Max memory: 4194304 KiB

@@ -1,0 +1,16 @@
+{
+  "path": "guests.yml",
+  "syncPhase": "dirty"
+}
+{
+  "path": "host_vars/lab-ha-0-cp4.yml",
+  "syncPhase": "dirty"
+}
+{
+  "path": "lab-ha-0-cp4.yml",
+  "syncPhase": "dirty"
+}
+{
+  "path": "group_vars/lab-ha-0-cp4.yml",
+  "syncPhase": "dirty"
+}

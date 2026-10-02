@@ -1,0 +1,30 @@
+
+TASK [Require action and subject] **********************************************
+skipping: [jumphost]
+
+TASK [Require subject for non-inventory actions] *******************************
+skipping: [jumphost]
+
+TASK [Require inventory bundle] ************************************************
+ok: [jumphost] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Write projected inventory atomically] ************************************
+changed: [jumphost]
+
+TASK [Emit inventory sync marker] **********************************************
+ok: [jumphost] => 
+    msg: FLEET_INVENTORY_SYNCED=1
+
+TASK [Collect jumphost inventory as JSON] **************************************
+skipping: [jumphost]
+
+TASK [Emit import JSON for hub] ************************************************
+skipping: [jumphost]
+
+TASK [Stop after standalone inventory sync] ************************************
+
+PLAY RECAP *********************************************************************
+jumphost                   : ok=3    changed=1    unreachable=0    failed=0    skipped=4    rescued=0    ignored=0   
+

@@ -1,0 +1,2 @@
+{'status': 'OK', 'message': None, 'data': {'redirect': 'https://demo.otthol.hu'}}
+keys ['status', 'data']

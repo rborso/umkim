@@ -1,0 +1,162 @@
+=== SC ===
+NAME                   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-path (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  100m
+=== PVC describe ===
+Name:          rocky-kv-pod-root
+Namespace:     kubevirt
+StorageClass:  longhorn
+Status:        Pending
+Volume:        
+Labels:        alerts.k8s.io/KubePersistentVolumeFillingUp=disabled
+               app=containerized-data-importer
+               app.kubernetes.io/component=storage
+               app.kubernetes.io/instance=rocky-kv-pod
+               app.kubernetes.io/managed-by=cdi-controller
+               app.kubernetes.io/name=rocky-10-vm
+               helm.sh/chart=rocky-10-vm-0.1.3
+               kubevirt.io/created-by=c575135d-d9f9-4bde-adc3-b130b1bb0192
+Annotations:   cdi.kubevirt.io/allowClaimAdoption: true
+               cdi.kubevirt.io/createdForDataVolume: 615af20e-2e77-43bd-974c-40432f7d91fd
+               cdi.kubevirt.io/storage.contentType: kubevirt
+               cdi.kubevirt.io/storage.import.endpoint: https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2
+               cdi.kubevirt.io/storage.import.source: http
+               cdi.kubevirt.io/storage.pod.restarts: 0
+               cdi.kubevirt.io/storage.preallocation.requested: false
+               cdi.kubevirt.io/storage.usePopulator: false
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:      
+Access Modes:  
+VolumeMode:    Filesystem
+Used By:       <none>
+Events:
+  Type     Reason              Age                 From                         Message
+  ----     ------              ----                ----                         -------
+  Warning  ProvisioningFailed  22s (x42 over 10m)  persistentvolume-controller  storageclass.storage.k8s.io "longhorn" not found
+=== DV describe ===
+              cdi.kubevirt.io/storage.usePopulator: false
+API Version:  cdi.kubevirt.io/v1beta1
+Kind:         DataVolume
+Metadata:
+  Creation Timestamp:  2026-10-01T23:26:30Z
+  Generation:          1
+  Owner References:
+    API Version:           kubevirt.io/v1
+    Block Owner Deletion:  true
+    Controller:            true
+    Kind:                  VirtualMachine
+    Name:                  rocky-kv-pod
+    UID:                   c575135d-d9f9-4bde-adc3-b130b1bb0192
+  Resource Version:        37039
+  UID:                     615af20e-2e77-43bd-974c-40432f7d91fd
+Spec:
+  Source:
+    Http:
+      URL:  https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2
+  Storage:
+    Access Modes:
+      ReadWriteOnce
+    Resources:
+      Requests:
+        Storage:         40Gi
+    Storage Class Name:  longhorn
+    Volume Mode:         Filesystem
+Status:
+  Claim Name:  rocky-kv-pod-root
+  Conditions:
+    Last Heartbeat Time:   2026-10-01T23:26:30Z
+    Last Transition Time:  2026-10-01T23:26:30Z
+    Message:               PVC rocky-kv-pod-root Pending
+    Reason:                Pending
+    Status:                False
+    Type:                  Bound
+    Last Heartbeat Time:   2026-10-01T23:26:30Z
+    Last Transition Time:  2026-10-01T23:26:30Z
+    Status:                False
+    Type:                  Ready
+    Last Heartbeat Time:   2026-10-01T23:26:30Z
+    Last Transition Time:  2026-10-01T23:26:30Z
+    Status:                False
+    Type:                  Running
+  Phase:                   Pending
+  Progress:                N/A
+Events:
+  Type    Reason   Age   From                          Message
+  ----    ------   ----  ----                          -------
+  Normal  Pending  10m   datavolume-import-controller  PVC rocky-kv-pod-root Pending
+=== longhorn ===
+No resources found in longhorn-system namespace.
+NAME           DISK
+lab-ha-0-cp1   39154662984
+lab-ha-0-cp2   39154662984
+lab-ha-0-cp3   39154662984
+lab-ha-0-cp4   39154662984
+=== events ===
+21m         Normal    Pulling                      pod/virt-handler-hgjc2                                                Pulling image "quay.io/kubevirt/virt-handler:v1.8.2"
+21m         Normal    Pulled                       pod/virt-handler-4scx2                                                Successfully pulled image "quay.io/kubevirt/virt-handler:v1.8.2" in 12.989s (12.989s including waiting). Image size: 260385965 bytes.
+21m         Normal    Pulling                      pod/virt-handler-b9lns                                                Pulling image "quay.io/kubevirt/virt-handler:v1.8.2"
+21m         Normal    Created                      pod/virt-handler-4scx2                                                Container created
+21m         Normal    Started                      pod/virt-handler-4scx2                                                Container started
+21m         Normal    ScalingReplicaSet            deployment/virt-api                                                   Scaled down replica set virt-api-6c6d79fdf7 from 2 to 1
+21m         Normal    SuccessfulDelete             replicaset/virt-api-6c6d79fdf7                                        Deleted pod: virt-api-6c6d79fdf7-9tmjv
+21m         Normal    Killing                      pod/virt-api-6c6d79fdf7-9tmjv                                         Stopping container virt-api
+21m         Normal    Pulled                       pod/virt-handler-55rgm                                                Successfully pulled image "quay.io/kubevirt/virt-handler:v1.8.2" in 15.513s (15.513s including waiting). Image size: 260385965 bytes.
+21m         Normal    Created                      pod/virt-handler-55rgm                                                Container created
+21m         Normal    Started                      pod/virt-handler-55rgm                                                Container started
+21m         Normal    Pulled                       pod/virt-handler-hgjc2                                                Successfully pulled image "quay.io/kubevirt/virt-handler:v1.8.2" in 16.65s (16.65s including waiting). Image size: 260385965 bytes.
+21m         Normal    Started                      pod/virt-handler-hgjc2                                                Container started
+21m         Normal    Created                      pod/virt-handler-hgjc2                                                Container created
+21m         Normal    ScalingReplicaSet            deployment/virt-api                                                   Scaled up replica set virt-api-6c6d79fdf7 from 1 to 2
+21m         Normal    SuccessfulCreate             replicaset/virt-api-6c6d79fdf7                                        Created pod: virt-api-6c6d79fdf7-8n7pc
+20m         Normal    Pulled                       pod/virt-handler-b9lns                                                Successfully pulled image "quay.io/kubevirt/virt-handler:v1.8.2" in 18.796s (18.797s including waiting). Image size: 260385965 bytes.
+20m         Normal    AddedInterface               pod/virt-api-6c6d79fdf7-8n7pc                                         Add eth0 [192.168.22.200/32] from k8s-pod-network
+20m         Normal    Created                      pod/virt-handler-b9lns                                                Container created
+20m         Normal    Created                      pod/virt-api-6c6d79fdf7-8n7pc                                         Container created
+20m         Normal    Started                      pod/virt-api-6c6d79fdf7-8n7pc                                         Container started
+20m         Normal    Pulled                       pod/virt-api-6c6d79fdf7-8n7pc                                         Container image "quay.io/kubevirt/virt-api:v1.8.2" already present on machine and can be accessed by the pod
+20m         Normal    Started                      pod/virt-handler-b9lns                                                Container started
+10m         Normal    Pending                      datavolume/rocky-kv-pod-root                                          PVC rocky-kv-pod-root Pending
+10m         Normal    SuccessfulDataVolumeCreate   virtualmachine/rocky-kv-lan                                           Created DataVolume rocky-kv-lan-root
+10m         Normal    Pending                      datavolume/rocky-kv-lan-root                                          PVC rocky-kv-lan-root Pending
+10m         Normal    NotFound                     datavolume/rocky-kv-lan-root                                          No PVC found
+10m         Normal    SuccessfulDataVolumeCreate   virtualmachine/rocky-kv-pod                                           Created DataVolume rocky-kv-pod-root
+26s         Warning   ProvisioningFailed           persistentvolumeclaim/rocky-kv-lan-root                               storageclass.storage.k8s.io "longhorn" not found
+26s         Warning   ProvisioningFailed           persistentvolumeclaim/rocky-kv-pod-root                               storageclass.storage.k8s.io "longhorn" not found
+=== cdi ===
+      cdi.kubevirt.io/configAuthority: ""
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"cdi.kubevirt.io/v1beta1","kind":"CDI","metadata":{"annotations":{},"name":"cdi"},"spec":{"config":{"featureGates":["HonorWaitForFirstConsumer"]},"imagePullPolicy":"IfNotPresent","infra":{"nodeSelector":{"kubernetes.io/os":"linux"},"tolerations":[{"key":"CriticalAddonsOnly","operator":"Exists"}]},"workload":{"nodeSelector":{"kubernetes.io/os":"linux"}}}}
+    creationTimestamp: "2026-10-01T23:12:50Z"
+    finalizers:
+    - operator.cdi.kubevirt.io
+    generation: 3
+    name: cdi
+    resourceVersion: "30196"
+    uid: 397d39ea-7867-4c43-89d7-acf65b908c78
+  spec:
+    config:
+      featureGates:
+      - HonorWaitForFirstConsumer
+    customizeComponents: {}
+    imagePullPolicy: IfNotPresent
+    infra:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+    workload:
+      nodeSelector:
+        kubernetes.io/os: linux
+  status:
+    conditions:
+    - lastHeartbeatTime: "2026-10-01T23:14:02Z"
+      lastTransitionTime: "2026-10-01T23:14:02Z"
+      message: Deployment Completed
+      reason: DeployCompleted
+      status: "True"
+      type: Available
+NAME                               READY   STATUS    RESTARTS   AGE
+cdi-apiserver-6f94b8c79c-hbg9x     1/1     Running   0          23m
+cdi-deployment-59bd94f6d-vnjd5     1/1     Running   0          23m
+cdi-operator-5bdf69f65f-6qgq8      1/1     Running   0          24m
+cdi-uploadproxy-7bccfb7d86-zkb2c   1/1     Running   0          23m

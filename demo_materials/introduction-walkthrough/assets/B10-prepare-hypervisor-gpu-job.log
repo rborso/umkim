@@ -1,0 +1,200 @@
+        TASK [configure-hypervisor : compute required gpu passthrough kernel args] *****
+        ok: [virt04]
+
+        TASK [configure-hypervisor : compute missing required kernel args] *************
+        ok: [virt04]
+
+        TASK [configure-hypervisor : ensure required iommu kernel args are set (RHEL/grubby)] ***
+        changed: [virt04]
+
+        TASK [configure-hypervisor : ensure required iommu kernel args are set (Debian/Proxmox grub)] ***
+        skipping: [virt04]
+
+        TASK [configure-hypervisor : rebuild initramfs after passthrough host configuration changes (RHEL/dracut)] ***
+        changed: [virt04]
+
+        TASK [configure-hypervisor : rebuild initramfs after passthrough host configuration changes (Debian/update-initramfs)] ***
+        skipping: [virt04]
+
+        TASK [configure-hypervisor : reboot hypervisor when gpu passthrough host configuration changed] ***
+        changed: [virt04]
+
+        TASK [configure-hypervisor : assert iommu kernel args are active on runtime cmdline] ***
+        ok: [virt04]
+
+        TASK [configure-hypervisor : validate runtime cmdline includes required iommu args] ***
+        ok: [virt04] => (item=intel_iommu=on) => {
+            "ansible_loop_var": "item",
+            "changed": false,
+            "item": "intel_iommu=on",
+            "msg": "All assertions passed"
+        }
+        ok: [virt04] => (item=iommu=pt) => {
+            "ansible_loop_var": "item",
+            "changed": false,
+            "item": "iommu=pt",
+            "msg": "All assertions passed"
+        }
+
+        TASK [configure-hypervisor : validate iommu group exists for configured pci devices] ***
+        ok: [virt04] => (item=0000:01:00.0)
+        ok: [virt04] => (item=0000:01:00.1)
+
+        TASK [configure-hypervisor : fail when configured pci device does not have iommu group] ***
+        ok: [virt04] => (item={'changed': False, 'stat': {'exists': True, 'path': '/sys/bus/pci/devices/0000:01:00.0/iommu_group', 'mode': '0777', 'isdir': False, 'ischr': False, 'isblk': False, 'isreg': False, 'isfifo': False, 'islnk': True, 'issock': False, 'uid': 0, 'gid': 0, 'size': 0, 'inode': 12366, 'dev': 24, 'nlink': 1, 'atime': 1790899352.3697562, 'mtime': 1790899352.27469, 'ctime': 1790899352.27469, 'wusr': True, 'rusr': True, 'xusr': True, 'wgrp': True, 'rgrp': True, 'xgrp': True, 'woth': True, 'roth': True, 'xoth': True, 'isuid': False, 'isgid': False, 'blocks': 0, 'block_size': 4096, 'device_type': 0, 'readable': True, 'writeable': True, 'executable': True, 'lnk_source': '/sys/kernel/iommu_groups/1', 'lnk_target': '../../../../kernel/iommu_groups/1', 'pw_name': 'root', 'gr_name': 'root', 'mimetype': 'inode/symlink', 'charset': 'binary', 'version': None, 'attributes': [], 'attr_flags': ''}, 'invocation': {'module_args': {'path': '/sys/bus/pci/devices/0000:01:00.0/iommu_group', 'follow': False, 'get_checksum': True, 'get_mime': True, 'get_attributes': True, 'checksum_algorithm': 'sha1'}}, 'failed': False, 'item': '0000:01:00.0', 'ansible_loop_var': 'item'}) => {
+            "ansible_loop_var": "item",
+            "changed": false,
+            "item": {
+                "ansible_loop_var": "item",
+                "changed": false,
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "checksum_algorithm": "sha1",
+                        "follow": false,
+                        "get_attributes": true,
+                        "get_checksum": true,
+                        "get_mime": true,
+                        "path": "/sys/bus/pci/devices/0000:01:00.0/iommu_group"
+                    }
+                },
+                "item": "0000:01:00.0",
+                "stat": {
+                    "atime": 1790899352.3697562,
+                    "attr_flags": "",
+                    "attributes": [],
+                    "block_size": 4096,
+                    "blocks": 0,
+                    "charset": "binary",
+                    "ctime": 1790899352.27469,
+                    "dev": 24,
+                    "device_type": 0,
+                    "executable": true,
+                    "exists": true,
+                    "gid": 0,
+                    "gr_name": "root",
+                    "inode": 12366,
+                    "isblk": false,
+                    "ischr": false,
+                    "isdir": false,
+                    "isfifo": false,
+                    "isgid": false,
+                    "islnk": true,
+                    "isreg": false,
+                    "issock": false,
+                    "isuid": false,
+                    "lnk_source": "/sys/kernel/iommu_groups/1",
+                    "lnk_target": "../../../../kernel/iommu_groups/1",
+                    "mimetype": "inode/symlink",
+                    "mode": "0777",
+                    "mtime": 1790899352.27469,
+                    "nlink": 1,
+                    "path": "/sys/bus/pci/devices/0000:01:00.0/iommu_group",
+                    "pw_name": "root",
+                    "readable": true,
+                    "rgrp": true,
+                    "roth": true,
+                    "rusr": true,
+                    "size": 0,
+                    "uid": 0,
+                    "version": null,
+                    "wgrp": true,
+                    "woth": true,
+                    "writeable": true,
+                    "wusr": true,
+                    "xgrp": true,
+                    "xoth": true,
+                    "xusr": true
+                }
+            },
+            "msg": "All assertions passed"
+        }
+        ok: [virt04] => (item={'changed': False, 'stat': {'exists': True, 'path': '/sys/bus/pci/devices/0000:01:00.1/iommu_group', 'mode': '0777', 'isdir': False, 'ischr': False, 'isblk': False, 'isreg': False, 'isfifo': False, 'islnk': True, 'issock': False, 'uid': 0, 'gid': 0, 'size': 0, 'inode': 12370, 'dev': 24, 'nlink': 1, 'atime': 1790899352.3702714, 'mtime': 1790899352.27469, 'ctime': 1790899352.27469, 'wusr': True, 'rusr': True, 'xusr': True, 'wgrp': True, 'rgrp': True, 'xgrp': True, 'woth': True, 'roth': True, 'xoth': True, 'isuid': False, 'isgid': False, 'blocks': 0, 'block_size': 4096, 'device_type': 0, 'readable': True, 'writeable': True, 'executable': True, 'lnk_source': '/sys/kernel/iommu_groups/1', 'lnk_target': '../../../../kernel/iommu_groups/1', 'pw_name': 'root', 'gr_name': 'root', 'mimetype': 'inode/symlink', 'charset': 'binary', 'version': None, 'attributes': [], 'attr_flags': ''}, 'invocation': {'module_args': {'path': '/sys/bus/pci/devices/0000:01:00.1/iommu_group', 'follow': False, 'get_checksum': True, 'get_mime': True, 'get_attributes': True, 'checksum_algorithm': 'sha1'}}, 'failed': False, 'item': '0000:01:00.1', 'ansible_loop_var': 'item'}) => {
+            "ansible_loop_var": "item",
+            "changed": false,
+            "item": {
+                "ansible_loop_var": "item",
+                "changed": false,
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "checksum_algorithm": "sha1",
+                        "follow": false,
+                        "get_attributes": true,
+                        "get_checksum": true,
+                        "get_mime": true,
+                        "path": "/sys/bus/pci/devices/0000:01:00.1/iommu_group"
+                    }
+                },
+                "item": "0000:01:00.1",
+                "stat": {
+                    "atime": 1790899352.3702714,
+                    "attr_flags": "",
+                    "attributes": [],
+                    "block_size": 4096,
+                    "blocks": 0,
+                    "charset": "binary",
+                    "ctime": 1790899352.27469,
+                    "dev": 24,
+                    "device_type": 0,
+                    "executable": true,
+                    "exists": true,
+                    "gid": 0,
+                    "gr_name": "root",
+                    "inode": 12370,
+                    "isblk": false,
+                    "ischr": false,
+                    "isdir": false,
+                    "isfifo": false,
+                    "isgid": false,
+                    "islnk": true,
+                    "isreg": false,
+                    "issock": false,
+                    "isuid": false,
+                    "lnk_source": "/sys/kernel/iommu_groups/1",
+                    "lnk_target": "../../../../kernel/iommu_groups/1",
+                    "mimetype": "inode/symlink",
+                    "mode": "0777",
+                    "mtime": 1790899352.27469,
+                    "nlink": 1,
+                    "path": "/sys/bus/pci/devices/0000:01:00.1/iommu_group",
+                    "pw_name": "root",
+                    "readable": true,
+                    "rgrp": true,
+                    "roth": true,
+                    "rusr": true,
+                    "size": 0,
+                    "uid": 0,
+                    "version": null,
+                    "wgrp": true,
+                    "woth": true,
+                    "writeable": true,
+                    "wusr": true,
+                    "xgrp": true,
+                    "xoth": true,
+                    "xusr": true
+                }
+            },
+            "msg": "All assertions passed"
+        }
+
+        TASK [configure-hypervisor : ensure target pci devices are bound to vfio-pci] ***
+        ok: [virt04] => (item=0000:01:00.0)
+        ok: [virt04] => (item=0000:01:00.1)
+
+        TASK [configure-hypervisor : print gpu passthrough host readiness summary] *****
+        ok: [virt04] => {
+            "msg": [
+                "gpu_passthrough_host_enabled=True",
+                "pci_devices=0000:01:00.0, 0000:01:00.1",
+                "vfio_ids=10de:1f82, 10de:10fa",
+                "runtime_cmdline=BOOT_IMAGE=(hd0,gpt3)/boot/vmlinuz-6.12.0-211.16.1.el10_2.0.1.x86_64 root=UUID=6037afcb-7442-42ac-bd9d-cc940fae9965 ro console=ttyS0,115200 intel_iommu=on iommu=pt modprobe.blacklist=nouveau,nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm rd.driver.blacklist=nvidia rd.driver.blacklist=nvidia_drm rd.driver.blacklist=nvidia_modeset rd.driver.blacklist=nvidia_uvm"
+            ]
+        }
+
+        PLAY RECAP *********************************************************************
+        virt04                     : ok=85   changed=7    unreachable=0    failed=0    skipped=86   rescued=0    ignored=0
+
+PLAY RECAP *********************************************************************
+jumphost                   : ok=12   changed=4    unreachable=0    failed=0    skipped=21   rescued=0    ignored=0   
+

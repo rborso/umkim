@@ -1,0 +1,2 @@
+VIP 172.16.10.100:6443 /livez /readyz /healthz return HTTP 401 Unauthorized from jumphost curl -sk (anonymous).
+Traefik NodePort :30080 returns HTTP 404 (listener up). Cluster Ready via Fleet API (available=true).

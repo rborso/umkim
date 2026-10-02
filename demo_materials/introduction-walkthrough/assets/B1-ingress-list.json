@@ -1,0 +1,28 @@
+{
+  "hubGateway": false,
+  "hubZone": "",
+  "ingress": [
+    {
+      "description": "Port-forward to virt03 (lab-single-0): 80→30080, 443→30443",
+      "id": "homelab-pf",
+      "method": "port_forward",
+      "wanAddressMode": "dns",
+      "wildcard": "*.homelab.otthol.hu",
+      "zone": "homelab.otthol.hu"
+    },
+    {
+      "description": "Port-forward to virt04 (lab-gpu-0): 80→30080, 443→30443",
+      "id": "homelab-gpu-pf",
+      "method": "port_forward",
+      "wanAddressMode": "dns",
+      "wildcard": "*.gpu.homelab.otthol.hu",
+      "zone": "homelab.otthol.hu"
+    },
+    {
+      "id": "edge-rp",
+      "method": "reverse_proxy",
+      "operatorNotes": "External reverse proxy terminates TLS; operator configures vhosts"
+    }
+  ],
+  "site": "homelab"
+}

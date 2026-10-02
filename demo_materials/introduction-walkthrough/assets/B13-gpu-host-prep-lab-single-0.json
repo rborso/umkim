@@ -1,0 +1,10 @@
+{
+  "driverBranch": "535",
+  "driverLoaded": true,
+  "hostMessage": "NVIDIA host driver installed",
+  "hostPhase": "Ready",
+  "marketingName": "NVIDIA GeForce GTX 1050 Ti",
+  "pciId": "10de:1c8c",
+  "recommendedDriverBranch": "535",
+  "runtimePhase": "NotEnabled"
+}

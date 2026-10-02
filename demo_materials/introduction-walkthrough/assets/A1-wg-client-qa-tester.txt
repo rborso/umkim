@@ -1,0 +1,180 @@
+=== wg-dev-client qa-tester 2026-10-01T21:17:48+02:00 ===
+[wg-dev-client] added qa-tester to /home/linux/umkim/inventory/group_vars/all/wg_operator_clients.yml
+
+PLAY [WireGuard operator clients | Load hub public key] ************************
+
+TASK [ansible.builtin.slurp] ***************************************************
+ok: [umkim-hub]
+
+TASK [ansible.builtin.set_fact] ************************************************
+ok: [umkim-hub]
+
+PLAY [WireGuard operator clients | Generate keys and configs] ******************
+
+TASK [wireguard_operator_clients : WG operator clients | Require client list] ***
+ok: [localhost] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [wireguard_operator_clients : WG operator clients | Require hub public key] ***
+ok: [localhost] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [wireguard_operator_clients : WG operator clients | Ensure secrets and output directories] ***
+ok: [localhost] => (item=/home/linux/umkim/secrets/wireguard-clients)
+ok: [localhost] => (item=/home/linux/umkim/output/wireguard-clients)
+
+TASK [wireguard_operator_clients : WG operator clients | Ensure per-client secret directories] ***
+changed: [localhost] => (item=qa-tester)
+ok: [localhost] => (item=my-laptop)
+ok: [localhost] => (item=my-notebook)
+ok: [localhost] => (item=notebook)
+ok: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Check for existing private key] ***
+ok: [localhost] => (item=qa-tester)
+ok: [localhost] => (item=my-laptop)
+ok: [localhost] => (item=my-notebook)
+ok: [localhost] => (item=notebook)
+ok: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Generate private key] ***
+changed: [localhost] => (item=qa-tester)
+skipping: [localhost] => (item=my-laptop) 
+skipping: [localhost] => (item=my-notebook) 
+skipping: [localhost] => (item=notebook) 
+skipping: [localhost] => (item=laptop) 
+
+TASK [wireguard_operator_clients : WG operator clients | Save private key] *****
+changed: [localhost] => (item={'changed': True, 'failed': False, 'msg': '', 'rc': 0, 'changed_when_result': True, 'ansible_loop_var': 'item', 'item': {'changed': False, 'failed': False, 'ansible_loop_var': 'item', 'item': {'name': 'qa-tester'}, 'stat': {'exists': False}}, 'stdout': 'QPIpikcVs4Td+JhK5LcvPEX7L6lP4c2WUV3xDf900Gc=', 'stderr': '', 'cmd': ['wg', 'genkey'], 'start': '2026-10-01 21:17:54.470235', 'end': '2026-10-01 21:17:54.476404', 'delta': '0:00:00.006169', 'stdout_lines': ['QPIpikcVs4Td+JhK5LcvPEX7L6lP4c2WUV3xDf900Gc='], 'stderr_lines': []})
+skipping: [localhost] => (item={'changed': False, 'failed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'not item.stat.exists', 'ansible_loop_var': 'item', 'item': {'changed': False, 'failed': False, 'ansible_loop_var': 'item', 'item': {'name': 'my-laptop'}, 'stat': {'exists': True, 'path': '/home/linux/umkim/secrets/wireguard-clients/my-laptop/privatekey', 'mode': '0600', 'isdir': False, 'ischr': False, 'isblk': False, 'isreg': True, 'isfifo': False, 'islnk': False, 'issock': False, 'uid': 1000, 'gid': 1000, 'size': 45, 'inode': 591635369, 'dev': 64516, 'nlink': 1, 'atime': 1790745597.3309948, 'mtime': 1788327017.5329535, 'ctime': 1788327017.8388376, 'wusr': True, 'rusr': True, 'xusr': False, 'wgrp': False, 'rgrp': False, 'xgrp': False, 'woth': False, 'roth': False, 'xoth': False, 'isuid': False, 'isgid': False, 'blocks': 8, 'disk_usage_bytes': 4096, 'block_size': 4096, 'device_type': 0, 'readable': True, 'writeable': True, 'executable': False, 'pw_name': 'linux', 'gr_name': 'linux', 'checksum': '6be4e70e8253898884e11d3a1815dc1761a21d8b', 'mimetype': 'text/plain', 'charset': 'us-ascii', 'version': '1833445132', 'attributes': [], 'attr_flags': ''}}}) 
+skipping: [localhost] => (item={'changed': False, 'failed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'not item.stat.exists', 'ansible_loop_var': 'item', 'item': {'changed': False, 'failed': False, 'ansible_loop_var': 'item', 'item': {'name': 'my-notebook'}, 'stat': {'exists': True, 'path': '/home/linux/umkim/secrets/wireguard-clients/my-notebook/privatekey', 'mode': '0600', 'isdir': False, 'ischr': False, 'isblk': False, 'isreg': True, 'isfifo': False, 'islnk': False, 'issock': False, 'uid': 1000, 'gid': 1000, 'size': 45, 'inode': 193016781, 'dev': 64516, 'nlink': 1, 'atime': 1790745597.6600146, 'mtime': 1788326997.9604917, 'ctime': 1788326998.2287002, 'wusr': True, 'rusr': True, 'xusr': False, 'wgrp': False, 'rgrp': False, 'xgrp': False, 'woth': False, 'roth': False, 'xoth': False, 'isuid': False, 'isgid': False, 'blocks': 8, 'disk_usage_bytes': 4096, 'block_size': 4096, 'device_type': 0, 'readable': True, 'writeable': True, 'executable': False, 'pw_name': 'linux', 'gr_name': 'linux', 'checksum': '5a09fbbaf4595abb238abd980ed3f7ade04a168f', 'mimetype': 'text/plain', 'charset': 'us-ascii', 'version': '2992755049', 'attributes': [], 'attr_flags': ''}}}) 
+skipping: [localhost] => (item={'changed': False, 'failed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'not item.stat.exists', 'ansible_loop_var': 'item', 'item': {'changed': False, 'failed': False, 'ansible_loop_var': 'item', 'item': {'name': 'notebook'}, 'stat': {'exists': True, 'path': '/home/linux/umkim/secrets/wireguard-clients/notebook/privatekey', 'mode': '0600', 'isdir': False, 'ischr': False, 'isblk': False, 'isreg': True, 'isfifo': False, 'islnk': False, 'issock': False, 'uid': 1000, 'gid': 1000, 'size': 45, 'inode': 348208533, 'dev': 64516, 'nlink': 1, 'atime': 1790745597.9850342, 'mtime': 1788267711.1087852, 'ctime': 1788278862.078892, 'wusr': True, 'rusr': True, 'xusr': False, 'wgrp': False, 'rgrp': False, 'xgrp': False, 'woth': False, 'roth': False, 'xoth': False, 'isuid': False, 'isgid': False, 'blocks': 8, 'disk_usage_bytes': 4096, 'block_size': 4096, 'device_type': 0, 'readable': True, 'writeable': True, 'executable': False, 'pw_name': 'linux', 'gr_name': 'linux', 'checksum': 'a4bc6e2e626f9f20e375baf5672bbcb8afc4eecf', 'mimetype': 'text/plain', 'charset': 'us-ascii', 'version': '2217908703', 'attributes': [], 'attr_flags': ''}}}) 
+skipping: [localhost] => (item={'changed': False, 'failed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'not item.stat.exists', 'ansible_loop_var': 'item', 'item': {'changed': False, 'failed': False, 'ansible_loop_var': 'item', 'item': {'name': 'laptop'}, 'stat': {'exists': True, 'path': '/home/linux/umkim/secrets/wireguard-clients/laptop/privatekey', 'mode': '0600', 'isdir': False, 'ischr': False, 'isblk': False, 'isreg': True, 'isfifo': False, 'islnk': False, 'issock': False, 'uid': 1000, 'gid': 1000, 'size': 45, 'inode': 192971769, 'dev': 64516, 'nlink': 1, 'atime': 1790745598.2650511, 'mtime': 1788258544.332051, 'ctime': 1788278862.078892, 'wusr': True, 'rusr': True, 'xusr': False, 'wgrp': False, 'rgrp': False, 'xgrp': False, 'woth': False, 'roth': False, 'xoth': False, 'isuid': False, 'isgid': False, 'blocks': 8, 'disk_usage_bytes': 4096, 'block_size': 4096, 'device_type': 0, 'readable': True, 'writeable': True, 'executable': False, 'pw_name': 'linux', 'gr_name': 'linux', 'checksum': '1ce6b0f73c0e4ab7bddbc0c228670c75b3df50ae', 'mimetype': 'text/plain', 'charset': 'us-ascii', 'version': '3789445992', 'attributes': [], 'attr_flags': ''}}}) 
+
+TASK [wireguard_operator_clients : WG operator clients | Read private keys] ****
+ok: [localhost] => (item=qa-tester)
+ok: [localhost] => (item=my-laptop)
+ok: [localhost] => (item=my-notebook)
+ok: [localhost] => (item=notebook)
+ok: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Derive public keys] ***
+ok: [localhost] => (item=qa-tester)
+ok: [localhost] => (item=my-laptop)
+ok: [localhost] => (item=my-notebook)
+ok: [localhost] => (item=notebook)
+ok: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Build client records] ***
+ok: [localhost]
+
+TASK [wireguard_operator_clients : WG operator clients | Ensure per-client output directories] ***
+changed: [localhost] => (item=qa-tester)
+ok: [localhost] => (item=my-laptop)
+ok: [localhost] => (item=my-notebook)
+ok: [localhost] => (item=notebook)
+ok: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Write WireGuard config on controller] ***
+changed: [localhost] => (item=qa-tester)
+changed: [localhost] => (item=my-laptop)
+changed: [localhost] => (item=my-notebook)
+changed: [localhost] => (item=notebook)
+changed: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Write README on controller] ***
+changed: [localhost] => (item=qa-tester)
+changed: [localhost] => (item=my-laptop)
+changed: [localhost] => (item=my-notebook)
+changed: [localhost] => (item=notebook)
+changed: [localhost] => (item=laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Build hub dynamic peer list] ***
+ok: [localhost]
+
+TASK [wireguard_operator_clients : WG operator clients | Summary] **************
+ok: [localhost] => (item=qa-tester) => 
+    msg: 'Client qa-tester: 10.10.0.100 → /home/linux/umkim/output/wireguard-clients/qa-tester/wg-umkim.conf'
+ok: [localhost] => (item=my-laptop) => 
+    msg: 'Client my-laptop: 10.10.0.101 → /home/linux/umkim/output/wireguard-clients/my-laptop/wg-umkim.conf'
+ok: [localhost] => (item=my-notebook) => 
+    msg: 'Client my-notebook: 10.10.0.102 → /home/linux/umkim/output/wireguard-clients/my-notebook/wg-umkim.conf'
+ok: [localhost] => (item=notebook) => 
+    msg: 'Client notebook: 10.10.0.103 → /home/linux/umkim/output/wireguard-clients/notebook/wg-umkim.conf'
+ok: [localhost] => (item=laptop) => 
+    msg: 'Client laptop: 10.10.0.104 → /home/linux/umkim/output/wireguard-clients/laptop/wg-umkim.conf'
+
+PLAY [WireGuard operator clients | Load spoke keys for hub template] ***********
+skipping: no hosts matched
+
+PLAY [WireGuard operator clients | Register peers on hub] **********************
+
+TASK [wireguard : WireGuard | Check for existing private key] ******************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Generate private key] ****************************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Store private key] *******************************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Read private key] ********************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Set private key fact] ****************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Derive public key] *******************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Store public key on disk] ************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Publish public key for hub peer templates] *******
+ok: [umkim-hub]
+
+TASK [wireguard_operator_clients : WG operator clients | Apply operator peers on hub wg0 (additive)] ***
+changed: [umkim-hub] => (item=operator-qa-tester)
+changed: [umkim-hub] => (item=operator-my-laptop)
+changed: [umkim-hub] => (item=operator-my-notebook)
+changed: [umkim-hub] => (item=operator-notebook)
+changed: [umkim-hub] => (item=operator-laptop)
+
+TASK [wireguard_operator_clients : WG operator clients | Persist operator peers for hub reboot restore] ***
+changed: [umkim-hub]
+
+TASK [wireguard_operator_clients : WG operator clients | Route operator overlay via wg0] ***
+skipping: [umkim-hub] => (item=operator-qa-tester) 
+skipping: [umkim-hub] => (item=operator-my-laptop) 
+skipping: [umkim-hub] => (item=operator-my-notebook) 
+skipping: [umkim-hub] => (item=operator-notebook) 
+skipping: [umkim-hub] => (item=operator-laptop) 
+skipping: [umkim-hub]
+
+TASK [wireguard_operator_clients : WG operator clients | Collect FleetClusterJoin WireGuard peers] ***
+ok: [umkim-hub]
+
+TASK [wireguard_operator_clients : WG operator clients | Re-apply FleetClusterJoin peers on hub wg0] ***
+skipping: [umkim-hub]
+
+TASK [wireguard_operator_clients : WG operator clients | Route FleetClusterJoin overlay IPs via wg0] ***
+skipping: [umkim-hub]
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=15   changed=6    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+umkim-hub                  : ok=11   changed=2    unreachable=0    failed=0    skipped=5    rescued=0    ignored=0   
+
+
+WireGuard client ready.
+
+  Config:  /home/linux/umkim/output/wireguard-clients/qa-tester/wg-umkim.conf
+  On your PC:  sudo wg-quick up ./wg-umkim.conf
+  Test:        ping -c1 10.10.0.1
+  Console:     http://10.10.0.1:30912/fleet/   (dashboard NodePort)
+
+Copy to your laptop (run on the laptop):
+  scp linux@159.195.137.119:/home/linux/umkim/output/wireguard-clients/qa-tester/wg-umkim.conf .
+
+See docs/wireguard-operator-clients.md

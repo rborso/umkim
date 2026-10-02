@@ -1,0 +1,7 @@
+{
+  "apps": [],
+  "defaults": {
+    "chartPrefix": "oci://10.10.0.1:30443/charts",
+    "hubEdgeDomain": "demo.otthol.hu"
+  }
+}

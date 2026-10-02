@@ -1,0 +1,1641 @@
+Warning: Permanently added '[jump.otthol.hu]:30200' (ED25519) to the list of known hosts.
+Warning: Permanently added '172.16.10.102' (ED25519) to the list of known hosts.
+Warning: Permanently added '172.16.10.103' (ED25519) to the list of known hosts.
+Warning: Permanently added '[jump.otthol.hu]:30200' (ED25519) to the list of known hosts.
+Warning: Permanently added '[jump.otthol.hu]:30200' (ED25519) to the list of known hosts.
+Warning: Permanently added '172.16.10.101' (ED25519) to the list of known hosts.
+Warning: Permanently added '172.16.10.101' (ED25519) to the list of known hosts.
+Rocky Linux 10 - BaseOS                         9.0 MB/s |  31 MB     00:03    
+Rocky Linux 10 - AppStream                      3.3 MB/s | 2.7 MB     00:00    
+Rocky Linux 10 - Extras                          12 kB/s | 5.8 kB     00:00    
+Package tar-2:1.35-11.el10.x86_64 is already installed.
+Package gzip-1.13-3.el10.x86_64 is already installed.
+Dependencies resolved.
+================================================================================
+ Package       Architecture    Version                    Repository       Size
+================================================================================
+Upgrading:
+ gzip          x86_64          1.13-4.el10_2              baseos          164 k
+ tar           x86_64          2:1.35-13.el10_2           baseos          858 k
+
+Transaction Summary
+================================================================================
+Upgrade  2 Packages
+
+Total download size: 1.0 M
+Downloading Packages:
+(1/2): gzip-1.13-4.el10_2.x86_64.rpm            538 kB/s | 164 kB     00:00    
+(2/2): tar-1.35-13.el10_2.x86_64.rpm            1.6 MB/s | 858 kB     00:00    
+--------------------------------------------------------------------------------
+Total                                           1.3 MB/s | 1.0 MB     00:00     
+Rocky Linux 10 - BaseOS                         1.6 MB/s | 1.6 kB     00:00    
+Importing GPG key 0x6FEDFC85:
+ Userid     : "Release Engineering (Rocky Linux 10) <releng@rockylinux.org>"
+ Fingerprint: FC22 6859 C086 0BF0 DDB9 5B08 5B10 6C73 6FED FC85
+ From       : /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-10
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Upgrading        : tar-2:1.35-13.el10_2.x86_64                            1/4 
+  Upgrading        : gzip-1.13-4.el10_2.x86_64                              2/4 
+  Cleanup          : tar-2:1.35-11.el10.x86_64                              3/4 
+  Cleanup          : gzip-1.13-3.el10.x86_64                                4/4 
+  Running scriptlet: gzip-1.13-3.el10.x86_64                                4/4 
+
+Upgraded:
+  gzip-1.13-4.el10_2.x86_64             tar-2:1.35-13.el10_2.x86_64            
+
+Complete!
+Last metadata expiration check: 0:00:05 ago on Thu 01 Oct 2026 09:30:25 PM UTC.
+Package curl-8.12.1-4.el10.x86_64 is already installed.
+Package iputils-20240905-5.el10.x86_64 is already installed.
+Package openssh-server-9.9p1-23.el10_2.rocky.0.1.x86_64 is already installed.
+Package openssh-clients-9.9p1-23.el10_2.rocky.0.1.x86_64 is already installed.
+Package rsync-3.4.1-6.el10_2.x86_64 is already installed.
+Dependencies resolved.
+================================================================================
+ Package                 Arch     Version                     Repository   Size
+================================================================================
+Installing:
+ kernel-core             x86_64   6.12.0-211.58.1.el10_2      baseos       19 M
+ kernel-modules-extra    x86_64   6.12.0-211.58.1.el10_2      baseos      3.1 M
+ python3-pip             noarch   23.3.2-11.el10_2            appstream   2.9 M
+ wireguard-tools         x86_64   1.0.20250521-2.el10         appstream   131 k
+Upgrading:
+ curl                    x86_64   8.12.1-4.el10_2.6           baseos      217 k
+ libacl                  x86_64   2.4.0-1.el10_2              baseos       26 k
+ libcurl                 x86_64   8.12.1-4.el10_2.6           baseos      369 k
+ openssh                 x86_64   9.9p1-27.el10_2.rocky.0.1   baseos      350 k
+ openssh-clients         x86_64   9.9p1-27.el10_2.rocky.0.1   baseos      761 k
+ openssh-server          x86_64   9.9p1-27.el10_2.rocky.0.1   baseos      541 k
+ openssl                 x86_64   1:3.5.8-1.el10_2            baseos      1.2 M
+ openssl-fips-provider   x86_64   1:3.5.8-1.el10_2            baseos      811 k
+ openssl-libs            x86_64   1:3.5.8-1.el10_2            baseos      2.3 M
+ rsync                   x86_64   3.5.0-3.el10_2              baseos      462 k
+Installing dependencies:
+ kernel-modules          x86_64   6.12.0-211.58.1.el10_2      baseos       42 M
+ kernel-modules-core     x86_64   6.12.0-211.58.1.el10_2      baseos       30 M
+ systemd-resolved        x86_64   257-23.el10_2.1.rocky.0.1   baseos      323 k
+
+Transaction Summary
+================================================================================
+Install   7 Packages
+Upgrade  10 Packages
+
+Total download size: 104 M
+Downloading Packages:
+(1/17): kernel-core-6.12.0-211.58.1.el10_2.x86_ 168 kB/s |  19 MB     01:56    
+(2/17): kernel-modules-extra-6.12.0-211.58.1.el 109 kB/s | 3.1 MB     00:29    
+(3/17): systemd-resolved-257-23.el10_2.1.rocky. 130 kB/s | 323 kB     00:02    
+(4/17): python3-pip-23.3.2-11.el10_2.noarch.rpm 268 kB/s | 2.9 MB     00:10    
+(5/17): wireguard-tools-1.0.20250521-2.el10.x86 116 kB/s | 131 kB     00:01    
+(6/17): curl-8.12.1-4.el10_2.6.x86_64.rpm        38 kB/s | 217 kB     00:05    
+(7/17): libacl-2.4.0-1.el10_2.x86_64.rpm         34 kB/s |  26 kB     00:00    
+(8/17): libcurl-8.12.1-4.el10_2.6.x86_64.rpm    217 kB/s | 369 kB     00:01    
+(9/17): openssh-9.9p1-27.el10_2.rocky.0.1.x86_6 226 kB/s | 350 kB     00:01    
+(10/17): openssh-clients-9.9p1-27.el10_2.rocky. 408 kB/s | 761 kB     00:01    
+(11/17): openssh-server-9.9p1-27.el10_2.rocky.0  27 kB/s | 541 kB     00:19    
+(12/17): kernel-modules-6.12.0-211.58.1.el10_2. 205 kB/s |  42 MB     03:27    
+(13/17): openssl-fips-provider-3.5.8-1.el10_2.x  56 kB/s | 811 kB     00:14    
+(14/17): openssl-3.5.8-1.el10_2.x86_64.rpm       39 kB/s | 1.2 MB     00:31    
+(15/17): rsync-3.5.0-3.el10_2.x86_64.rpm        175 kB/s | 462 kB     00:02    
+(16/17): openssl-libs-3.5.8-1.el10_2.x86_64.rpm 218 kB/s | 2.3 MB     00:10    
+(17/17): kernel-modules-core-6.12.0-211.58.1.el 123 kB/s |  30 MB     04:09    
+--------------------------------------------------------------------------------
+Total                                           426 kB/s | 104 MB     04:10     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-core-6.12.0-211.58.1.el10_2.x86_64     1/27 
+  Installing       : kernel-core-6.12.0-211.58.1.el10_2.x86_64             2/27 
+  Running scriptlet: kernel-core-6.12.0-211.58.1.el10_2.x86_64             2/27 
+  Installing       : kernel-modules-6.12.0-211.58.1.el10_2.x86_64          3/27 
+  Running scriptlet: kernel-modules-6.12.0-211.58.1.el10_2.x86_64          3/27 
+  Upgrading        : openssl-libs-1:3.5.8-1.el10_2.x86_64                  4/27 
+  Upgrading        : openssl-fips-provider-1:3.5.8-1.el10_2.x86_64         5/27 
+  Upgrading        : openssh-9.9p1-27.el10_2.rocky.0.1.x86_64              6/27 
+  Running scriptlet: systemd-resolved-257-23.el10_2.1.rocky.0.1.x86_64     7/27 
+  Installing       : systemd-resolved-257-23.el10_2.1.rocky.0.1.x86_64     7/27 
+  Running scriptlet: systemd-resolved-257-23.el10_2.1.rocky.0.1.x86_64     7/27 
+  Upgrading        : libcurl-8.12.1-4.el10_2.6.x86_64                      8/27 
+  Upgrading        : libacl-2.4.0-1.el10_2.x86_64                          9/27 
+  Upgrading        : rsync-3.5.0-3.el10_2.x86_64                          10/27 
+  Upgrading        : curl-8.12.1-4.el10_2.6.x86_64                        11/27 
+  Installing       : wireguard-tools-1.0.20250521-2.el10.x86_64           12/27 
+  Upgrading        : openssh-clients-9.9p1-27.el10_2.rocky.0.1.x86_64     13/27 
+  Running scriptlet: openssh-clients-9.9p1-27.el10_2.rocky.0.1.x86_64     13/27 
+  Running scriptlet: openssh-server-9.9p1-27.el10_2.rocky.0.1.x86_64      14/27 
+  Upgrading        : openssh-server-9.9p1-27.el10_2.rocky.0.1.x86_64      14/27 
+  Running scriptlet: openssh-server-9.9p1-27.el10_2.rocky.0.1.x86_64      14/27 
+  Upgrading        : openssl-1:3.5.8-1.el10_2.x86_64                      15/27 
+  Installing       : kernel-modules-extra-6.12.0-211.58.1.el10_2.x86_64   16/27 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.58.1.el10_2.x86_64   16/27 
+  Installing       : python3-pip-23.3.2-11.el10_2.noarch                  17/27 
+  Cleanup          : openssl-1:3.5.5-2.el10_2.x86_64                      18/27 
+  Cleanup          : rsync-3.4.1-6.el10_2.x86_64                          19/27 
+  Running scriptlet: openssh-server-9.9p1-23.el10_2.rocky.0.1.x86_64      20/27 
+  Cleanup          : openssh-server-9.9p1-23.el10_2.rocky.0.1.x86_64      20/27 
+  Running scriptlet: openssh-server-9.9p1-23.el10_2.rocky.0.1.x86_64      20/27 
+  Running scriptlet: openssh-clients-9.9p1-23.el10_2.rocky.0.1.x86_64     21/27 
+  Cleanup          : openssh-clients-9.9p1-23.el10_2.rocky.0.1.x86_64     21/27 
+  Cleanup          : openssh-9.9p1-23.el10_2.rocky.0.1.x86_64             22/27 
+  Cleanup          : curl-8.12.1-4.el10.x86_64                            23/27 
+  Cleanup          : libcurl-8.12.1-4.el10.x86_64                         24/27 
+  Cleanup          : openssl-fips-provider-1:3.5.5-2.el10_2.x86_64        25/27 
+  Cleanup          : openssl-libs-1:3.5.5-2.el10_2.x86_64                 26/27 
+  Cleanup          : libacl-2.3.2-4.el10.x86_64                           27/27 
+  Running scriptlet: kernel-modules-core-6.12.0-211.58.1.el10_2.x86_64    27/27 
+  Running scriptlet: kernel-core-6.12.0-211.58.1.el10_2.x86_64            27/27 
+kdump: For kernel=/boot/vmlinuz-6.12.0-211.58.1.el10_2.x86_64, crashkernel=2G-64G:256M,64G-:512M now. Please reboot the system for the change to take effect. Note if you don't want kdump-utils to manage the crashkernel kernel parameter, please set auto_reset_crashkernel=no in /etc/kdump.conf.
+
+  Running scriptlet: kernel-modules-6.12.0-211.58.1.el10_2.x86_64         27/27 
+  Running scriptlet: libacl-2.3.2-4.el10.x86_64                           27/27 
+
+Upgraded:
+  curl-8.12.1-4.el10_2.6.x86_64                                                 
+  libacl-2.4.0-1.el10_2.x86_64                                                  
+  libcurl-8.12.1-4.el10_2.6.x86_64                                              
+  openssh-9.9p1-27.el10_2.rocky.0.1.x86_64                                      
+  openssh-clients-9.9p1-27.el10_2.rocky.0.1.x86_64                              
+  openssh-server-9.9p1-27.el10_2.rocky.0.1.x86_64                               
+  openssl-1:3.5.8-1.el10_2.x86_64                                               
+  openssl-fips-provider-1:3.5.8-1.el10_2.x86_64                                 
+  openssl-libs-1:3.5.8-1.el10_2.x86_64                                          
+  rsync-3.5.0-3.el10_2.x86_64                                                   
+Installed:
+  kernel-core-6.12.0-211.58.1.el10_2.x86_64                                     
+  kernel-modules-6.12.0-211.58.1.el10_2.x86_64                                  
+  kernel-modules-core-6.12.0-211.58.1.el10_2.x86_64                             
+  kernel-modules-extra-6.12.0-211.58.1.el10_2.x86_64                            
+  python3-pip-23.3.2-11.el10_2.noarch                                           
+  systemd-resolved-257-23.el10_2.1.rocky.0.1.x86_64                             
+  wireguard-tools-1.0.20250521-2.el10.x86_64                                    
+
+Complete!
+Waiting for process with pid 25760 to finish.
+Dependencies resolved.
+================================================================================
+ Package                Arch     Version                         Repo      Size
+================================================================================
+Installing:
+ kernel-modules-extra   x86_64   6.12.0-211.16.1.el10_2.0.1      baseos   3.0 M
+Installing dependencies:
+ kernel-modules         x86_64   6.12.0-211.16.1.el10_2.0.1      baseos    42 M
+
+Transaction Summary
+================================================================================
+Install  2 Packages
+
+Total download size: 45 M
+Installed size: 40 M
+Downloading Packages:
+(1/2): kernel-modules-extra-6.12.0-211.16.1.el1 4.9 MB/s | 3.0 MB     00:00    
+(2/2): kernel-modules-6.12.0-211.16.1.el10_2.0.  13 MB/s |  42 MB     00:03    
+--------------------------------------------------------------------------------
+Total                                            13 MB/s |  45 MB     00:03     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       1/2 
+  Running scriptlet: kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       1/2 
+  Installing       : kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+  Running scriptlet: kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       2/2 
+Running: dracut -f --kver 6.12.0-211.16.1.el10_2.0.1.x86_64 /boot/initramfs-6.12.0-211.16.1.el10_2.0.1.x86_64.img
+
+  Running scriptlet: kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+
+Installed:
+  kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64                              
+  kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_64                        
+
+Complete!
+Last metadata expiration check: 0:02:03 ago on Thu 01 Oct 2026 09:39:03 PM UTC.
+Package kernel-modules-extra-6.12.0-211.58.1.el10_2.x86_64 is already installed.
+Package kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_64 is already installed.
+Dependencies resolved.
+================================================================================
+ Package                 Arch      Version                      Repo       Size
+================================================================================
+Installing:
+ kernel-core             x86_64    6.12.0-211.61.1.el10_2       baseos     19 M
+ kernel-modules-extra    x86_64    6.12.0-211.61.1.el10_2       baseos    3.1 M
+Installing dependencies:
+ kernel-modules          x86_64    6.12.0-211.61.1.el10_2       baseos     42 M
+ kernel-modules-core     x86_64    6.12.0-211.61.1.el10_2       baseos     30 M
+
+Transaction Summary
+================================================================================
+Install  4 Packages
+
+Total download size: 94 M
+Installed size: 138 M
+Downloading Packages:
+(1/4): kernel-modules-core-6.12.0-211.61.1.el10  22 MB/s |  30 MB     00:01    
+(2/4): kernel-core-6.12.0-211.61.1.el10_2.x86_6  12 MB/s |  19 MB     00:01    
+(3/4): kernel-modules-6.12.0-211.61.1.el10_2.x8  20 MB/s |  42 MB     00:02    
+(4/4): kernel-modules-extra-6.12.0-211.61.1.el1 4.1 MB/s | 3.1 MB     00:00    
+--------------------------------------------------------------------------------
+Total                                            39 MB/s |  94 MB     00:02     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64      1/4 
+  Installing       : kernel-core-6.12.0-211.61.1.el10_2.x86_64              2/4 
+  Running scriptlet: kernel-core-6.12.0-211.61.1.el10_2.x86_64              2/4 
+  Installing       : kernel-modules-6.12.0-211.61.1.el10_2.x86_64           3/4 
+  Running scriptlet: kernel-modules-6.12.0-211.61.1.el10_2.x86_64           3/4 
+  Installing       : kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+  Running scriptlet: kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64      4/4 
+  Running scriptlet: kernel-core-6.12.0-211.61.1.el10_2.x86_64              4/4 
+kdump: For kernel=/boot/vmlinuz-6.12.0-211.61.1.el10_2.x86_64, crashkernel=2G-64G:256M,64G-:512M now. Please reboot the system for the change to take effect. Note if you don't want kdump-utils to manage the crashkernel kernel parameter, please set auto_reset_crashkernel=no in /etc/kdump.conf.
+
+  Running scriptlet: kernel-modules-6.12.0-211.61.1.el10_2.x86_64           4/4 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+
+Installed:
+  kernel-core-6.12.0-211.61.1.el10_2.x86_64                                     
+  kernel-modules-6.12.0-211.61.1.el10_2.x86_64                                  
+  kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64                             
+  kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64                            
+
+Complete!
+[fleet-cluster-bundle] Kernel modules ready on local host
+[fleet-cluster-bundle] Installed bundle SSH public key for linux
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+[fleet-cluster-bundle] Skipping SSH peer seed for local host 172.16.10.101 (authorized_keys already updated)
+Warning: Permanently added '172.16.10.102' (ED25519) to the list of known hosts.
+[fleet-cluster-bundle] Bundle SSH public key present on 172.16.10.102
+[fleet-cluster-bundle] Ensuring kernel modules on peer 172.16.10.102
+[fleet-cluster-bundle] Ensuring kernel modules on peer 172.16.10.103
+Warning: Permanently added '172.16.10.103' (ED25519) to the list of known hosts.
+Warning: Permanently added '172.16.10.102' (ED25519) to the list of known hosts.
+Rocky Linux 10 - BaseOS                          17 MB/s |  34 MB     00:01    
+Rocky Linux 10 - BaseOS                          16 MB/s |  34 MB     00:02    
+Rocky Linux 10 - AppStream                      4.2 MB/s | 2.7 MB     00:00    
+Rocky Linux 10 - Extras                         9.2 kB/s | 5.8 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package                Arch     Version                         Repo      Size
+================================================================================
+Installing:
+ kernel-modules-extra   x86_64   6.12.0-211.16.1.el10_2.0.1      baseos   3.0 M
+Installing dependencies:
+ kernel-modules         x86_64   6.12.0-211.16.1.el10_2.0.1      baseos    42 M
+
+Transaction Summary
+================================================================================
+Install  2 Packages
+
+Total download size: 45 M
+Installed size: 40 M
+Downloading Packages:
+(1/2): kernel-modules-extra-6.12.0-211.16.1.el1 6.9 MB/s | 3.0 MB     00:00    
+(2/2): kernel-modules-6.12.0-211.16.1.el10_2.0.  18 MB/s |  42 MB     00:02    
+--------------------------------------------------------------------------------
+Total                                            18 MB/s |  45 MB     00:02     
+Rocky Linux 10 - BaseOS                         1.0 MB/s | 1.6 kB     00:00    
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       1/2 
+  Running scriptlet: kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       1/2Rocky Linux 10 - AppStream                      4.9 MB/s | 2.7 MB     00:00    
+Rocky Linux 10 - Extras                         8.8 kB/s | 5.8 kB     00:00    
+Last metadata expiration check: 0:00:01 ago on Thu 01 Oct 2026 09:44:07 PM UTC.
+Dependencies resolved.
+================================================================================
+ Package                Arch     Version                         Repo      Size
+================================================================================
+Installing:
+ kernel-modules-extra   x86_64   6.12.0-211.16.1.el10_2.0.1      baseos   3.0 M
+Installing dependencies:
+ kernel-modules         x86_64   6.12.0-211.16.1.el10_2.0.1      baseos    42 M
+
+Transaction Summary
+================================================================================
+Install  2 Packages
+
+Total download size: 45 M
+Installed size: 40 M
+Downloading Packages:
+ 
+  Installing       : kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+  Running scriptlet: kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       2/2(1/2): kernel-modules-extra-6.12.0-211.16.1.el1 105 kB/s | 3.0 MB     00:29    
+ 
+Running: dracut -f --kver 6.12.0-211.16.1.el10_2.0.1.x86_64 /boot/initramfs-6.12.0-211.16.1.el10_2.0.1.x86_64.img
+
+  Running scriptlet: kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+
+Installed:
+  kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64                              
+  kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_64                        
+
+Complete!
+Last metadata expiration check: 0:01:09 ago on Thu 01 Oct 2026 09:43:59 PM UTC.
+Package kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_64 is already installed.
+Dependencies resolved.
+================================================================================
+ Package                 Arch      Version                      Repo       Size
+================================================================================
+Installing:
+ kernel-core             x86_64    6.12.0-211.61.1.el10_2       baseos     19 M
+ kernel-modules-extra    x86_64    6.12.0-211.61.1.el10_2       baseos    3.1 M
+Installing dependencies:
+ kernel-modules          x86_64    6.12.0-211.61.1.el10_2       baseos     42 M
+ kernel-modules-core     x86_64    6.12.0-211.61.1.el10_2       baseos     30 M
+
+Transaction Summary
+================================================================================
+Install  4 Packages
+
+Total download size: 94 M
+Installed size: 138 M
+Downloading Packages:
+(1/4): kernel-core-6.12.0-211.61.1.el10_2.x86_6  15 MB/s |  19 MB     00:01    
+(2/4): kernel-modules-extra-6.12.0-211.61.1.el1  11 MB/s | 3.1 MB     00:00    
+(3/4): kernel-modules-core-6.12.0-211.61.1.el10  17 MB/s |  30 MB     00:01    
+(4/4): kernel-modules-6.12.0-211.61.1.el10_2.x8  19 MB/s |  42 MB     00:02    
+--------------------------------------------------------------------------------
+Total                                            38 MB/s |  94 MB     00:02     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64      1/4 
+  Installing       : kernel-core-6.12.0-211.61.1.el10_2.x86_64              2/4 
+  Running scriptlet: kernel-core-6.12.0-211.61.1.el10_2.x86_64              2/4 
+  Installing       : kernel-modules-6.12.0-211.61.1.el10_2.x86_64           3/4 
+  Running scriptlet: kernel-modules-6.12.0-211.61.1.el10_2.x86_64           3/4 
+  Installing       : kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+  Running scriptlet: kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64      4/4 
+  Running scriptlet: kernel-core-6.12.0-211.61.1.el10_2.x86_64              4/4 
+kdump: For kernel=/boot/vmlinuz-6.12.0-211.61.1.el10_2.x86_64, crashkernel=2G-64G:256M,64G-:512M now. Please reboot the system for the change to take effect. Note if you don't want kdump-utils to manage the crashkernel kernel parameter, please set auto_reset_crashkernel=no in /etc/kdump.conf.
+
+  Running scriptlet: kernel-modules-6.12.0-211.61.1.el10_2.x86_64           4/4 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+
+Installed:
+  kernel-core-6.12.0-211.61.1.el10_2.x86_64                                     
+  kernel-modules-6.12.0-211.61.1.el10_2.x86_64                                  
+  kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64                             
+  kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64                            
+
+Complete!
+[fleet-cluster-bundle] Kernel modules ready on peer 172.16.10.103
+(2/2): kernel-modules-6.12.0-211.16.1.el10_2.0. 214 kB/s |  42 MB     03:18    
+--------------------------------------------------------------------------------
+Total                                           229 kB/s |  45 MB     03:18     
+Rocky Linux 10 - BaseOS                          71 kB/s | 1.6 kB     00:00    
+Key imported successfully
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       1/2 
+  Running scriptlet: kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       1/2 
+  Installing       : kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+  Running scriptlet: kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64       2/2 
+Running: dracut -f --kver 6.12.0-211.16.1.el10_2.0.1.x86_64 /boot/initramfs-6.12.0-211.16.1.el10_2.0.1.x86_64.img
+
+  Running scriptlet: kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_   2/2 
+
+Installed:
+  kernel-modules-6.12.0-211.16.1.el10_2.0.1.x86_64                              
+  kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_64                        
+
+Complete!
+Last metadata expiration check: 0:04:31 ago on Thu 01 Oct 2026 09:44:07 PM UTC.
+Package kernel-modules-extra-6.12.0-211.16.1.el10_2.0.1.x86_64 is already installed.
+Dependencies resolved.
+================================================================================
+ Package                 Arch      Version                      Repo       Size
+================================================================================
+Installing:
+ kernel-core             x86_64    6.12.0-211.61.1.el10_2       baseos     19 M
+ kernel-modules-extra    x86_64    6.12.0-211.61.1.el10_2       baseos    3.1 M
+Installing dependencies:
+ kernel-modules          x86_64    6.12.0-211.61.1.el10_2       baseos     42 M
+ kernel-modules-core     x86_64    6.12.0-211.61.1.el10_2       baseos     30 M
+
+Transaction Summary
+================================================================================
+Install  4 Packages
+
+Total download size: 94 M
+Installed size: 138 M
+Downloading Packages:
+(1/4): kernel-core-6.12.0-211.61.1.el10_2.x86_6  18 MB/s |  19 MB     00:01    
+(2/4): kernel-modules-extra-6.12.0-211.61.1.el1  11 MB/s | 3.1 MB     00:00    
+(3/4): kernel-modules-6.12.0-211.61.1.el10_2.x8  19 MB/s |  42 MB     00:02    
+(4/4): kernel-modules-core-6.12.0-211.61.1.el10  12 MB/s |  30 MB     00:02    
+--------------------------------------------------------------------------------
+Total                                            33 MB/s |  94 MB     00:02     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64      1/4 
+  Installing       : kernel-core-6.12.0-211.61.1.el10_2.x86_64              2/4 
+  Running scriptlet: kernel-core-6.12.0-211.61.1.el10_2.x86_64              2/4 
+  Installing       : kernel-modules-6.12.0-211.61.1.el10_2.x86_64           3/4 
+  Running scriptlet: kernel-modules-6.12.0-211.61.1.el10_2.x86_64           3/4 
+  Installing       : kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+  Running scriptlet: kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64      4/4 
+  Running scriptlet: kernel-core-6.12.0-211.61.1.el10_2.x86_64              4/4 
+kdump: For kernel=/boot/vmlinuz-6.12.0-211.61.1.el10_2.x86_64, crashkernel=2G-64G:256M,64G-:512M now. Please reboot the system for the change to take effect. Note if you don't want kdump-utils to manage the crashkernel kernel parameter, please set auto_reset_crashkernel=no in /etc/kdump.conf.
+
+  Running scriptlet: kernel-modules-6.12.0-211.61.1.el10_2.x86_64           4/4 
+  Running scriptlet: kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64     4/4 
+
+Installed:
+  kernel-core-6.12.0-211.61.1.el10_2.x86_64                                     
+  kernel-modules-6.12.0-211.61.1.el10_2.x86_64                                  
+  kernel-modules-core-6.12.0-211.61.1.el10_2.x86_64                             
+  kernel-modules-extra-6.12.0-211.61.1.el10_2.x86_64                            
+
+Complete!
+[fleet-cluster-bundle] Kernel modules ready on peer 172.16.10.102
+Starting galaxy collection install process
+Process install dependency map
+Starting collection install process
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/ansible-posix-2.2.2.tar.gz to /root/.ansible/tmp/ansible-local-475743qquggqp/tmplr0gkyke/ansible-posix-2.2.2-r2arx5l1
+Installing 'ansible.posix:2.2.2' to '/root/.ansible/collections/ansible_collections/ansible/posix'
+ansible.posix:2.2.2 was installed successfully
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/community-general-13.4.0.tar.gz to /root/.ansible/tmp/ansible-local-475743qquggqp/tmplr0gkyke/community-general-13.4.0-_h2uug7u
+Installing 'community.general:13.4.0' to '/root/.ansible/collections/ansible_collections/community/general'
+community.general:13.4.0 was installed successfully
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/ansible-utils-6.1.1.tar.gz to /root/.ansible/tmp/ansible-local-475743qquggqp/tmplr0gkyke/ansible-utils-6.1.1-rwyb0n28
+Installing 'ansible.utils:6.1.1' to '/root/.ansible/collections/ansible_collections/ansible/utils'
+ansible.utils:6.1.1 was installed successfully
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/community-library_inventory_filtering_v1-1.1.5.tar.gz to /root/.ansible/tmp/ansible-local-475743qquggqp/tmplr0gkyke/community-library_inventory_filtering_v1-1.1.5-chxqkegi
+Installing 'community.library_inventory_filtering_v1:1.1.5' to '/root/.ansible/collections/ansible_collections/community/library_inventory_filtering_v1'
+community.library_inventory_filtering_v1:1.1.5 was installed successfully
+
+PLAY [Fleet cluster ssh | Distribute bundle SSH key] ***************************
+
+TASK [fleet_cluster_ssh : Fleet cluster ssh | Require bundle directory] ********
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [fleet_cluster_ssh : Fleet cluster ssh | Stat bundle public key] **********
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_ssh : Fleet cluster ssh | Install bundle public key for linux] ***
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster wireguard | All nodes] *************************************
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Require bundle config path] ***
+ok: [lab-ha-0-cp2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Set overlay interface facts] ***
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Install wireguard-tools] ***
+ok: [lab-ha-0-cp1]
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Install umkim DNS-ready helper] ***
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp1]
+changed: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Ensure wg-quick systemd drop-in directory] ***
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp1]
+changed: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Install wg-quick DNS-ready drop-in] ***
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+changed: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Reload systemd after DNS-ready drop-in] ***
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Stat existing overlay config] ***
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Compare bundle config with installed] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Check if overlay interface is up] ***
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Set config changed flag] ***
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Install overlay WireGuard config from bundle] ***
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+changed: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Enable overlay WireGuard systemd unit] ***
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+changed: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Restart overlay WireGuard after config update] ***
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+changed: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Start overlay WireGuard when down] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_wireguard : Fleet cluster wireguard | Ping hub overlay] ****
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+PLAY RECAP *********************************************************************
+lab-ha-0-cp1               : ok=17   changed=6    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+lab-ha-0-cp2               : ok=16   changed=7    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+lab-ha-0-cp3               : ok=16   changed=7    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+
+[fleet-cluster-bundle] Hub 10.10.0.1 reachable
+[fleet-cluster-bundle] Enrollment OK (HTTP 200)
+Starting galaxy collection install process
+Nothing to do. All requested collections are already installed. If you want to reinstall them, consider using `--force`.
+
+PLAY [Fleet cluster validate | All nodes] **************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [fleet_site_validate : Fleet site validate | Require site name] ***********
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [fleet_site_validate : Fleet site validate | Ping hub overlay] ************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_site_validate : Fleet cluster validate | Ensure nmap-ncat for WireGuard UDP probe] ***
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp1]
+
+TASK [fleet_site_validate : Fleet cluster validate | Check WireGuard endpoint UDP egress] ***
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_site_validate : Fleet site validate | Gather facts on bootstrap host] ***
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [fleet_site_validate : Fleet site validate | Assert Rocky Linux] **********
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [fleet_site_validate : Fleet site validate | Check root disk size] ********
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [fleet_site_validate : Fleet cluster validate | Check KVM device] *********
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_site_validate : Fleet cluster validate | Fail without KVM] *********
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_site_validate : Fleet cluster validate | Stat Longhorn block device] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_site_validate : Fleet cluster validate | Require Longhorn block device] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_site_validate : Fleet cluster validate | Read Longhorn device size] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_site_validate : Fleet cluster validate | Require Longhorn device capacity] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_site_validate : Fleet cluster validate | Stat K3s kubeconfig for VIP pre-check] ***
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_site_validate : Fleet cluster validate | Ensure control plane VIP is not already assigned] ***
+skipping: [lab-ha-0-cp3]
+skipping: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_site_validate : Fleet site validate | Success] *********************
+ok: [lab-ha-0-cp1] => {
+    "msg": "Site lab-ha-0 validation passed on lab-ha-0-cp1"
+}
+ok: [lab-ha-0-cp2] => {
+    "msg": "Site lab-ha-0 validation passed on lab-ha-0-cp2"
+}
+ok: [lab-ha-0-cp3] => {
+    "msg": "Site lab-ha-0 validation passed on lab-ha-0-cp3"
+}
+
+PLAY RECAP *********************************************************************
+lab-ha-0-cp1               : ok=11   changed=1    unreachable=0    failed=0    skipped=6    rescued=0    ignored=0   
+lab-ha-0-cp2               : ok=7    changed=0    unreachable=0    failed=0    skipped=10   rescued=0    ignored=0   
+lab-ha-0-cp3               : ok=7    changed=0    unreachable=0    failed=0    skipped=10   rescued=0    ignored=0   
+
+Starting galaxy collection install process
+Nothing to do. All requested collections are already installed. If you want to reinstall them, consider using `--force`.
+
+PLAY [Fleet cluster provision | Cleanup leftover K3s on all nodes] *************
+
+TASK [kube_vip : Kube-vip | Remove control plane VIP from local interfaces] ****
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cleanup | Stop K3s server] *************************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cleanup | Uninstall K3s server] ********************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [k3s : K3s cleanup | Uninstall K3s agent] *********************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [k3s : K3s cleanup | Remove leftover state directories] *******************
+ok: [lab-ha-0-cp3] => (item=/etc/rancher/k3s)
+ok: [lab-ha-0-cp3] => (item=/var/lib/rancher/k3s)
+ok: [lab-ha-0-cp1] => (item=/etc/rancher/k3s)
+ok: [lab-ha-0-cp2] => (item=/etc/rancher/k3s)
+ok: [lab-ha-0-cp3] => (item=/etc/rancher/node)
+ok: [lab-ha-0-cp1] => (item=/var/lib/rancher/k3s)
+ok: [lab-ha-0-cp2] => (item=/var/lib/rancher/k3s)
+ok: [lab-ha-0-cp1] => (item=/etc/rancher/node)
+ok: [lab-ha-0-cp2] => (item=/etc/rancher/node)
+
+TASK [kube_vip : Kube-vip | Remove control plane VIP from local interfaces] ****
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster provision | Rocky 10 host prepare] *************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Gather facts] ******************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Install base packages] *********************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Disable swap immediately] ******************
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp1]
+changed: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | Remove swap entries from fstab] ************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Stop and disable firewalld] ****************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Probe br_netfilter module] *****************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | Reboot to activate kernel-modules-extra] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Load br_netfilter module] ******************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | Persist br_netfilter module] ***************
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+changed: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Deploy sysctl settings] ********************
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp1]
+changed: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | Apply sysctl settings immediately] *********
+changed: [lab-ha-0-cp3] => (item={'key': 'net.ipv4.ip_forward', 'value': 1})
+ok: [lab-ha-0-cp3] => (item={'key': 'net.ipv4.conf.all.forwarding', 'value': 1})
+changed: [lab-ha-0-cp2] => (item={'key': 'net.ipv4.ip_forward', 'value': 1})
+changed: [lab-ha-0-cp1] => (item={'key': 'net.ipv4.ip_forward', 'value': 1})
+ok: [lab-ha-0-cp3] => (item={'key': 'net.bridge.bridge-nf-call-iptables', 'value': 1})
+changed: [lab-ha-0-cp3] => (item={'key': 'net.bridge.bridge-nf-call-ip6tables', 'value': 0})
+ok: [lab-ha-0-cp2] => (item={'key': 'net.ipv4.conf.all.forwarding', 'value': 1})
+ok: [lab-ha-0-cp1] => (item={'key': 'net.ipv4.conf.all.forwarding', 'value': 1})
+changed: [lab-ha-0-cp3] => (item={'key': 'net.ipv6.conf.all.disable_ipv6', 'value': 1})
+ok: [lab-ha-0-cp3] => (item={'key': 'net.ipv6.conf.default.disable_ipv6', 'value': 1})
+ok: [lab-ha-0-cp2] => (item={'key': 'net.bridge.bridge-nf-call-iptables', 'value': 1})
+ok: [lab-ha-0-cp1] => (item={'key': 'net.bridge.bridge-nf-call-iptables', 'value': 1})
+changed: [lab-ha-0-cp2] => (item={'key': 'net.bridge.bridge-nf-call-ip6tables', 'value': 0})
+changed: [lab-ha-0-cp1] => (item={'key': 'net.bridge.bridge-nf-call-ip6tables', 'value': 0})
+changed: [lab-ha-0-cp2] => (item={'key': 'net.ipv6.conf.all.disable_ipv6', 'value': 1})
+changed: [lab-ha-0-cp1] => (item={'key': 'net.ipv6.conf.all.disable_ipv6', 'value': 1})
+ok: [lab-ha-0-cp2] => (item={'key': 'net.ipv6.conf.default.disable_ipv6', 'value': 1})
+ok: [lab-ha-0-cp1] => (item={'key': 'net.ipv6.conf.default.disable_ipv6', 'value': 1})
+
+TASK [host_prepare : Host prepare | List NetworkManager connections] ***********
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | Build list of NM profiles that support IPv6 settings] ***
+skipping: [lab-ha-0-cp1] => (item=cloud-init ens3:802-3-ethernet) 
+skipping: [lab-ha-0-cp2] => (item=cloud-init ens3:802-3-ethernet) 
+skipping: [lab-ha-0-cp1] => (item=lo:loopback) 
+skipping: [lab-ha-0-cp2] => (item=lo:loopback) 
+skipping: [lab-ha-0-cp1] => (item=wg-umkim:wireguard) 
+skipping: [lab-ha-0-cp3] => (item=cloud-init ens3:802-3-ethernet) 
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp3] => (item=lo:loopback) 
+skipping: [lab-ha-0-cp2] => (item=wg-umkim:wireguard) 
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3] => (item=wg-umkim:wireguard) 
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Disable IPv6 on eligible NM connections] ***
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Configure NM connection as default route (manual)] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Configure NM DHCP connection route metric] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Configure NM connection without default route] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Extra NM connection tweaks] ****************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Bring NM connections up] *******************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | Flush handlers (apply NM/sysctl before verify)] ***
+
+TASK [host_prepare : Host prepare | Flush handlers (apply NM/sysctl before verify)] ***
+
+TASK [host_prepare : Host prepare | Flush handlers (apply NM/sysctl before verify)] ***
+
+RUNNING HANDLER [host_prepare : Reload sysctl] *********************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | Verify sysctl ip_forward] ******************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | Verify IPv6 disabled] **********************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [host_prepare : Host prepare | OpenWrt disable LAN IPv6 assignment] *******
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt disable wan6 interface] ************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt disable RA on LAN] *****************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt disable DHCPv6 on LAN] *************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt disable SLAAC on LAN] **************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt remove wan6 from firewall wan zone] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt commit UCI changes] ****************
+skipping: [lab-ha-0-cp1] => (item=uci commit network) 
+skipping: [lab-ha-0-cp1] => (item=uci commit dhcp) 
+skipping: [lab-ha-0-cp1] => (item=uci commit firewall) 
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2] => (item=uci commit network) 
+skipping: [lab-ha-0-cp3] => (item=uci commit network) 
+skipping: [lab-ha-0-cp2] => (item=uci commit dhcp) 
+skipping: [lab-ha-0-cp2] => (item=uci commit firewall) 
+skipping: [lab-ha-0-cp3] => (item=uci commit dhcp) 
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3] => (item=uci commit firewall) 
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt persist IPv6 sysctl] ***************
+skipping: [lab-ha-0-cp1] => (item={'key': 'all', 'value': 1}) 
+skipping: [lab-ha-0-cp3] => (item={'key': 'all', 'value': 1}) 
+skipping: [lab-ha-0-cp1] => (item={'key': 'default', 'value': 1}) 
+skipping: [lab-ha-0-cp3] => (item={'key': 'default', 'value': 1}) 
+skipping: [lab-ha-0-cp3]
+skipping: [lab-ha-0-cp2] => (item={'key': 'all', 'value': 1}) 
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2] => (item={'key': 'default', 'value': 1}) 
+skipping: [lab-ha-0-cp2]
+
+TASK [host_prepare : Host prepare | OpenWrt apply IPv6 sysctl live] ************
+skipping: [lab-ha-0-cp1] => (item={'key': 'all', 'value': 1}) 
+skipping: [lab-ha-0-cp1] => (item={'key': 'default', 'value': 1}) 
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp3] => (item={'key': 'all', 'value': 1}) 
+skipping: [lab-ha-0-cp2] => (item={'key': 'all', 'value': 1}) 
+skipping: [lab-ha-0-cp3] => (item={'key': 'default', 'value': 1}) 
+skipping: [lab-ha-0-cp2] => (item={'key': 'default', 'value': 1}) 
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt stop odhcpd] ***********************
+skipping: [lab-ha-0-cp1] => (item=/etc/init.d/odhcpd stop) 
+skipping: [lab-ha-0-cp1] => (item=/etc/init.d/odhcpd disable) 
+skipping: [lab-ha-0-cp2] => (item=/etc/init.d/odhcpd stop) 
+skipping: [lab-ha-0-cp2] => (item=/etc/init.d/odhcpd disable) 
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3] => (item=/etc/init.d/odhcpd stop) 
+skipping: [lab-ha-0-cp3] => (item=/etc/init.d/odhcpd disable) 
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt reload network and firewall] *******
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt reload firewall] *******************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [host_prepare : Host prepare | OpenWrt verify IPv4 internet] **************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+PLAY [Fleet cluster provision | K3s standalone on single-node bootstrap] *******
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Skip when disabled on host] **********************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Install server] **********************************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Enable and start server] *************************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Wait for kubeconfig] *****************************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Patch kubeconfig when API binds on all interfaces] ***********
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Install kubectl wrapper symlink] *****************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Wait for API to answer] **************************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Show node status] ********************************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Report nodes] ************************************************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Wait for metrics-server Addon manifest dir] ******************
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Ensure umkim staging dir for metrics-server manifest] ********
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Stage hostNetwork metrics-server deployment manifest] ********
+skipping: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Install and verify hostNetwork metrics-server] ***************
+skipping: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster provision | K3s cluster-init on first control plane] *******
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Skip when no control plane VIP] ********************
+skipping: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Gather network facts] ******************************
+skipping: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Require VIP and management interface] **************
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [kube_vip : Kube-vip | Create K3s static manifests directory] *************
+changed: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Install podman for manifest generation] ************
+changed: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Pull kube-vip container image] *********************
+changed: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Deploy RBAC manifest for DaemonSet] ****************
+changed: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Remove legacy static pod manifest] *****************
+ok: [lab-ha-0-cp1]
+
+TASK [kube_vip : Kube-vip | Generate DaemonSet manifest via container] *********
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Install first server with cluster-init] **************
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Enable init server] **********************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Wait for kubeconfig] *********************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Patch kubeconfig when API binds on all interfaces] ***********
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Install kubectl wrapper symlink] *********************
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Wait for init node API] ******************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Wait for kube-vip control plane VIP] *****************
+FAILED - RETRYING: [lab-ha-0-cp1]: k3s : K3s cluster | Wait for kube-vip control plane VIP (35 retries left).
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Wait for metrics-server Addon manifest dir] ******************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Ensure umkim staging dir for metrics-server manifest] ********
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Stage hostNetwork metrics-server deployment manifest] ********
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Install and verify hostNetwork metrics-server] ***************
+changed: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Read node token] *************************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Publish join token for other plays] ******************
+ok: [lab-ha-0-cp1]
+
+RUNNING HANDLER [k3s : Restart k3s] ********************************************
+changed: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster provision | K3s join additional control plane nodes] *******
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s cluster | Skip init node] **************************************
+
+PLAY [Fleet cluster provision | K3s join additional control plane nodes] *******
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp2]
+
+TASK [k3s : K3s cluster | Skip init node] **************************************
+skipping: [lab-ha-0-cp2]
+
+TASK [k3s : K3s cluster | Wait for cluster join token from init node] **********
+ok: [lab-ha-0-cp2] => {
+    "attempts": 1,
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k3s : K3s cluster | Install additional server node] **********************
+changed: [lab-ha-0-cp2]
+
+TASK [k3s : K3s cluster | Enable server] ***************************************
+ok: [lab-ha-0-cp2]
+
+TASK [k3s : K3s cluster | Install kubectl wrapper symlink] *********************
+changed: [lab-ha-0-cp2]
+
+RUNNING HANDLER [k3s : Restart k3s] ********************************************
+changed: [lab-ha-0-cp2]
+
+PLAY [Fleet cluster provision | K3s join additional control plane nodes] *******
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp3]
+
+TASK [k3s : K3s cluster | Skip init node] **************************************
+skipping: [lab-ha-0-cp3]
+
+TASK [k3s : K3s cluster | Wait for cluster join token from init node] **********
+ok: [lab-ha-0-cp3] => {
+    "attempts": 1,
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k3s : K3s cluster | Install additional server node] **********************
+changed: [lab-ha-0-cp3]
+
+TASK [k3s : K3s cluster | Enable server] ***************************************
+ok: [lab-ha-0-cp3]
+
+TASK [k3s : K3s cluster | Install kubectl wrapper symlink] *********************
+changed: [lab-ha-0-cp3]
+
+RUNNING HANDLER [k3s : Restart k3s] ********************************************
+[WARNING]: Could not match supplied host pattern, ignoring: fleet_cluster_workers
+changed: [lab-ha-0-cp3]
+
+PLAY [Fleet cluster provision | K3s join worker nodes] *************************
+skipping: no hosts matched
+
+PLAY [Fleet cluster provision | Harbor registry mirrors on K3s nodes] **********
+
+TASK [Load Harbor admin password from the hub Ansible secret] ******************
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [harbor : Harbor | Ensure K3s config directory for registries.yaml] *******
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [harbor : Harbor | Deploy K3s registries.yaml] ****************************
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+changed: [lab-ha-0-cp1]
+
+TASK [harbor : Harbor | Resolve K3s unit for registry reload] ******************
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp3]
+
+TASK [harbor : Harbor | Restart K3s to apply registry mirrors] *****************
+changed: [lab-ha-0-cp1]
+changed: [lab-ha-0-cp3]
+changed: [lab-ha-0-cp2]
+
+PLAY [Fleet cluster provision | Detect Calico interface on all nodes] **********
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Resolve node IPv4 for interface detection] *************
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp3]
+
+TASK [calico : Calico | Detect interface carrying node management IPv4] ********
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [calico : Calico | Store detected interface name] *************************
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp3]
+
+TASK [calico : Calico | Fail when management IPv4 interface cannot be detected] ***
+ok: [lab-ha-0-cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [lab-ha-0-cp3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+PLAY [Fleet cluster provision | Calico on bootstrap] ***************************
+
+TASK [calico : Calico | Skip when K3s disabled on host] ************************
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Collect detected interfaces from cluster nodes] ********
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Use uniform detected interface for autodetection] ******
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Use management subnet when interfaces differ across nodes] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Fallback when auto-detection could not resolve a method] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Check if already applied] ******************************
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Apply manifest] ****************************************
+changed: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Patch kube-controllers hostNetwork for k3s multus-shim deadlock] ***
+changed: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Stat k3s multus-shim CNI config] ***********************
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Disable k3s multus-shim default CNI] *******************
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Restart k3s after disabling multus-shim] ***************
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Wait for k3s API after multus-shim restart] ************
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Set IP autodetection on calico-node] *******************
+changed: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Wait for calico-node rollout] **************************
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Wait for node Ready] ***********************************
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Wait for IP pool CR] ***********************************
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Disable IPIP/VXLAN on default IP pool (homelab BGP prep)] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Recycle pods stuck before CNI was ready] ***************
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Wait for calico-kube-controllers rollout] **************
+ok: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster provision | Wait for metrics-server after CNI Ready] *******
+
+TASK [Wait for control-plane node Ready] ***************************************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Wait for metrics-server Addon manifest dir] ******************
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Ensure umkim staging dir for metrics-server manifest] ********
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Stage hostNetwork metrics-server deployment manifest] ********
+ok: [lab-ha-0-cp1]
+
+TASK [k3s : K3s | Install and verify hostNetwork metrics-server] ***************
+changed: [lab-ha-0-cp1]
+
+TASK [Wait for metrics-server hostNetwork rollout] *****************************
+changed: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster provision | Longhorn host dependencies on all nodes] *******
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Install Longhorn dependencies] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Enable iscsid] *********
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Symlink iscsiadm into /usr/bin for Longhorn] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+PLAY [Fleet cluster provision | Longhorn data disk prep on control nodes] ******
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp3]
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Skip disk prep when not enabled] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Skip disk prep when not enabled] ***
+skipping: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Skip disk prep when not enabled] ***
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Install node dependencies] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Enable iscsid] *********
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Ensure data directory on root filesystem] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Skip block-device prep in directory mode] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Skip block-device prep in directory mode] ***
+skipping: [lab-ha-0-cp2]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Skip block-device prep in directory mode] ***
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Stat block device] *****
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Require block device] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Read device size] ******
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Require minimum data disk size] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Wipe existing filesystem signatures when unformatted] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Create partition on data disk] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Set partition fact] ****
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Set partition fact for nvme] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Create XFS on Longhorn partition] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Ensure mount directory exists] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Mount Longhorn data path] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+PLAY [Fleet cluster provision | Longhorn install on bootstrap] *****************
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Check pinned Helm binary] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Download pinned Helm archive] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Extract pinned Helm archive] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Install pinned Helm binary] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Add Longhorn helm repo] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Update helm repos] *****
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Install Longhorn chart] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Wait for Longhorn manager pods] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Clear default from local-path StorageClass] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Set Longhorn as default StorageClass] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_longhorn : Fleet cluster longhorn | Verify Longhorn StorageClass exists] ***
+skipping: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster provision | Local NFS server on bootstrap (nfs_local)] *****
+
+TASK [Gathering Facts] *********************************************************
+ok: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Resolve local NFS server address] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Ensure local NFS export directories] ***
+skipping: [lab-ha-0-cp1] => (item=/srv/fleet-nfs) 
+skipping: [lab-ha-0-cp1] => (item=/srv/fleet-nfs/lab-ha-0) 
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Install nfs-utils (server + client)] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Enable rpcbind] **********
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Configure /etc/exports for local NFS] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Enable and start nfs-server] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Apply NFS exports] *******
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Default client mount path for nfs_local] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Skip node prep when local_path] ***
+
+PLAY [Fleet cluster provision | Cluster storage (NFS) node packages] ***********
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Resolve local NFS server address] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Ensure local NFS export directories] ***
+skipping: [lab-ha-0-cp1] => (item=/srv/fleet-nfs) 
+skipping: [lab-ha-0-cp2] => (item=/srv/fleet-nfs) 
+skipping: [lab-ha-0-cp1] => (item=/srv/fleet-nfs/lab-ha-0) 
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp3] => (item=/srv/fleet-nfs) 
+skipping: [lab-ha-0-cp2] => (item=/srv/fleet-nfs/lab-ha-0) 
+skipping: [lab-ha-0-cp3] => (item=/srv/fleet-nfs/lab-ha-0) 
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Install nfs-utils (server + client)] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Enable rpcbind] **********
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Configure /etc/exports for local NFS] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Enable and start nfs-server] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Apply NFS exports] *******
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Default client mount path for nfs_local] ***
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+skipping: [lab-ha-0-cp3]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Skip node prep when local_path] ***
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Skip node prep when local_path] ***
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Skip node prep when local_path] ***
+
+PLAY [Fleet cluster provision | Cluster storage (NFS) provisioner on bootstrap] ***
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Resolve local NFS server address] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Ensure local NFS export directories] ***
+skipping: [lab-ha-0-cp1] => (item=/srv/fleet-nfs) 
+skipping: [lab-ha-0-cp1] => (item=/srv/fleet-nfs/lab-ha-0) 
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Install nfs-utils (server + client)] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Enable rpcbind] **********
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Configure /etc/exports for local NFS] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Enable and start nfs-server] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Apply NFS exports] *******
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Default client mount path for nfs_local] ***
+skipping: [lab-ha-0-cp1]
+
+TASK [fleet_cluster_storage : Fleet cluster storage | Skip node prep when local_path] ***
+
+PLAY [Fleet cluster provision | Apply node labels from create spec] ************
+
+TASK [Apply fleet_node_labels to Kubernetes node] ******************************
+skipping: [lab-ha-0-cp3]
+skipping: [lab-ha-0-cp1]
+skipping: [lab-ha-0-cp2]
+
+PLAY RECAP *********************************************************************
+lab-ha-0-cp1               : ok=73   changed=23   unreachable=0    failed=0    skipped=95   rescued=0    ignored=0   
+lab-ha-0-cp2               : ok=37   changed=9    unreachable=0    failed=0    skipped=48   rescued=0    ignored=0   
+lab-ha-0-cp3               : ok=37   changed=9    unreachable=0    failed=0    skipped=48   rescued=0    ignored=0   
+
+[fleet-cluster-bundle] Progress OK (Validated)
+[fleet-cluster-bundle] Done. Open Fleet Console and click Provision.

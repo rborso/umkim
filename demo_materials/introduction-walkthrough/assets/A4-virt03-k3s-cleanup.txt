@@ -1,0 +1,36 @@
+=== A4 virt03 k3s leftover cleanup 2026-10-01T21:20:54+02:00 ===
+before: active
+/bin/systemctl
+Dependencies resolved.
+================================================================================
+ Package            Arch    Version           Repository                   Size
+================================================================================
+Removing:
+ k3s-selinux        noarch  1.6-1.el9         @rancher-k3s-common-stable   96 k
+Removing unused dependencies:
+ container-selinux  noarch  4:2.246.0-1.el10  @appstream                   74 k
+
+Transaction Summary
+================================================================================
+Remove  2 Packages
+
+Freed space: 170 k
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Erasing          : k3s-selinux-1.6-1.el9.noarch                           1/2 
+  Running scriptlet: k3s-selinux-1.6-1.el9.noarch                           1/2 
+  Erasing          : container-selinux-4:2.246.0-1.el10.noarch              2/2 
+  Running scriptlet: container-selinux-4:2.246.0-1.el10.noarch              2/2 
+
+Removed:
+  container-selinux-4:2.246.0-1.el10.noarch     k3s-selinux-1.6-1.el9.noarch    
+
+Complete!
+after k3s: inactive
+K3S_GONE=OK
+virt03.lab.local
+Rocky Linux release 10.2 (Red Quartz)

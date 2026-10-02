@@ -1,0 +1,118 @@
+apiVersion: v1
+data:
+  inventory.ini: |
+    [fleet_cluster_control]
+    lab-ha-0-cp1 ansible_host=172.16.10.101 ansible_user=linux wireguard_address=10.10.0.12/32 fleet_node_mgmt_address=172.16.10.101 k3s_role=server
+    lab-ha-0-cp2 ansible_host=172.16.10.102 ansible_user=linux wireguard_address=10.10.0.13/32 fleet_node_mgmt_address=172.16.10.102 k3s_role=server
+    lab-ha-0-cp4 ansible_host=172.16.10.143 ansible_user=linux wireguard_address=10.10.0.16/32 fleet_node_mgmt_address=172.16.10.143 k3s_role=server
+
+    [fleet_cluster_workers]
+    lab-ha-0-w1 ansible_host=172.16.10.140 ansible_user=linux wireguard_address=10.10.0.15/32 fleet_node_mgmt_address=172.16.10.140 k3s_role=agent
+
+    [fleet_cluster_nodes:children]
+    fleet_cluster_control
+    fleet_cluster_workers
+
+    [fleet_cluster_nodes:vars]
+    fleet_node=true
+    ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="ssh -i /root/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -p 30200 -W %h:%p linux@jump.otthol.hu"
+    ansible_ssh_private_key_file=/root/.ssh/id_rsa
+    fleet_cluster_kvm=true
+    fleet_site_enable_kubevirt=true
+    fleet_cluster_kubevirt_bridge_enabled=true
+    kubevirt_bridge_host_bridge=n0p0_mgmt_nw
+    kubevirt_bridge_nad_name=mgmt-l2
+    kubevirt_bridge_nad_namespace=default
+    fleet_cluster_kubevirt_bridge_keep_ip=true
+    k3s_cluster_mode=true
+    k3s_cluster_init_host=lab-ha-0-cp1
+    k3s_cluster_name=lab-ha-0
+    k3s_control_plane_vip=172.16.10.100
+    k3s_cluster_join_server=https://172.16.10.100:6443
+    calico_ip_autodetection_method=interface=n0p0_mgmt_nw
+    fleet_cluster_wireguard_interface=wg-umkim
+    k3s_bind_address=0.0.0.0
+    k3s_node_ip={{ fleet_node_mgmt_address | default(ansible_host) }}
+    k3s_advertise_address={{ fleet_node_mgmt_address | default(ansible_host) }}
+    harbor_host=10.10.0.1
+    harbor_nodeport_https=30443
+    harbor_enable_quay_mirror=false
+    fleet_site_min_root_disk_gi=38
+    fleet_hub_wireguard_ip=10.10.0.1
+    wireguard_endpoint_host=wg.otthol.hu
+    wireguard_endpoint_port=51820
+    ocm_cluster_name=lab-ha-0
+    ocm_hub_apiserver=https://10.10.0.1:6443
+    ocm_hub_host=umkim-hub
+    fleet_site_hub_inventory_name=umkim-hub
+    ocm_hub=false
+    k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml
+    ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml
+
+    [site_bootstrap]
+    lab-ha-0-cp1 ansible_host=172.16.10.101 ansible_user=linux
+
+    [site_bootstrap:vars]
+    wireguard_address=10.10.0.12/32
+    fleet_node_mgmt_address=172.16.10.101
+    fleet_site_name=lab-ha-0
+    fleet_cluster_name=lab-ha-0
+    fleet_site_id=homelab
+    fleet_site_wg_ip=10.10.0.12/32
+    fleet_site_sp_endpoint=10.10.0.12
+    calico_ip_autodetection_method=interface=n0p0_mgmt_nw
+    fleet_cluster_wireguard_interface=wg-umkim
+    k3s_bind_address=0.0.0.0
+    k3s_node_ip={{ fleet_node_mgmt_address | default(ansible_host) }}
+    k3s_advertise_address={{ fleet_node_mgmt_address | default(ansible_host) }}
+    fleet_cluster_ingress_id=homelab-ha-pf
+    fleet_cluster_exposure_mode=port_forward
+    fleet_cluster_tls_policy=acme_cluster
+    fleet_cluster_spoke_direct_ingress=true
+    fleet_cluster_traefik_http_port=30080
+    fleet_cluster_traefik_https_port=30443
+    phase6_deploy_whoami_demo=false
+    k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml
+    ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml
+    k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+    [ocm_spoke_join:children]
+    site_bootstrap
+
+    [fleet_cluster]
+    lab-ha-0 ansible_host=172.16.10.101 ansible_user=linux
+
+    [fleet_cluster:vars]
+    k3s_kubeconfig=/etc/rancher/k3s/k3s.yaml
+    ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml
+    fleet_site=homelab
+    cluster_region=
+    wireguard_address=10.10.0.12/32
+
+    [hub]
+    umkim-hub ansible_host=127.0.0.1 ansible_user=linux
+
+    [hub:vars]
+    wireguard_address=10.10.0.1/24
+    ocm_kubeconfig=/etc/rancher/k3s/k3s.yaml
+    k3s_command_path=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    ansible_ssh_private_key_file=/root/.ssh/id_rsa
+    ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+    ocm_spoke_kubeconfig_delegate_local=true
+    ocm_spoke_kubeconfig_ssh_private_key_file=/root/.ssh/id_rsa
+    ocm_spoke_kubeconfig_kubectl_config=/etc/kube/config
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2026-10-01T21:29:33Z"
+  name: fleet-cluster-lab-ha-0-inventory
+  namespace: fleet-console
+  ownerReferences:
+  - apiVersion: fleet.umkim.com/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: FleetClusterJoin
+    name: lab-ha-0
+    uid: 6134baf7-3112-4564-bac1-a5ef1c88a98e
+  resourceVersion: "52006"
+  uid: 05d13a9b-37c0-4f20-9dd6-c02f0c793b11

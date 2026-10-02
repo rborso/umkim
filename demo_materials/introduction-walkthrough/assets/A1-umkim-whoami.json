@@ -1,0 +1,17 @@
+{
+  "dcAdmin": true,
+  "groups": null,
+  "kind": "User",
+  "name": "localadmin",
+  "permissions": [
+    {
+      "resource": "*",
+      "scopeKind": "*",
+      "scopeName": "*",
+      "verb": "*"
+    }
+  ],
+  "roles": [
+    "dc-admin"
+  ]
+}

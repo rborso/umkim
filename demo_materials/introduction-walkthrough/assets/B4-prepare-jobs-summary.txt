@@ -1,0 +1,5 @@
+B4 prepare jobs (fleet-console):
+- fleet-site-prov-a27b2917517c  subject=virt01  action=prepare_hypervisor  playbook=configure-hypervisors.yml tags=prepare
+- fleet-site-prov-cf234c5d9b5f  subject=virt02  action=prepare_hypervisor  playbook=configure-hypervisors.yml tags=prepare
+Note: virt02 umkim CLI failed with FleetSite conflict; Ansible job still created/running.
+Inventory bundle / SSH secrets redacted — do not dump job describe -o yaml to assets.

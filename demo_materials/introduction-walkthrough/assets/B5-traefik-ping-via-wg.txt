@@ -1,0 +1,5 @@
+date=2026-10-01T23:07:22+02:00
+WG ping OK to 10.10.0.10
+OK
+NAMESPACE                       NAME                            READY   UP-TO-DATE   AVAILABLE   AGE
+fleet-ingress                   traefik                         1/1     1            1           5m6s

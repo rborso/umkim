@@ -1,0 +1,5 @@
+=== guest SSH post-create ===
+172.16.10.101: Warning: Permanently added '172.16.10.101' (ED25519) to the list of known hosts. linux@172.16.10.101: Permission denied (publickey,gssapi-keyex,gssapi-with-mic). 
+172.16.10.102: Warning: Permanently added '172.16.10.102' (ED25519) to the list of known hosts. linux@172.16.10.102: Permission denied (publickey,gssapi-keyex,gssapi-with-mic). 
+172.16.10.103: Warning: Permanently added '172.16.10.103' (ED25519) to the list of known hosts. linux@172.16.10.103: Permission denied (publickey,gssapi-keyex,gssapi-with-mic). 
+172.16.10.140: Warning: Permanently added '172.16.10.140' (ED25519) to the list of known hosts. linux@172.16.10.140: Permission denied (publickey,gssapi-keyex,gssapi-with-mic). 

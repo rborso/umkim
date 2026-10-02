@@ -1,0 +1,1 @@
+job.batch "fleet-site-yaidap-76499929845f" deleted from fleet-console namespace

@@ -1,0 +1,14 @@
+{
+  "chart": "oci://10.10.0.1:30443/charts/whoami",
+  "clusterName": "lab-ha-0",
+  "llmBackend": true,
+  "name": "whoami-site",
+  "namespace": "default",
+  "phase": "",
+  "releaseName": "whoami-site",
+  "route": {
+    "mode": "site",
+    "siteHost": "whoami.homelab.otthol.hu"
+  },
+  "version": "0.1.0"
+}

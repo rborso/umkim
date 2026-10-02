@@ -1,0 +1,13 @@
+{
+  "name": "whoami-auth",
+  "clusterName": "intro-single-0",
+  "chart": "whoami",
+  "version": "0.1.0",
+  "releaseName": "whoami-auth",
+  "namespace": "default",
+  "route": {
+    "mode": "hub",
+    "hubHost": "whoami-auth.demo.otthol.hu",
+    "requireAuth": true
+  }
+}

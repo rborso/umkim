@@ -1,0 +1,82 @@
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"work.open-cluster-management.io/v1","kind":"ManifestWork","metadata":{"annotations":{},"labels":{"edge.umkim.com/instance-id":"whoami-auth","edge.umkim.com/route":"true"},"name":"fleet-route-whoami-auth","namespace":"intro-single-0"},"spec":{"workload":{"manifests":[{"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"traefik.ingress.kubernetes.io/router.entrypoints":"web-hub"},"name":"fleet-route-whoami-auth","namespace":"default"},"spec":{"ingressClassName":"traefik","rules":[{"host":"whoami-auth.demo.otthol.hu","http":{"paths":[{"backend":{"service":{"name":"whoami-auth","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}]}}]}}}
+  creationTimestamp: "2026-10-01T19:52:43Z"
+  finalizers:
+  - cluster.open-cluster-management.io/manifest-work-cleanup
+  generation: 1
+  labels:
+    edge.umkim.com/instance-id: whoami-auth
+    edge.umkim.com/route: "true"
+  name: fleet-route-whoami-auth
+  namespace: intro-single-0
+  resourceVersion: "15545"
+  uid: 122f1408-c617-420d-abe2-2b2637a84d4c
+spec:
+  workload:
+    manifests:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        annotations:
+          traefik.ingress.kubernetes.io/router.entrypoints: web-hub
+        name: fleet-route-whoami-auth
+        namespace: default
+      spec:
+        ingressClassName: traefik
+        rules:
+        - host: whoami-auth.demo.otthol.hu
+          http:
+            paths:
+            - backend:
+                service:
+                  name: whoami-auth
+                  port:
+                    number: 80
+              path: /
+              pathType: Prefix
+status:
+  conditions:
+  - lastTransitionTime: "2026-10-01T19:52:43Z"
+    message: Apply manifest work complete
+    observedGeneration: 1
+    reason: AppliedManifestWorkComplete
+    status: "True"
+    type: Applied
+  - lastTransitionTime: "2026-10-01T19:52:43Z"
+    message: All resources are available
+    observedGeneration: 1
+    reason: ResourcesAvailable
+    status: "True"
+    type: Available
+  resourceStatus:
+    manifests:
+    - conditions:
+      - lastTransitionTime: "2026-10-01T19:52:43Z"
+        message: Apply manifest complete
+        observedGeneration: 1
+        reason: AppliedManifestComplete
+        status: "True"
+        type: Applied
+      - lastTransitionTime: "2026-10-01T19:52:43Z"
+        message: Resource is available
+        reason: ResourceAvailable
+        status: "True"
+        type: Available
+      - lastTransitionTime: "2026-10-01T19:52:43Z"
+        message: ""
+        reason: NoStatusFeedbackSynced
+        status: "True"
+        type: StatusFeedbackSynced
+      resourceMeta:
+        group: networking.k8s.io
+        kind: Ingress
+        name: fleet-route-whoami-auth
+        namespace: default
+        ordinal: 0
+        resource: ingresses
+        version: v1
+      statusFeedback: {}

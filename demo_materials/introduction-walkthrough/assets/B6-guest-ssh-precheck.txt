@@ -1,0 +1,7 @@
+172.16.10.101: lab-ha-0-cp1 Rocky Linux release 10.2 (Red Quartz) 
+172.16.10.102: lab-ha-0-cp2 Rocky Linux release 10.2 (Red Quartz) 
+172.16.10.103: lab-ha-0-cp3 Rocky Linux release 10.2 (Red Quartz) 
+172.16.10.140: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY! Someone could be eavesdropping on you right now (man-in-the-middle attack)! It is also possible that a host key has just been changed. The fingerprint for the ED25519 key sent by the remote host is SHA256:tWCZFcb7QXl0iMxP873IvBVAwSVPNxV99HviIlAB1Fc. Please contact your system administrator. Add correct host key in /home/linux/.ssh/known_hosts to get rid of this message. Offending ED25519 key in /home/linux/.ssh/known_hosts:30 Host key for 172.16.10.140 has changed and you have requested strict checking. Host key verification failed. 
+Warning: Permanently added '172.16.10.140' (ED25519) to the list of known hosts.
+lab-ha-0-w1
+Rocky Linux release 10.2 (Red Quartz)

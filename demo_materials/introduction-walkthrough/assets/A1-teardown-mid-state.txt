@@ -1,0 +1,25 @@
+=== 2026-10-01T20:33:19+02:00 mid-state ===
+NAMESPACE       NAME                                        PHASE          SITE      CLUSTER    AGE
+fleet-console   fleetclusterjoin.fleet.umkim.com/lab-ha-0   ScriptIssued   homelab   lab-ha-0   4m11s
+
+NAMESPACE       NAME                                         CLUSTER        CHART                                         PHASE   AGE
+fleet-console   fleetapp.fleet.umkim.com/llama-qwen-gpu      lab-gpu-0      oci://10.10.0.1:30443/charts/llama-cpp-helm   Ready   30h
+fleet-console   fleetapp.fleet.umkim.com/llama-qwen-gpu-pt   lab-gpu-pt-0   oci://10.10.0.1:30443/charts/llama-cpp-helm   Ready   10h
+fleet-console   fleetapp.fleet.umkim.com/llama-qwen-single   lab-single-0   oci://10.10.0.1:30443/charts/llama-cpp-helm   Ready   32h
+NAME                            STATUS     COMPLETIONS   DURATION   AGE
+fa-i-llama-qwen-gpu-pt          Complete   1/1           5s         10h
+fa-u-llama-pt-52f15b29          Complete   1/1           3s         9h
+fleet-acme-1790879098           Complete   1/1           17s        8m22s
+fleet-cluster-wg-lab-ha-0       Complete   1/1           3s         4m12s
+fleet-ingress-auth-1790832875   Complete   1/1           38s        12h
+fleet-llm-1790879349            Complete   1/1           9s         4m11s
+fleet-site-prov-0470e5921a2d    Complete   1/1           30s        12h
+fleet-site-prov-0d61a4f7cd70    Complete   1/1           15m        12h
+fleet-site-prov-68c8c49aa9e6    Complete   1/1           72s        11h
+fleet-site-prov-783b0516c5c8    Failed     0/1           12h        12h
+fleet-site-prov-9b4028558efe    Failed     0/1           11h        11h
+fleet-site-prov-a3a3cb469836    Complete   1/1           41s        11h
+fleet-site-prov-d4645f6f11cd    Failed     0/1           11h        11h
+fleet-site-prov-eaaea49a3355    Complete   1/1           89s        11h
+fleet-site-prov-ec111bf7be76    Failed     0/1           11h        11h
+fleet-site-prov-fe240926dbbd    Failed     0/1           12h        12h

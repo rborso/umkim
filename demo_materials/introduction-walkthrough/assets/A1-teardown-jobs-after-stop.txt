@@ -1,0 +1,8 @@
+NAME                                                      STATUS     COMPLETIONS   DURATION   AGE
+job.batch/fleet-cluster-delete-lab-gpu-pt-0               Running    0/1           11s        11s
+job.batch/fleet-cluster-delete-lab-ha-0                   Running    0/1           3m48s      3m48s
+job.batch/fleet-cluster-delete-lab-single-0               Running    0/1           3m47s      3m47s
+NAME                                                      READY   STATUS             RESTARTS   AGE
+pod/fleet-cluster-delete-lab-gpu-pt-0-nm6lz               1/1     Running            0          12s
+pod/fleet-cluster-delete-lab-ha-0-wc2f9                   1/1     Running            0          3m49s
+pod/fleet-cluster-delete-lab-single-0-475xw               1/1     Running            0          3m48s

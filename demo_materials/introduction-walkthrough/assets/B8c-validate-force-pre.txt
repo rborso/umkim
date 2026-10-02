@@ -1,0 +1,10 @@
+cluster_ready	pass	cluster is Ready
+cluster_writable	pass	cluster accepts mutations
+node_operation_idle	pass	no node operation in progress
+spoke_api	pass	listed 4 spoke node(s)
+old_node	pass	oldNode provided
+old_node_is_control	pass	old node is control plane
+new_address	pass	replacement address provided
+new_address_unique	pass	replacement address is available
+ha_control_count	pass	HA control-plane count looks valid
+old_node_reachable	pass	old node reachability acceptable

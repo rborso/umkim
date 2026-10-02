@@ -1,0 +1,15 @@
+{
+  "apiVersion": "fleet.umkim.com/v1alpha1",
+  "kind": "FleetSite",
+  "metadata": { "name": "intro-hub" },
+  "spec": {
+    "siteName": "intro-hub",
+    "siteId": "intro-hub",
+    "provisioningMode": "registry",
+    "edge": {
+      "hubGateway": true,
+      "hubZone": "demo.otthol.hu",
+      "hubWildcard": "*.demo.otthol.hu"
+    }
+  }
+}

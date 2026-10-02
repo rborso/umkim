@@ -1,0 +1,44 @@
+{
+  "items": [
+    {
+      "path": "bare_metals.yml",
+      "size": 66,
+      "synced": false
+    },
+    {
+      "path": "group_vars/all/all.yml",
+      "size": 1299,
+      "synced": true
+    },
+    {
+      "path": "guests.yml",
+      "size": 442,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt01.yml",
+      "size": 1580,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt02.yml",
+      "size": 1298,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt03.yml",
+      "size": 914,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt04.yml",
+      "size": 1230,
+      "synced": true
+    },
+    {
+      "path": "hypervisors.yml",
+      "size": 266,
+      "synced": true
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "bridgeName": "n0p0_mgmt_nw",
+  "install": true,
+  "jobName": "fleet-cluster-kubevirt-lab-ha-0",
+  "lanBridge": true,
+  "message": "Installing KubeVirt platform (Multus/CDI/KubeVirt)",
+  "phase": "Installing"
+}

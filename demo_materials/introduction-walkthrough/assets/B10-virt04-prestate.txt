@@ -1,0 +1,32 @@
+=== B10 virt04 pre-state 2026-10-02T02:00:26+02:00 ===
+gpu-bm-1.lab.local
+ 00:00:27 up 17:14,  2 users,  load average: 1.06, 0.60, 0.45
+6.12.0-211.16.1.el10_2.0.1.x86_64
+====PCI====
+01:00.0 VGA compatible controller [0300]: NVIDIA Corporation TU117 [GeForce GTX 1650] [10de:1f82] (rev a1)
+	Subsystem: Gigabyte Technology Co., Ltd Device [1458:3fcb]
+	Kernel driver in use: vfio-pci
+	Kernel modules: nouveau, nvidia_drm, nvidia
+====MODULES====
+vfio_pci               16384  2
+vfio_pci_core         110592  1 vfio_pci
+irqbypass              12288  2 vfio_pci_core,kvm
+vfio_iommu_type1       57344  1
+vfio                   81920  9 vfio_pci_core,vfio_iommu_type1,vfio_pci
+iommufd               151552  1 vfio
+====CMDLINE====
+BOOT_IMAGE=(hd0,gpt3)/boot/vmlinuz-6.12.0-211.16.1.el10_2.0.1.x86_64 root=UUID=6037afcb-7442-42ac-bd9d-cc940fae9965 ro console=ttyS0,115200 intel_iommu=on iommu=pt modprobe.blacklist=nouveau,nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm rd.driver.blacklist=nouveau
+====LIBVIRT====
+inactive
+ Id   Name               State
+----------------------------------
+ 6    lab-gpu-pt-0-cp1   running
+
+ Id   Name               State
+----------------------------------
+ 6    lab-gpu-pt-0-cp1   running
+
+====K3S====
+active
+====WG====
+wg-umkim         UNKNOWN        10.10.0.12/32 

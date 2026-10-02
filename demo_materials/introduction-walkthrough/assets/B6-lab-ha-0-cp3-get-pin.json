@@ -1,0 +1,18 @@
+{
+  "ansible_host": "172.16.10.103",
+  "kind": "vm",
+  "name": "lab-ha-0-cp3",
+  "status": {
+    "ansible_host": "172.16.10.103",
+    "cluster": {
+      "clusterName": "lab-ha-0",
+      "fcjName": "lab-ha-0",
+      "message": "FleetClusterJoin created",
+      "mode": "enroll",
+      "phase": "Applying"
+    },
+    "message": "VM created",
+    "phase": "Ready"
+  },
+  "vm_location": "virt02"
+}

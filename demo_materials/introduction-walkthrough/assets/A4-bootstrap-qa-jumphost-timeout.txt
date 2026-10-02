@@ -1,0 +1,8 @@
+A4 note: umkim cluster bootstrap from QA WireGuard client (10.10.0.100) failed:
+  ssh: connect to host jump.otthol.hu port 30200: Connection timed out
+  Error: scp bundle to jumphost: exit status 255
+
+Hub host can reach jump.otthol.hu:30200 (JUMP_OK). Workaround: run bootstrap from hub
+(or any host with egress to the jumphost), not from the WG-only QA overlay client.
+
+QA also has no route to spoke WG IP 10.10.0.10:22 before spoke is fully up.

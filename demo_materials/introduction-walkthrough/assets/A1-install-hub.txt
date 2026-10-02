@@ -1,0 +1,1908 @@
+=== START install-hub 2026-10-01T20:38:55+02:00 ===
+=== install-hub ===
+INV=-i inventory/hosts.yml -i inventory/hosts-from-hub.yml
+
+PLAY [UMKIM hub preflight] *****************************************************
+
+TASK [Preflight | Gather OS facts] *********************************************
+ok: [umkim-hub]
+
+TASK [Preflight | Require Rocky Linux 10 hub] **********************************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Preflight | Sibling git pins are not used in v0.2] ***********************
+skipping: [umkim-hub]
+
+TASK [Preflight | Require hub WAN IPv4 for ACME] *******************************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Preflight | Require VERSIONS.md] *****************************************
+ok: [umkim-hub -> localhost]
+
+TASK [Preflight | Require umkim_version] ***************************************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Preflight | Require LLDAP for console login] *****************************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Preflight | Reject placeholder Harbor admin password] ********************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Preflight | Reject placeholder console session secret] *******************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Preflight | Fleet images must not use main tag] **************************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+PLAY [Prepare fleet Linux nodes] ***********************************************
+
+TASK [host_prepare : Host prepare | Gather facts] ******************************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Install base packages] *********************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Disable swap immediately] ******************
+changed: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Remove swap entries from fstab] ************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Stop and disable firewalld] ****************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Probe br_netfilter module] *****************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Reboot to activate kernel-modules-extra] ***
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Load br_netfilter module] ******************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Persist br_netfilter module] ***************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Deploy sysctl settings] ********************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Apply sysctl settings immediately] *********
+ok: [umkim-hub] => (item={'key': 'net.ipv4.ip_forward', 'value': 1})
+ok: [umkim-hub] => (item={'key': 'net.ipv4.conf.all.forwarding', 'value': 1})
+ok: [umkim-hub] => (item={'key': 'net.bridge.bridge-nf-call-iptables', 'value': 1})
+ok: [umkim-hub] => (item={'key': 'net.bridge.bridge-nf-call-ip6tables', 'value': 0})
+ok: [umkim-hub] => (item={'key': 'net.ipv6.conf.all.disable_ipv6', 'value': 1})
+ok: [umkim-hub] => (item={'key': 'net.ipv6.conf.default.disable_ipv6', 'value': 1})
+
+TASK [host_prepare : Host prepare | List NetworkManager connections] ***********
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Build list of NM profiles that support IPv6 settings] ***
+skipping: [umkim-hub] => (item=cloud-init eth0:802-3-ethernet) 
+skipping: [umkim-hub] => (item=lo:loopback) 
+skipping: [umkim-hub] => (item=eth0:802-3-ethernet) 
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Disable IPv6 on eligible NM connections] ***
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Configure NM connection as default route (manual)] ***
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Configure NM DHCP connection route metric] ***
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Configure NM connection without default route] ***
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Extra NM connection tweaks] ****************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Bring NM connections up] *******************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Flush handlers (apply NM/sysctl before verify)] ***
+
+TASK [host_prepare : Host prepare | Verify sysctl ip_forward] ******************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | Verify IPv6 disabled] **********************
+ok: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt disable LAN IPv6 assignment] *******
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt disable wan6 interface] ************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt disable RA on LAN] *****************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt disable DHCPv6 on LAN] *************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt disable SLAAC on LAN] **************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt remove wan6 from firewall wan zone] ***
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt commit UCI changes] ****************
+skipping: [umkim-hub] => (item=uci commit network) 
+skipping: [umkim-hub] => (item=uci commit dhcp) 
+skipping: [umkim-hub] => (item=uci commit firewall) 
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt persist IPv6 sysctl] ***************
+skipping: [umkim-hub] => (item={'key': 'all', 'value': 1}) 
+skipping: [umkim-hub] => (item={'key': 'default', 'value': 1}) 
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt apply IPv6 sysctl live] ************
+skipping: [umkim-hub] => (item={'key': 'all', 'value': 1}) 
+skipping: [umkim-hub] => (item={'key': 'default', 'value': 1}) 
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt stop odhcpd] ***********************
+skipping: [umkim-hub] => (item=/etc/init.d/odhcpd stop) 
+skipping: [umkim-hub] => (item=/etc/init.d/odhcpd disable) 
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt reload network and firewall] *******
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt reload firewall] *******************
+skipping: [umkim-hub]
+
+TASK [host_prepare : Host prepare | OpenWrt verify IPv4 internet] **************
+[WARNING]: Could not match supplied host pattern, ignoring: routers
+skipping: [umkim-hub]
+
+PLAY [Prepare OpenWrt edge router] *********************************************
+skipping: no hosts matched
+
+PLAY [WireGuard | Install packages and generate keys on all fleet nodes] *******
+
+TASK [wireguard : WireGuard | Add temporary default route via mgmt for package downloads] ***
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Install packages] ********************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Remove temporary mgmt default route] *************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Ensure config directory exists] ******************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Enable IPv4 forwarding for overlay routing] ******
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Check for existing private key] ******************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Generate private key] ****************************
+changed: [umkim-hub]
+
+TASK [wireguard : WireGuard | Store private key] *******************************
+changed: [umkim-hub]
+
+TASK [wireguard : WireGuard | Read private key] ********************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Set private key fact] ****************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Derive public key] *******************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Store public key on disk] ************************
+changed: [umkim-hub]
+
+TASK [wireguard : WireGuard | Publish public key for hub peer templates] *******
+ok: [umkim-hub]
+
+PLAY [WireGuard | Configure hub server (umkim-hub)] ****************************
+
+TASK [wireguard : WireGuard | Check for existing private key] ******************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Generate private key] ****************************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Store private key] *******************************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Read private key] ********************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Set private key fact] ****************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Derive public key] *******************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Store public key on disk] ************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Publish public key for hub peer templates] *******
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Validate spoke public keys are available] ********
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Deploy hub server configuration] *****************
+changed: [umkim-hub]
+
+TASK [wireguard : WireGuard | Install hub WireGuard peer restore script] *******
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Install hub WireGuard peer restore systemd unit] ***
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Enable and start wg-quick service] ***************
+changed: [umkim-hub]
+
+RUNNING HANDLER [wireguard : Restart WireGuard interface] **********************
+changed: [umkim-hub]
+
+PLAY [WireGuard | Configure spoke clients] *************************************
+skipping: no hosts matched
+
+PLAY [WireGuard | Verify overlay connectivity] *********************************
+
+TASK [wireguard : WireGuard | Check interface is present] **********************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Spokes ping hub on overlay] **********************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Hub ping each spoke on overlay] ******************
+skipping: [umkim-hub]
+
+TASK [wireguard : WireGuard | Hub show peer handshakes] ************************
+ok: [umkim-hub]
+
+TASK [wireguard : WireGuard | Report hub peer handshakes] **********************
+ok: [umkim-hub] => 
+    msg:
+    - "1uc+1Q4z1nVfKaf7D9m8Yh0Bt7uMczba0g+aXYchTVk=\t0"
+    - "YALellbDfEWM9WrHlh/nWt0saxBtGsWTA43bunUpcgA=\t0"
+    - "B/uDHxR9aQKM6FkHIZeugeDWjH9Jp4jDIl2quPIqL1I=\t0"
+    - "/2EFmzby23oPv0a2ebrvWhF8eZLyQUaSFU5eWlPl1nY=\t0"
+
+PLAY [K3s hub cluster on umkim-hub] ********************************************
+
+TASK [k3s : K3s | Skip when disabled on host] **********************************
+skipping: [umkim-hub]
+
+TASK [k3s : K3s | Install server] **********************************************
+changed: [umkim-hub]
+
+TASK [k3s : K3s | Enable and start server] *************************************
+ok: [umkim-hub]
+
+TASK [k3s : K3s | Wait for kubeconfig] *****************************************
+ok: [umkim-hub]
+
+TASK [k3s : K3s | Patch kubeconfig when API binds on all interfaces] ***********
+skipping: [umkim-hub]
+
+TASK [k3s : K3s | Install kubectl wrapper symlink] *****************************
+ok: [umkim-hub]
+
+TASK [k3s : K3s | Wait for API to answer] **************************************
+ok: [umkim-hub]
+
+TASK [k3s : K3s | Show node status] ********************************************
+ok: [umkim-hub]
+
+TASK [k3s : K3s | Report nodes] ************************************************
+ok: [umkim-hub] => 
+    k3s_nodes.stdout_lines:
+    - NAME        STATUS   ROLES           AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                        KERNEL-VERSION                          CONTAINER-RUNTIME
+    - umkim-hub   Ready    control-plane   2s    v1.36.5+k3s1   10.10.0.1     <none>        Rocky
+        Linux 10.2 (Red Quartz)   6.12.0-211.49.1.el10_2.x86_64 (amd64)   containerd://2.3.4-k3s1.36
+
+TASK [k3s : K3s | Wait for metrics-server Addon manifest dir] ******************
+ok: [umkim-hub]
+
+TASK [k3s : K3s | Ensure umkim staging dir for metrics-server manifest] ********
+changed: [umkim-hub]
+
+TASK [k3s : K3s | Stage hostNetwork metrics-server deployment manifest] ********
+changed: [umkim-hub]
+
+TASK [k3s : K3s | Install and verify hostNetwork metrics-server] ***************
+changed: [umkim-hub]
+
+RUNNING HANDLER [k3s : Restart k3s] ********************************************
+changed: [umkim-hub]
+
+PLAY [Calico CNI on hub (required before OCM pods schedule)] *******************
+
+TASK [calico : Calico | Skip when K3s disabled on host] ************************
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Collect detected interfaces from cluster nodes] ********
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Use uniform detected interface for autodetection] ******
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Use management subnet when interfaces differ across nodes] ***
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Fallback when auto-detection could not resolve a method] ***
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Check if already applied] ******************************
+ok: [umkim-hub]
+
+TASK [calico : Calico | Apply manifest] ****************************************
+changed: [umkim-hub]
+
+TASK [calico : Calico | Patch kube-controllers hostNetwork for k3s multus-shim deadlock] ***
+changed: [umkim-hub]
+
+TASK [calico : Calico | Stat k3s multus-shim CNI config] ***********************
+ok: [umkim-hub]
+
+TASK [calico : Calico | Disable k3s multus-shim default CNI] *******************
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Restart k3s after disabling multus-shim] ***************
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Wait for k3s API after multus-shim restart] ************
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Set IP autodetection on calico-node] *******************
+changed: [umkim-hub]
+
+TASK [calico : Calico | Wait for calico-node rollout] **************************
+ok: [umkim-hub]
+
+TASK [calico : Calico | Wait for node Ready] ***********************************
+ok: [umkim-hub]
+
+TASK [calico : Calico | Wait for IP pool CR] ***********************************
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Disable IPIP/VXLAN on default IP pool (homelab BGP prep)] ***
+skipping: [umkim-hub]
+
+TASK [calico : Calico | Recycle pods stuck before CNI was ready] ***************
+ok: [umkim-hub]
+
+TASK [calico : Calico | Wait for calico-kube-controllers rollout] **************
+ok: [umkim-hub]
+
+PLAY [OCM hub control plane on umkim-hub] **************************************
+
+TASK [ocm : OCM | Check clusteradm binary] *************************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Download clusteradm install script] **************************
+skipping: [umkim-hub]
+
+TASK [ocm : OCM | Run clusteradm install script] *******************************
+skipping: [umkim-hub]
+
+TASK [ocm : OCM | Verify clusteradm version] ***********************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Report clusteradm version] ***********************************
+ok: [umkim-hub] => 
+    msg:
+    - "clusteradm\tversion\t:v1.3.1-0-g90bdc31"
+    - "default bundle\tversion\t:1.3.1"
+
+TASK [ocm : OCM | Ensure K3s API is ready] *************************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Check if hub already initialized] ****************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Check cluster-manager pods are running] **********************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Ensure OCM config directory] *********************************
+changed: [umkim-hub]
+
+TASK [ocm : OCM | Initialize hub with clusteradm] ******************************
+changed: [umkim-hub]
+
+TASK [ocm : OCM | Save join command template for spokes] ***********************
+changed: [umkim-hub]
+
+TASK [ocm : OCM | Show init output] ********************************************
+ok: [umkim-hub] => 
+    msg:
+    - flag bundle-version has been set
+    - flag create-namespace has been set
+    - flag registration-drivers has been set
+    - flag wait has been set
+    - The multicluster hub control plane has been initialized successfully!
+    - ''
+    - 'You can now register cluster(s) to the hub control plane. Log onto those cluster(s)
+        and run the following command:'
+    - ''
+    - '    /usr/local/bin/clusteradm join --hub-token eyJhbGciOiJSUzI1NiIsImtpZCI6ImhiTWRKTlM4QVd6WVpnemt5WUQxdGNaakUzYlY0cVVtNmRLMzE3NVNXNlkifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiLCJrM3MiXSwiZXhwIjoxNzkwODgzNjU5LCJpYXQiOjE3OTA4ODAwNTksImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiZmZlMzNiMTQtYmQ1ZS00YTE5LThhYTQtOTMyZjg3ZDljMDk2Iiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJvcGVuLWNsdXN0ZXItbWFuYWdlbWVudCIsInNlcnZpY2VhY2NvdW50Ijp7Im5hbWUiOiJhZ2VudC1yZWdpc3RyYXRpb24tYm9vdHN0cmFwIiwidWlkIjoiZjhkYzU0NWQtNDc3Yi00ZjU3LWE5YzUtMWNmYjU2NWE5Y2Y3In19LCJuYmYiOjE3OTA4ODAwNTksInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpvcGVuLWNsdXN0ZXItbWFuYWdlbWVudDphZ2VudC1yZWdpc3RyYXRpb24tYm9vdHN0cmFwIn0.UuB0MSYDuUclPI24Bzgyc1pJ8uEuE5UzhDuZLCdPz152S_vI5mlF_w2SFx6I6MzDG0cU4KZdLyGUUBtnnff_xsBDrbFB8yGM4CrKT9hDguivhJs6AZqoUNC_PJvgun2o8TIDMAJgHdccMKN4iFYou4lAR3VmO9dx5-iO7h9Y4_80x3gTMNKOQUBZAc7qTvSCYsvaVLq5HCEA8ST40SvemRpyrRDKkCKYEmoCBXgAM6KkR4AbCRY8diKMMAjVQ9njeCa4z6G1ZlTe4JfpwWJYP8kwwrpBwQ0zJ9hmgtMOAuQrg4L7cbNhVaHxjKtn161YvnFBuf_t-JBGZa2Lw9_DlQ
+        --hub-apiserver https://10.10.0.1:6443 --wait --cluster-name <cluster_name>'
+    - ''
+    - Replace <cluster_name> with a cluster name of your choice. For example, cluster1.
+
+TASK [ocm : OCM | Read cluster-info kubeconfig server] *************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Read cluster-info ConfigMap manifest] ************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Compute fixed cluster-info ConfigMap manifest] ***************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Write fixed cluster-info manifest] ***************************
+skipping: [umkim-hub]
+
+TASK [ocm : OCM | Replace immutable cluster-info ConfigMap] ********************
+skipping: [umkim-hub]
+
+TASK [ocm : OCM | Apply fixed cluster-info ConfigMap] **************************
+skipping: [umkim-hub]
+
+TASK [ocm : OCM | Wait for cluster-manager deployment] *************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Wait for hub addon controllers] ******************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | List OCM pods] ***********************************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Report pod status] *******************************************
+ok: [umkim-hub] => 
+    ocm_pods.stdout_lines:
+    - NAME                               READY   STATUS    RESTARTS   AGE   IP               NODE        NOMINATED
+        NODE   READINESS GATES
+    - cluster-manager-77767f9474-h9mzj   1/1     Running   0          37s   192.168.24.196   umkim-hub   <none>           <none>
+    - cluster-manager-77767f9474-wkbkt   1/1     Running   0          37s   192.168.24.197   umkim-hub   <none>           <none>
+    - cluster-manager-77767f9474-xm87p   1/1     Running   0          37s   192.168.24.198   umkim-hub   <none>           <none>
+
+TASK [ocm : OCM | Verify hub cluster manager pods are running] *****************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Join spoke cluster to hub] ***********************************
+skipping: [umkim-hub]
+
+PLAY [OCM fleet web console on hub] ********************************************
+
+TASK [fleet_webui : Fleet WebUI | Render OCM console manifest] *****************
+skipping: [umkim-hub]
+
+TASK [fleet_webui : Fleet WebUI | Apply OCM console] ***************************
+skipping: [umkim-hub]
+
+TASK [fleet_webui : Fleet WebUI | Wait for OCM console] ************************
+skipping: [umkim-hub]
+
+TASK [fleet_webui : Fleet WebUI | Probe OCM console HTTP] **********************
+skipping: [umkim-hub]
+
+PLAY [Install Harbor on hub (umkim-hub)] ***************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Require hub host] **************************************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Install prerequisites] *********************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Check for helm] ****************************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Install helm] ******************************************
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Place helm binary] *************************************
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Add Helm repository] ***********************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Update Helm repositories] ******************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Render Helm values] ************************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Install or upgrade Harbor] *****************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Wait for core deployment] ******************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Wait for registry deployment] **************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Configure proxy cache registries and projects] *********
+included: /home/linux/umkim/roles/harbor/tasks/configure_proxy.yml for umkim-hub
+
+TASK [harbor : Harbor | Wait for API] ******************************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Check existing registry endpoints] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Create Quay registry endpoint] *************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Refresh registry list] *********************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set Quay registry id fact] *****************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Create Quay proxy cache project] ***********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Create GHCR registry endpoint] *************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Refresh registry list for GHCR] ************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set GHCR registry id fact] *****************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Create GHCR proxy cache project] ***********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Configure hosted fleet project (push target)] **********
+included: /home/linux/umkim/roles/harbor/tasks/configure_hosted.yml for umkim-hub
+
+TASK [harbor : Harbor | Create fleet hosted project] ***************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Configure hosted charts project] ***********************
+included: /home/linux/umkim/roles/harbor/tasks/configure_charts_project.yml for umkim-hub
+
+TASK [harbor : Harbor | Create charts hosted project] **************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Create mirror hosted project] **************************
+changed: [umkim-hub]
+
+PLAY [Seed Harbor proxy cache from images already on umkim-hub] ****************
+
+TASK [ansible.builtin.include_role : harbor] ***********************************
+included: harbor for umkim-hub
+
+TASK [harbor : Harbor | Ensure warm scratch directory] *************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | List tagged quay.io images in k3s containerd] **********
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | List tagged ghcr.io images in k3s containerd] **********
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Warm quay.io proxy cache (pull through Harbor)] ********
+ok: [umkim-hub] => (item=quay.io/calico/cni:v3.31.3)
+ok: [umkim-hub] => (item=quay.io/calico/kube-controllers:v3.31.3)
+ok: [umkim-hub] => (item=quay.io/calico/node:v3.31.3)
+ok: [umkim-hub] => (item=quay.io/open-cluster-management/addon-manager:v1.3.1)
+ok: [umkim-hub] => (item=quay.io/open-cluster-management/placement:v1.3.1)
+ok: [umkim-hub] => (item=quay.io/open-cluster-management/registration-operator:v1.3.1)
+ok: [umkim-hub] => (item=quay.io/open-cluster-management/registration:v1.3.1)
+ok: [umkim-hub] => (item=quay.io/open-cluster-management/work:v1.3.1)
+
+TASK [harbor : Harbor | Warm ghcr.io proxy cache (pull through Harbor)] ********
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Wait for quay cache warm jobs] *************************
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j698951574435.4515', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/calico/cni:v3.31.3', 'started': True, 'results_file': '/root/.ansible_async/j698951574435.4515'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j73041585760.4532', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/calico/kube-controllers:v3.31.3', 'started': True, 'results_file': '/root/.ansible_async/j73041585760.4532'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j799682319629.4556', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/calico/node:v3.31.3', 'started': True, 'results_file': '/root/.ansible_async/j799682319629.4556'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j504160253442.4604', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/open-cluster-management/addon-manager:v1.3.1', 'started': True, 'results_file': '/root/.ansible_async/j504160253442.4604'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j442031022483.4627', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/open-cluster-management/placement:v1.3.1', 'started': True, 'results_file': '/root/.ansible_async/j442031022483.4627'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j634764117661.4651', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/open-cluster-management/registration-operator:v1.3.1', 'started': True, 'results_file': '/root/.ansible_async/j634764117661.4651'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j903733489161.4675', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/open-cluster-management/registration:v1.3.1', 'started': True, 'results_file': '/root/.ansible_async/j903733489161.4675'})
+changed: [umkim-hub] => (item={'changed': False, 'failed': False, 'finished': False, 'ansible_job_id': 'j589305668701.4699', 'changed_when_result': False, 'failed_when_result': False, 'ansible_loop_var': 'item', 'item': 'quay.io/open-cluster-management/work:v1.3.1', 'started': True, 'results_file': '/root/.ansible_async/j589305668701.4699'})
+
+TASK [harbor : Harbor | Wait for ghcr cache warm jobs] *************************
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Report seed summary] ***********************************
+ok: [umkim-hub] => 
+    msg:
+    - 'Quay images warmed via Harbor pull-through: 0/8'
+    - 'GHCR images warmed: 0/0'
+    - Proxy cache cannot accept direct push; Harbor fetched from upstream on first pull.
+
+PLAY [Build and push fleet-owned images to Harbor hosted project] **************
+
+TASK [ansible.builtin.include_role : harbor] ***********************************
+included: harbor for umkim-hub
+
+TASK [harbor : Harbor | Ensure fleet hosted project exists] ********************
+included: /home/linux/umkim/roles/harbor/tasks/configure_hosted.yml for umkim-hub
+
+TASK [harbor : Harbor | Create fleet hosted project] ***************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Install build tools for fleet image push] **************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Ensure fleet source directory parent] ******************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push fleet-built images] *******************************
+included: /home/linux/umkim/roles/harbor/tasks/push_fleet_image.yml for umkim-hub => (item=fleet-site-controller:0.2)
+included: /home/linux/umkim/roles/harbor/tasks/push_fleet_image.yml for umkim-hub => (item=fleet-ansible-runner:0.2)
+included: /home/linux/umkim/roles/harbor/tasks/push_fleet_image.yml for umkim-hub => (item=fleet-edge-controller:0.2)
+included: /home/linux/umkim/roles/harbor/tasks/push_fleet_image.yml for umkim-hub => (item=fleet-failover-controller:0.2)
+included: /home/linux/umkim/roles/harbor/tasks/push_fleet_image.yml for umkim-hub => (item=umkim-console:0.2)
+included: /home/linux/umkim/roles/harbor/tasks/push_fleet_image.yml for umkim-hub => (item=fleet-console-auth:0.2)
+
+TASK [harbor : Harbor | Check artifact in fleet project] ***********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set skip push when artifact exists] ********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve local source for fleet image] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stat local fleet image source on controller] ***********
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure clone directory on hub] *************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Remove stale empty clone dir when local_src basename differs] ***
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage fleet-ansible-runner build context from repo root] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Ensure local staging dir on controller] ****************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Archive fleet image source on controller] **************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Upload fleet image source to hub] **********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Extract fleet image source on hub] *********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Require local fleet image source on controller] ********
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Clone fleet image source from GitHub (fallback, optional)] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Assert fleet image source present] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage LICENSE and NOTICE for image build] **************
+ok: [umkim-hub] => (item=LICENSE)
+ok: [umkim-hub] => (item=NOTICE)
+
+TASK [harbor : Harbor | Sync cluster-delete playbook into ansible-runner build context] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Build image with podman] *******************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push image to Harbor fleet project] ********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Fleet image push result] *******************************
+ok: [umkim-hub] => 
+    msg: fleet-site-controller:0.2 → 10.10.0.1:30443/fleet/fleet-site-controller:0.2 (pushed)
+
+TASK [harbor : Harbor | Check artifact in fleet project] ***********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set skip push when artifact exists] ********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve local source for fleet image] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stat local fleet image source on controller] ***********
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure clone directory on hub] *************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Remove stale empty clone dir when local_src basename differs] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Stage fleet-ansible-runner build context from repo root] ***
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure local staging dir on controller] ****************
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Archive fleet image source on controller] **************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Upload fleet image source to hub] **********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Extract fleet image source on hub] *********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Require local fleet image source on controller] ********
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Clone fleet image source from GitHub (fallback, optional)] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Assert fleet image source present] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage LICENSE and NOTICE for image build] **************
+ok: [umkim-hub] => (item=LICENSE)
+ok: [umkim-hub] => (item=NOTICE)
+
+TASK [harbor : Harbor | Sync cluster-delete playbook into ansible-runner build context] ***
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Build image with podman] *******************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push image to Harbor fleet project] ********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Fleet image push result] *******************************
+ok: [umkim-hub] => 
+    msg: fleet-ansible-runner:0.2 → 10.10.0.1:30443/fleet/fleet-ansible-runner:0.2 (pushed)
+
+TASK [harbor : Harbor | Check artifact in fleet project] ***********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set skip push when artifact exists] ********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve local source for fleet image] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stat local fleet image source on controller] ***********
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure clone directory on hub] *************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Remove stale empty clone dir when local_src basename differs] ***
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage fleet-ansible-runner build context from repo root] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Ensure local staging dir on controller] ****************
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Archive fleet image source on controller] **************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Upload fleet image source to hub] **********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Extract fleet image source on hub] *********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Require local fleet image source on controller] ********
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Clone fleet image source from GitHub (fallback, optional)] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Assert fleet image source present] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage LICENSE and NOTICE for image build] **************
+ok: [umkim-hub] => (item=LICENSE)
+changed: [umkim-hub] => (item=NOTICE)
+
+TASK [harbor : Harbor | Sync cluster-delete playbook into ansible-runner build context] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Build image with podman] *******************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push image to Harbor fleet project] ********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Fleet image push result] *******************************
+ok: [umkim-hub] => 
+    msg: fleet-edge-controller:0.2 → 10.10.0.1:30443/fleet/fleet-edge-controller:0.2 (pushed)
+
+TASK [harbor : Harbor | Check artifact in fleet project] ***********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set skip push when artifact exists] ********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve local source for fleet image] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stat local fleet image source on controller] ***********
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure clone directory on hub] *************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Remove stale empty clone dir when local_src basename differs] ***
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage fleet-ansible-runner build context from repo root] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Ensure local staging dir on controller] ****************
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Archive fleet image source on controller] **************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Upload fleet image source to hub] **********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Extract fleet image source on hub] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Require local fleet image source on controller] ********
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Clone fleet image source from GitHub (fallback, optional)] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Assert fleet image source present] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage LICENSE and NOTICE for image build] **************
+ok: [umkim-hub] => (item=LICENSE)
+ok: [umkim-hub] => (item=NOTICE)
+
+TASK [harbor : Harbor | Sync cluster-delete playbook into ansible-runner build context] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Build image with podman] *******************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push image to Harbor fleet project] ********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Fleet image push result] *******************************
+ok: [umkim-hub] => 
+    msg: fleet-failover-controller:0.2 → 10.10.0.1:30443/fleet/fleet-failover-controller:0.2
+        (pushed)
+
+TASK [harbor : Harbor | Check artifact in fleet project] ***********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set skip push when artifact exists] ********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve local source for fleet image] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stat local fleet image source on controller] ***********
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure clone directory on hub] *************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Remove stale empty clone dir when local_src basename differs] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Stage fleet-ansible-runner build context from repo root] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Ensure local staging dir on controller] ****************
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Archive fleet image source on controller] **************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Upload fleet image source to hub] **********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Extract fleet image source on hub] *********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Require local fleet image source on controller] ********
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Clone fleet image source from GitHub (fallback, optional)] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Assert fleet image source present] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage LICENSE and NOTICE for image build] **************
+ok: [umkim-hub] => (item=LICENSE)
+changed: [umkim-hub] => (item=NOTICE)
+
+TASK [harbor : Harbor | Sync cluster-delete playbook into ansible-runner build context] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Build image with podman] *******************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push image to Harbor fleet project] ********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Fleet image push result] *******************************
+ok: [umkim-hub] => 
+    msg: umkim-console:0.2 → 10.10.0.1:30443/fleet/umkim-console:0.2 (pushed)
+
+TASK [harbor : Harbor | Check artifact in fleet project] ***********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Set skip push when artifact exists] ********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve local source for fleet image] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stat local fleet image source on controller] ***********
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Ensure clone directory on hub] *************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Remove stale empty clone dir when local_src basename differs] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Stage fleet-ansible-runner build context from repo root] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Ensure local staging dir on controller] ****************
+ok: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Archive fleet image source on controller] **************
+changed: [umkim-hub -> localhost]
+
+TASK [harbor : Harbor | Upload fleet image source to hub] **********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Extract fleet image source on hub] *********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Require local fleet image source on controller] ********
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [harbor : Harbor | Clone fleet image source from GitHub (fallback, optional)] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Assert fleet image source present] *********************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Stage LICENSE and NOTICE for image build] **************
+ok: [umkim-hub] => (item=LICENSE)
+changed: [umkim-hub] => (item=NOTICE)
+
+TASK [harbor : Harbor | Sync cluster-delete playbook into ansible-runner build context] ***
+skipping: [umkim-hub]
+
+TASK [harbor : Harbor | Build image with podman] *******************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push image to Harbor fleet project] ********************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Fleet image push result] *******************************
+ok: [umkim-hub] => 
+    msg: fleet-console-auth:0.2 → 10.10.0.1:30443/fleet/fleet-console-auth:0.2 (pushed)
+
+PLAY [Push Helm charts to Harbor OCI (charts project)] *************************
+
+TASK [ansible.builtin.include_role : harbor] ***********************************
+included: harbor for umkim-hub
+
+TASK [harbor : Harbor | Ensure charts project exists] **************************
+included: /home/linux/umkim/roles/harbor/tasks/configure_charts_project.yml for umkim-hub
+
+TASK [harbor : Harbor | Create charts hosted project] **************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Create mirror hosted project] **************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Charts to push] ****************************************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Package charts on controller] **************************
+changed: [umkim-hub -> localhost] => (item={'name': 'whoami', 'version': '0.1.0'})
+changed: [umkim-hub -> localhost] => (item={'name': 'pet-clinic-helm', 'version': '0.1.1'})
+changed: [umkim-hub -> localhost] => (item={'name': 'llama-cpp-helm', 'version': '0.1.4'})
+changed: [umkim-hub -> localhost] => (item={'name': 'rocky-10-vm', 'version': '0.1.3'})
+
+TASK [harbor : Harbor | Upload chart tgz to hub] *******************************
+ok: [umkim-hub] => (item={'name': 'whoami', 'version': '0.1.0'})
+ok: [umkim-hub] => (item={'name': 'pet-clinic-helm', 'version': '0.1.1'})
+ok: [umkim-hub] => (item={'name': 'llama-cpp-helm', 'version': '0.1.4'})
+ok: [umkim-hub] => (item={'name': 'rocky-10-vm', 'version': '0.1.3'})
+
+TASK [harbor : Harbor | Helm registry login on hub] ****************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Push charts to Harbor OCI] *****************************
+changed: [umkim-hub] => (item={'name': 'whoami', 'version': '0.1.0'})
+changed: [umkim-hub] => (item={'name': 'pet-clinic-helm', 'version': '0.1.1'})
+changed: [umkim-hub] => (item={'name': 'llama-cpp-helm', 'version': '0.1.4'})
+changed: [umkim-hub] => (item={'name': 'rocky-10-vm', 'version': '0.1.3'})
+
+PLAY [Configure K3s registry mirrors on all fleet nodes] ***********************
+
+TASK [ansible.builtin.include_role : harbor] ***********************************
+included: harbor for umkim-hub
+
+TASK [harbor : Harbor | Ensure K3s config directory for registries.yaml] *******
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Deploy K3s registries.yaml] ****************************
+changed: [umkim-hub]
+
+TASK [harbor : Harbor | Resolve K3s unit for registry reload] ******************
+ok: [umkim-hub]
+
+TASK [harbor : Harbor | Restart K3s to apply registry mirrors] *****************
+changed: [umkim-hub]
+
+PLAY [Fleet platform on hub] ***************************************************
+
+TASK [olm : OLM | Check if already installed] **********************************
+ok: [umkim-hub]
+
+TASK [olm : OLM | Apply CRDs (server-side; CSV CRD exceeds annotation size limit on k3s)] ***
+changed: [umkim-hub]
+
+TASK [olm : OLM | Wait for OLM CRDs to be established] *************************
+ok: [umkim-hub]
+
+TASK [olm : OLM | Apply OLM deployment] ****************************************
+changed: [umkim-hub]
+
+TASK [olm : OLM | Wait for olm-operator] ***************************************
+ok: [umkim-hub]
+
+TASK [olm : OLM | Wait for catalog-operator] ***********************************
+ok: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Check if already installed] ****************
+ok: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Remove stale OLM subscription (manifest install; avoids catalog CPU loop)] ***
+ok: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Create namespace] **************************
+ok: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Apply namespace] ***************************
+changed: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Install from upstream manifest] ************
+changed: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Wait for deployments] **********************
+ok: [umkim-hub]
+
+TASK [cert_manager : cert-manager | Wait for webhook] **************************
+ok: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Require KVM device] ********************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Fail if KVM is missing] ****************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Label node for fleet placement] ********
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Install Multus] ************************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Raise Multus memory (thick daemon OOMs at default 50Mi on k3s)] ***
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Wait for Multus daemonset] *************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Install CDI operator] ******************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Install CDI CR] ************************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Install KubeVirt operator] *************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Wait for KubeVirt operator] ************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Install KubeVirt CR] *******************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Wait for KubeVirt control plane] *******
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Report KubeVirt pods] ******************
+skipping: [umkim-hub]
+
+TASK [kubevirt_stack : KubeVirt stack | Show status] ***************************
+skipping: [umkim-hub]
+
+PLAY [Fleet platform | Warm Harbor cache for spoke images] *********************
+
+TASK [olm : OLM | Warm Harbor pull-through cache for spoke platform images] ****
+ok: [umkim-hub] => (item=operator-framework/olm@sha256:f228c7a6b8c53e32f21a7cb855d9bc1c8f355fa5124cfc6c82552502e0a8481e)
+ok: [umkim-hub] => (item=operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f)
+ok: [umkim-hub] => (item=jetstack/cert-manager-controller:v1.20.4)
+ok: [umkim-hub] => (item=jetstack/cert-manager-webhook:v1.20.4)
+ok: [umkim-hub] => (item=jetstack/cert-manager-cainjector:v1.20.4)
+
+PLAY [Fleet platform | Push OLM and cert-manager to spokes] ********************
+
+TASK [olm : OLM | Push platform bootstrap ManifestWork to each spoke] **********
+skipping: [umkim-hub]
+
+TASK [olm : OLM | Apply ManifestWork on hub] ***********************************
+skipping: [umkim-hub]
+
+PLAY [Fleet platform | Verify spoke platform components] ***********************
+
+TASK [olm : OLM | Wait for ManifestWork to apply on spoke] *********************
+skipping: [umkim-hub]
+
+TASK [olm : OLM | Report ManifestWork status] **********************************
+skipping: [umkim-hub]
+
+TASK [olm : OLM | Show spoke ManifestWork status] ******************************
+ok: [umkim-hub] => 
+    msg: []
+
+PLAY [Fleet console CRDs via Helm on hub] **************************************
+
+TASK [fleet_console_helm : Fleet console Helm | Skip when disabled] ************
+skipping: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Generate htpasswd line] ********
+ok: [umkim-hub -> localhost]
+
+TASK [fleet_console_helm : Fleet console Helm | Set htpasswd fact] *************
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Stage chart on hub] ************
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Render values] *****************
+changed: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Upgrade install chart] *********
+changed: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Restart dashboard after upgrade (same image tag, new digest)] ***
+changed: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Wait for LLDAP bootstrap job] ***
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Wait for auth deployment] ******
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Wait for dashboard deployment] ***
+ok: [umkim-hub]
+
+PLAY [Fleet console (Helm) on hub] *********************************************
+
+TASK [fleet_console_helm : Fleet console Helm | Skip when disabled] ************
+skipping: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Generate htpasswd line] ********
+ok: [umkim-hub -> localhost]
+
+TASK [fleet_console_helm : Fleet console Helm | Set htpasswd fact] *************
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Stage chart on hub] ************
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Render values] *****************
+changed: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Upgrade install chart] *********
+changed: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Restart dashboard after upgrade (same image tag, new digest)] ***
+changed: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Wait for LLDAP bootstrap job] ***
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Wait for auth deployment] ******
+ok: [umkim-hub]
+
+TASK [fleet_console_helm : Fleet console Helm | Wait for dashboard deployment] ***
+ok: [umkim-hub]
+
+PLAY [Hub ingress on management hub] *******************************************
+
+TASK [hub_ingress : Hub ingress | Ensure namespace] ****************************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply namespace] *****************************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Ensure ACME hostPath directory] **************
+changed: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Set Traefik fragment facts] ********************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Clear Traefik fragments when disabled] *********
+skipping: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Ensure config staging directory] *************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage static config] *************************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage dynamic routes placeholder] ************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage fleet routes middlewares placeholder] ***
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read staged static config] *******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read staged dynamic routes] ******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Set config checksum facts] *******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply static ConfigMap] **********************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply dynamic ConfigMap] *********************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read existing fleet routes ConfigMap] ********
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Keep controller-owned fleet routes when present] ***
+skipping: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply fleet routes ConfigMap] ****************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Render gateway manifest] *********************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply gateway Deployment] ********************
+changed: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Wait for gateway rollout] ********************
+ok: [umkim-hub]
+
+PLAY [Fleet hub firewall (WireGuard-only management)] **************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Skip when disabled] ************
+skipping: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Install nftables] **************
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Ensure nftables config directory] ***
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Allow hairpin to local NodePorts/API (route_localnet)] ***
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Render filter rules] ***********
+changed: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Detect firewalld] **************
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Open public TCP ports in firewalld] ***
+skipping: [umkim-hub] => (item=22) 
+skipping: [umkim-hub] => (item=80) 
+skipping: [umkim-hub] => (item=443) 
+skipping: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Open public UDP ports in firewalld] ***
+skipping: [umkim-hub] => (item=51820) 
+skipping: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Allow WireGuard overlay to K3s API in firewalld] ***
+skipping: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Install WAN REDIRECT rules] ****
+skipping: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Remove WAN REDIRECT rules] *****
+changed: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Remove legacy nft WAN NAT include] ***
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Drop legacy nft WAN NAT table] ***
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Register filter include in main nftables config] ***
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Load rules] ********************
+changed: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Enable nftables service] *******
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Verify prerouting filter exists] ***
+ok: [umkim-hub]
+
+TASK [fleet_hub_firewall : Fleet hub firewall | Summary] ***********************
+ok: [umkim-hub] => 
+    msg: ' Public eth0: SSH, UDP 51820, HTTP/S :80/:443 on gateway Traefik hostNetwork
+        (single replica). Management NodePorts still blocked on WAN IP; use 10.10.0.1
+        over WireGuard. '
+
+PLAY [Fleet site CRD on hub] ***************************************************
+
+TASK [Fleet site | Copy CRD manifest] ******************************************
+ok: [umkim-hub]
+
+TASK [Fleet site | Apply CRD] **************************************************
+changed: [umkim-hub]
+
+TASK [Fleet site | Wait for CRD Established] ***********************************
+ok: [umkim-hub]
+
+TASK [Fleet cluster join | Copy CRD manifest] **********************************
+ok: [umkim-hub]
+
+TASK [Fleet cluster join | Apply CRD] ******************************************
+changed: [umkim-hub]
+
+TASK [Fleet cluster join | Wait for CRD Established] ***************************
+ok: [umkim-hub]
+
+TASK [Fleet ingress auth | Copy CRD manifest] **********************************
+ok: [umkim-hub]
+
+TASK [Fleet ingress auth | Apply CRD] ******************************************
+changed: [umkim-hub]
+
+TASK [Fleet ingress auth | Wait for CRD Established] ***************************
+ok: [umkim-hub]
+
+TASK [Fleet ACME | Copy CRD manifest] ******************************************
+ok: [umkim-hub]
+
+TASK [Fleet ACME | Apply CRD] **************************************************
+changed: [umkim-hub]
+
+TASK [Fleet ACME | Wait for CRD Established] ***********************************
+ok: [umkim-hub]
+
+TASK [Fleet LLM | Copy CRD manifest] *******************************************
+ok: [umkim-hub]
+
+TASK [Fleet LLM | Apply CRD] ***************************************************
+changed: [umkim-hub]
+
+TASK [Fleet LLM | Wait for CRD Established] ************************************
+ok: [umkim-hub]
+
+TASK [Fleet app | Copy CRD manifest] *******************************************
+ok: [umkim-hub]
+
+TASK [Fleet app | Apply CRD] ***************************************************
+changed: [umkim-hub]
+
+TASK [Fleet app | Wait for CRD Established] ************************************
+ok: [umkim-hub]
+
+TASK [Fleet chart | Copy CRD manifest] *****************************************
+ok: [umkim-hub]
+
+TASK [Fleet chart | Apply CRD] *************************************************
+changed: [umkim-hub]
+
+TASK [Fleet chart | Wait for CRD Established] **********************************
+ok: [umkim-hub]
+
+TASK [Fleet llama profile | Copy CRD manifest] *********************************
+ok: [umkim-hub]
+
+TASK [Fleet llama profile | Apply CRD] *****************************************
+changed: [umkim-hub]
+
+TASK [Fleet llama profile | Wait for CRD Established] **************************
+ok: [umkim-hub]
+
+TASK [Fleet llama profile test | Copy CRD manifest] ****************************
+ok: [umkim-hub]
+
+TASK [Fleet llama profile test | Apply CRD] ************************************
+changed: [umkim-hub]
+
+TASK [Fleet llama profile test | Wait for CRD Established] *********************
+ok: [umkim-hub]
+
+PLAY [Fleet site controller on hub] ********************************************
+
+TASK [fleet_site_controller : Fleet site controller | Skip when disabled] ******
+skipping: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Ensure namespace] ********
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Slurp hub WireGuard public key] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Hub WG public key Secret] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Controller kubeconfig Secret] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Find Ansible SSH private key on hub] ***
+ok: [umkim-hub] => (item=/home/linux/.ssh/id_ed25519)
+ok: [umkim-hub] => (item=/home/linux/.ssh/id_rsa)
+
+TASK [fleet_site_controller : Fleet site controller | Select hub SSH private key path] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Check Ansible SSH private key on hub] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Find Ansible SSH private key on controller] ***
+ok: [umkim-hub -> localhost] => (item=/home/linux/.ssh/id_ed25519)
+ok: [umkim-hub -> localhost] => (item=/home/linux/.ssh/id_rsa)
+
+TASK [fleet_site_controller : Fleet site controller | Select controller SSH private key path] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Check Ansible SSH private key on controller] ***
+ok: [umkim-hub -> localhost]
+
+TASK [fleet_site_controller : Fleet site controller | Slurp bootstrap SSH key from hub] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Slurp bootstrap SSH key from Ansible controller] ***
+skipping: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Select bootstrap SSH key material] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Write bootstrap SSH key to hub temp] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Render hub Ansible secrets for provider jobs] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Hub Ansible secrets for provider jobs] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Shared Ansible SSH secret for site Jobs] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Authorize Ansible SSH key on hub (provision jobs delegate here)] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Ensure skopeo for image preflight] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Verify controller image in Harbor] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Require controller image in Harbor] ***
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [fleet_site_controller : Fleet site controller | Render RBAC] *************
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Apply RBAC] **************
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Chart upload inbox] ******
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Render Deployment] *******
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Apply Deployment] ********
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Rollout status] **********
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site registry | Ensure fleet-console namespace] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site registry | Apply FleetSite per fleet_sites entry] ***
+ok: [umkim-hub] => (item=management)
+
+TASK [fleet_site_controller : Fleet site registry | kubectl apply FleetSite] ***
+changed: [umkim-hub] => (item=management)
+
+TASK [fleet_site_controller : Fleet site controller | Bootstrap FleetAcme CR via fleet-site API] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Wait for FleetAcme CR] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Enable hub ACME from inventory] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Trigger ACME reconcile from inventory] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Require LLDAP password when ingress auth enabled] ***
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [fleet_site_controller : Fleet site controller | Render hub ingress-auth secrets manifest] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Apply hub ingress-auth secrets] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Bootstrap FleetIngressAuth CR via fleet-site API] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Wait for FleetIngressAuth CR] ***
+ok: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Enable hub ingress auth from inventory] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Trigger ingress-auth reconcile from inventory] ***
+changed: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Bootstrap FleetLLM CR via fleet-site API] ***
+skipping: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Wait for FleetLLM CR] ****
+skipping: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Enable hub LLM from inventory] ***
+skipping: [umkim-hub]
+
+TASK [fleet_site_controller : Fleet site controller | Trigger LLM reconcile from inventory] ***
+skipping: [umkim-hub]
+
+PLAY [Fleet edge CRD on hub] ***************************************************
+
+TASK [Fleet edge | Copy CRD manifest] ******************************************
+ok: [umkim-hub]
+
+TASK [Fleet edge | Apply CRD] **************************************************
+changed: [umkim-hub]
+
+TASK [Fleet edge | Wait for CRD Established] ***********************************
+ok: [umkim-hub]
+
+PLAY [Fleet edge controller on hub] ********************************************
+
+TASK [fleet_edge : Fleet edge | Check cluster registry console-managed] ********
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Check cluster registry ConfigMap exists] *******
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Ensure fleet-system namespace] *****************
+changed: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Render cluster registry ConfigMap] *************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Apply cluster registry ConfigMap] **************
+changed: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Check domain registry console-managed] *********
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Check domain registry ConfigMap exists] ********
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Render domain registry] ************************
+changed: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | kubectl apply domain registry] *****************
+changed: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Set Traefik fragment facts] ********************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Clear Traefik fragments when disabled] *********
+skipping: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Ensure config staging directory] *************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage static config] *************************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage dynamic routes] ************************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage fleet routes fragment] *****************
+skipping: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read existing fleet routes ConfigMap] ********
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Keep controller-owned fleet routes when present] ***
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read staged static config] *******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read staged dynamic routes] ******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Set config checksum facts] *******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply static ConfigMap] **********************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply dynamic ConfigMap] *********************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply fleet routes ConfigMap] ****************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Rollout gateway after route update] **********
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Classify clusters by ingress mode] *************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Collect direct-cluster DNS notes] **************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Collect direct-cluster port-forward notes] *****
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Build manual DNS checklist] ********************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Gateway ping] **********************************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Probe global app routes via hub gateway] *******
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Report app probe results] **********************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Probe HTTPS app routes (Let's Encrypt)] ********
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Report HTTPS probe results] ********************
+skipping: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Skip when disabled] ******
+skipping: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Detect FleetIngressAuth CR] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Enable ingress auth from FleetIngressAuth CR] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Read gateway hostNetwork] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Read gateway replicas] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Check gateway-acme Service exists] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Set ACME profile from gateway cluster state] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Apply ACME profile facts] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Require hub WAN IPv4 for ACME] ***
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [fleet_edge_controller : Fleet edge controller | Ensure namespace] ********
+changed: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Stage RBAC manifest] *****
+changed: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Apply RBAC] **************
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Render Deployment manifest] ***
+changed: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Apply Deployments] *******
+changed: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Wait for controller rollout] ***
+ok: [umkim-hub]
+
+TASK [fleet_edge_controller : Fleet edge controller | Wait for route-sync rollout] ***
+[WARNING]: Could not match supplied host pattern, ignoring: virt01_k3s_cluster
+skipping: [umkim-hub]
+
+TASK [fleet_failover_controller : Fleet failover controller | Skip when disabled] ***
+
+PLAY [Fleet edge | Bootstrap IngressClass on extra clusters] *******************
+skipping: no hosts matched
+
+PLAY [Fleet edge | Refresh spoke ingress ManifestWorks (fleet hostnames)] ******
+
+TASK [spoke_ingress : Spoke ingress | Push ManifestWork to each spoke] *********
+skipping: [umkim-hub]
+
+TASK [spoke_ingress : Spoke ingress | Apply ManifestWork on hub] ***************
+skipping: [umkim-hub]
+
+PLAY [Fleet edge | Apply hub Traefik routes and verify] ************************
+
+TASK [fleet_edge : Fleet edge | Check cluster registry console-managed] ********
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Check cluster registry ConfigMap exists] *******
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Ensure fleet-system namespace] *****************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Render cluster registry ConfigMap] *************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Apply cluster registry ConfigMap] **************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Check domain registry console-managed] *********
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Check domain registry ConfigMap exists] ********
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Render domain registry] ************************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | kubectl apply domain registry] *****************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Set Traefik fragment facts] ********************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Clear Traefik fragments when disabled] *********
+skipping: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Ensure config staging directory] *************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage static config] *************************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage dynamic routes] ************************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Stage fleet routes fragment] *****************
+skipping: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read existing fleet routes ConfigMap] ********
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Keep controller-owned fleet routes when present] ***
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read staged static config] *******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Read staged dynamic routes] ******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Set config checksum facts] *******************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply static ConfigMap] **********************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply dynamic ConfigMap] *********************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Apply fleet routes ConfigMap] ****************
+ok: [umkim-hub]
+
+TASK [hub_ingress : Hub ingress | Rollout gateway after route update] **********
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Classify clusters by ingress mode] *************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Collect direct-cluster DNS notes] **************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Collect direct-cluster port-forward notes] *****
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Build manual DNS checklist] ********************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Gateway ping] **********************************
+ok: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Probe global app routes via hub gateway] *******
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Report app probe results] **********************
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Probe HTTPS app routes (Let's Encrypt)] ********
+skipping: [umkim-hub]
+
+TASK [fleet_edge : Fleet edge | Report HTTPS probe results] ********************
+skipping: [umkim-hub]
+
+PLAY RECAP *********************************************************************
+umkim-hub                  : ok=431  changed=123  unreachable=0    failed=0    skipped=127  rescued=0    ignored=0   
+
+
+=== Next: verify ===
+./scripts/verify-hub-install.sh
+
+=== Then (console): create workload site + FleetClusterJoin cluster ===
+Deploy apps via FleetApp (v0.2) after a cluster joins and is Ready.
+
+To wipe and reinstall from zero: ./scripts/teardown-hub.sh --confirm

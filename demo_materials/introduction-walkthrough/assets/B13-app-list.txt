@@ -1,0 +1,7 @@
+NAME              CLUSTER       CHART                             VERSION  NAMESPACE  PHASE  ROUTE  ROUTE_HOST                   
+rocky-kv-lan      lab-ha-0      oci://10.10.0.1:30443/charts/...  0.1.3    kubevirt   Ready  none                                
+llama-virt03      lab-single-0  oci://10.10.0.1:30443/charts/...  0.1.4    llm        Ready  none                                
+llama-gpu-pt      lab-gpu-pt-0  oci://10.10.0.1:30443/charts/...  0.1.4    llm        Ready  none                                
+whoami-site       lab-ha-0      oci://10.10.0.1:30443/charts/...  0.1.0    default    Ready  site   whoami.homelab.otthol.hu     
+whoami-site-auth  lab-ha-0      oci://10.10.0.1:30443/charts/...  0.1.0    default    Ready  site   whoami-auth.homelab.otthol.hu
+rocky-kv-pod      lab-ha-0      oci://10.10.0.1:30443/charts/...  0.1.3    kubevirt   Ready  none                                

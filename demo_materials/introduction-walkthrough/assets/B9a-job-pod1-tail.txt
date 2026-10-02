@@ -1,0 +1,100 @@
+TASK [kubevirt_host_bridge : KubeVirt host bridge | Verify bridge present] *****
+ok: [lab-ha-0-cp1]
+ok: [lab-ha-0-cp2]
+ok: [lab-ha-0-cp4]
+
+PLAY [Fleet cluster kubevirt | Reconcile Calico after host bridge] *************
+
+TASK [calico : Calico | Resolve post-bridge autodetection interface] ***********
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Check calico-node daemonset exists] ********************
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Clear stale IPv4Address annotations on all nodes] ******
+ok: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Set IP autodetection on calico-node (post-bridge)] *****
+changed: [lab-ha-0-cp1]
+
+TASK [calico : Calico | Wait for calico-node rollout after bridge reconcile] ***
+ok: [lab-ha-0-cp1]
+
+PLAY [Fleet cluster kubevirt | Platform stack on bootstrap] ********************
+
+TASK [fleet_site : Fleet site | Check KubeVirt control plane Available] ********
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Require KVM device] ********************
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Fail if KVM is missing] ****************
+skipping: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Label node for fleet placement] ********
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Install Multus] ************************
+changed: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Raise Multus memory (thick daemon OOMs at default 50Mi on k3s)] ***
+changed: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Wait for Multus daemonset] *************
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Install CDI operator] ******************
+changed: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Install CDI CR] ************************
+changed: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Install KubeVirt operator] *************
+changed: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Wait for KubeVirt operator] ************
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Install KubeVirt CR] *******************
+changed: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Wait for KubeVirt control plane] *******
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Report KubeVirt pods] ******************
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_stack : KubeVirt stack | Show status] ***************************
+ok: [lab-ha-0-cp1] => 
+    kv_pods.stdout_lines:
+    - NAME                               READY   STATUS    RESTARTS   AGE     IP                NODE           NOMINATED
+        NODE   READINESS GATES
+    - virt-api-6c6d79fdf7-58gnj          1/1     Running   0          2m9s    192.168.71.15     lab-ha-0-cp2   <none>           <none>
+    - virt-api-6c6d79fdf7-8n7pc          1/1     Running   0          34s     192.168.22.200    lab-ha-0-cp3   <none>           <none>
+    - virt-controller-58cbb998f8-n2m8x   1/1     Running   0          97s     192.168.231.133   lab-ha-0-cp4   <none>           <none>
+    - virt-controller-58cbb998f8-zpzbj   1/1     Running   0          97s     192.168.140.197   lab-ha-0-cp1   <none>           <none>
+    - virt-handler-4scx2                 1/1     Running   0          97s     192.168.22.199    lab-ha-0-cp3   <none>           <none>
+    - virt-handler-55rgm                 1/1     Running   0          97s     192.168.71.16     lab-ha-0-cp2   <none>           <none>
+    - virt-handler-b9lns                 1/1     Running   0          97s     192.168.140.198   lab-ha-0-cp1   <none>           <none>
+    - virt-handler-hgjc2                 1/1     Running   0          97s     192.168.231.134   lab-ha-0-cp4   <none>           <none>
+    - virt-operator-5889fcb959-5wszr     1/1     Running   0          3m39s   192.168.231.130   lab-ha-0-cp4   <none>           <none>
+    - virt-operator-5889fcb959-r28lj     1/1     Running   0          3m39s   192.168.140.195   lab-ha-0-cp1   <none>           <none>
+
+TASK [kubevirt_bridge_nad : KubeVirt bridge NAD | Defaults] ********************
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_bridge_nad : KubeVirt bridge NAD | Ensure bridge CNI plugin present] ***
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_bridge_nad : KubeVirt bridge NAD | Ensure host bridge exists] ***
+ok: [lab-ha-0-cp1]
+
+TASK [kubevirt_bridge_nad : KubeVirt bridge NAD | Apply NetworkAttachmentDefinition] ***
+changed: [lab-ha-0-cp1]
+
+PLAY RECAP *********************************************************************
+lab-ha-0-cp1               : ok=27   changed=11   unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+lab-ha-0-cp2               : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+lab-ha-0-cp4               : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+lab-ha-0-w1                : ok=0    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+

@@ -1,0 +1,20 @@
+=== verify start 2026-10-01T21:17:37+02:00 ===
+=== verify-hub-install (v0.2 spine) ===
+OK: k3s API
+OK: OCM ManagedCluster CRD
+OK: FleetClusterJoin CRD
+OK: FleetApp CRD
+OK: FleetChart CRD
+OK: FleetAppRoute CRD
+OK: Harbor deployment
+OK: fleet-site-controller
+OK: fleet-edge-controller
+OK: fleet-console-auth
+OK: UMKIM console
+OK: hub gateway hostNetwork=true (fleet-ingress/gateway)
+OK: fleet-edge FLEET_GATEWAY_PROBE_HOST=159.195.137.119
+OK: Traefik /ping on :80
+OK: nft table fleet_hub
+OK: WireGuard wg0
+=== verify-hub-install OK ===
+verify_exit=0

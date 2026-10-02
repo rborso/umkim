@@ -1,0 +1,69 @@
+{
+  "apiVersion": "fleet.umkim.com/v1alpha1",
+  "kind": "FleetSite",
+  "metadata": {
+    "creationTimestamp": "2026-10-01T19:20:31Z",
+    "generation": 1,
+    "managedFields": [
+      {
+        "apiVersion": "fleet.umkim.com/v1alpha1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:spec": {
+            ".": {},
+            "f:edge": {
+              ".": {},
+              "f:hubGateway": {},
+              "f:hubWildcard": {},
+              "f:hubZone": {}
+            },
+            "f:gpu": {},
+            "f:minRootDiskGi": {},
+            "f:provisioningMode": {},
+            "f:rockyVersion": {},
+            "f:siteId": {},
+            "f:siteName": {}
+          }
+        },
+        "manager": "fleet-site-controller",
+        "operation": "Update",
+        "time": "2026-10-01T19:20:31Z"
+      },
+      {
+        "apiVersion": "fleet.umkim.com/v1alpha1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:status": {
+            ".": {},
+            "f:message": {},
+            "f:phase": {}
+          }
+        },
+        "manager": "fleet-site-controller",
+        "operation": "Update",
+        "subresource": "status",
+        "time": "2026-10-01T19:20:31Z"
+      }
+    ],
+    "name": "intro-hub",
+    "namespace": "fleet-console",
+    "resourceVersion": "5990",
+    "uid": "95837d14-c20e-41b0-bc69-0c0b3a6c2775"
+  },
+  "spec": {
+    "edge": {
+      "hubGateway": true,
+      "hubWildcard": "*.demo.otthol.hu",
+      "hubZone": "demo.otthol.hu"
+    },
+    "minRootDiskGi": 40,
+    "provisioningMode": "registry",
+    "rockyVersion": "9",
+    "siteId": "intro-hub",
+    "siteName": "intro-hub"
+  },
+  "status": {
+    "message": "Registry site (datacenter metadata)",
+    "phase": "Ready"
+  }
+}

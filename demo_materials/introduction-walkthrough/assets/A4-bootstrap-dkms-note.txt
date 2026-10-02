@@ -1,0 +1,2 @@
+101:Error! Your kernel headers for kernel 6.12.0-211.61.1.el10_2.x86_64 cannot be found at /lib/modules/6.12.0-211.61.1.el10_2.x86_64/build or /lib/modules/6.12.0-211.61.1.el10_2.x86_64/source.
+102:Please install your distribution's kernel headers package matching 6.12.0-211.61.1.el10_2.x86_64, or use the --kernelsourcedir option to tell DKMS where it's located.

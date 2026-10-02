@@ -1,0 +1,56 @@
+{
+  "apiEndpoint": "https://llm.api.demo.otthol.hu/v1",
+  "keys": [
+    {
+      "apiVersion": "console.umkim.com/v1alpha1",
+      "kind": "FleetLLMApiKey",
+      "metadata": {
+        "creationTimestamp": "2026-10-02T00:24:35Z",
+        "generation": 1,
+        "managedFields": [
+          {
+            "apiVersion": "console.umkim.com/v1alpha1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:spec": {
+                ".": {},
+                "f:displayName": {},
+                "f:secretRef": {}
+              }
+            },
+            "manager": "fleet-console-auth",
+            "operation": "Update",
+            "time": "2026-10-02T00:24:35Z"
+          },
+          {
+            "apiVersion": "console.umkim.com/v1alpha1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:active": {},
+                "f:keyPrefix": {}
+              }
+            },
+            "manager": "fleet-console-auth",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2026-10-02T00:24:35Z"
+          }
+        ],
+        "name": "intro-lab",
+        "namespace": "fleet-console",
+        "resourceVersion": "63571",
+        "uid": "29e03d26-d92e-460f-93d7-dc31cfc7bc82"
+      },
+      "spec": {
+        "displayName": "Intro lab",
+        "secretRef": "fleet-llm-apikey-intro-lab"
+      },
+      "status": {
+        "active": true,
+        "keyPrefix": "fleet_llm_cb\u2026"
+      }
+    }
+  ]
+}

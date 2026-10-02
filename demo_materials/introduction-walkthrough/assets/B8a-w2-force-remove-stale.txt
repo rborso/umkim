@@ -1,0 +1,8 @@
+{
+  "force": true,
+  "message": "Node operation accepted",
+  "node": "lab-ha-0-w2",
+  "phase": "Pending",
+  "provisioning_phase": "Ready",
+  "type": "removeWorker"
+}

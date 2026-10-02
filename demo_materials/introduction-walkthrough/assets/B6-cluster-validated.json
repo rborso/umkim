@@ -1,0 +1,19 @@
+{
+  "available": false,
+  "capabilities": {
+    "ha_cluster": true,
+    "ha_topology": true
+  },
+  "name": "lab-ha-0",
+  "provisioning_mode": "bundle",
+  "provisioning_phase": "Validated",
+  "site": "homelab",
+  "topology": {
+    "nest_depth": "0",
+    "provisioner": "k3s",
+    "region": "",
+    "topology": "ha_3_node"
+  },
+  "traefik_http_port": 30080,
+  "upstream_host": "10.10.0.12"
+}

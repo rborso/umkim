@@ -1,0 +1,6 @@
+{
+  "id": "nop-1790893993384171239",
+  "jobName": "fleet-cluster-nodeop-lab-ha-0",
+  "logs": "\nPLAY [Fleet cluster remove worker | Cordon, drain, and delete node] ************\n\nTASK [Cordon worker node] ******************************************************\nskipping: [lab-ha-0-cp1]\n\nTASK [Drain worker node] *******************************************************\nskipping: [lab-ha-0-cp1]\n\nTASK [Delete worker node from API (force)] *************************************\nchanged: [lab-ha-0-cp1]\n\nTASK [Delete worker node from API] *********************************************\nskipping: [lab-ha-0-cp1]\n\nPLAY [Fleet cluster remove worker | Uninstall K3s agent on target (online)] ****\nskipping: no hosts matched\n\nPLAY RECAP *********************************************************************\nlab-ha-0-cp1               : ok=1    changed=1    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   \n\n",
+  "source": "history"
+}

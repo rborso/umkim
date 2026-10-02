@@ -1,0 +1,6 @@
+=== wait ScriptIssued 2026-10-02T02:08:12+02:00 ===
+02:08:12 phase=ScriptIssued
+NAME          SITE     PHASE         READY  TOPOLOGY     INGRESS         METHOD        UPSTREAM    JUMPHOST                    ACME
+lab-ha-0      homelab  Ready         yes    ha_3_node    homelab-ha-pf   port_forward  10.10.0.12                              yes 
+lab-single-0  homelab  Ready         yes    single_node  homelab-pf      port_forward  10.10.0.10  linux@jump.otthol.hu:30200  yes 
+lab-gpu-pt-0  homelab  ScriptIssued  no     single_node  homelab-gpu-pf                10.10.0.14  linux@jump.otthol.hu:30200  no  

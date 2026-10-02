@@ -1,0 +1,87 @@
+# B9a bridge survey before enable-kubevirt
+# Date: 2026-10-02T01:01:19+02:00
+# Decision: use strategy default n0p0_mgmt_nw (exists on virt03 hypervisor as mgmt L2).
+# Lab CP VMs currently have no bridge; mgmt IP on ens3. Day-2 will create n0p0_mgmt_nw.
+# No n0p0_lab_nw observed on surveyed hosts.
+
+===== 10.10.0.12 =====
+lab-ha-0-cp1
+lo               UNKNOWN        127.0.0.1/8 
+ens3             UP             172.16.10.101/24 172.16.10.100/32 
+wg-umkim         UNKNOWN        10.10.0.12/32 
+tunl0@NONE       UNKNOWN        192.168.140.192/32 
+cali1fc750d09c1@if3 UP             
+cali359817db03a@if3 UP             
+---
+===== 10.10.0.13 =====
+lab-ha-0-cp2
+lo               UNKNOWN        127.0.0.1/8 
+ens3             UP             172.16.10.102/24 
+wg-umkim         UNKNOWN        10.10.0.13/32 
+tunl0@NONE       UNKNOWN        192.168.71.0/32 
+calid279ee5f377@if3 UP             
+calid98a75ce932@if3 UP             
+calic8295452cbd@if3 UP             
+caliab7f87027ce@if3 UP             
+cali2b4fc54e9aa@if3 UP             
+---
+===== 10.10.0.10 =====
+virt03.lab.local
+lo               UNKNOWN        127.0.0.1/8 
+enp2s0           UP             
+n0p0_mgmt_nw     UP             172.16.10.4/24 
+cali1dcc643453a@if2 UP             
+tunl0@NONE       UNKNOWN        192.168.252.128/32 
+cali668b13477f2@if3 UP             
+cali94f6612dff4@if3 UP             
+cali19178a9a714@if3 UP             
+cali1c8c7d9b512@if3 UP             
+cali9df67e66473@if3 UP             
+calic787bd68e1f@if3 UP             
+wg-umkim         UNKNOWN        10.10.0.10/32 
+---
+ageing_time
+bridge_id
+default_pvid
+flush
+forward_delay
+gc_timer
+group_addr
+group_fwd_mask
+hash_elasticity
+hash_max
+hello_time
+hello_timer
+max_age
+multicast_igmp_version
+multicast_last_member_count
+multicast_last_member_interval
+multicast_membership_interval
+multicast_mld_version
+multicast_querier
+multicast_querier_interval
+multicast_query_interval
+multicast_query_response_interval
+multicast_query_use_ifaddr
+multicast_router
+multicast_snooping
+multicast_startup_query_count
+multicast_startup_query_interval
+multicast_stats_enabled
+nf_call_arptables
+nf_call_ip6tables
+nf_call_iptables
+no_linklocal_learn
+priority
+root_id
+root_path_cost
+root_port
+stp_state
+tcn_timer
+topology_change
+topology_change_detected
+topology_change_timer
+vlan_filtering
+vlan_protocol
+vlan_stats_enabled
+vlan_stats_per_port

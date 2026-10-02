@@ -1,0 +1,4 @@
+# SSH attempt 2026-10-02T01:57:07+02:00
+Warning: Permanently added '172.16.10.150' (ED25519) to the list of known hosts.
+rocky@172.16.10.150: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password).
+sshpass unavailable or ssh failed

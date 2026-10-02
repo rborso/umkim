@@ -1,0 +1,63 @@
+{
+  "available": true,
+  "capabilities": {
+    "gpu": false,
+    "ha_cluster": true,
+    "ha_storage": true,
+    "ha_topology": true,
+    "kubevirt": false,
+    "kvm": false,
+    "network.multus_l2": false,
+    "storage.rwo": true,
+    "storage.rwx": false
+  },
+  "capability_discovery": {
+    "message": "Discovery starting",
+    "phase": "Running"
+  },
+  "labels": {
+    "fleet.capability/gpu": "false",
+    "fleet.capability/ha_cluster": "true",
+    "fleet.capability/ha_storage": "true",
+    "fleet.capability/kvm": "false",
+    "fleet.capability/storage.rwo": "true",
+    "fleet.capability/storage.rwx": "false",
+    "fleet.resource/capacity_ok": "false",
+    "fleet.resource/metrics_at": "20261001T220930Z",
+    "fleet.resource/metrics_ok": "false",
+    "fleet.site": "homelab",
+    "fleet.topology/ha": "true",
+    "fleet.topology/nest_depth": "0",
+    "fleet.topology/provisioner": "k3s",
+    "fleet.topology/region": "",
+    "fleet.topology/topology": "ha_3_node"
+  },
+  "managed_cluster_available": true,
+  "name": "lab-ha-0",
+  "providers": {
+    "helm": {
+      "phase": "NotInstalled",
+      "providerName": "helm-lab-ha-0"
+    },
+    "k8s": {
+      "phase": "NotInstalled",
+      "providerName": "k8s-lab-ha-0"
+    },
+    "kubevirt": {
+      "phase": "NotInstalled",
+      "providerName": "kubevirt-lab-ha-0"
+    }
+  },
+  "provisioning_mode": "bundle",
+  "provisioning_phase": "Ready",
+  "site": "homelab",
+  "tls_policy": "inherit",
+  "topology": {
+    "ha": "true",
+    "nest_depth": "0",
+    "provisioner": "k3s",
+    "region": ""
+  },
+  "traefik_http_port": 30080,
+  "upstream_host": "10.10.0.12"
+}

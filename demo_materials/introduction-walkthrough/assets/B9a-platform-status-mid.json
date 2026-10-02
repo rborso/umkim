@@ -1,0 +1,8 @@
+{
+  "bridgeName": "n0p0_mgmt_nw",
+  "install": true,
+  "jobName": "",
+  "lanBridge": true,
+  "message": "KubeVirt install failed: Job has reached the specified backoff limit",
+  "phase": "Failed"
+}

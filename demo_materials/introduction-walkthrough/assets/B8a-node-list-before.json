@@ -1,0 +1,247 @@
+{
+  "nodes": [
+    {
+      "addresses": [
+        {
+          "address": "172.16.10.101",
+          "type": "InternalIP"
+        },
+        {
+          "address": "lab-ha-0-cp1",
+          "type": "Hostname"
+        }
+      ],
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral_storage": "39154662984",
+        "memory": "3740796Ki",
+        "pods": "110"
+      },
+      "capacity": {
+        "cpu": "2",
+        "ephemeral_storage": "40249448Ki",
+        "memory": "3740796Ki",
+        "pods": "110"
+      },
+      "conditions": [
+        {
+          "message": "Calico is running on this node",
+          "reason": "CalicoIsUp",
+          "status": "False",
+          "type": "NetworkUnavailable"
+        },
+        {
+          "message": "Node is a voting member of the etcd cluster",
+          "reason": "MemberNotLearner",
+          "status": "True",
+          "type": "EtcdIsVoter"
+        },
+        {
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        }
+      ],
+      "kubelet_version": "v1.36.5+k3s1",
+      "labels": {
+        "fleet.capability/gpu": "false",
+        "fleet.capability/kvm": "true",
+        "fleet.resource/gpu.allocatable": "0",
+        "node-role.kubernetes.io/control-plane": "true",
+        "node-role.kubernetes.io/etcd": "true"
+      },
+      "name": "lab-ha-0-cp1",
+      "os_image": "Rocky Linux 10.2 (Red Quartz)",
+      "ready": true,
+      "roles": [
+        "etcd",
+        "control-plane"
+      ],
+      "usage": {
+        "cpu": "272828286n",
+        "memory": "1226264Ki"
+      }
+    },
+    {
+      "addresses": [
+        {
+          "address": "172.16.10.102",
+          "type": "InternalIP"
+        },
+        {
+          "address": "lab-ha-0-cp2",
+          "type": "Hostname"
+        }
+      ],
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral_storage": "39154662984",
+        "memory": "3740796Ki",
+        "pods": "110"
+      },
+      "capacity": {
+        "cpu": "2",
+        "ephemeral_storage": "40249448Ki",
+        "memory": "3740796Ki",
+        "pods": "110"
+      },
+      "conditions": [
+        {
+          "message": "Calico is running on this node",
+          "reason": "CalicoIsUp",
+          "status": "False",
+          "type": "NetworkUnavailable"
+        },
+        {
+          "message": "Node is a voting member of the etcd cluster",
+          "reason": "MemberNotLearner",
+          "status": "True",
+          "type": "EtcdIsVoter"
+        },
+        {
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        }
+      ],
+      "kubelet_version": "v1.36.5+k3s1",
+      "labels": {
+        "fleet.capability/gpu": "false",
+        "fleet.capability/kvm": "true",
+        "fleet.resource/gpu.allocatable": "0",
+        "node-role.kubernetes.io/control-plane": "true",
+        "node-role.kubernetes.io/etcd": "true"
+      },
+      "name": "lab-ha-0-cp2",
+      "os_image": "Rocky Linux 10.2 (Red Quartz)",
+      "ready": true,
+      "roles": [
+        "control-plane",
+        "etcd"
+      ],
+      "usage": {
+        "cpu": "247159808n",
+        "memory": "1036416Ki"
+      }
+    },
+    {
+      "addresses": [
+        {
+          "address": "172.16.10.103",
+          "type": "InternalIP"
+        },
+        {
+          "address": "lab-ha-0-cp3",
+          "type": "Hostname"
+        }
+      ],
+      "allocatable": {
+        "cpu": "2",
+        "ephemeral_storage": "39154662984",
+        "memory": "3740796Ki",
+        "pods": "110"
+      },
+      "capacity": {
+        "cpu": "2",
+        "ephemeral_storage": "40249448Ki",
+        "memory": "3740796Ki",
+        "pods": "110"
+      },
+      "conditions": [
+        {
+          "message": "Calico is running on this node",
+          "reason": "CalicoIsUp",
+          "status": "False",
+          "type": "NetworkUnavailable"
+        },
+        {
+          "message": "Node is a voting member of the etcd cluster",
+          "reason": "MemberNotLearner",
+          "status": "True",
+          "type": "EtcdIsVoter"
+        },
+        {
+          "message": "kubelet has sufficient memory available",
+          "reason": "KubeletHasSufficientMemory",
+          "status": "False",
+          "type": "MemoryPressure"
+        },
+        {
+          "message": "kubelet has no disk pressure",
+          "reason": "KubeletHasNoDiskPressure",
+          "status": "False",
+          "type": "DiskPressure"
+        },
+        {
+          "message": "kubelet has sufficient PID available",
+          "reason": "KubeletHasSufficientPID",
+          "status": "False",
+          "type": "PIDPressure"
+        },
+        {
+          "message": "kubelet is posting ready status",
+          "reason": "KubeletReady",
+          "status": "True",
+          "type": "Ready"
+        }
+      ],
+      "kubelet_version": "v1.36.5+k3s1",
+      "labels": {
+        "fleet.capability/gpu": "false",
+        "fleet.capability/kvm": "true",
+        "fleet.resource/gpu.allocatable": "0",
+        "node-role.kubernetes.io/control-plane": "true",
+        "node-role.kubernetes.io/etcd": "true"
+      },
+      "name": "lab-ha-0-cp3",
+      "os_image": "Rocky Linux 10.2 (Red Quartz)",
+      "ready": true,
+      "roles": [
+        "etcd",
+        "control-plane"
+      ],
+      "usage": {
+        "cpu": "168320822n",
+        "memory": "1199412Ki"
+      }
+    }
+  ]
+}

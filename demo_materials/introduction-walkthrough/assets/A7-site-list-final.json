@@ -1,0 +1,99 @@
+{
+  "sites": [
+    {
+      "apiVersion": "fleet.umkim.com/v1alpha1",
+      "kind": "FleetSite",
+      "metadata": {
+        "annotations": {
+          "fleet.umkim.com/management-site": "true",
+          "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"fleet.umkim.com/v1alpha1\",\"kind\":\"FleetSite\",\"metadata\":{\"annotations\":{\"fleet.umkim.com/management-site\":\"true\"},\"name\":\"management\",\"namespace\":\"fleet-console\"},\"spec\":{\"displayName\":\"Management DC\",\"edge\":{\"hubGateway\":true,\"hubWildcard\":\"*.demo.otthol.hu\",\"hubZone\":\"demo.otthol.hu\",\"wanEgress\":{\"dnsTargetNote\":\"A/AAAA *.demo.otthol.hu → hub WAN IP\",\"enabled\":true,\"expectedWanIp\":\"159.195.137.119\"}},\"provisioningMode\":\"registry\",\"region\":\"management\",\"siteId\":\"management\",\"siteName\":\"management\"}}\n"
+        },
+        "creationTimestamp": "2026-10-01T19:10:41Z",
+        "generation": 1,
+        "managedFields": [
+          {
+            "apiVersion": "fleet.umkim.com/v1alpha1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:status": {
+                ".": {},
+                "f:message": {},
+                "f:phase": {}
+              }
+            },
+            "manager": "fleet-site-controller",
+            "operation": "Update",
+            "subresource": "status",
+            "time": "2026-10-01T19:10:41Z"
+          },
+          {
+            "apiVersion": "fleet.umkim.com/v1alpha1",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:annotations": {
+                  ".": {},
+                  "f:fleet.umkim.com/management-site": {},
+                  "f:kubectl.kubernetes.io/last-applied-configuration": {}
+                }
+              },
+              "f:spec": {
+                ".": {},
+                "f:displayName": {},
+                "f:edge": {
+                  ".": {},
+                  "f:hubGateway": {},
+                  "f:hubWildcard": {},
+                  "f:hubZone": {},
+                  "f:wanEgress": {
+                    ".": {},
+                    "f:dnsTargetNote": {},
+                    "f:enabled": {},
+                    "f:expectedWanIp": {}
+                  }
+                },
+                "f:gpu": {},
+                "f:minRootDiskGi": {},
+                "f:provisioningMode": {},
+                "f:region": {},
+                "f:rockyVersion": {},
+                "f:siteId": {},
+                "f:siteName": {}
+              }
+            },
+            "manager": "kubectl-client-side-apply",
+            "operation": "Update",
+            "time": "2026-10-01T19:10:41Z"
+          }
+        ],
+        "name": "management",
+        "namespace": "fleet-console",
+        "resourceVersion": "4811",
+        "uid": "6a440a6c-d5f7-46c5-ba5e-b2a2b41143f5"
+      },
+      "spec": {
+        "displayName": "Management DC",
+        "edge": {
+          "hubGateway": true,
+          "hubWildcard": "*.demo.otthol.hu",
+          "hubZone": "demo.otthol.hu",
+          "wanEgress": {
+            "dnsTargetNote": "A/AAAA *.demo.otthol.hu → hub WAN IP",
+            "enabled": true,
+            "expectedWanIp": "159.195.137.119"
+          }
+        },
+        "minRootDiskGi": 40,
+        "provisioningMode": "registry",
+        "region": "management",
+        "rockyVersion": "9",
+        "siteId": "management",
+        "siteName": "management"
+      },
+      "status": {
+        "message": "Registry site (datacenter metadata)",
+        "phase": "Ready"
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "backendsSource": "auto",
+  "hub": {
+    "endpoint": "https://llm.api.demo.otthol.hu/v1",
+    "phase": "Ready"
+  },
+  "hubEnabled": true,
+  "message": "LLM platform ready",
+  "phase": "Ready",
+  "publicHost": "llm.api.demo.otthol.hu"
+}

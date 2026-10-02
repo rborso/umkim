@@ -1,0 +1,44 @@
+{
+  "apiVersion": "fleet.umkim.com/v1alpha1",
+  "kind": "FleetSite",
+  "metadata": {
+    "name": "homelab"
+  },
+  "spec": {
+    "siteName": "homelab",
+    "siteId": "homelab",
+    "provisioningMode": "registry",
+    "displayName": "Homelab",
+    "region": "homelab",
+    "jumphost": "linux@jump.otthol.hu:30200",
+    "edge": {
+      "ingress": [
+        {
+          "id": "homelab-pf",
+          "method": "port_forward",
+          "wanAddressMode": "dns",
+          "zone": "homelab.otthol.hu",
+          "wildcard": "*.homelab.otthol.hu",
+          "description": "Port-forward to virt03 (lab-single-0): 80→30080, 443→30443"
+        },
+        {
+          "id": "homelab-gpu-pf",
+          "method": "port_forward",
+          "wanAddressMode": "dns",
+          "zone": "homelab.otthol.hu",
+          "wildcard": "*.gpu.homelab.otthol.hu",
+          "description": "Port-forward to virt04 (lab-gpu-0): 80→30080, 443→30443"
+        },
+        {
+          "id": "edge-rp",
+          "method": "reverse_proxy",
+          "operatorNotes": "External reverse proxy terminates TLS; operator configures vhosts"
+        }
+      ],
+      "wanEgress": {
+        "enabled": true,
+        "dnsTargetNote": "A/AAAA *.homelab.otthol.hu → current WAN (router port-forward 80→30080, 443→30443)"
+      }
+    }
+  }
+}

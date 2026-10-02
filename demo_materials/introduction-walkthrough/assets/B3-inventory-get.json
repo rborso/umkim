@@ -1,0 +1,65 @@
+{
+  "catalog": {
+    "defaults": {}
+  },
+  "files": [
+    {
+      "path": "bare_metals.yml",
+      "size": 25,
+      "synced": false
+    },
+    {
+      "path": "group_vars/all/all.yml",
+      "size": 155,
+      "synced": true
+    },
+    {
+      "path": "guests.yml",
+      "size": 20,
+      "synced": true
+    },
+    {
+      "path": "hypervisors.yml",
+      "size": 25,
+      "synced": true
+    }
+  ],
+  "guests": {},
+  "meta": {
+    "inventoryPath": "/home/linux/yaidap/inventory/homelab",
+    "lastSyncedAt": "2026-10-01T20:15:11Z",
+    "provider": "yaidap",
+    "revisionHead": "d3571385bf51cdd1",
+    "schemaVersion": 1,
+    "syncPhase": "synced"
+  },
+  "revisions": [
+    {
+      "actor": "system",
+      "id": "d3571385bf51cdd1",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T20:15:11Z"
+    },
+    {
+      "actor": "system",
+      "id": "946284b58708c53d",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T20:15:11Z"
+    },
+    {
+      "actor": "system/reconcile",
+      "after": {
+        "bare_metals.yml": "bare_metals:\n  hosts: {}\n",
+        "group_vars/all/all.yml": "---\nmemory: 4096\ncores: 2\nlibvirt_dir: /opt/local\nstorages:\n  - name: local\n    type: local\n    shared: false\n    path: /opt/local\n    os: [rocky, fedora]\n",
+        "guests.yml": "guests:\n  hosts: {}\n",
+        "hypervisors.yml": "hypervisors:\n  hosts: {}\n"
+      },
+      "id": "90ed143efd5114bf",
+      "scope": "import",
+      "summary": "import merge",
+      "ts": "2026-10-01T20:01:24Z"
+    }
+  ]
+}

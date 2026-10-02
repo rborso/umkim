@@ -1,0 +1,26 @@
+===== 2026-10-01T23:26:41+02:00 provision lab-ha-0-cp1 =====
+lab-ha-0-cp1 Succeeded VM created
+{
+  "ansible_host": "172.16.10.101",
+  "clusters": [
+===== 2026-10-01T23:27:41+02:00 provision lab-ha-0-cp2 =====
+lab-ha-0-cp2 Succeeded VM created
+{
+  "ansible_host": "172.16.10.102",
+  "clusters": [
+===== 2026-10-01T23:28:44+02:00 provision lab-ha-0-cp3 =====
+lab-ha-0-cp3 Succeeded VM created
+{
+  "ansible_host": "172.16.10.103",
+  "clusters": [
+NAME              KIND        PHASE     ANSIBLE_HOST   VM_LOCATION
+lab-gpu-pt-0-cp1  vm          Declared  172.16.10.141  virt04     
+lab-ha-0-cp1      vm          Ready     172.16.10.101  virt01     
+lab-ha-0-cp2      vm          Ready     172.16.10.102  virt01     
+lab-ha-0-cp3      vm          Ready     172.16.10.103  virt02     
+lab-ha-0-w1       vm          Ready     172.16.10.140  virt02     
+virt01            hypervisor  Ready     172.16.10.2               
+virt02            hypervisor  Ready     172.16.10.3               
+virt03            bare_metal  Failed    172.16.10.4               
+virt04            hypervisor  Declared  172.16.10.6               
+PIN_RETRY_COMPLETE

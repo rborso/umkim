@@ -1,0 +1,373 @@
+=== job describe ===
+Name:                        fleet-site-prov-9d39b09b38b9
+Namespace:                   fleet-console
+Selector:                    batch.kubernetes.io/controller-uid=801ace58-cf7f-49a7-b5c3-9873fc164ea3
+Labels:                      app=fleet-site-ansible
+                             fleet-site=homelab
+Annotations:                 <none>
+Parallelism:                 1
+Completions:                 1
+Completion Mode:             NonIndexed
+Suspend:                     false
+Backoff Limit:               1
+TTL Seconds After Finished:  86400
+Start Time:                  Thu, 01 Oct 2026 22:18:16 +0200
+Active Deadline Seconds:     5400s
+Pods Statuses:               1 Active (1 Ready) / 0 Succeeded / 1 Failed
+Pod Template:
+  Labels:           app=fleet-site-ansible
+                    batch.kubernetes.io/controller-uid=801ace58-cf7f-49a7-b5c3-9873fc164ea3
+                    batch.kubernetes.io/job-name=fleet-site-prov-9d39b09b38b9
+                    controller-uid=801ace58-cf7f-49a7-b5c3-9873fc164ea3
+                    fleet-site=homelab
+                    job-name=fleet-site-prov-9d39b09b38b9
+  Service Account:  fleet-site-controller
+  Containers:
+   ansible:
+    Image:      10.10.0.1:30443/fleet/fleet-ansible-runner:0.2
+    Port:       <none>
+    Host Port:  <none>
+    Command:
+      ansible-playbook
+      /ansible/site-provision-connector.yml
+      -e
+      fleet_site_name=homelab
+      -e
+      fleet_site_id=homelab
+      -e
+      @/ansible/inventory/group_vars/all/common.yml
+      -i
+      /inventory/inventory.ini
+      --limit
+      jumphost
+      -e
+      fleet_provision_action=install_bm
+      -e
+      fleet_provision_subject=virt03
+      -e
+      fleet_provision_confirm=true
+      -e
+      fleet_provision_inventory_path=/home/linux/yaidap/inventory/homelab
+      -e
+      fleet_provision_yaidap_root=/home/linux/yaidap
+      -e
+      fleet_provision_playbook=playbooks/install-bare-metal.yml
+      -e
+      fleet_provision_tags=install_bm
+      -e
+      fleet_provision_sync_from_store=true
+      -e
+      fleet_provision_inventory_bundle_b64=eyJmaWxlcyI6eyJncm91cF92YXJzL2FsbC9hbGwueW1sIjoiLS0tXG5tZW1vcnk6IDQwOTZcbmNvcmVzOiAyXG5saWJ2aXJ0X2RpcjogL29wdC9sb2NhbFxuYWxwaGFiZXQ6IGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6XG5kb21haW46IGxhYi5sb2NhbFxuIyBKdW1waG9zdCBsYWIgYnJpZGdlIChuMHAxX2xhYl9udyk7IHJlcXVpcmVkIGZvciBQWEUgbmV4dC1zZXJ2ZXIgLyBURlRQIGJpbmQgd2hlbiBsb2NhbGhvc3QgZmFjdHMgbGFjayBsYWIgSVB2NC5cbnRlbXB4ZV9zZXJ2ZXJfaXA6IDE3Mi4xNi4xMC41XG5jb25maWd1cmVfZmlyZXdhbGxkOiBmYWxzZVxuc3NoX3B1YmtleTogXCJzc2gtZWQyNTUxOSBBQUFBQzNOemFDMWxaREkxTlRFNUFBQUFJQ2MxSFBJK2QyelMvdmdHYzdwTnZSVXZCMEdJRUdKekFrRU52TXdFb1V2SSBsaW51eEBiY2sub3R0aG9sLmxvY2FsXCJcbnNzaF9wdWJrZXlzOlxuICAtIFwic3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUNjMUhQSStkMnpTL3ZnR2M3cE52UlV2QjBHSUVHSnpBa0VOdk13RW9VdkkgbGludXhAYmNrLm90dGhvbC5sb2NhbFwiXG5jbG91ZGluaXRfdXNlcjogbGludXhcbmNsb3VkaW5pdF9wYXNzd29yZDogXCJ5YWlkYXAtbGFiLW9ubHlcIlxuc3RvcmFnZXM6XG4gIC0gbmFtZTogbG9jYWxcbiAgICB0eXBlOiBsb2NhbFxuICAgIHNoYXJlZDogZmFsc2VcbiAgICBwYXRoOiAvb3B0L2xvY2FsXG4gICAgb3M6IFtyb2NreSwgZmVkb3JhLCByb2NreS0xMF1cbiAgLSBuYW1lOiBsb2NhbF9zc2RcbiAgICB0eXBlOiBsb2NhbFxuICAgIHNoYXJlZDogZmFsc2VcbiAgICBwYXRoOiAvb3B0L2xvY2FsXG4gICAgb3M6IFtyb2NreSwgZmVkb3JhLCByb2NreS0xMF1cbm5ldHdvcmtzOlxuICAtIG5ldHdvcmtfbmFtZTogbWdtdF9ud1xuICAgIGNpZHI6IDE5Mi4xNjguMS4wLzI0XG4gICAgZ3c6IDE5Mi4xNjguMS4xXG4gICAgZGhjcF9zdGFydDogMTkyLjE2OC4xLjIwMFxuICAgIGRoY3BfZW5kOiAxOTIuMTY4LjEuMjQwXG4gICAgZG5zOiAxOTIuMTY4LjEuMVxuICAgIGRvbWFpbjogbGFiLmxvY2FsXG4gICAgdGFnOiBcIlwiXG4gICAgcGh5c2ljYWxfbmV0d29yazogbWdtdF9hY2Nlc3NfbDFcbiAgICBkZWZhdWx0X3JvdXRlOiB0cnVlXG4gIC0gbmV0d29ya19uYW1lOiBsYWJfbndcbiAgICBjaWRyOiAxNzIuMTYuMTAuMC8yNFxuICAgIGd3OiAxNzIuMTYuMTAuMVxuICAgIGRoY3Bfc3RhcnQ6IDE3Mi4xNi4xMC4xMDBcbiAgICBkaGNwX2VuZDogMTcyLjE2LjEwLjE5OVxuICAgIGRuczogMTcyLjE2LjEwLjFcbiAgICBkb21haW46IGxhYi5sb2NhbFxuICAgIHRhZzogXCIxMFwiXG4gICAgcGh5c2ljYWxfbmV0d29yazogZGVmYXVsdF9sMlxuICAgIGRlZmF1bHRfcm91dGU6IGZhbHNlXG4iLCJndWVzdHMueW1sIjoiZ3Vlc3RzOlxuICBob3N0czpcbiAgICBsYWItZ3B1LXB0LTAtY3AxOlxuICAgICAgYW5zaWJsZV9ob3N0OiAxNzIuMTYuMTAuMTQxXG4gICAgICB2bV9sb2NhdGlvbjogdmlydDA0XG4gICAgbGFiLWhhLTAtY3AxOlxuICAgICAgYW5zaWJsZV9ob3N0OiAxNzIuMTYuMTAuMTAxXG4gICAgICB2bV9sb2NhdGlvbjogbGVhc3QtdXRpbGl6ZWRcbiAgICBsYWItaGEtMC1jcDI6XG4gICAgICBhbnNpYmxlX2hvc3Q6IDE3Mi4xNi4xMC4xMDJcbiAgICAgIHZtX2xvY2F0aW9uOiBsZWFzdC11dGlsaXplZFxuICAgIGxhYi1oYS0wLWNwMzpcbiAgICAgIGFuc2libGVfaG9zdDogMTcyLjE2LjEwLjEwM1xuICAgICAgdm1fbG9jYXRpb246IGxlYXN0LXV0aWxpemVkXG4gICAgbGFiLWhhLTAtdzE6XG4gICAgICBhbnNpYmxlX2hvc3Q6IDE3Mi4xNi4xMC4xNDBcbiAgICAgIHZtX2xvY2F0aW9uOiBsZWFzdC11dGlsaXplZFxuZXh0ZXJuYWw6XG4gIGhvc3RzOlxuICAgIHZpcnQwMzpcbiAgICAgIGFuc2libGVfaG9zdDogMTcyLjE2LjEwLjRcbiIsImhvc3RfdmFycy92aXJ0MDEueW1sIjoiLS0tXG5hbnNpYmxlX2hvc3Q6IDE3Mi4xNi4xMC4yXG5vczogcm9ja3ktMTBcbmxlZ2FjeTogZmFsc2Vcbmluc3RhbGxfb3M6IGZhbHNlXG5jb25maWd1cmVfZmlyZXdhbGxkOiBmYWxzZVxuYWxsb3dfbWFuYWdlbWVudF9uaWNfcmV3aXJlOiB0cnVlXG5wcm92aXNpb25pbmdfcHJvdmlkZXI6IGxpYnZpcnRcblxudGVtcHhlX2Rpc2NvdmVyeTpcbiAgZW5hYmxlZDogZmFsc2VcblxubmZzX2V4cG9ydHM6XG4gIC0gcGF0aDogL2V4cG9ydC9sYWJcbiAgICBjbGllbnRzOlxuICAgICAgLSAxNzIuMTYuMTAuMTAwXG4gICAgICAtIDE3Mi4xNi4xMC4xMDFcbiAgICAgIC0gMTcyLjE2LjEwLjEwMlxuICAgICAgLSAxNzIuMTYuMTAuMTAzXG4gICAgICAtIDE3Mi4xNi4xMC4xNDBcbiAgLSBwYXRoOiAvZXhwb3J0L3ZpcnQwMi12bTAxXG4gICAgY2xpZW50czpcbiAgICAgIC0gMTcyLjE2LjEwLjE0MFxuXG5kaXNrczpcbiAgLSBuYW1lOiBib290ZGlza1xuICAgIGRpc2s6IGRpc2svYnktaWQvbnZtZS1TYW1zdW5nX1NTRF85ODBfNTAwR0JfUzY0RE5MMFQ1MDE5MTVXXG4gICAgYm9vdGRpc2s6IHRydWVcbiAgICBkZXZpY2U6IDBcbiAgICBzaXplOiA0NjZcbiAgICB1c2VfZnVsbF9kaXNrOiB0cnVlXG5cbnVwbGlua3M6XG4gIC0gbmFtZTogbjBwMFxuICAgIHBoeXNpY2FsX25ldHdvcms6IGxhYl9hY2Nlc3NfbDFcbiAgICBpbnRlcmZhY2U6IGVucDBzMzFmNlxuICAgIG1hY19hZGRyZXNzOiBcImU4OjZhOjY0OjU2OmUzOjkzXCJcbiAgICBuZXR3b3JrczpcbiAgICAgIC0gem9uZTogbGFiXG4gICAgICAgIG1vZGVsOiBlMTAwMFxuICAgICAgICBjbG91ZGluaXQ6IGZhbHNlXG4gICAgICAgIHB4ZTogdHJ1ZVxuICAgICAgICB2bV9uZXR3b3JrOiB0cnVlXG4gICAgICAgIG5ldHdvcmtfbmFtZTogbGFiX253XG4gICAgICAgIHRhZzogXCJcIlxuICAgICAgICBicmlkZ2VfbmFtZTogbjBwMF9sYWJfbndcbiAgICAgICAgaXA6IFwiMTcyLjE2LjEwLjJcIlxuICAgICAgICBkZWZhdWx0X3JvdXRlOiB0cnVlXG4gICAgICAgIHRjcF9vcGVuOlxuICAgICAgICAgIC0gMjJcbiAgICAgICAgICAtIDU5MDAtNTk5OVxuICAgICAgICB1ZHBfb3BlbjogW11cbiAgICAgICAgc2VydmljZXNfb3BlbjpcbiAgICAgICAgICAtIG5mc1xuICAgICAgICAgIC0gcnBjLWJpbmRcbiAgICAgICAgICAtIG1vdW50ZFxuICAtIG5hbWU6IG4wcDFcbiAgICBwaHlzaWNhbF9uZXR3b3JrOiBtZ210X2FjY2Vzc19sMVxuICAgIGludGVyZmFjZTogZW5wMHMyMGYwdTFcbiAgICBtYWNfYWRkcmVzczogXCIwMDowZTpjNjphZjoyNjo0OVwiXG4gICAgbmV0d29ya3M6XG4gICAgICAtIHpvbmU6IGV4dGVybmFsXG4gICAgICAgIG1vZGVsOiBlMTAwMFxuICAgICAgICBjbG91ZGluaXQ6IGZhbHNlXG4gICAgICAgIHB4ZTogZmFsc2VcbiAgICAgICAgdm1fbmV0d29yazogdHJ1ZVxuICAgICAgICBuZXR3b3JrX25hbWU6IG1nbXRfbndcbiAgICAgICAgdGFnOiBcIlwiXG4gICAgICAgIGJyaWRnZV9uYW1lOiBuMHAxX21nbXRfbndcbiAgICAgICAgaXA6IFwiMTkyLjE2OC4xLjExMFwiXG4gICAgICAgIGRlZmF1bHRfcm91dGU6IGZhbHNlXG4gICAgICAgIHRjcF9vcGVuOlxuICAgICAgICAgIC0gMjJcbiAgICAgICAgdWRwX29wZW46IFtdXG4gICAgICAgIHNlcnZpY2VzX29wZW46IFtdXG4iLCJob3N0X3ZhcnMvdmlydDAyLnltbCI6Ii0tLVxuYW5zaWJsZV9ob3N0OiAxNzIuMTYuMTAuM1xub3M6IHJvY2t5LTEwXG5sZWdhY3k6IGZhbHNlXG5pbnN0YWxsX29zOiBmYWxzZVxuY29uZmlndXJlX2ZpcmV3YWxsZDogZmFsc2VcbmFsbG93X21hbmFnZW1lbnRfbmljX3Jld2lyZTogdHJ1ZVxucHJvdmlzaW9uaW5nX3Byb3ZpZGVyOiBsaWJ2aXJ0XG5cbnRlbXB4ZV9kaXNjb3Zlcnk6XG4gIGVuYWJsZWQ6IGZhbHNlXG5cbmRpc2tzOlxuICAtIG5hbWU6IGJvb3RkaXNrXG4gICAgZGlzazogZGlzay9ieS1pZC9hdGEtU2Ftc3VuZ19TU0RfODUwX0VWT18xMjBHQl9TMjFVTlNBRzQxMzg5MkpcbiAgICBib290ZGlzazogdHJ1ZVxuICAgIGRldmljZTogMFxuICAgIHNpemU6IDExMlxuICAgIHVzZV9mdWxsX2Rpc2s6IHRydWVcblxudXBsaW5rczpcbiAgLSBuYW1lOiBuMHAwXG4gICAgcGh5c2ljYWxfbmV0d29yazogbGFiX2FjY2Vzc19sMVxuICAgIG1vZGVsOiBlMTAwMFxuICAgIGludGVyZmFjZTogZW5wMHMzMWY2XG4gICAgbWFjX2FkZHJlc3M6IFwiODA6ZTg6MmM6OWQ6YWI6OTlcIlxuICAgIG5ldHdvcmtzOlxuICAgICAgLSB6b25lOiBsYWJcbiAgICAgICAgY2xvdWRpbml0OiBmYWxzZVxuICAgICAgICBweGU6IHRydWVcbiAgICAgICAgdm1fbmV0d29yazogdHJ1ZVxuICAgICAgICBuZXR3b3JrX25hbWU6IGxhYl9ud1xuICAgICAgICB0YWc6IFwiXCJcbiAgICAgICAgYnJpZGdlX25hbWU6IG4wcDBfbGFiX253XG4gICAgICAgIGlwOiBcIjE3Mi4xNi4xMC4zXCJcbiAgICAgICAgZGVmYXVsdF9yb3V0ZTogdHJ1ZVxuICAgICAgICB0Y3Bfb3BlbjpcbiAgICAgICAgICAtIDIyXG4gICAgICAgICAgLSA1OTAwLTU5OTlcbiAgICAgICAgdWRwX29wZW46IFtdXG4gICAgICAgIHNlcnZpY2VzX29wZW46IFtdXG4gIC0gbmFtZTogbjBwMVxuICAgIHBoeXNpY2FsX25ldHdvcms6IG1nbXRfYWNjZXNzX2wxXG4gICAgbW9kZWw6IGUxMDAwXG4gICAgaW50ZXJmYWNlOiBlbnAwczIwZjB1M1xuICAgIG1hY19hZGRyZXNzOiBcIjYwOjdkOjA5OjdkOmQxOmM5XCJcbiAgICBuZXR3b3JrczpcbiAgICAgIC0gem9uZTogZXh0ZXJuYWxcbiAgICAgICAgY2xvdWRpbml0OiBmYWxzZVxuICAgICAgICBweGU6IGZhbHNlXG4gICAgICAgIHZtX25ldHdvcms6IHRydWVcbiAgICAgICAgbmV0d29ya19uYW1lOiBtZ210X253XG4gICAgICAgIHRhZzogXCJcIlxuICAgICAgICBicmlkZ2VfbmFtZTogbjBwMV9tZ210X253XG4gICAgICAgIGlwOiBcIjE5Mi4xNjguMS4xMjBcIlxuICAgICAgICBkZWZhdWx0X3JvdXRlOiBmYWxzZVxuICAgICAgICB0Y3Bfb3BlbjpcbiAgICAgICAgICAtIDIyXG4gICAgICAgIHVkcF9vcGVuOiBbXVxuICAgICAgICBzZXJ2aWNlc19vcGVuOiBbXVxuIiwiaG9zdF92YXJzL3ZpcnQwMy55bWwiOiItLS1cbiMgQmFyZS1tZXRhbCBjbHVzdGVyIG5vZGUgdmlydDAzIChsYWItc2luZ2xlLTA7IGJhcmVfbWV0YWxzLnltbCDigJQgbm90IGEgbGlidmlydCBndWVzdCkuXG5hbnNpYmxlX2hvc3Q6IDE3Mi4xNi4xMC40XG5vczogcm9ja3ktMTBcbmxlZ2FjeTogZmFsc2Vcbmluc3RhbGxfb3M6IHRydWVcbmNvbmZpZ3VyZV9maXJld2FsbGQ6IGZhbHNlXG5jb25maWd1cmVfY29ja3BpdDogZmFsc2VcbmFsbG93X21hbmFnZW1lbnRfbmljX3Jld2lyZTogdHJ1ZVxuXG50ZW1weGVfZGlzY292ZXJ5OlxuICBlbmFibGVkOiB0cnVlXG5cbmRpc2tzOlxuICAtIG5hbWU6IGJvb3RkaXNrXG4gICAgZGlzazogZGlzay9ieS1pZC9hdGEtVE9TSElCQV9USE5TTkoyNTZHOE5VXzQ1S0IzMDgyS0ZKWFxuICAgIGJvb3RkaXNrOiB0cnVlXG4gICAgZGV2aWNlOiAwXG4gICAgc2l6ZTogMjM5XG4gICAgdXNlX2Z1bGxfZGlzazogdHJ1ZVxuXG51cGxpbmtzOlxuICAtIG5hbWU6IG4wcDBcbiAgICBwaHlzaWNhbF9uZXR3b3JrOiBsYWJfYWNjZXNzX2wxXG4gICAgbW9kZWw6IGUxMDAwXG4gICAgaW50ZXJmYWNlOiBlbnAyczBcbiAgICBtYWNfYWRkcmVzczogXCI4ODpkNzpmNjoyYzoxNzozYlwiXG4gICAgbmV0d29ya3M6XG4gICAgICAtIHpvbmU6IGxhYlxuICAgICAgICBjbG91ZGluaXQ6IGZhbHNlXG4gICAgICAgIHB4ZTogdHJ1ZVxuICAgICAgICB2bV9uZXR3b3JrOiB0cnVlXG4gICAgICAgIG5ldHdvcmtfbmFtZTogbGFiX253XG4gICAgICAgIHRhZzogXCJcIlxuICAgICAgICBicmlkZ2VfbmFtZTogbjBwMF9sYWJfbndcbiAgICAgICAgaXA6IFwiMTcyLjE2LjEwLjRcIlxuICAgICAgICBkZWZhdWx0X3JvdXRlOiB0cnVlXG4gICAgICAgIHRjcF9vcGVuOlxuICAgICAgICAgIC0gMjJcbiAgICAgICAgICAtIDU5MDAtNTk5OVxuICAgICAgICB1ZHBfb3BlbjogW11cbiAgICAgICAgc2VydmljZXNfb3BlbjogW11cbiIsImhvc3RfdmFycy92aXJ0MDQueW1sIjoiLS0tXG4jIEh5cGVydmlzb3IgdmlydDA0IOKAlCBsYWItZ3B1LTAgLyBsYWItZ3B1LXB0LTAgR1BVIGhvc3QgKDE3Mi4xNi4xMC42OyBwcm9tb3RlZCBmcm9tIGJhcmUgbWV0YWwpLlxuYW5zaWJsZV9ob3N0OiAxNzIuMTYuMTAuNlxub3M6IHJvY2t5LTEwXG5sZWdhY3k6IGZhbHNlXG5pbnN0YWxsX29zOiBmYWxzZVxuY29uZmlndXJlX2ZpcmV3YWxsZDogZmFsc2VcbmNvbmZpZ3VyZV9jb2NrcGl0OiBmYWxzZVxuYWxsb3dfbWFuYWdlbWVudF9uaWNfcmV3aXJlOiB0cnVlXG5wcm92aXNpb25pbmdfcHJvdmlkZXI6IGxpYnZpcnRcblxudGVtcHhlX2Rpc2NvdmVyeTpcbiAgZW5hYmxlZDogZmFsc2VcblxuZGlza3M6XG4gIC0gbmFtZTogYm9vdGRpc2tcbiAgICBkaXNrOiBkaXNrL2J5LWlkL2F0YS1XRENfV0RTNTAwRzJCMEEtMDBTTTUwXzIwMzYwRjgwMjc0NFxuICAgIGJvb3RkaXNrOiB0cnVlXG4gICAgZGV2aWNlOiAwXG4gICAgc2l6ZTogNDY2XG4gICAgdXNlX2Z1bGxfZGlzazogdHJ1ZVxuXG51cGxpbmtzOlxuICAtIG5hbWU6IG4wcDBcbiAgICBwaHlzaWNhbF9uZXR3b3JrOiBsYWJfYWNjZXNzX2wxXG4gICAgaW50ZXJmYWNlOiBlbnAyczBcbiAgICBtYWNfYWRkcmVzczogXCI3MDo4NTpjMjpkNDo1YTo5NVwiXG4gICAgbmV0d29ya3M6XG4gICAgICAtIHpvbmU6IGxhYlxuICAgICAgICBjbG91ZGluaXQ6IGZhbHNlXG4gICAgICAgIHB4ZTogdHJ1ZVxuICAgICAgICB2bV9uZXR3b3JrOiB0cnVlXG4gICAgICAgIG5ldHdvcmtfbmFtZTogbGFiX253XG4gICAgICAgIHRhZzogXCJcIlxuICAgICAgICBicmlkZ2VfbmFtZTogbjBwMF9sYWJfbndcbiAgICAgICAgaXA6IFwiMTcyLjE2LjEwLjZcIlxuICAgICAgICBkZWZhdWx0X3JvdXRlOiB0cnVlXG4gICAgICAgIHRjcF9vcGVuOlxuICAgICAgICAgIC0gMjJcbiAgICAgICAgdWRwX29wZW46IFtdXG4gICAgICAgIHNlcnZpY2VzX29wZW46IFtdXG5cbmdwdV9wYXNzdGhyb3VnaF9ob3N0OlxuICBlbmFibGVkOiB0cnVlXG4gIHJlYm9vdF9hbGxvd2VkOiB0cnVlXG4gIGRpc2FibGVfbnZpZGlhX2hvc3RfZHJpdmVyOiB0cnVlXG4gIGF1dG9fZGV0ZWN0OiBmYWxzZVxuICBpbmNsdWRlX2F1ZGlvX2Z1bmN0aW9uOiB0cnVlXG4gIGtlcm5lbF9hcmdzOlxuICAgIC0gaW50ZWxfaW9tbXU9b25cbiAgICAtIGlvbW11PXB0XG4gIHBjaV9kZXZpY2VzOlxuICAgIC0gXCIwMDAwOjAxOjAwLjBcIlxuICAgIC0gXCIwMDAwOjAxOjAwLjFcIlxuICB2ZmlvX2RldmljZV9pZHM6XG4gICAgLSBcIjEwZGU6MWY4MlwiXG4gICAgLSBcIjEwZGU6MTBmYVwiXG4iLCJoeXBlcnZpc29ycy55bWwiOiIjIExhYiBoeXBlcnZpc29yczogdmlydDAx4oCTdmlydDAyIChnZW5lcmFsKSwgdmlydDA0IChsYWItZ3B1LTAgQCAuNikuIHZpcnQwMyBpcyBiYXJlIG1ldGFsIGluIGJhcmVfbWV0YWxzLnltbC5cbmh5cGVydmlzb3JzOlxuICBob3N0czpcbiAgICB2aXJ0MDE6XG4gICAgICBhbnNpYmxlX2hvc3Q6IDE3Mi4xNi4xMC4yXG4gICAgdmlydDAyOlxuICAgICAgYW5zaWJsZV9ob3N0OiAxNzIuMTYuMTAuM1xuICAgIHZpcnQwNDpcbiAgICAgIGFuc2libGVfaG9zdDogMTcyLjE2LjEwLjZcbiJ9fQ==
+    Environment:
+      KUBECONFIG:                 /etc/kube/config
+      ANSIBLE_HOST_KEY_CHECKING:  False
+    Mounts:
+      /etc/kube from kube (rw)
+      /inventory from inventory (rw)
+      /root/.ssh from ssh (ro)
+  Volumes:
+   inventory:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      fleet-site-homelab-provision-inventory
+    Optional:  false
+   ssh:
+    Type:        Secret=***REDACTED*** volume populated by a Secret)
+    SecretName:  fleet-site-homelab-provision-ssh
+    Optional:    false
+   kube:
+    Type:          Secret=***REDACTED*** volume populated by a Secret)
+    SecretName:    fleet-site-controller-kubeconfig
+    Optional:      false
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Events:
+  Type    Reason            Age    From            Message
+  ----    ------            ----   ----            -------
+  Normal  SuccessfulCreate  27m    job-controller  Created pod: fleet-site-prov-9d39b09b38b9-k4pgk
+  Normal  SuccessfulCreate  7m14s  job-controller  Created pod: fleet-site-prov-9d39b09b38b9-kg9vx
+=== pod list ===
+NAME                                 READY   STATUS    RESTARTS   AGE     IP          NODE        NOMINATED NODE   READINESS GATES
+fleet-site-prov-9d39b09b38b9-k4pgk   0/1     Error     0          27m     10.10.0.1   umkim-hub   <none>           <none>
+fleet-site-prov-9d39b09b38b9-kg9vx   1/1     Running   0          7m14s   10.10.0.1   umkim-hub   <none>           <none>
+=== logs Error pod k4pgk ===
+        ok: [virt03] => {
+            "msg": [
+                "TempXE container 'pxe-server' is RUNNING (PXE armed).",
+                "REINSTALL MACs on the wire: none",
+                "DISCOVERY MACs on the wire: 88:d7:f6:2c:17:3b",
+                "When finished: ansible-playbook -i <inventory> playbooks/configure-tempxe.yml --tags tempxe_stop"
+            ]
+        }
+
+        PLAY [Reboot target into PXE install] ******************************************
+
+        TASK [configure-tempxe : skip automated pxe reboot when disabled] **************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : select uefi ipv4 network boot entry and reboot] *******
+        changed: [virt03]
+
+        PLAY [Wait for kickstart install, handoff, and disarm TempXE] ******************
+
+        TASK [configure-tempxe : wait for ssh to drop after pxe reboot] ****************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : remove stale ssh host key after reinstall] ************
+        changed: [virt03 -> localhost]
+
+        TASK [configure-tempxe : poll until kickstart post-install completes] **********
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (45 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (44 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (43 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (42 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (41 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (40 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (39 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (38 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (37 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (36 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (35 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (34 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (33 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (32 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (31 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (30 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (29 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (28 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (27 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (26 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (25 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (24 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (23 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (22 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (21 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (20 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (19 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (18 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (17 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (16 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (15 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (14 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (13 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (12 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (11 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (10 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (9 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (8 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (7 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (6 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (5 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (4 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (3 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (2 retries left).
+        FAILED - RETRYING: [virt03 -> localhost]: poll until kickstart post-install completes (1 retries left).
+        fatal: [virt03 -> localhost]: FAILED! => {"attempts": 45, "changed": false, "cmd": "set -euo pipefail\nuser=\"linux\"\nhost=\"172.16.10.4\"\nssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 \\\n  \"${user}@${host}\" \\\n  'sudo test -f /root/ks-post.log && cat /proc/sys/kernel/random/boot_id'\n", "delta": "0:00:00.304083", "end": "2026-10-01 22:38:07.511566", "msg": "", "rc": 0, "start": "2026-10-01 22:38:07.207483", "stderr": "", "stderr_lines": [], "stdout": "e055eb9e-9c89-44a7-9a40-93ede60a15e7", "stdout_lines": ["e055eb9e-9c89-44a7-9a40-93ede60a15e7"]}
+
+        TASK [record bare-metal install failure for integration emit] ******************
+        ok: [virt03]
+
+        TASK [fail bare-metal install after recording integration result] **************
+        fatal: [virt03]: FAILED! => {"changed": false, "msg": ""}
+
+        TASK [configure-tempxe : load tempxe container facts] **************************
+        included: /home/linux/yaidap/roles/configure-tempxe/tasks/tempxe_container_facts.yml for virt03
+
+        TASK [configure-tempxe : build tempxe podman command prefix] *******************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : inspect tempxe container state] ***********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : set tempxe container status fact] *********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : resolve tempxe discovery output paths] ****************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : build tempxe podman command prefix] *******************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : inspect tempxe container state] ***********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : set tempxe container status fact] *********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : ensure tempxe discovery data directory exists] ********
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : copy discovery archives from tempxe container when present] ***
+        changed: [virt03 -> localhost]
+
+        TASK [configure-tempxe : list local PXE discovery archives] ********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : index PXE discovery archives by host and mac] *********
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : select latest PXE discovery archive for this host] ****
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : skip host when no PXE discovery archive is present] ***
+        ok: [virt03 -> localhost] => {
+            "msg": "No PXE discovery archive for virt03 under /home/linux/yaidap/playbooks/../inventory/example/generated/pxe-discovery (container=running)."
+        }
+
+        TASK [configure-tempxe : ensure PXE discovery unpack directory exists] *********
+        skipping: [virt03]
+
+        TASK [configure-tempxe : unpack PXE discovery archive] *************************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : read PXE discovery notes.json] ************************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : read PXE discovery ip_addr.json] **********************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : read PXE discovery ansible_host identity] *************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : fail when PXE archive has no notes.json] **************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : parse PXE discovery notes and addresses] **************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : map PXE discovered IPv4 addresses by MAC] *************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : build generated interface values from PXE notes] ******
+        skipping: [virt03]
+
+        TASK [configure-tempxe : build generated disk values from PXE notes] ***********
+        skipping: [virt03]
+
+        TASK [configure-tempxe : compose notes for generated inventory from PXE discovery] ***
+        skipping: [virt03]
+
+        TASK [export generated inventory drafts from PXE discovery] ********************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : print PXE discovery collect summary] ******************
+        skipping: [virt03]
+
+        TASK [configure-tempxe : stop tempxe pxe container when present] ***************
+        changed: [virt03 -> localhost]
+
+        TASK [configure-tempxe : refresh tempxe container status after stop] ***********
+        included: /home/linux/yaidap/roles/configure-tempxe/tasks/tempxe_container_facts.yml for virt03
+
+        TASK [configure-tempxe : build tempxe podman command prefix] *******************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : inspect tempxe container state] ***********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : set tempxe container status fact] *********************
+        ok: [virt03 -> localhost]
+
+        TASK [configure-tempxe : confirm tempxe container is absent] *******************
+        ok: [virt03 -> localhost] => {
+            "changed": false,
+            "msg": "All assertions passed"
+        }
+
+        TASK [configure-tempxe : print tempxe disarmed message] ************************
+        ok: [virt03 -> localhost] => {
+            "msg": [
+                "TempXE container 'pxe-server' stopped/removed — PXE disarmed at runtime.",
+                "PXE discovery drafts (if any) were written under /home/linux/yaidap/playbooks/../inventory/example/generated/host_vars/.",
+                "Boot files under roles/configure-tempxe/container/ are unchanged; rebuild if you need different arming.",
+                "Check inventory intent anytime with --tags tempxe_status"
+            ]
+        }
+
+        PLAY RECAP *********************************************************************
+        virt03                     : ok=107  changed=9    unreachable=0    failed=1    skipped=57   rescued=1    ignored=0
+    stdout_lines: <omitted>
+
+PLAY RECAP *********************************************************************
+jumphost                   : ok=10   changed=3    unreachable=0    failed=1    skipped=21   rescued=0    ignored=0   
+
+=== logs Running pod kg9vx (tail) ===
+skipping: [jumphost]
+
+TASK [Emit import files JSON for hub] ******************************************
+skipping: [jumphost]
+
+TASK [Stop after standalone inventory import preview] **************************
+skipping: [jumphost]
+
+TASK [Require YAIDAP repo sync parameters] *************************************
+skipping: [jumphost]
+
+TASK [Stage YAIDAP git deploy key on jumphost] *********************************
+skipping: [jumphost]
+
+TASK [Ensure git host keys for SSH remotes] ************************************
+skipping: [jumphost]
+
+TASK [Clone or update YAIDAP checkout] *****************************************
+skipping: [jumphost]
+
+TASK [Emit YAIDAP sync revision marker] ****************************************
+skipping: [jumphost]
+
+TASK [Remove staged YAIDAP git deploy key from jumphost] ***********************
+skipping: [jumphost]
+
+TASK [Stop after YAIDAP repo sync] *********************************************
+skipping: [jumphost]
+
+TASK [Resolve YAIDAP playbook defaults] ****************************************
+ok: [jumphost]
+
+TASK [Fail when playbook mapping missing] **************************************
+ok: [jumphost] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [Check YAIDAP guest host_vars before legacy sync] *************************
+skipping: [jumphost]
+
+TASK [Create YAIDAP guest host_vars stub for legacy hub sync] ******************
+skipping: [jumphost]
+
+TASK [Sync vm_location into YAIDAP guest host_vars] ****************************
+skipping: [jumphost]
+
+TASK [Sync memory into YAIDAP guest host_vars] *********************************
+skipping: [jumphost]
+
+TASK [Sync cores into YAIDAP guest host_vars] **********************************
+skipping: [jumphost]
+
+TASK [Sync os into YAIDAP guest host_vars] *************************************
+skipping: [jumphost]
+
+TASK [Derive lab MAC from ansible_host when provided] **************************
+skipping: [jumphost]
+
+TASK [Sync ansible_host into YAIDAP guest host_vars] ***************************
+skipping: [jumphost]
+
+TASK [Require guest mgmt IP for VM create (legacy sync)] ***********************
+skipping: [jumphost]
+
+TASK [Require guest mgmt IP for VM create (connector store)] *******************
+skipping: [jumphost]
+
+TASK [Ensure YAIDAP libvirt guest profile in host_vars] ************************
+skipping: [jumphost]
+
+TASK [Resolve provision subject ansible_host for SSH] **************************
+ok: [jumphost]
+
+TASK [Remove stale provision subject host key] *********************************
+changed: [jumphost]
+
+TASK [Seed provision subject host key after refresh] ***************************
+changed: [jumphost]
+
+TASK [Run YAIDAP ansible-playbook command on jumphost] *************************

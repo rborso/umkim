@@ -1,0 +1,143 @@
+{
+  "acmeStatus": {
+    "message": "Cluster Let's Encrypt active",
+    "phase": "Ready"
+  },
+  "acme_enabled": true,
+  "available": true,
+  "capabilities": {
+    "gpu": false,
+    "ha_cluster": true,
+    "ha_storage": true,
+    "ha_topology": true,
+    "kubevirt": false,
+    "kvm": true,
+    "network.multus_l2": false,
+    "storage.rwo": true,
+    "storage.rwx": false
+  },
+  "capability_discovery": {
+    "cluster_capabilities": {
+      "gpu": false,
+      "ha_topology": true,
+      "kubevirt": false,
+      "kvm": true,
+      "network.multus_l2": false,
+      "storage.rwo": true,
+      "storage.rwx": false
+    },
+    "cluster_resources": {
+      "gpu.available": 0,
+      "gpu.total": 0
+    },
+    "completed_at": "2026-10-01T22:10:49Z",
+    "message": "Capabilities discovered",
+    "nodes": [
+      {
+        "capabilities": {
+          "gpu": false,
+          "kvm": true
+        },
+        "name": "lab-ha-0-cp1"
+      },
+      {
+        "capabilities": {
+          "gpu": false,
+          "kvm": true
+        },
+        "name": "lab-ha-0-cp2"
+      },
+      {
+        "capabilities": {
+          "gpu": false,
+          "kvm": true
+        },
+        "name": "lab-ha-0-cp3"
+      }
+    ],
+    "phase": "Succeeded"
+  },
+  "console_managed": true,
+  "direct_ingress": true,
+  "dns_zone": "homelab.otthol.hu",
+  "edge_wan_ip": "172.16.10.100",
+  "ingressAuthStatus": {
+    "message": "Ingress forward-auth active",
+    "phase": "Ready"
+  },
+  "ingress_auth_enabled": true,
+  "ingress_enabled": true,
+  "ingress_id": "homelab-ha-pf",
+  "labels": {
+    "fleet.capability/gpu": "false",
+    "fleet.capability/ha_cluster": "true",
+    "fleet.capability/ha_storage": "true",
+    "fleet.capability/kubevirt": "false",
+    "fleet.capability/kvm": "true",
+    "fleet.capability/network.multus_l2": "false",
+    "fleet.capability/storage.rwo": "true",
+    "fleet.capability/storage.rwx": "false",
+    "fleet.health/overlay_reachable": "false",
+    "fleet.resource/capacity_ok": "true",
+    "fleet.resource/cpu.allocatable_milli": "6000",
+    "fleet.resource/cpu.max_node_allocatable_milli": "2000",
+    "fleet.resource/cpu.max_node_available_milli": "1728",
+    "fleet.resource/cpu.requested_milli": "974",
+    "fleet.resource/cpu.usage_milli": "697",
+    "fleet.resource/cpu.utilization": "12",
+    "fleet.resource/gpu.available": "0",
+    "fleet.resource/gpu.requested": "0",
+    "fleet.resource/gpu.total": "0",
+    "fleet.resource/memory.allocatable_bytes": "11491725312",
+    "fleet.resource/memory.max_node_allocatable_bytes": "3830575104",
+    "fleet.resource/memory.max_node_available_bytes": "3757174784",
+    "fleet.resource/memory.requested_bytes": "381681664",
+    "fleet.resource/memory.usage_bytes": "3531710464",
+    "fleet.resource/memory.utilization": "31",
+    "fleet.resource/metrics_at": "20261001T222630Z",
+    "fleet.resource/metrics_ok": "true",
+    "fleet.site": "homelab",
+    "fleet.topology/ha": "true",
+    "fleet.topology/nest_depth": "0",
+    "fleet.topology/provisioner": "k3s",
+    "fleet.topology/region": "",
+    "fleet.topology/topology": "ha_3_node"
+  },
+  "managed_cluster_available": true,
+  "method": "port_forward",
+  "name": "lab-ha-0",
+  "nodeOperation": {
+    "id": "nop-1790893586855311281",
+    "jobName": "fleet-cluster-nodeop-lab-ha-0",
+    "message": "Adding worker node (Ansible)",
+    "node": "lab-ha-0-w1",
+    "phase": "Running",
+    "type": "addWorker"
+  },
+  "providers": {
+    "helm": {
+      "phase": "NotInstalled",
+      "providerName": "helm-lab-ha-0"
+    },
+    "k8s": {
+      "phase": "NotInstalled",
+      "providerName": "k8s-lab-ha-0"
+    },
+    "kubevirt": {
+      "phase": "NotInstalled",
+      "providerName": "kubevirt-lab-ha-0"
+    }
+  },
+  "provisioning_mode": "bundle",
+  "provisioning_phase": "Ready",
+  "site": "homelab",
+  "tls_policy": "acme_cluster",
+  "topology": {
+    "ha": "true",
+    "nest_depth": "0",
+    "provisioner": "k3s",
+    "region": ""
+  },
+  "traefik_http_port": 30080,
+  "upstream_host": "10.10.0.12"
+}

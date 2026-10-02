@@ -1,0 +1,11 @@
+START_FORCE 2026-10-02T01:19:46+02:00
+OK: KubeVirt platform install with LAN Multus requested (phase=Installing)
+status: phase=Installing message=KubeVirt platform install with LAN Multus requested
+status: phase=Installing message=Installing KubeVirt platform (Multus/CDI/KubeVirt)
+status: phase=Installing message=Installing KubeVirt platform (Multus/CDI/KubeVirt)
+status: phase=Installing message=Installing KubeVirt platform (Multus/CDI/KubeVirt)
+status: phase=Installing message=Installing KubeVirt platform (Multus/CDI/KubeVirt)
+status: phase=Installing message=Installing KubeVirt platform (Multus/CDI/KubeVirt)
+status: phase=Ready message=KubeVirt platform installed (LAN Multus NAD)
+OK: KubeVirt Ready on lab-ha-0
+EXIT:0 2026-10-02T01:20:46+02:00

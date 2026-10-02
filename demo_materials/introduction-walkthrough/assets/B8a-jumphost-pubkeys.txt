@@ -1,0 +1,6 @@
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICc1HPI+d2zS/vgGc7pNvRUvB0GIEGJzAkENvMwEoUvI linux@bck.otthol.local
+authorized_keys
+id_ed25519
+id_ed25519.pub
+known_hosts
+known_hosts.old

@@ -1,0 +1,30 @@
+{
+  "cluster_capabilities": {
+    "gpu": true,
+    "ha_topology": false,
+    "kubevirt": false,
+    "kvm": true,
+    "network.multus_l2": false,
+    "storage.rwo": true,
+    "storage.rwx": false
+  },
+  "cluster_resources": {
+    "gpu.available": 1,
+    "gpu.total": 1
+  },
+  "completed_at": "2026-10-02T00:31:20Z",
+  "message": "Capabilities discovered",
+  "nodes": [
+    {
+      "capabilities": {
+        "gpu": true,
+        "kvm": true
+      },
+      "driver_loaded": true,
+      "gpu_count": 1,
+      "name": "virt03.lab.local",
+      "nvidia_pci_id": "10de:1c8c"
+    }
+  ],
+  "phase": "Succeeded"
+}

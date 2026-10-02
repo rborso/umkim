@@ -1,0 +1,2 @@
+whoami=404
+whoami-auth=404

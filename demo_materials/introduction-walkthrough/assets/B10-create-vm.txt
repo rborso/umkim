@@ -1,0 +1,77 @@
+=== create_vm 2026-10-02T02:05:02+02:00 ===
+Error: HTTP 500: Operation cannot be fulfilled on fleetsites.fleet.umkim.com "homelab": the object has been modified; please apply your changes to the latest version and try again
+Usage:
+  umkim site host provision [site] [name] [flags]
+
+Flags:
+      --action string   install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status | prepare_hypervisor | prepare_gpu_passthrough | prepare_hypervisor_gpu (default from kind)
+      --confirm         Required for install_bm / discover_pxe / destroy / prepare_gpu_passthrough / prepare_hypervisor_gpu
+  -h, --help            help for provision
+      --wait            Poll until Succeeded or Failed
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+
+exit:0
+=== create_vm retry 2026-10-02T02:05:10+02:00 ===
+Error: HTTP 404: not found
+Usage:
+  umkim site host provision [site] [name] [flags]
+
+Flags:
+      --action string   install_bm | create_vm | plan_vm | destroy | discover | discover_pxe | status | prepare_hypervisor | prepare_gpu_passthrough | prepare_hypervisor_gpu (default from kind)
+      --confirm         Required for install_bm / discover_pxe / destroy / prepare_gpu_passthrough / prepare_hypervisor_gpu
+  -h, --help            help for provision
+      --wait            Poll until Succeeded or Failed
+
+Global Flags:
+      --api-url string    Fleet API base URL (or UMKIM_API_URL)
+      --auth-url string   Auth API base URL (or UMKIM_AUTH_URL)
+  -o, --output string     Output format: table, wide, json (default "table")
+      --token string      Service account token (or UMKIM_TOKEN)
+
+exit:0
+Found 2 pods, using pod/fleet-site-prov-0d133fa14b9f-fznl6
+TASK [Create YAIDAP guest host_vars stub for legacy hub sync] ******************
+skipping: [jumphost]
+
+TASK [Sync vm_location into YAIDAP guest host_vars] ****************************
+skipping: [jumphost]
+
+TASK [Sync memory into YAIDAP guest host_vars] *********************************
+skipping: [jumphost]
+
+TASK [Sync cores into YAIDAP guest host_vars] **********************************
+skipping: [jumphost]
+
+TASK [Sync os into YAIDAP guest host_vars] *************************************
+skipping: [jumphost]
+
+TASK [Derive lab MAC from ansible_host when provided] **************************
+skipping: [jumphost]
+
+TASK [Sync ansible_host into YAIDAP guest host_vars] ***************************
+skipping: [jumphost]
+
+TASK [Require guest mgmt IP for VM create (legacy sync)] ***********************
+skipping: [jumphost]
+
+TASK [Require guest mgmt IP for VM create (connector store)] *******************
+changed: [jumphost]
+
+TASK [Ensure YAIDAP libvirt guest profile in host_vars] ************************
+skipping: [jumphost]
+
+TASK [Resolve provision subject ansible_host for SSH] **************************
+skipping: [jumphost]
+
+TASK [Remove stale provision subject host key] *********************************
+skipping: [jumphost]
+
+TASK [Seed provision subject host key after refresh] ***************************
+skipping: [jumphost]
+
+TASK [Run YAIDAP ansible-playbook command on jumphost] *************************

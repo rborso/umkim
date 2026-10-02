@@ -1,0 +1,14 @@
+verify_at: 2026-10-01T22:46:18+02:00
+via: ssh -p 30200 linux@jump.otthol.hu then ssh linux@172.16.10.4
+Rocky Linux release 10.2 (Red Quartz)
+virt03.lab.local
+ 20:46:18 up 2 days,  4:14,  1 user,  load average: 0.14, 0.07, 0.01
+lo               UNKNOWN        127.0.0.1/8 
+enp2s0           UP             
+n0p0_mgmt_nw     UP             172.16.10.4/24 
+tunl0@NONE       UNKNOWN        192.168.252.128/32 
+---
+NO_KS_POST
+e055eb9e-9c89-44a7-9a40-93ede60a15e7
+2026-09-29 16:31:29
+exit=0

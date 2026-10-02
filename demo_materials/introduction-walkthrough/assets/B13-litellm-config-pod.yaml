@@ -1,0 +1,29 @@
+general_settings:
+  redis_host: redis.fleet-llm.svc.cluster.local
+  redis_port: 6379
+
+model_list:
+  - model_name: Qwen3.5-2B-UD
+    litellm_params:
+      model: openai/Qwen3.5-2B-UD
+      api_base: http://10.10.0.10:8080/v1
+      api_key: "none"
+  - model_name: Qwen3.5-2B-UD
+    litellm_params:
+      model: openai/Qwen3.5-2B-UD
+      api_base: http://10.10.0.14:8080/v1
+      api_key: "none"
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+# Multiple model_list rows with the same model_name are load-balanced by LiteLLM.
+# session_affinity pins a conversation when clients send x-litellm-session-id or metadata.session_id.
+router_settings:
+  routing_strategy: simple-shuffle
+  redis_host: redis.fleet-llm.svc.cluster.local
+  redis_port: 6379
+  optional_pre_call_checks:
+    - session_affinity
+  deployment_affinity_ttl_seconds: 3600

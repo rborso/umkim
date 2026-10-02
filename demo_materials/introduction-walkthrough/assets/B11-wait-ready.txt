@@ -1,0 +1,19 @@
+=== wait Ready (up to 120m) 2026-10-02T02:14:50+02:00 ===
+02:14:50 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     single_node  homelab-gpu-pf                10.10.0.14  linux@jump.otthol.hu:30200  no  
+02:15:20 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     single_node  homelab-gpu-pf                10.10.0.14  linux@jump.otthol.hu:30200  no  
+02:15:50 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:16:20 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:16:50 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:17:20 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:17:50 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:18:20 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:18:50 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:19:20 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no                                                           linux@jump.otthol.hu:30200  no  
+02:19:51 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     ha                                                    linux@jump.otthol.hu:30200  no  
+02:20:21 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     ha                                                    linux@jump.otthol.hu:30200  no  
+02:20:51 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     ha                                                    linux@jump.otthol.hu:30200  no  
+02:21:21 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     ha                                                    linux@jump.otthol.hu:30200  no  
+02:21:51 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     ha                                                    linux@jump.otthol.hu:30200  no  
+02:22:21 phase=Provisioning ready=no | lab-gpu-pt-0  homelab  Provisioning  no     ha                                                    linux@jump.otthol.hu:30200  no  
+02:22:51 phase=Ready ready=yes | lab-gpu-pt-0  homelab  Ready  yes    single_node  homelab-gpu-pf  port_forward  10.10.0.14  linux@jump.otthol.hu:30200  yes 
+READY_OK

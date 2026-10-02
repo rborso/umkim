@@ -1,0 +1,13 @@
+# B9c final 2026-10-02T01:57:22+02:00
+NAMESPACE  NAME          PHASE    READY  NODE          IP             
+kubevirt   rocky-kv-lan  Running  yes    lab-ha-0-cp2  172.16.10.150  
+kubevirt   rocky-kv-pod  Running  yes    lab-ha-0-cp1  192.168.140.206
+
+PING 172.16.10.150 (172.16.10.150) 56(84) bytes of data.
+64 bytes from 172.16.10.150: icmp_seq=1 ttl=64 time=1.55 ms
+64 bytes from 172.16.10.150: icmp_seq=2 ttl=64 time=1.05 ms
+64 bytes from 172.16.10.150: icmp_seq=3 ttl=64 time=1.00 ms
+
+--- 172.16.10.150 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 1.002/1.198/1.545/0.245 ms

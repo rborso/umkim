@@ -1,0 +1,10 @@
+{
+  "backendsSource": "auto",
+  "hub": {
+    "phase": "Disabled"
+  },
+  "hubEnabled": true,
+  "message": "LLM platform disabled",
+  "phase": "Disabled",
+  "publicHost": "llm.api.demo.otthol.hu"
+}

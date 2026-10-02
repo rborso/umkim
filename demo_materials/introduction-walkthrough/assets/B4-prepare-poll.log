@@ -1,0 +1,122 @@
+===== 2026-10-01T23:12:23+02:00 poll 1 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           2m35s      2m35s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           2m35s      2m35s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:12:53+02:00 poll 2 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           3m5s       3m5s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           3m5s       3m5s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:13:24+02:00 poll 3 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           3m36s      3m36s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           3m36s      3m36s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:13:54+02:00 poll 4 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           4m6s       4m6s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           4m6s       4m6s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:14:25+02:00 poll 5 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           4m37s      4m37s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           4m37s      4m37s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:14:56+02:00 poll 6 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           5m8s       5m8s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           5m8s       5m8s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:15:26+02:00 poll 7 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           5m38s      5m38s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           5m38s      5m38s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:15:57+02:00 poll 8 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           6m9s       6m9s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           6m9s       6m9s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:16:28+02:00 poll 9 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           6m40s      6m40s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           6m40s      6m40s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:16:58+02:00 poll 10 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           7m10s      7m10s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           7m10s      7m10s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:17:29+02:00 poll 11 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           7m41s      7m41s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           7m41s      7m41s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:18:00+02:00 poll 12 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           8m12s      8m12s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           8m12s      8m12s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:18:30+02:00 poll 13 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           8m42s      8m42s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           8m42s      8m42s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:19:01+02:00 poll 14 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           9m13s      9m13s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           9m13s      9m13s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:19:32+02:00 poll 15 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           9m44s      9m44s
+fleet-site-prov-cf234c5d9b5f   Running   0/1           9m44s      9m44s
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:20:02+02:00 poll 16 =====
+NAME                           STATUS    COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Running   0/1           10m        10m
+fleet-site-prov-cf234c5d9b5f   Running   0/1           10m        10m
+virt01 Provisioning YAIDAP connector job started
+virt02 Declared 
+succ1= fail1= succ2= fail2=
+===== 2026-10-01T23:20:33+02:00 poll 17 =====
+NAME                           STATUS     COMPLETIONS   DURATION   AGE
+fleet-site-prov-a27b2917517c   Complete   1/1           10m        10m
+fleet-site-prov-cf234c5d9b5f   Complete   1/1           10m        10m
+virt01 Ready Hypervisor prepare succeeded (libvirt bridges and packages)
+virt02 Declared 
+succ1=1 fail1= succ2=1 fail2=
+active1= active2=
+DONE
+POLL_COMPLETE

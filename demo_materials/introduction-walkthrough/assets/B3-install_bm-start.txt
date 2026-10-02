@@ -1,0 +1,10 @@
+B3 install_bm start: 2026-10-01T22:18:11+02:00 (Thu Oct  1 10:18:11 PM CEST 2026)
+command: umkim site host provision homelab virt03 --action install_bm --confirm --wait -o json
+host pre-status: Ready / Hardware discovery exported to generated inventory drafts
+
+B3 install_bm end: 2026-10-01T22:46:18+02:00 (Thu Oct  1 10:46:18 PM CEST 2026)
+phase: Failed
+jobName: fleet-site-prov-9d39b09b38b9
+host status: Failed / YAIDAP connector job failed
+bug: bugs/BUG-20261001-B3-install_bm-kickstart-poll-timeout.md
+note: k8s job still had a Running retry pod at end capture; did not proceed to B4

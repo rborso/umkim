@@ -1,0 +1,188 @@
+=== B10 virt04 leftover k3s cleanup 2026-10-02T00:00:35+00:00 ===
+before k3s: active
+Domain 'lab-gpu-pt-0-cp1' marked as autostarted
+
+Autostart:      enable
+Autostart Once: disable
+++ id -u
++ '[' 0 -eq 0 ']'
++ K3S_DATA_DIR=/var/lib/rancher/k3s
++ /usr/local/bin/k3s-killall.sh
++ for service in /etc/systemd/system/k3s*.service
++ '[' -s /etc/systemd/system/k3s.service ']'
+++ basename /etc/systemd/system/k3s.service
++ systemctl stop k3s.service
++ for service in /etc/init.d/k3s*
++ '[' -x '/etc/init.d/k3s*' ']'
++ killtree 2232 2326 2367 2888 2950 3095 3326
++ kill -9 2232 2548 2764 2810 2326 2555 2367 2543 3398 3599 3615 3600 3616 3601 3612 3602 3614 3603 3611 3604 3772 3605 3773 3606 3609 3607 3613 2888 3005 2950 3003 3160 3095 3175 3295 3326 3396 3540
++ do_unmount_and_remove /run/k3s
++ set +x
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/f9bc9e33775eda139df2dc2816b73682ba871cd4cb8cba012daf993eba9086df/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/f5d6a3def3c3deafb92a6cfc041bfb9176c654f9a5464083eb4c07503aea2960/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/b3cb318b520de1f61d50a45e56f603005cd6a31b8b25c4c421e2fbe3cd7d5335/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/9d24e22ddd80bcb786e61512e3857613ef2c13b502bc2edf7ac0d60a0c5b8517/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/90a5ab93cc1fc6d90fe37846f139b0ccafcf360a5c754ea9170ddda6e772e94a/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/817ac104d83609e397ff449cc1650a7ee23d923c70e176e196139c2a2abd1e6b/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/71fd29e6f1c5a97516e5d50249121aa77152684526ce974fd33aaf96be01c959/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/716ee08b723d0f8f109ec220c7014c10d53191eb3d576538ee1562ae3c8b5c24/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/6df4b119391c27ef6c903bafbdf0d9dfa47fb6545658fe05008a0130fdf58552/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/4fafb04fcb4d4e033f6024e8fb9f8b1922c82cd7e3f3b8f6a74dacee96d1f81b/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/4cf113abe51e4be4fd1c8f1ffb32cd37df125a3e43b50c7e972736697ddcf5e2/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.runtime.v2.task/k8s.io/3f3762ad17bb8e786494c9b3ce3c880725f090a4e1c40eded099e2fecd09a8ec/rootfs
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/b3cb318b520de1f61d50a45e56f603005cd6a31b8b25c4c421e2fbe3cd7d5335/shm
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/90a5ab93cc1fc6d90fe37846f139b0ccafcf360a5c754ea9170ddda6e772e94a/shm
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/817ac104d83609e397ff449cc1650a7ee23d923c70e176e196139c2a2abd1e6b/shm
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/716ee08b723d0f8f109ec220c7014c10d53191eb3d576538ee1562ae3c8b5c24/shm
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/6df4b119391c27ef6c903bafbdf0d9dfa47fb6545658fe05008a0130fdf58552/shm
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/4cf113abe51e4be4fd1c8f1ffb32cd37df125a3e43b50c7e972736697ddcf5e2/shm
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/k3s/containerd/io.containerd.grpc.v1.cri/sandboxes/3f3762ad17bb8e786494c9b3ce3c880725f090a4e1c40eded099e2fecd09a8ec/shm
++ do_unmount_and_remove /var/lib/kubelet/pods
++ set +x
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/fb2c8f49-bf36-4734-9fe3-520b81870f74/volumes/kubernetes.io~projected/kube-api-access-9hk7z
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/c921413d-af41-4591-b6d9-5f3129dd864a/volumes/kubernetes.io~projected/kube-api-access-wbwpq
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/bde094d9-2c53-4b82-9ca6-d576ed5745d3/volumes/kubernetes.io~projected/kube-api-access-crxln
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/bde094d9-2c53-4b82-9ca6-d576ed5745d3/volumes/kubernetes.io~local-volume/pvc-4edd4f53-cf3e-489b-a57d-b14bee93f1cd
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/9c60aeee-43f5-4c80-9544-8ce74eebcd40/volumes/kubernetes.io~projected/kube-api-access-fzvbz
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/52f911f7-3f47-4a97-ac59-bffdeec8d224/volumes/kubernetes.io~projected/kube-api-access-mwplx
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/52dea7c7-8da2-4ff8-a0da-544ce3c0ed8b/volumes/kubernetes.io~projected/kube-api-access-rkm2c
+sh -c 'umount -f "$0" && rm -rf "$0"' /var/lib/kubelet/pods/21a72946-e7ae-4c94-9d64-aa0521aaf6d7/volumes/kubernetes.io~projected/kube-api-access-kd6dw
++ do_unmount_and_remove /var/lib/kubelet/plugins
++ set +x
++ do_unmount_and_remove /run/netns/cni-
++ set +x
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/netns/cni-ec6caed6-628d-a004-fd9c-302ef9b370b1
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/netns/cni-45b1fdb4-51bc-0dc4-a2f5-9ee3628e1170
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/netns/cni-2f6603c4-ca6f-9334-1318-e17bbf6c7f21
+sh -c 'umount -f "$0" && rm -rf "$0"' /run/netns/cni-2bb9ad25-3d25-380d-d063-342f1835b583
++ ip netns show
++ grep cni-
++ xargs -r -t -n 1 ip netns delete
++ remove_interfaces
++ ip link show
++ grep 'master cni0'
++ read ignore iface ignore
++ ip link delete cni0
+Cannot find device "cni0"
++ ip link delete flannel.1
+Cannot find device "flannel.1"
++ ip link delete flannel-v6.1
+Cannot find device "flannel-v6.1"
++ ip link delete kube-ipvs0
+Cannot find device "kube-ipvs0"
++ ip link delete flannel-wg
+Cannot find device "flannel-wg"
++ ip link delete flannel-wg-v6
+Cannot find device "flannel-wg-v6"
+++ command -v tailscale
++ '[' -n '' ']'
++ rm -rf /var/lib/cni/
++ iptables-save
++ grep -v KUBE-
++ grep -v CNI-
++ grep -iv flannel
++ iptables-restore
++ ip6tables-save
++ grep -v KUBE-
++ grep -v CNI-
++ grep -iv flannel
+/bin/systemctl
++ ip6tables-restore
++ command -v systemctl
++ systemctl disable k3s
+Removed '/etc/systemd/system/multi-user.target.wants/k3s.service'.
++ systemctl reset-failed k3s
+Failed to reset failed state of unit k3s.service: Unit k3s.service not loaded.
++ systemctl daemon-reload
++ command -v rc-update
++ rm -f /etc/systemd/system/k3s.service
++ rm -f /etc/systemd/system/k3s.service.env
++ trap remove_uninstall EXIT
++ for cmd in kubectl crictl ctr
++ '[' -L /usr/local/bin/kubectl ']'
++ for cmd in kubectl crictl ctr
++ '[' -L /usr/local/bin/crictl ']'
++ rm -f /usr/local/bin/crictl
++ for cmd in kubectl crictl ctr
++ '[' -L /usr/local/bin/ctr ']'
++ rm -f /usr/local/bin/ctr
++ rm -rf /etc/rancher/k3s
++ rm -rf /run/k3s
++ rm -rf /run/flannel
++ clean_mounted_directory /var/lib/rancher/k3s
++ grep -q ' /var/lib/rancher/k3s' /proc/mounts
++ rm -rf /var/lib/rancher/k3s
++ return 0
++ rm -rf /var/lib/kubelet
++ rm -f /usr/local/bin/k3s
++ rm -f /usr/local/bin/k3s-killall.sh
++ rpm_ostree_uninstall_cmd='rpm-ostree uninstall --idempotent k3s-selinux'
++ '[' -r /etc/os-release ']'
++ . /etc/os-release
+++ NAME='Rocky Linux'
+++ VERSION='10.2 (Red Quartz)'
+++ RELEASE_TYPE=stable
+++ ID=rocky
+++ ID_LIKE='rhel centos fedora'
+++ VERSION_ID=10.2
+++ PLATFORM_ID=platform:el10
+++ PRETTY_NAME='Rocky Linux 10.2 (Red Quartz)'
+++ ANSI_COLOR='0;32'
+++ LOGO=fedora-logo-icon
+++ CPE_NAME=cpe:/o:rocky:rocky:10::baseos
+++ HOME_URL=https://rockylinux.org/
+++ VENDOR_NAME=RESF
+++ VENDOR_URL=https://resf.org/
+++ BUG_REPORT_URL=https://bugs.rockylinux.org/
+++ SUPPORT_END=2035-05-31
+++ ROCKY_SUPPORT_PRODUCT=Rocky-Linux-10
+++ ROCKY_SUPPORT_PRODUCT_VERSION=10.2
+++ REDHAT_SUPPORT_PRODUCT='Rocky Linux'
+++ REDHAT_SUPPORT_PRODUCT_VERSION=10.2
+++ expr 'rhel centos fedora' : '.*suse.*'
++ '[' 0 '!=' 0 ']'
++ '[' rocky = fedora ']'
+++ expr 'rhel centos fedora' : '.*fedora.*\|.*rhel.*\|.*centos.*'
++ '[' 18 '!=' 0 ']'
++ '[' -n '' ']'
++ dnf_remove_selinux_rpm
++ package_manager=dnf
++ type dnf
++ dnf remove -y k3s-selinux
+Dependencies resolved.
+================================================================================
+ Package         Arch       Version        Repository                      Size
+================================================================================
+Removing:
+ k3s-selinux     noarch     1.6-1.el9      @rancher-k3s-common-stable      96 k
+
+Transaction Summary
+================================================================================
+Remove  1 Package
+
+Freed space: 96 k
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Erasing          : k3s-selinux-1.6-1.el9.noarch                           1/1 
+  Running scriptlet: k3s-selinux-1.6-1.el9.noarch                           1/1 
+
+Removed:
+  k3s-selinux-1.6-1.el9.noarch                                                  
+
+Complete!
++ '[' -d /etc/zypp/repos.d ']'
++ '[' -d /etc/yum.repos.d ']'
++ rm -f /etc/yum.repos.d/rancher-k3s-common.repo
++ remove_uninstall
++ rm -f /usr/local/bin/k3s-uninstall.sh
+after k3s: inactive
+k3s binary: ls: cannot access '/usr/local/bin/k3s': No such file or directory
+GONE
+wg: Device "wg-umkim" does not exist.
+GONE
+vm still: lab-gpu-pt-0-cp1
+gpu-bm-1.lab.local

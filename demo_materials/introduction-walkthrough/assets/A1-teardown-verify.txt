@@ -1,0 +1,4 @@
+=== A1 teardown verify 2026-10-01T20:38:55+02:00 ===
+K3S_GONE=OK
+inactive
+operator-peers.conf

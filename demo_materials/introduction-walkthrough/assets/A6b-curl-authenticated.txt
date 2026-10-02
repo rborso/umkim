@@ -1,0 +1,33 @@
+=== authenticated curl to whoami-auth (cookies used, values redacted in this file) ===
+HTTP/2 200 
+content-type: text/plain; charset=utf-8
+date: Thu, 01 Oct 2026 19:53:33 GMT
+content-length: 615
+
+http_code=200
+=== body ===
+Hostname: whoami-auth-57fc767b9-vbm42
+IP: 127.0.0.1
+IP: ::1
+IP: 192.168.252.141
+IP: fe80::2c17:bff:feff:2506
+RemoteAddr: 192.168.252.135:48886
+GET / HTTP/1.1
+Host: whoami-auth.demo.otthol.hu
+User-Agent: curl/8.12.1
+Accept: */*
+Accept-Encoding: gzip
+Cookie: authelia_session=REDACTED
+Remote-Email: admin@umkim.com
+Remote-Groups: lldap_admin
+Remote-Name: Administrator
+Remote-User: admin
+X-Forwarded-For: 172.16.10.4
+X-Forwarded-Host: whoami-auth.demo.otthol.hu
+X-Forwarded-Port: 80
+X-Forwarded-Proto: http
+X-Forwarded-Server: traefik-654ccbcffd-hgwf5
+X-Real-Ip: 172.16.10.4
+
+
+auth_code=200

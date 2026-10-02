@@ -7,7 +7,7 @@ auth:
   enabled: true
   image:
     repository: {{ fleet_console_auth_image_name }}
-    tag: {{ fleet_console_auth_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.2.0'))) }}
+    tag: "{{ fleet_console_auth_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.2.0'))) }}"
     pullPolicy: Always
   port: {{ fleet_console_auth_http_port }}
   sessionSecret: {{ fleet_console_auth_session_secret | quote }}
@@ -41,7 +41,7 @@ dashboard:
   enabled: {{ umkim_console_enabled | default(true) | bool }}
   image:
     repository: {{ umkim_console_image_name }}
-    tag: {{ umkim_console_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.2.0'))) }}
+    tag: "{{ umkim_console_tag | default(harbor_fleet_image_tag | default(umkim_version | default('0.2.0'))) }}"
     pullPolicy: {{ umkim_console_image_pull_policy | default('Always') }}
   nodePort: {{ umkim_console_nodeport }}
   buildId: {{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) | quote }}

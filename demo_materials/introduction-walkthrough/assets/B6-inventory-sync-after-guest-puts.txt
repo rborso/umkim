@@ -1,0 +1,262 @@
+{
+  "jobName": "fleet-site-inv-8aa357a1f3d1",
+  "phase": "running"
+}
+{
+  "catalog": {
+    "defaults": {}
+  },
+  "files": [
+    {
+      "path": "bare_metals.yml",
+      "size": 66,
+      "synced": false
+    },
+    {
+      "path": "group_vars/all/all.yml",
+      "size": 1299,
+      "synced": true
+    },
+    {
+      "path": "group_vars/lab-ha-0-w1.yml",
+      "size": 57,
+      "synced": true
+    },
+    {
+      "path": "group_vars/lab-ha-0.yml",
+      "size": 85,
+      "synced": true
+    },
+    {
+      "path": "guests.yml",
+      "size": 442,
+      "synced": true
+    },
+    {
+      "path": "host_vars/lab-ha-0-cp1.yml",
+      "size": 724,
+      "synced": true
+    },
+    {
+      "path": "host_vars/lab-ha-0-cp2.yml",
+      "size": 724,
+      "synced": true
+    },
+    {
+      "path": "host_vars/lab-ha-0-cp3.yml",
+      "size": 724,
+      "synced": true
+    },
+    {
+      "path": "host_vars/lab-ha-0-w1.yml",
+      "size": 716,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt01.yml",
+      "size": 1580,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt02.yml",
+      "size": 1298,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt03.yml",
+      "size": 1135,
+      "synced": true
+    },
+    {
+      "path": "host_vars/virt04.yml",
+      "size": 1230,
+      "synced": true
+    },
+    {
+      "path": "hypervisors.yml",
+      "size": 266,
+      "synced": true
+    },
+    {
+      "path": "lab-ha-0-w1.yml",
+      "size": 39,
+      "synced": true
+    },
+    {
+      "path": "lab-ha-0.yml",
+      "size": 73,
+      "synced": true
+    }
+  ],
+  "guests": {},
+  "meta": {
+    "inventoryPath": "/home/linux/yaidap/inventory/homelab",
+    "lastSyncedAt": "2026-10-01T21:24:09Z",
+    "provider": "yaidap",
+    "revisionHead": "b5e3a9ae573a17da",
+    "schemaVersion": 1,
+    "syncPhase": "synced"
+  },
+  "revisions": [
+    {
+      "actor": "system",
+      "id": "b5e3a9ae573a17da",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T21:24:09Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "guests:\n  hosts:\n    lab-ha-0-cp1:\n      ansible_host: 172.16.10.101\n      vm_location: least-utilized\n    lab-ha-0-cp2:\n      ansible_host: 172.16.10.102\n      vm_location: least-utilized\n    lab-ha-0-cp3:\n      ansible_host: 172.16.10.103\n      vm_location: least-utilized\n    lab-ha-0-w1:\n      ansible_host: 172.16.10.140\n      vm_location: least-utilized\n    lab-gpu-pt-0-cp1:\n      ansible_host: 172.16.10.141\n      vm_location: virt04\n",
+      "before": "guests:\n  hosts:\n    lab-ha-0-cp1:\n      ansible_host: 172.16.10.101\n      vm_location: least-utilized\n    lab-ha-0-cp2:\n      ansible_host: 172.16.10.102\n      vm_location: least-utilized\n    lab-ha-0-cp3:\n      ansible_host: 172.16.10.103\n      vm_location: least-utilized\n    lab-ha-0-w1:\n      ansible_host: 172.16.10.140\n      vm_location: least-utilized\n    lab-gpu-pt-0-cp1:\n      ansible_host: 172.16.10.141\n      vm_location: virt04\n",
+      "id": "bd5caabc8d895166",
+      "scope": "file",
+      "summary": "file guests.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "mode: add_worker\ntargetCluster: lab-ha-0\nautoApply: true\n",
+      "id": "2845cbaf60d19889",
+      "scope": "file",
+      "summary": "file group_vars/lab-ha-0-w1.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "topology: ha_3_node\nautoApply: true\nhaGroup: lab-ha-0\ncontrolPlaneVip: 172.16.10.100\n",
+      "id": "013f0ca217500bfb",
+      "scope": "file",
+      "summary": "file group_vars/lab-ha-0.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "lab-ha-0-w1:\n  hosts:\n    lab-ha-0-w1:\n",
+      "id": "d9d88bac751f328b",
+      "scope": "file",
+      "summary": "file lab-ha-0-w1.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "lab-ha-0:\n  hosts:\n    lab-ha-0-cp1:\n    lab-ha-0-cp2:\n    lab-ha-0-cp3:\n",
+      "id": "41e4a07c17877761",
+      "scope": "file",
+      "summary": "file lab-ha-0.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "---\nansible_host: 172.16.10.140\nconfigure_firewalld: false\ncores: 2\ndisks:\n  - bootdisk: true\n    device: 0\n    disk: vda\n    format: qcow2\n    name: bootdisk\n    size: 40\n    storage: local\nmemory: 4096\nos: rocky-10\nprovisioning_provider: libvirt\nuplinks:\n  - mac_address: \"52:54:00:02:01:40\"\n    name: n0p0\n    networks:\n      - bridge_name: n0p0_lab_nw\n        cloudinit: true\n        default_route: true\n        hypervisor_uplink: n0p0\n        ip: 172.16.10.140\n        model: virtio\n        network_name: lab_nw\n        pxe: false\n        services_open: []\n        tcp_open:\n          - 22\n        udp_open: []\n        vm_network: false\n        zone: lab\n    physical_network: lab_access_l1\nvm_location: virt02\n",
+      "id": "19119087a6d42102",
+      "scope": "file",
+      "summary": "file host_vars/lab-ha-0-w1.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "---\nansible_host: 172.16.10.103\nconfigure_firewalld: false\ncores: 2\ndisks:\n  - bootdisk: true\n    device: 0\n    disk: vda\n    format: qcow2\n    name: bootdisk\n    size: 40\n    storage: local\nmemory: 4096\nos: rocky-10\nprovisioning_provider: libvirt\nuplinks:\n  - mac_address: \"52:54:00:0a:03:01\"\n    name: n0p0\n    networks:\n      - bridge_name: n0p0_lab_nw\n        cloudinit: true\n        default_route: true\n        hypervisor_uplink: n0p0\n        ip: 172.16.10.103\n        model: virtio\n        network_name: lab_nw\n        pxe: false\n        services_open: []\n        tcp_open:\n          - 22\n        udp_open: []\n        vm_network: false\n        zone: lab\n    physical_network: lab_access_l1\nvm_location: least-utilized\n",
+      "id": "b2dc859549f4ed57",
+      "scope": "file",
+      "summary": "file host_vars/lab-ha-0-cp3.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "---\nansible_host: 172.16.10.102\nconfigure_firewalld: false\ncores: 2\ndisks:\n  - bootdisk: true\n    device: 0\n    disk: vda\n    format: qcow2\n    name: bootdisk\n    size: 40\n    storage: local\nmemory: 4096\nos: rocky-10\nprovisioning_provider: libvirt\nuplinks:\n  - mac_address: \"52:54:00:0a:02:01\"\n    name: n0p0\n    networks:\n      - bridge_name: n0p0_lab_nw\n        cloudinit: true\n        default_route: true\n        hypervisor_uplink: n0p0\n        ip: 172.16.10.102\n        model: virtio\n        network_name: lab_nw\n        pxe: false\n        services_open: []\n        tcp_open:\n          - 22\n        udp_open: []\n        vm_network: false\n        zone: lab\n    physical_network: lab_access_l1\nvm_location: least-utilized\n",
+      "id": "d7c0d801de4bba3f",
+      "scope": "file",
+      "summary": "file host_vars/lab-ha-0-cp2.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "---\nansible_host: 172.16.10.101\nconfigure_firewalld: false\ncores: 2\ndisks:\n  - bootdisk: true\n    device: 0\n    disk: vda\n    format: qcow2\n    name: bootdisk\n    size: 40\n    storage: local\nmemory: 4096\nos: rocky-10\nprovisioning_provider: libvirt\nuplinks:\n  - mac_address: \"52:54:00:0a:01:01\"\n    name: n0p0\n    networks:\n      - bridge_name: n0p0_lab_nw\n        cloudinit: true\n        default_route: true\n        hypervisor_uplink: n0p0\n        ip: 172.16.10.101\n        model: virtio\n        network_name: lab_nw\n        pxe: false\n        services_open: []\n        tcp_open:\n          - 22\n        udp_open: []\n        vm_network: false\n        zone: lab\n    physical_network: lab_access_l1\nvm_location: least-utilized\n",
+      "id": "6cfc44fc53a945e2",
+      "scope": "file",
+      "summary": "file host_vars/lab-ha-0-cp1.yml updated",
+      "ts": "2026-10-01T21:24:08Z"
+    },
+    {
+      "actor": "system",
+      "id": "3c06db492a506fd6",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T21:21:44Z"
+    },
+    {
+      "actor": "system",
+      "id": "b1171e2c125c898b",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T21:20:19Z"
+    },
+    {
+      "actor": "system",
+      "id": "dbea557700b002bb",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T20:50:20Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "---\n# Bare-metal cluster node virt03 (lab-single-0; bare_metals.yml — not a libvirt guest).\nansible_host: 172.16.10.4\nos: rocky-10\nlegacy: false\ninstall_os: true\nconfigure_firewalld: false\nconfigure_cockpit: false\nallow_management_nic_rewire: true\n\n# install_bm / kickstart reinstall requires discovery OFF.\n# With tempxe_discovery.enabled=true, tempxe_arming_report classifies risk=discovery_pxe\n# (not reinstall_pxe) and default.j2 boots discovery-ks instead of ks/.\ntempxe_discovery:\n  enabled: false\n\ndisks:\n  - name: bootdisk\n    disk: disk/by-id/ata-TOSHIBA_THNSNJ256G8NU_45KB3082KFJX\n    bootdisk: true\n    device: 0\n    size: 239\n    use_full_disk: true\n\nuplinks:\n  - name: n0p0\n    physical_network: lab_access_l1\n    model: e1000\n    interface: enp2s0\n    mac_address: \"88:d7:f6:2c:17:3b\"\n    networks:\n      - zone: lab\n        cloudinit: false\n        pxe: true\n        vm_network: true\n        network_name: lab_nw\n        tag: \"\"\n        bridge_name: n0p0_lab_nw\n        ip: \"172.16.10.4\"\n        default_route: true\n        tcp_open:\n          - 22\n          - 5900-5999\n        udp_open: []\n        services_open: []\n",
+      "before": "---\n# Bare-metal cluster node virt03 (lab-single-0; bare_metals.yml — not a libvirt guest).\nansible_host: 172.16.10.4\nos: rocky-10\nlegacy: false\ninstall_os: true\nconfigure_firewalld: false\nconfigure_cockpit: false\nallow_management_nic_rewire: true\n\ntempxe_discovery:\n  enabled: true\n\ndisks:\n  - name: bootdisk\n    disk: disk/by-id/ata-TOSHIBA_THNSNJ256G8NU_45KB3082KFJX\n    bootdisk: true\n    device: 0\n    size: 239\n    use_full_disk: true\n\nuplinks:\n  - name: n0p0\n    physical_network: lab_access_l1\n    model: e1000\n    interface: enp2s0\n    mac_address: \"88:d7:f6:2c:17:3b\"\n    networks:\n      - zone: lab\n        cloudinit: false\n        pxe: true\n        vm_network: true\n        network_name: lab_nw\n        tag: \"\"\n        bridge_name: n0p0_lab_nw\n        ip: \"172.16.10.4\"\n        default_route: true\n        tcp_open:\n          - 22\n          - 5900-5999\n        udp_open: []\n        services_open: []\n",
+      "id": "1ab293551f1e7c31",
+      "scope": "file",
+      "summary": "file host_vars/virt03.yml updated",
+      "ts": "2026-10-01T20:50:20Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "guests:\n  hosts:\n    lab-ha-0-cp1:\n      ansible_host: 172.16.10.101\n      vm_location: least-utilized\n    lab-ha-0-cp2:\n      ansible_host: 172.16.10.102\n      vm_location: least-utilized\n    lab-ha-0-cp3:\n      ansible_host: 172.16.10.103\n      vm_location: least-utilized\n    lab-ha-0-w1:\n      ansible_host: 172.16.10.140\n      vm_location: least-utilized\n    lab-gpu-pt-0-cp1:\n      ansible_host: 172.16.10.141\n      vm_location: virt04\n",
+      "before": "guests:\n  hosts:\n    lab-ha-0-cp1:\n      ansible_host: 172.16.10.101\n      vm_location: least-utilized\n    lab-ha-0-cp2:\n      ansible_host: 172.16.10.102\n      vm_location: least-utilized\n    lab-ha-0-cp3:\n      ansible_host: 172.16.10.103\n      vm_location: least-utilized\n    lab-ha-0-w1:\n      ansible_host: 172.16.10.140\n      vm_location: least-utilized\n    lab-gpu-pt-0-cp1:\n      ansible_host: 172.16.10.141\n      vm_location: virt04\n",
+      "id": "42bf99f1f0ee2e67",
+      "scope": "file",
+      "summary": "file guests.yml updated",
+      "ts": "2026-10-01T20:17:17Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "# Lab hypervisors: virt01–virt02 (general), virt04 (lab-gpu-0 @ .6). virt03 is bare metal in bare_metals.yml.\nhypervisors:\n  hosts:\n    virt01:\n      ansible_host: 172.16.10.2\n    virt02:\n      ansible_host: 172.16.10.3\n    virt04:\n      ansible_host: 172.16.10.6\n",
+      "before": "# Lab hypervisors: virt01–virt02 (general), virt04 (lab-gpu-0 @ .6). virt03 is bare metal in bare_metals.yml.\nhypervisors:\n  hosts:\n    virt01:\n      ansible_host: 172.16.10.2\n    virt02:\n      ansible_host: 172.16.10.3\n    virt04:\n      ansible_host: 172.16.10.6\n",
+      "id": "ee3fca959d528f62",
+      "scope": "file",
+      "summary": "file hypervisors.yml updated",
+      "ts": "2026-10-01T20:17:17Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "---\n# Bare-metal cluster node virt03 (lab-single-0; bare_metals.yml — not a libvirt guest).\nansible_host: 172.16.10.4\nos: rocky-10\nlegacy: false\ninstall_os: true\nconfigure_firewalld: false\nconfigure_cockpit: false\nallow_management_nic_rewire: true\n\ntempxe_discovery:\n  enabled: true\n\ndisks:\n  - name: bootdisk\n    disk: disk/by-id/ata-TOSHIBA_THNSNJ256G8NU_45KB3082KFJX\n    bootdisk: true\n    device: 0\n    size: 239\n    use_full_disk: true\n\nuplinks:\n  - name: n0p0\n    physical_network: lab_access_l1\n    model: e1000\n    interface: enp2s0\n    mac_address: \"88:d7:f6:2c:17:3b\"\n    networks:\n      - zone: lab\n        cloudinit: false\n        pxe: true\n        vm_network: true\n        network_name: lab_nw\n        tag: \"\"\n        bridge_name: n0p0_lab_nw\n        ip: \"172.16.10.4\"\n        default_route: true\n        tcp_open:\n          - 22\n          - 5900-5999\n        udp_open: []\n        services_open: []\n",
+      "before": "---\n# Bare-metal cluster node virt03 (lab-single-0; bare_metals.yml — not a libvirt guest).\nansible_host: 172.16.10.4\nos: rocky-10\nlegacy: false\ninstall_os: false\nconfigure_firewalld: false\nconfigure_cockpit: false\nallow_management_nic_rewire: true\n\ntempxe_discovery:\n  enabled: true\n\ndisks:\n  - name: bootdisk\n    disk: disk/by-id/ata-TOSHIBA_THNSNJ256G8NU_45KB3082KFJX\n    bootdisk: true\n    device: 0\n    size: 239\n    use_full_disk: true\n\nuplinks:\n  - name: n0p0\n    physical_network: lab_access_l1\n    model: e1000\n    interface: enp2s0\n    mac_address: \"88:d7:f6:2c:17:3b\"\n    networks:\n      - zone: lab\n        cloudinit: false\n        pxe: true\n        vm_network: true\n        network_name: lab_nw\n        tag: \"\"\n        bridge_name: n0p0_lab_nw\n        ip: \"172.16.10.4\"\n        default_route: true\n        tcp_open:\n          - 22\n          - 5900-5999\n        udp_open: []\n        services_open: []\n",
+      "id": "f9e9c60efe5bc925",
+      "scope": "file",
+      "summary": "file host_vars/virt03.yml updated",
+      "ts": "2026-10-01T20:17:17Z"
+    },
+    {
+      "actor": "User/localadmin",
+      "after": "bare_metals:\n  hosts:\n    virt03:\n      ansible_host: 172.16.10.4\n",
+      "before": "bare_metals:\n  hosts:\n    virt03:\n      ansible_host: 172.16.10.4\n",
+      "id": "83f71107729c970f",
+      "scope": "file",
+      "summary": "file bare_metals.yml updated",
+      "ts": "2026-10-01T20:17:17Z"
+    },
+    {
+      "actor": "system",
+      "id": "dda75461017fb0b6",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T20:16:55Z"
+    },
+    {
+      "actor": "system",
+      "id": "120e5c0298039df5",
+      "scope": "sync",
+      "summary": "pushed inventory to jumphost",
+      "ts": "2026-10-01T20:16:55Z"
+    }
+  ]
+}

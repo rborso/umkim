@@ -1,0 +1,36 @@
+==== virt01 mem/domains ====
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi        12Gi       385Mi         9Mi        18Gi        18Gi
+Swap:             0B          0B          0B
+---
+ Id   Name              State
+---------------------------------
+ 1    cli-test-ha-cp3   running
+ 3    lab-single-1-0    running
+ 4    cli-test-ha-cp1   running
+ 6    lab-ha-0-cp1      running
+ 7    lab-ha-0-cp2      running
+
+---
+cli-test-ha-cp3 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+lab-single-1-0 CPU(s):         2 Max memory:     2097152 KiB Used memory:    2097152 KiB 
+cli-test-ha-cp1 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+lab-ha-0-cp1 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+lab-ha-0-cp2 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+==== virt02 mem/domains ====
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi       7.6Gi        16Gi       9.7Mi       7.5Gi        23Gi
+Swap:             0B          0B          0B
+---
+ Id   Name              State
+---------------------------------
+ 1    cli-test-sn1      running
+ 2    cli-test-ha-cp2   running
+ 5    lab-ha-0-cp3      running
+ 8    lab-ha-0-w1       running
+
+---
+cli-test-sn1 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+cli-test-ha-cp2 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+lab-ha-0-cp3 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 
+lab-ha-0-w1 CPU(s):         2 Max memory:     4194304 KiB Used memory:    4194304 KiB 

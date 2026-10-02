@@ -1,0 +1,14 @@
+{
+  "ansible_host": "172.16.10.103",
+  "clusters": [
+    "lab-ha-0"
+  ],
+  "kind": "vm",
+  "name": "lab-ha-0-cp3",
+  "status": {
+    "lastProvisionID": "1abfc894f57b",
+    "message": "YAIDAP connector job started",
+    "phase": "Provisioning"
+  },
+  "vm_location": "least-utilized"
+}

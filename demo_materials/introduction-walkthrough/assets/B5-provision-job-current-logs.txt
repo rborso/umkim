@@ -1,0 +1,130 @@
+
+TASK [ocm : OCM | Brief pause before next registration poll] *******************
+skipping: [umkim-hub]
+
+TASK [ocm : OCM | Assert hub-kubeconfig-secret=***REDACTED*** join host] *******************
+ok: [umkim-hub] => 
+    changed: false
+    msg: All assertions passed
+
+TASK [k3s : K3s | Ensure iptables for overlay NAT] *****************************
+ok: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [k3s : K3s | Detect WireGuard interface for overlay NAT] ******************
+ok: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [k3s : K3s | Detect pod CIDRs for overlay NAT] ****************************
+ok: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [k3s : K3s | Install pod-to-overlay NAT and FORWARD rules] ****************
+changed: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [k3s : K3s | Allow pod CIDRs through firewalld to overlay] ****************
+ok: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [ocm : OCM | Wait for klusterlet work agent deployment] *******************
+ok: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [ocm : OCM | Scale klusterlet work agent (pod network)] *******************
+changed: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [ocm : OCM | Wait for klusterlet-work-agent on join host] *****************
+ok: [umkim-hub -> lab-single-0(172.16.10.4)]
+
+TASK [ocm : OCM | Wait for ManagedCluster Available] ***************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Ensure fleet-system namespace for kubeconfig secrets] ********
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Apply fleet-system namespace] ********************************
+ok: [umkim-hub]
+
+TASK [ocm : OCM | Sync spoke kubeconfig secret=***REDACTED*** fleet-site node API] ********
+changed: [umkim-hub -> localhost] => (item=lab-single-0)
+
+TASK [ocm : OCM | Patch ManagedCluster fleet labels from inventory] ************
+changed: [umkim-hub] => (item=lab-single-0)
+
+TASK [fleet_site : Fleet site | Label ManagedCluster fleet.site] ***************
+changed: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Resolve cluster] *******************************
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Register synthetic host for platform ManifestWork] ***
+changed: [umkim-hub]
+
+TASK [olm : OLM | Push platform bootstrap ManifestWork to each spoke] **********
+ok: [umkim-hub] => (item=lab-single-0)
+
+TASK [olm : OLM | Apply ManifestWork on hub] ***********************************
+ok: [umkim-hub] => (item=lab-single-0)
+
+TASK [olm : OLM | Wait for ManifestWork to apply on spoke] *********************
+ok: [umkim-hub] => (item=lab-single-0)
+
+TASK [olm : OLM | Report ManifestWork status] **********************************
+ok: [umkim-hub] => (item=lab-single-0)
+
+TASK [olm : OLM | Show spoke ManifestWork status] ******************************
+ok: [umkim-hub] => 
+    msg:
+    -   - NAME                        AGE
+        - phase4-platform-bootstrap   2m41s
+
+TASK [fleet_site : Fleet site | Resolve OCM cluster name for spoke ingress] ****
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Resolve spoke ingress vars from site_bootstrap inventory] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Resolve spoke ingress method from fleet-edge-clusters] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Parse cluster ingress method for phase6 ACME] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Render spoke ingress ManifestWork] *************
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Apply spoke ingress ManifestWork on hub] *******
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Wait for spoke ingress ManifestWork Available] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Wait for Traefik deployment after ManifestWork change] ***
+skipping: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Probe spoke Traefik /ping locally on cluster node] ***
+TASK [fleet_site : Fleet site | Resolve spoke ingress method from fleet-edge-clusters] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Parse cluster ingress method for phase6 ACME] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Render spoke ingress ManifestWork] *************
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Apply spoke ingress ManifestWork on hub] *******
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Wait for spoke ingress ManifestWork Available] ***
+ok: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Wait for Traefik deployment after ManifestWork change] ***
+skipping: [umkim-hub]
+
+TASK [fleet_site : Fleet site | Probe spoke Traefik /ping locally on cluster node] ***
+fatal: [umkim-hub -> lab-single-0]: UNREACHABLE! => 
+    changed: false
+    msg: |-
+        Failed to connect to the host via ssh: Connection timed out during banner exchange
+        Connection to UNKNOWN port 65535 timed out
+    unreachable: true
+
+PLAY RECAP *********************************************************************
+lab-single-0               : ok=28   changed=3    unreachable=0    failed=0    skipped=69   rescued=0    ignored=0   
+umkim-hub                  : ok=184  changed=7    unreachable=1    failed=0    skipped=37   rescued=0    ignored=0   
+

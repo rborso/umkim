@@ -1,0 +1,4 @@
+B3 install_bm retry NOT started
+Thu Oct  1 10:50:29 PM CEST 2026
+Reason: inventory arming fix applied (tempxe_discovery.enabled false), but virt03 efibootmgr has no IPv4/Network/PXE Boot#### entry; install_bm_pxe_reboot.yml would fail to select BootNext and SSH-drop wait is failed_when:false so poll would again see unchanged boot_id.
+Host remains SSH-usable for B5 with existing Rocky 10.2 OS.

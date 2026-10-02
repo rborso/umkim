@@ -1,0 +1,9 @@
+Device "tunl0" does not exist.
+wireguard             122880  0
+ip6_udp_tunnel         16384  1 wireguard
+udp_tunnel             36864  1 wireguard
+curve25519_x86_64      36864  1 wireguard
+libcurve25519_generic    49152  2 curve25519_x86_64,wireguard
+ls: cannot open directory '/etc/wireguard/': Permission denied
+disabled
+failed
