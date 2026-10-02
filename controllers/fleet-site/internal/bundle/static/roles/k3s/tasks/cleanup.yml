@@ -45,12 +45,15 @@
     tasks_from: remove_vip.yml
   tags: [k3s, k3s_cleanup, kube_vip]
 
+# Preserve fleet overlay during cluster-provision-local (WG installed before this cleanup).
+# Full host teardown playbooks set k3s_cleanup_remove_wireguard=true.
 - name: K3s cleanup | Stop fleet WireGuard interface
   ansible.builtin.systemd:
     name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
     state: stopped
     enabled: false
   failed_when: false
+  when: k3s_cleanup_remove_wireguard | default(false) | bool
   tags: [k3s, k3s_cleanup]
 
 - name: K3s cleanup | Remove fleet WireGuard config
@@ -58,6 +61,7 @@
     path: "/etc/wireguard/{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}.conf"
     state: absent
   failed_when: false
+  when: k3s_cleanup_remove_wireguard | default(false) | bool
   tags: [k3s, k3s_cleanup]
 
 - name: K3s cleanup | Bring down Calico IPIP interface when present

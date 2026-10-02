@@ -155,6 +155,8 @@
       ansible.builtin.import_role:
         name: k3s
         tasks_from: cleanup.yml
+      vars:
+        k3s_cleanup_remove_wireguard: true
       when: teardown_hub_delete_k3s | default(true) | bool
       tags: [teardown_hub, teardown_hub_k3s, k3s, k3s_cleanup]
 
