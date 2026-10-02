@@ -21,8 +21,7 @@
           - fleet_node_replace_old | length > 0
           - >-
               (fleet_node_replace_force | default(false) | bool)
-              or (fleet_node_replace_old in (groups[fleet_cluster_control] | default([])))
-              or (fleet_node_replace_old in hostvars)
+              or (hostvars[fleet_node_replace_old] is defined)
         fail_msg: >-
           replace control plane requires old node {{ fleet_node_replace_old }} in
           Ansible inventory (graceful leave cannot run). Controller must inject
