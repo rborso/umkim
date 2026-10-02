@@ -16,9 +16,8 @@
     fleet_site_spoke_ingress_method: >-
       {{ fleet_edge_clusters[item].method | default('')
          if item in fleet_edge_clusters else '' }}
-    phase6_spoke_acme_http_challenge: >-
-      {{ fleet_edge_clusters[item].method | default('') == 'port_forward'
-         if item in fleet_edge_clusters else false }}
+    # TLS-ALPN for spoke port_forward ACME (see push_cluster_spoke_ingress.yml).
+    phase6_spoke_acme_http_challenge: false
   tags: [spoke_ingress, phase6, spoke_ingress_push, phase6_push]
 
 - name: Spoke ingress | Apply ManifestWork on hub

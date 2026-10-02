@@ -42,10 +42,8 @@
     fleet_site_spoke_ingress_method: >-
       {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].method
          | default('') }}
-    fleet_site_spoke_acme_http_challenge: >-
-      {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].method
-         | default(hostvars[groups['site_bootstrap'][0]].fleet_cluster_exposure_mode | default(''))
-         == 'port_forward' }}
+    # port_forward ACME: TLS-ALPN (HTTP-01 WAN 404 with websecure-only Ingress).
+    fleet_site_spoke_acme_http_challenge: false
 
 - name: Fleet site | Render spoke ingress ManifestWork
   ansible.builtin.template:
