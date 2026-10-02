@@ -14,13 +14,32 @@ const wgIface = "wg-umkim"
 // via a privileged hostPID Job (klusterlet applies it when overlay SSH is down).
 func SpokeWGRestartManifestWork(clusterName, workName string) *unstructured.Unstructured {
 	jobName := workName
+	// Repair firewalld pod forwarding first. Restart WireGuard only when the
+	// handshake is stale — replaying a backlog of restarts is what drops the
+	// spoke route to the hub API ("no route to host") and stalls ManifestWork.
 	script := fmt.Sprintf(`set -e
 IFACE=%s
-nsenter -t 1 -m -u -i -n -p -- systemctl restart wg-quick@${IFACE} 2>/dev/null || \
-(nsenter -t 1 -m -u -i -n -p -- wg-quick down ${IFACE} 2>/dev/null || true; \
- nsenter -t 1 -m -u -i -n -p -- wg-quick up ${IFACE})
-nsenter -t 1 -m -u -i -n -p -- wg show ${IFACE}
+nsenter -t 1 -m -u -i -n -p -- sh -s "$IFACE" <<'EOS'
+set -e
+IFACE=$1
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+  ip -4 route show proto bird | awk '/blackhole/ {print $2}' | while read -r cidr; do
+    [ -n "$cidr" ] || continue
+    firewall-cmd --zone=trusted --query-source="$cidr" >/dev/null 2>&1 && continue
+    firewall-cmd --permanent --zone=trusted --add-source="$cidr" >/dev/null 2>&1 || true
+    firewall-cmd --zone=trusted --add-source="$cidr" >/dev/null
+  done
+fi
+NOW=$(date +%%s)
+HS=$(wg show "$IFACE" latest-handshakes 2>/dev/null | awk '{print $2; exit}')
+AGE=999999
+if [ -n "$HS" ] && [ "$HS" != "0" ]; then AGE=$((NOW-HS)); fi
+if [ "$AGE" -gt 90 ]; then
+  systemctl restart "wg-quick@${IFACE}" 2>/dev/null || { wg-quick down "$IFACE" 2>/dev/null || true; wg-quick up "$IFACE"; }
+fi
+wg show "$IFACE"
 echo ok
+EOS
 `, wgIface)
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{

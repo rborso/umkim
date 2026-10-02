@@ -29,11 +29,24 @@
     daemon_reload: true
   when: fleet_overlay_dns_dropin is changed
 
+- name: Fleet site overlay | Restore pod forwarding through firewalld
+  ansible.builtin.import_role:
+    name: k3s
+    tasks_from: spoke_overlay_nat.yml
+
+- name: Fleet site overlay | Probe hub before restarting WireGuard
+  ansible.builtin.command:
+    cmd: ping -c1 -W2 {{ fleet_hub_wireguard_ip | default('10.10.0.1') }}
+  register: fleet_overlay_hub_ping
+  changed_when: false
+  failed_when: false
+
 - name: Fleet site overlay | Restart spoke WireGuard
   ansible.builtin.systemd:
     name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
     state: restarted
   register: fleet_overlay_spoke_wg_restart
+  when: fleet_overlay_hub_ping.rc != 0
 
 - name: Fleet site overlay | Wait for hub handshake
   ansible.builtin.pause:

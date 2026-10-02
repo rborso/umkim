@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
@@ -79,8 +80,13 @@ func (r *RouteHealthReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				if latest.Status.FailoverPhase == fleetv1alpha1.FailoverPhaseDegraded {
 					latest.Status.FailoverPhase = fleetv1alpha1.FailoverPhaseIdle
 				}
-				if latest.Status.Phase == fleetv1alpha1.PhaseDegraded && latest.Status.Message == "" {
+				// Message is set when the route flips to Degraded, so requiring an
+				// empty message meant a recovered hub path stayed Degraded forever.
+				if latest.Status.Phase == fleetv1alpha1.PhaseDegraded {
 					latest.Status.Phase = fleetv1alpha1.PhaseApplied
+					if strings.HasPrefix(latest.Status.Message, "hub path unhealthy") {
+						latest.Status.Message = ""
+					}
 				}
 			}
 		} else {

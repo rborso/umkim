@@ -80,3 +80,29 @@ spec:
             path: {{ hub_ingress_acme_host_path }}
             type: DirectoryOrCreate
 {% endif %}
+
+---
+# hostNetwork gateway has no pod IP. The edge controller probes
+# http://gateway.<ns>.svc; without this Service that lookup fails and hub
+# routes stay Degraded even when Traefik is serving :80 on the node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ hub_ingress_gateway_name }}
+  namespace: {{ hub_ingress_namespace }}
+  labels:
+    app: hub-gateway
+    fleet.umkim.com/component: hub-ingress
+spec:
+  selector:
+    app: hub-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+    - name: https
+      port: 443
+      targetPort: https
+{% endif %}
+

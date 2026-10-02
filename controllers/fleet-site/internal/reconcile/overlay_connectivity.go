@@ -12,25 +12,25 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/overlay"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/wg"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	batchv1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
-	annOverlayCheckAt      = "fleet.umkim.com/overlay-check-at"
-	annOverlayCheckJob     = "fleet.umkim.com/overlay-check-job"
-	annOverlayRecoverJob   = "fleet.umkim.com/overlay-recover-job"
-	annOverlayReachable    = "fleet.umkim.com/overlay-reachable"
-	annOverlayFailCount    = "fleet.umkim.com/overlay-fail-count"
-	labelOverlayReachable  = "fleet.health/overlay_reachable"
-	overlayCheckInterval   = 60 * time.Second
+	annOverlayCheckAt       = "fleet.umkim.com/overlay-check-at"
+	annOverlayCheckJob      = "fleet.umkim.com/overlay-check-job"
+	annOverlayRecoverJob    = "fleet.umkim.com/overlay-recover-job"
+	annOverlayReachable     = "fleet.umkim.com/overlay-reachable"
+	annOverlayFailCount     = "fleet.umkim.com/overlay-fail-count"
+	labelOverlayReachable   = "fleet.health/overlay_reachable"
+	overlayCheckInterval    = 60 * time.Second
 	overlayRecoverFailCount = 3
 )
 
@@ -240,10 +240,33 @@ func (r *ClusterJoinReconciler) patchOverlayReachableLabel(ctx context.Context, 
 
 func (r *ClusterJoinReconciler) applySpokeWGRestartManifestWork(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) error {
 	_ = fcj
+	if err := r.pruneSpokeWGRestartManifestWorks(ctx, clusterName); err != nil {
+		return err
+	}
 	workName := overlay.SpokeWGRestartWorkName(clusterName)
 	mw := overlay.SpokeWGRestartManifestWork(clusterName, workName)
 	if err := r.Create(ctx, mw); err != nil && !errors.IsAlreadyExists(err) {
 		return err
+	}
+	return nil
+}
+
+// pruneSpokeWGRestartManifestWorks drops earlier overlay-restart works so a
+// disconnected work-agent cannot replay a burst of wg-quick restarts.
+func (r *ClusterJoinReconciler) pruneSpokeWGRestartManifestWorks(ctx context.Context, clusterName string) error {
+	var list unstructured.UnstructuredList
+	list.SetAPIVersion("work.open-cluster-management.io/v1")
+	list.SetKind("ManifestWork")
+	if err := r.List(ctx, &list, client.InNamespace(clusterName), client.MatchingLabels{
+		"fleet.umkim.com/overlay-recover": "true",
+	}); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	for i := range list.Items {
+		mw := &list.Items[i]
+		if err := r.Delete(ctx, mw); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 	}
 	return nil
 }
