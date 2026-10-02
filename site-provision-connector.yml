@@ -571,7 +571,10 @@
                         if line.startswith("vm_location:"):
                             loc = line.split(":", 1)[1].strip()
                             break
-            print(loc if loc else "hypervisors")
+            # Schedule tokens are not inventory hosts/groups. Including them in
+            # --limit skips the hypervisors gather play (total_mib=0 / cannot place).
+            SCHEDULE_TOKENS = {"", "least-utilized", "least_utilized", "auto"}
+            print("hypervisors" if loc.strip().lower() in SCHEDULE_TOKENS else (loc if loc else "hypervisors"))
             PY
             )
               LIMIT="${LIMIT},${HV}"
