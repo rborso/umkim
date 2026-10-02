@@ -1,13 +1,7 @@
 ---
 # Replace a control plane node in a Ready HA fleet cluster.
 #
-#   ansible-playbook cluster-replace-control.yml -e fleet_cluster_name=my-cluster \
-#     -e fleet_node_replace_old=my-cluster-2 \
-#     -e fleet_node_replace_new_hostname=my-cluster-2 -i inventory.ini
-#
-# Inventory MUST include the old CP hostname for graceful leave. The fleet-site
-# controller persists oldNodeAddress and re-injects the old host on every
-# inventory rebuild while replaceControlPlane is Pending/Running.
+# Inventory MUST include the old CP hostname for graceful leave.
 
 - name: Fleet cluster replace CP | Require old node in inventory
   hosts: site_bootstrap
@@ -19,9 +13,7 @@
         that:
           - fleet_node_replace_old is defined
           - fleet_node_replace_old | length > 0
-          - >-
-              (fleet_node_replace_force | default(false) | bool)
-              or (hostvars[fleet_node_replace_old] is defined)
+          - (fleet_node_replace_force | default(false) | bool) or (hostvars[fleet_node_replace_old] is defined)
         fail_msg: >-
           replace control plane requires old node {{ fleet_node_replace_old }} in
           Ansible inventory (graceful leave cannot run). Controller must inject
@@ -45,7 +37,7 @@
       ansible.builtin.command:
         argv: [kubectl, delete, node, "{{ fleet_node_replace_old }}", --ignore-not-found, --force, --grace-period=0]
       environment:
-        KUBECONFIG: "{{ k3s_kubeconfig | default(/etc/rancher/k3s/k3s.yaml) }}"
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
       when: fleet_node_replace_force | default(false) | bool
       tags: [fleet_cluster_replace_cp]
 
@@ -62,7 +54,7 @@
 
     - name: Deploy overlay WireGuard config from controller
       ansible.builtin.copy:
-        dest: "/etc/wireguard/{{ fleet_cluster_wireguard_interface | default(wg-umkim) }}.conf"
+        dest: "/etc/wireguard/{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}.conf"
         mode: "0600"
         content: |
           [Interface]
@@ -71,8 +63,8 @@
 
           [Peer]
           PublicKey = {{ fleet_hub_wg_public_key }}
-          Endpoint = {{ wireguard_endpoint_host | default(fleet_hub_wireguard_ip) }}:{{ wireguard_endpoint_port | default(51820) }}
-          AllowedIPs = {{ wireguard_subnet | default(10.10.0.0/16) }}
+          Endpoint = {{ wireguard_endpoint_host | default(fleet_hub_wireguard_ip) }}:{{ wireguard_endpoint_port | default('51820') }}
+          AllowedIPs = {{ wireguard_subnet | default('10.10.0.0/16') }}
           PersistentKeepalive = {{ wireguard_persistent_keepalive | default(25) }}
       when:
         - fleet_node_wg_private_key is defined
@@ -82,7 +74,7 @@
 
     - name: Enable overlay WireGuard
       ansible.builtin.systemd:
-        name: "wg-quick@{{ fleet_cluster_wireguard_interface | default(wg-umkim) }}"
+        name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
         enabled: true
         state: started
         daemon_reload: true
@@ -92,7 +84,7 @@
   handlers:
     - name: Restart fleet overlay WireGuard
       ansible.builtin.systemd:
-        name: "wg-quick@{{ fleet_cluster_wireguard_interface | default(wg-umkim) }}"
+        name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
         state: restarted
         daemon_reload: true
 
@@ -163,15 +155,12 @@
       ansible.builtin.command:
         cmd: kubectl get nodes --no-headers
       environment:
-        KUBECONFIG: "{{ k3s_kubeconfig | default(/etc/rancher/k3s/k3s.yaml) }}"
-        PATH: "{{ k3s_command_path | default(/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin) }}"
+        KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
       register: fleet_cp_replace_nodes
       until: >-
         fleet_cp_replace_nodes.rc == 0
-        and (fleet_cp_replace_nodes.stdout_lines
-             | select(search, fleet_node_replace_new_hostname | default(fleet_node_replace_old))
-             | select(search,  Ready )
-             | list | length) > 0
+        and (fleet_cp_replace_nodes.stdout_lines | select('search', fleet_node_replace_new_hostname | default(fleet_node_replace_old)) | select('search', ' Ready ') | list | length) > 0
       retries: 60
       delay: 10
       changed_when: false
@@ -182,11 +171,10 @@
         that:
           - >-
               (fleet_node_replace_new_hostname | default(fleet_node_replace_old)) == fleet_node_replace_old
-              or (fleet_cp_replace_nodes.stdout_lines
-                  | select(search, ^ ~ (fleet_node_replace_old | regex_escape) ~ \s)
-                  | list | length) == 0
+              or (fleet_cp_replace_nodes.stdout_lines | select('search', '^' ~ (fleet_node_replace_old | regex_escape) ~ '\\s') | list | length) == 0
         fail_msg: >-
           old control-plane node {{ fleet_node_replace_old }} still appears in
           kubectl get nodes after replace
       when: not (fleet_node_replace_force | default(false) | bool)
       tags: [fleet_cluster_replace_cp]
+
