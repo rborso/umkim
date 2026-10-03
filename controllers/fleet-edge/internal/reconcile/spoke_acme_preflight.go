@@ -86,12 +86,26 @@ func validateSpokeConnectivityForCluster(ctx context.Context, hostname string, r
 		upstream := strings.TrimSpace(regCluster.UpstreamHost)
 		if upstream != "" {
 			httpPort := spokeProbeHTTPPort(regCluster)
-			if msg := dialPublicPort(ctx, upstream, fmt.Sprintf("%d", httpPort)); msg == "" {
-				if msg := probeHTTPChallengePathViaUpstream(ctx, hostname, upstream, httpPort); msg == "" {
-					return true, ""
-				}
+			if msg := dialPublicPort(ctx, upstream, fmt.Sprintf("%d", httpPort)); msg != "" {
 				return false, msg
 			}
+			// probeHTTPChallengePathViaUpstream must not share the dial msg variable:
+			// a successful dial is "", which used to hide the HTTP-01 failure and
+			// hold the route as FailedDNS with an empty message.
+			probeMsg := probeHTTPChallengePathViaUpstream(ctx, hostname, upstream, httpPort)
+			if probeMsg != "" && !strings.Contains(probeMsg, "redirects to HTTPS") {
+				return false, probeMsg
+			}
+			// Port-forward spokes use TLS-ALPN and a global HTTP→HTTPS redirect, so
+			// /.well-known/acme-challenge/ on :80 redirecting is expected. Require the
+			// HTTPS nodeport instead of holding the FleetAppRoute.
+			if probeMsg != "" {
+				httpsPort := spokeProbeHTTPSPort(regCluster)
+				if msg := dialPublicPort(ctx, upstream, fmt.Sprintf("%d", httpsPort)); msg != "" {
+					return false, msg
+				}
+			}
+			return true, ""
 		}
 	}
 	lookupCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
