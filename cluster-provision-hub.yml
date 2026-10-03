@@ -4,6 +4,20 @@
 #   ansible-playbook cluster-provision-hub.yml -e fleet_cluster_name=virt01-k3s \
 #     -i inventory/from-controller.ini
 
+- name: Fleet cluster provision | Firewalld overlay NAT on all nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    # Calico pod CIDRs are assigned after host_prepare. Trusting them only on
+    # the bootstrap node leaves firewalld on the other control planes rejecting
+    # cross-node pod traffic, so a NodePort that lands on the wrong node
+    # (kube-vip / WG address) never reaches Traefik.
+    - ansible.builtin.import_role:
+        name: k3s
+        tasks_from: spoke_overlay_nat.yml
+      tags: [k3s, k3s_overlay_nat, fleet_cluster_provision]
+
 - name: Fleet cluster provision | OCM join spoke (hub runner SSH to bootstrap node)
   hosts: site_bootstrap
   become: true
@@ -15,11 +29,6 @@
     ocm_join_extra_args:
       - --force-internal-endpoint-lookup
   tasks:
-    - ansible.builtin.import_role:
-        name: k3s
-        tasks_from: spoke_overlay_nat.yml
-      tags: [k3s, k3s_overlay_nat, fleet_cluster_provision]
-
     - ansible.builtin.import_role:
         name: ocm
         tasks_from: install_clusteradm.yml
