@@ -17,6 +17,16 @@
     masked: false
     enabled: true
     state: started
+  # firewalld start reloads nftables and can drop the Ansible SSH session.
+  # Keep the host in the play and reconnect before opening ports.
+  ignore_unreachable: true
+  tags: [host_prepare]
+
+- name: Host prepare | Reconnect SSH after firewalld start
+  ansible.builtin.wait_for_connection:
+    delay: 2
+    sleep: 3
+    timeout: 90
   tags: [host_prepare]
 
 - name: Host prepare | Keep SSH allowed
@@ -25,6 +35,10 @@
     permanent: true
     immediate: true
     state: enabled
+  register: host_prepare_firewalld_ssh
+  retries: 6
+  delay: 5
+  until: host_prepare_firewalld_ssh is succeeded
   tags: [host_prepare]
 
 - name: Host prepare | Trust overlay, pod, and service sources

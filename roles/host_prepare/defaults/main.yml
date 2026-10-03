@@ -52,4 +52,7 @@ host_prepare_firewalld_tcp_ports:
   - 2379
   - 2380
   - 10250
+  # Calico BGP. Peers are management-LAN node IPs, not the trusted overlay
+  # CIDRs, so bird stays unready unless 179/tcp is open.
+  - 179
 
