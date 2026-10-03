@@ -125,7 +125,8 @@ spec:
 {% else %}
                     - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
 {% endif %}
-{% if fleet_edge_acme_preflight_enabled | default(true) | bool %}
+{# Hub legacy gateways force fleet_edge_acme_preflight_enabled false. Spoke dry-run is separate. #}
+{% if fleet_spoke_acme_preflight_enabled | default(true) | bool %}
                     - --certificatesresolvers.letsencrypt-staging.acme.email={{ fleet_edge_acme_email }}
                     - --certificatesresolvers.letsencrypt-staging.acme.storage=/data/acme-staging.json
                     - --certificatesresolvers.letsencrypt-staging.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
@@ -133,7 +134,6 @@ spec:
                     - --certificatesresolvers.letsencrypt-staging.acme.httpchallenge=true
                     - --certificatesresolvers.letsencrypt-staging.acme.httpchallenge.entrypoint=web
 {% else %}
-                    {# Match prod challenge; entrypoint HTTP→HTTPS redirect breaks HTTP-01 preflight (B7b). #}
                     - --certificatesresolvers.letsencrypt-staging.acme.tlschallenge=true
 {% endif %}
 {% endif %}
