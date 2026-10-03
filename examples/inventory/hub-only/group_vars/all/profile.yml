@@ -1,0 +1,28 @@
+---
+# Default hub install (the only supported path).
+# Encrypted vault, LLDAP console login, overlay HTTP cookies.
+# Not HA / not a "production" profile — one Rocky 10 management node.
+
+fleet_profile: default
+
+fleet_secrets_strict: true
+
+fleet_secret_placeholder_patterns:
+  - change-me
+  - ChangeMe
+  - REPLACE_ME
+  - fleet-admin-change-me
+  - FleetHarbor-ChangeMe
+  - FleetDCM-ChangeMe
+  - fleet-ingress-auth-change-me
+  - fleet-lldap-jwt-change-me
+  - fleet-lldap-admin-change-me
+  - fleet-authelia-session-change-me
+  - fleet-authelia-storage-change-me
+  - fleet-authelia-reset-jwt-change-me
+
+# Console uses LLDAP. Break-glass localadmin remains in vault.
+fleet_auth_lldap_enabled_profile: true
+# Console is HTTP on the WireGuard overlay (NodePort 30912). Secure cookies
+# would drop the session. Set true only if the console is served over HTTPS.
+fleet_console_auth_session_secure_profile: false

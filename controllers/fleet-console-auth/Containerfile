@@ -1,0 +1,19 @@
+FROM docker.io/library/golang:1.26.0-bookworm@sha256:2a0ba12e116687098780d3ce700f9ce3cb340783779646aafbabed748fa6677c AS build
+ENV GOTOOLCHAIN=local
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download 2>/dev/null || true
+COPY . ./
+RUN go mod tidy && CGO_ENABLED=0 go build -o /fleet-console-auth ./cmd/server
+
+FROM docker.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/rborso/umkim"
+LABEL org.opencontainers.image.vendor="Robert Borso"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates=20230311+deb12u1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY LICENSE NOTICE /licenses/
+COPY --from=build /fleet-console-auth /usr/local/bin/fleet-console-auth
+EXPOSE 18090
+ENTRYPOINT ["/usr/local/bin/fleet-console-auth"]

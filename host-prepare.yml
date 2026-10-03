@@ -1,0 +1,25 @@
+---
+# OS-level host preparation (ARCHITECTURE.md Phase 1).
+# Runs before WireGuard or K3s installation.
+#
+# Usage:
+#   ansible-galaxy collection install -r requirements.yml
+#   ansible-playbook host-prepare.yml --tags host_prepare
+#   ansible-playbook host-prepare.yml --tags host_prepare -l virt02
+#   ansible-playbook host-prepare.yml --tags host_prepare --check --diff
+
+- name: Prepare fleet Linux nodes
+  hosts: fleet_nodes
+  become: true
+  gather_facts: false
+  roles:
+    - role: host_prepare
+      tags: [host_prepare]
+
+- name: Prepare OpenWrt edge router
+  hosts: routers
+  become: false
+  gather_facts: false
+  roles:
+    - role: host_prepare
+      tags: [host_prepare]

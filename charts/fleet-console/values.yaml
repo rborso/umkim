@@ -1,0 +1,69 @@
+namespace: fleet-console
+
+auth:
+  enabled: true
+  image:
+    repository: fleet-console-auth
+    tag: "0.2.0"
+    pullPolicy: Always
+  port: 18090
+  sessionSecret: CHANGE_ME
+  sessionTTL: 8h
+  sessionSecure: false
+  bypass: false
+  bootstrapAdminUser: localadmin
+  bootstrapInstallToken: ""
+  bootstrapLdapGroup: fleet-admins
+  # Must match lldap group cn (memberOf); lldap uses the group name verbatim.
+  bootstrapLdapGroupCN: fleet-admins
+  htpasswdLine: ""
+  fleetUpstream: http://fleet-site-controller.fleet-console.svc.cluster.local:18080
+  llmUpstream: http://litellm.fleet-llm.svc.cluster.local:4000
+  llmMasterKeySecretNamespace: fleet-llm
+  llmMasterKeySecretName: fleet-llm-master-key
+  llmMasterKeySecretKey: master_key
+  ldap:
+    url: ""
+    baseDN: dc=umkim,dc=com
+    bindDN: ""
+    bindPassword: ""
+    userFilter: "(uid=%s)"
+    groupFilter: "(member={dn})"
+  oidc:
+    issuer: ""
+    clientId: ""
+    clientSecret: ""
+    redirectUrl: ""
+
+dashboard:
+  enabled: true
+  image:
+    repository: umkim-console
+    tag: "0.2.0"
+    pullPolicy: Always
+  nodePort: 30912
+  buildId: ""
+  fleetAuthHost: fleet-console-auth.fleet-console.svc.cluster.local:18090
+  fleetSiteHost: fleet-site-controller.fleet-console.svc.cluster.local:18080
+
+lldap:
+  enabled: false
+  image: ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
+  ldapPort: 3890
+  httpPort: 17170
+  # When > 0, expose LLDAP web UI on a fixed NodePort (WireGuard-only in lab; use Infrastructure toggle post-install).
+  webUINodePort: 0
+  baseDN: dc=umkim,dc=com
+  jwtSecret: CHANGE_ME
+  adminPassword: CHANGE_ME
+  bootstrap:
+    enabled: true
+    groups:
+      - fleet-admins
+      - fleet-site-admins
+      - fleet-cluster-admins
+      - fleet-viewers
+
+registry:
+  prefix: ""
+  # When set (e.g. 10.10.0.1:30000/fleet), prepended to image repository

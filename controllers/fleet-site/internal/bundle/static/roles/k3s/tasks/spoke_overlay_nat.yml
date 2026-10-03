@@ -1,0 +1,138 @@
+---
+# Masquerade Calico/pod traffic to the fleet WireGuard overlay so klusterlet pods can reach the hub API.
+- name: K3s | Ensure iptables for overlay NAT
+  ansible.builtin.dnf:
+    name:
+      - iptables-nft
+      - iptables
+    state: present
+
+- name: K3s | Detect WireGuard interface for overlay NAT
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ip -o link show | awk -F': ' '{print $2}' | grep -E '^wg(-umkim)?$' | head -1
+  args:
+    executable: /bin/bash
+  register: k3s_overlay_wg_iface
+  changed_when: false
+  failed_when: false
+
+- name: K3s | Detect pod CIDRs for overlay NAT
+  ansible.builtin.shell: |
+    set -euo pipefail
+    KC="{{ k3s_overlay_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    if ! command -v kubectl >/dev/null 2>&1 || [ ! -r "$KC" ]; then
+      exit 0
+    fi
+    {
+      kubectl --kubeconfig "$KC" get nodes -o jsonpath='{range .items[*]}{.spec.podCIDR}{"\n"}{end}' 2>/dev/null || true
+      kubectl --kubeconfig "$KC" get blockaffinities.crd.projectcalico.org -o jsonpath='{range .items[*]}{.spec.cidr}{"\n"}{end}' 2>/dev/null || true
+      kubectl --kubeconfig "$KC" get ippools.crd.projectcalico.org -o jsonpath='{range .items[*]}{.spec.cidr}{"\n"}{end}' 2>/dev/null || true
+    } | awk 'NF' | sort -u
+  args:
+    executable: /bin/bash
+  register: k3s_overlay_pod_cidrs
+  changed_when: false
+  failed_when: false
+
+- name: K3s | Install pod-to-overlay NAT and FORWARD rules
+  ansible.builtin.shell: |
+    set -euo pipefail
+    WG_IF="{{ k3s_overlay_wg_iface.stdout | trim }}"
+    OVERLAY="{{ wireguard_subnet | default('10.10.0.0/16') }}"
+    [ -n "$WG_IF" ] || exit 0
+    while IFS= read -r POD_CIDR; do
+      [ -n "$POD_CIDR" ] || continue
+      iptables -t nat -C POSTROUTING -s "$POD_CIDR" -d "$OVERLAY" -o "$WG_IF" -j MASQUERADE 2>/dev/null \
+        || iptables -t nat -A POSTROUTING -s "$POD_CIDR" -d "$OVERLAY" -o "$WG_IF" -j MASQUERADE
+      iptables -C FORWARD -s "$POD_CIDR" -d "$OVERLAY" -j ACCEPT 2>/dev/null \
+        || iptables -A FORWARD -s "$POD_CIDR" -d "$OVERLAY" -j ACCEPT
+      iptables -C FORWARD -s "$OVERLAY" -d "$POD_CIDR" -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null \
+        || iptables -A FORWARD -s "$OVERLAY" -d "$POD_CIDR" -m state --state RELATED,ESTABLISHED -j ACCEPT
+    done <<< "{{ k3s_overlay_pod_cidrs.stdout }}"
+  args:
+    executable: /bin/bash
+  when:
+    - k3s_overlay_wg_iface.stdout | trim | length > 0
+    - k3s_overlay_pod_cidrs.stdout | trim | length > 0
+  changed_when: true
+
+# firewalld's nft FORWARD hook (priority filter+10) runs after iptables ACCEPT and can
+# still reject Calico→wg-umkim (klusterlet work-agent → hub API). Seen on hosts that keep
+# firewalld (e.g. GPU/hypervisor) while host_prepare disable_firewalld is false/skipped.
+- name: K3s | Allow pod CIDRs through firewalld to overlay
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v firewall-cmd >/dev/null 2>&1; then
+      exit 0
+    fi
+    if ! firewall-cmd --state >/dev/null 2>&1; then
+      exit 0
+    fi
+    WG_IF="{{ k3s_overlay_wg_iface.stdout | trim }}"
+    if [ -n "$WG_IF" ]; then
+      if ! firewall-cmd --zone=trusted --query-interface="$WG_IF" >/dev/null 2>&1; then
+        firewall-cmd --permanent --zone=trusted --add-interface="$WG_IF" >/dev/null 2>&1 || true
+        firewall-cmd --zone=trusted --add-interface="$WG_IF" >/dev/null
+        echo "trusted-interface $WG_IF"
+      fi
+    fi
+    # firewalld nft FORWARD (priority filter+10) rejects non-DNAT forwards with
+    # icmp admin-prohibited. curl reports that as "no route to host".
+    # ClusterIP works (ct status dnat accept); pod IP and pod to wg-umkim do not.
+    # Trusting the pod CIDR source accepts pod-to-pod and pod-to-overlay.
+    while IFS= read -r POD_CIDR; do
+      [ -n "$POD_CIDR" ] || continue
+      if firewall-cmd --zone=trusted --query-source="$POD_CIDR" >/dev/null 2>&1; then
+        continue
+      fi
+      firewall-cmd --permanent --zone=trusted --add-source="$POD_CIDR" >/dev/null 2>&1 || true
+      firewall-cmd --zone=trusted --add-source="$POD_CIDR" >/dev/null
+      echo "trusted-source $POD_CIDR"
+    done <<< "{{ k3s_overlay_pod_cidrs.stdout }}"
+  args:
+    executable: /bin/bash
+  when:
+    - k3s_overlay_wg_iface.stdout | trim | length > 0
+    - k3s_overlay_pod_cidrs.stdout | trim | length > 0
+  register: k3s_overlay_firewalld
+  changed_when: k3s_overlay_firewalld.stdout | default('') | length > 0
+  failed_when: false
+
+- name: K3s | Open Traefik node ports in firewalld when spoke ingress is enabled
+  when: fleet_cluster_spoke_ingress_enabled | default(true) | bool
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v firewall-cmd >/dev/null 2>&1; then
+      exit 0
+    fi
+    if ! firewall-cmd --state >/dev/null 2>&1; then
+      exit 0
+    fi
+    # NodePorts published by roles/spoke_ingress (web, websecure, web-hub).
+    # Hub gateway Traefik binds 80/443 on the hub; spokes do not.
+    for PORT in {{ k3s_traefik_firewall_tcp_ports | join(' ') }}; do
+      if firewall-cmd --query-port="${PORT}/tcp" >/dev/null 2>&1; then
+        continue
+      fi
+      firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null
+      firewall-cmd --add-port="${PORT}/tcp" >/dev/null
+      echo "opened ${PORT}/tcp"
+    done
+    # Service CIDR is not a pod CIDR, so the discovery loop above misses it.
+    # ClusterIP is usually DNAT; trusting the source matches pod-CIDR handling
+    # for the non-DNAT forwards firewalld otherwise rejects.
+    SVC="{{ k3s_service_cidr | default('10.43.0.0/16') }}"
+    if [ -n "$SVC" ]; then
+      if ! firewall-cmd --zone=trusted --query-source="$SVC" >/dev/null 2>&1; then
+        firewall-cmd --permanent --zone=trusted --add-source="$SVC" >/dev/null
+        firewall-cmd --zone=trusted --add-source="$SVC" >/dev/null
+        echo "trusted-source $SVC"
+      fi
+    fi
+  args:
+    executable: /bin/bash
+  register: k3s_traefik_firewalld
+  changed_when: k3s_traefik_firewalld.stdout | default('') | length > 0
+  failed_when: false
+

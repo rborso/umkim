@@ -1,0 +1,21 @@
+---
+# Deploy fleet-edge-controller on hub.
+# Failover controller is skipped unless fleet_failover_controller_enabled is true.
+#
+#   ansible-playbook fleet-edge-crd.yml -l hub
+#   ansible-playbook fleet-edge-controller.yml -l hub
+#
+# Prereqs: fleet-edge.yml (cluster registry CM), Harbor images fleet/fleet-edge-controller and fleet/fleet-failover-controller
+
+- name: Fleet edge controller on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_edge
+      tasks_from: cluster_registry.yml
+      tags: [fleet_edge, fleet_edge_registry]
+    - role: fleet_edge_controller
+      tags: [fleet_edge_controller]
+    - role: fleet_failover_controller
+      tags: [fleet_failover_controller]

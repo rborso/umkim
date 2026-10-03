@@ -1,0 +1,5 @@
+{
+  "jumphost": "jump@bastion.example.com:22",
+  "region": "homelab",
+  "failureDomain": "rack-a"
+}

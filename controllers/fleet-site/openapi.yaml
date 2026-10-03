@@ -1,0 +1,250 @@
+openapi: 3.0.3
+info:
+  title: Fleet Site API
+  version: v1alpha1
+  description: |
+    Fleet-site HTTP API for sites, clusters, FleetApp Helm installs, and the chart library.
+    See docs/components/fleet-apps.md and docs/components/fleet-site.md.
+servers:
+  - url: /fleet/api/v1alpha1
+paths:
+  /apps:
+    get:
+      summary: List FleetApp Helm installs and chart prefix defaults
+      responses:
+        '200':
+          description: apps plus defaults.chartPrefix
+    post:
+      summary: Install an OCI chart on a selected Ready cluster
+      description: clusterName is required. There is no placement engine.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FleetAppCreate'
+      responses:
+        '201':
+          description: FleetApp created
+        '400':
+          description: Missing clusterName or disallowed chart
+        '409':
+          description: Cluster is not Ready, or name exists
+  /apps/{name}:
+    get:
+      summary: Get a FleetApp
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: FleetApp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetApp'
+        '404':
+          description: Not found
+    patch:
+      summary: Update chart version, values, route, or llama-cpp LiteLLM registration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FleetAppPatch'
+      responses:
+        '200':
+          description: FleetApp updated
+        '404':
+          description: Not found
+        '409':
+          description: App is Installing or Deleting
+    delete:
+      summary: Uninstall the Helm release and delete the FleetApp
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Uninstall started
+  /charts:
+    get:
+      summary: List hub library charts (FleetChart)
+      responses:
+        '200':
+          description: charts array
+    post:
+      summary: Publish a chart into Harbor and record a FleetChart
+      description: |
+        JSON body with origin (oci:// or http(s) .tgz) or multipart field chart (.tgz).
+        imagePolicy is external, proxy, or copy. cluster install is a separate POST /apps.
+      responses:
+        '201':
+          description: FleetChart created
+        '200':
+          description: Existing FleetChart updated for republish
+        '400':
+          description: Invalid origin, imagePolicy, or package
+  /charts/{name}:
+    get:
+      summary: Get a library chart
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: FleetChart
+        '404':
+          description: Not found
+    delete:
+      summary: Remove the library record (Harbor artifact is kept)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Deleted
+  /llama-profiles:
+    get:
+      summary: List FleetLlamaProfile CRs (console namespace)
+      responses:
+        '200':
+          description: profiles array
+    post:
+      summary: Create a user llama profile overlay
+      responses:
+        '201':
+          description: Created
+  /llama-profiles/{name}:
+    get:
+      summary: Get a profile
+    patch:
+      summary: Update description, profileYaml, or chartVersion
+    delete:
+      summary: Delete profile (system profiles require force=true)
+  /llama-profiles/{name}/values:
+    get:
+      summary: Merged llama-cpp-helm valuesYaml preview
+  /llama-profiles/{name}/verify:
+    post:
+      summary: Quick or extended verify on a Ready GPU cluster
+      description: Creates FleetLlamaProfileTest and a temporary FleetApp; extended mode enables hub-proxied chat.
+  /llama-profiles/tests:
+    get:
+      summary: List verify sessions
+  /llama-profiles/tests/{id}:
+    get:
+      summary: Test status
+    delete:
+      summary: End extended test and remove FleetApp
+  /llama-profiles/tests/{id}/chat/completions:
+    post:
+      summary: Hub proxy to spoke llama-server OpenAI API (extended tests only)
+
+components:
+  schemas:
+    FleetAppRoute:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [none, hub, site]
+        hubHost:
+          type: string
+        siteHost:
+          type: string
+        requireAuth:
+          type: boolean
+        serviceName:
+          type: string
+        servicePort:
+          type: integer
+        serviceNamespace:
+          type: string
+        healthPath:
+          type: string
+    FleetApp:
+      type: object
+      properties:
+        name:
+          type: string
+        clusterName:
+          type: string
+        chart:
+          type: string
+        version:
+          type: string
+        releaseName:
+          type: string
+        namespace:
+          type: string
+        valuesYaml:
+          type: string
+        route:
+          $ref: '#/components/schemas/FleetAppRoute'
+        phase:
+          type: string
+        message:
+          type: string
+        routeName:
+          type: string
+        llmBackend:
+          type: boolean
+          description: |
+            When true, Ready llama-cpp installs are included in hub LiteLLM auto-discovery
+            (FleetApp annotation fleet.umkim.com/llm-backend). Omitted legacy apps default to true.
+    FleetAppCreate:
+      type: object
+      required: [clusterName, chart]
+      properties:
+        name:
+          type: string
+        clusterName:
+          type: string
+        chart:
+          type: string
+        version:
+          type: string
+        releaseName:
+          type: string
+        namespace:
+          type: string
+        valuesYaml:
+          type: string
+        route:
+          $ref: '#/components/schemas/FleetAppRoute'
+        llmBackend:
+          type: boolean
+          description: Llama-cpp only — opt in or out of hub LiteLLM backend discovery when Ready.
+    FleetAppPatch:
+      type: object
+      properties:
+        version:
+          type: string
+        valuesYaml:
+          type: string
+        namespace:
+          type: string
+        route:
+          $ref: '#/components/schemas/FleetAppRoute'
+        llmBackend:
+          type: boolean

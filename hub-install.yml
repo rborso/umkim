@@ -1,0 +1,74 @@
+---
+# Greenfield hub install (v0.2 spine): K3s, OCM, Harbor, console, fleet-site, fleet-edge.
+# No DCM. No Ansible-managed spokes. Workload clusters join later via console (FleetClusterJoin).
+#
+# Prerequisites: inventory from examples/inventory/hub-only (see scripts/bootstrap-hub-inventory.sh)
+#
+# Usage:
+#   ./scripts/install-hub.sh
+#   ansible-playbook hub-install.yml -l hub
+#   ansible-playbook hub-install.yml -l hub --tags harbor_push_fleet   # resume
+#
+# Environment:
+#   ANSIBLE_VAULT_PASSWORD_FILE=~/.umkim-vault-pass  (required)
+#   INV="-i inventory/hosts.yml -i inventory/hosts-from-hub.yml"
+
+- name: Hub install | Preflight
+  ansible.builtin.import_playbook: playbooks/preflight.yml
+  tags: [hub_install, hub_install_preflight]
+
+- name: Hub install | Host prepare
+  ansible.builtin.import_playbook: host-prepare.yml
+  tags: [hub_install, host_prepare]
+
+- name: Hub install | WireGuard
+  ansible.builtin.import_playbook: wireguard.yml
+  tags: [hub_install, wireguard_install, wireguard_server]
+
+- name: Hub install | OCM hub
+  ansible.builtin.import_playbook: ocm.yml
+  tags: [hub_install, ocm]
+
+- name: Hub install | Harbor
+  ansible.builtin.import_playbook: harbor.yml
+  tags: [hub_install, harbor, harbor_install, harbor_registries, harbor_push_fleet, harbor_push_charts]
+
+- name: Hub install | Fleet platform (OLM, cert-manager)
+  ansible.builtin.import_playbook: fleet-platform.yml
+  tags: [hub_install, platform, platform_hub]
+
+- name: Hub install | Fleet console auth CRD
+  ansible.builtin.import_playbook: fleet-console-auth-crd.yml
+  tags: [hub_install, fleet_console_auth]
+
+- name: Hub install | Fleet console Helm
+  ansible.builtin.import_playbook: fleet-console-auth.yml
+  tags: [hub_install, fleet_console_auth, fleet_console_helm]
+
+- name: Hub install | Hub ingress (Traefik hostNetwork)
+  ansible.builtin.import_playbook: hub-ingress.yml
+  tags: [hub_install, hub_ingress]
+
+- name: Hub install | Hub firewall
+  ansible.builtin.import_playbook: hub-firewall.yml
+  tags: [hub_install, hub_firewall]
+
+- name: Hub install | Fleet site CRD
+  ansible.builtin.import_playbook: fleet-site-crd.yml
+  tags: [hub_install, fleet_site]
+
+- name: Hub install | Fleet site controller
+  ansible.builtin.import_playbook: fleet-site-controller.yml
+  tags: [hub_install, fleet_site, fleet_site_controller]
+
+- name: Hub install | Fleet edge CRD
+  ansible.builtin.import_playbook: fleet-edge-crd.yml
+  tags: [hub_install, fleet_edge]
+
+- name: Hub install | Fleet edge controller
+  ansible.builtin.import_playbook: fleet-edge-controller.yml
+  tags: [hub_install, fleet_edge, fleet_edge_controller]
+
+- name: Hub install | Fleet edge Traefik routes
+  ansible.builtin.import_playbook: fleet-edge.yml
+  tags: [hub_install, fleet_edge, fleet_edge_traefik]

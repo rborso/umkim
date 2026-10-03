@@ -1,0 +1,31 @@
+---
+# Install KubeVirt + CDI platform on site bootstrap (direct manifests, same as phase4 nested parents).
+- name: Fleet site | Check KubeVirt control plane Available
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n kubevirt get kubevirt kubevirt
+      -o 'jsonpath={.status.conditions[?(@.type=="Available")].status}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  register: fleet_site_kubevirt_available
+  failed_when: false
+  changed_when: false
+  when: fleet_site_enable_kubevirt | default(false) | bool
+  tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision, kubevirt, phase4]
+
+- name: Fleet site | KubeVirt platform stack on site cluster
+  ansible.builtin.import_role:
+    name: kubevirt_stack
+  when:
+    - fleet_site_enable_kubevirt | default(false) | bool
+    - fleet_site_kubevirt_available.stdout | default('') | trim != 'True'
+  tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision, kubevirt, phase4]
+
+- name: Fleet site | Multus bridge NAD for LAN KubeVirt VMs
+  ansible.builtin.import_role:
+    name: kubevirt_bridge_nad
+  when:
+    - fleet_site_enable_kubevirt | default(false) | bool
+    - fleet_cluster_kubevirt_bridge_enabled | default(false) | bool
+  tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision, kubevirt, kubevirt_bridge_nad]

@@ -1,0 +1,28 @@
+---
+# Deploy llama-cpp-helm onto a selected Ready GPU cluster.
+# Operators should prefer console Apps or `umkim app create --llama-profile`.
+# This flow remains for break-glass / CI when the fleet API is unavailable.
+#
+#   ansible-playbook $INV playbooks/flows/llama-cpp-helm-deploy.yml \
+#     -e fleet_flow_cluster_name=lab-gpu-0 \
+#     -e fleet_flow_release_name=llama
+
+- name: Fleet flow | llama-cpp Helm chart
+  ansible.builtin.import_playbook: app-install.yml
+  vars:
+    fleet_flow_cluster_name: "{{ fleet_flow_cluster_name | default(fleet_flow_cluster | default('')) }}"
+    fleet_flow_chart: "{{ fleet_flow_chart | default('llama-cpp-helm') }}"
+    fleet_flow_version: "{{ fleet_flow_version | default('0.1.4') }}"
+    fleet_flow_release_name: "{{ fleet_flow_release_name | default('llama') }}"
+    fleet_flow_namespace: "{{ fleet_flow_namespace | default('llm') }}"
+    fleet_flow_route_mode: "{{ fleet_flow_route_mode | default('none') }}"
+    fleet_flow_llama_profile: "{{ fleet_flow_llama_profile | default('qwen35-2b-ud-4g') }}"
+    fleet_flow_values_yaml: "{{ _fleet_llama_merged_values }}"
+    _fleet_llama_runtime: "{{ lookup('file', playbook_dir + '/../../deploy/llama-cpp-helm/values-fleet-runtime.yaml') | from_yaml }}"
+    _fleet_llama_profile_doc: "{{ lookup('file', playbook_dir + '/../../deploy/llama-cpp-helm/profiles/' + fleet_flow_llama_profile + '.yaml') | from_yaml }}"
+    _fleet_llama_image_overlay:
+      image:
+        repository: "{{ fleet_llama_cpp_image_repository | default(harbor_fleet_registry + '/' + harbor_proxy_project_ghcr + '/ggml-org/llama.cpp') }}"
+        tag: server-cuda
+        pullPolicy: IfNotPresent
+    _fleet_llama_merged_values: "{{ _fleet_llama_runtime | combine(_fleet_llama_profile_doc, recursive=true) | combine(_fleet_llama_image_overlay, recursive=true) | to_yaml }}"

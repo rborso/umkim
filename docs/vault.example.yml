@@ -1,0 +1,44 @@
+---
+# Copy to vault.yml, fill values, encrypt:
+#   cp docs/vault.example.yml inventory/group_vars/all/vault.yml
+#   ansible-vault encrypt inventory/group_vars/all/vault.yml
+#
+# Run hub install:
+#   ./scripts/install-hub.sh
+#
+# Never commit decrypted vault.yml with real secrets to a public repo.
+
+# Shared LLDAP (console + hub ingress-auth when fleet_auth_lldap_enabled)
+fleet_lldap_jwt_secret_vault: "CHANGE_ME"
+fleet_lldap_admin_password_vault: "CHANGE_ME"
+
+# Console auth (fleet-console-auth)
+fleet_console_auth_session_secret_vault: "CHANGE_ME"
+fleet_console_auth_admin_password_vault: "CHANGE_ME"
+fleet_console_auth_bootstrap_install_token_vault: "CHANGE_ME"  # optional one-time bootstrap
+
+# Console LDAP bind override (optional; default uses fleet_lldap_admin_password_vault via role defaults)
+fleet_auth_ldap_bind_password_vault: ""
+
+# Ingress auth (Authelia) — required when fleet_ingress_auth_enabled on hub/spokes
+fleet_ingress_auth_bootstrap_password_vault: "CHANGE_ME"
+fleet_ingress_auth_session_secret_vault: "CHANGE_ME"
+fleet_ingress_auth_storage_key_vault: "CHANGE_ME"
+fleet_ingress_auth_reset_jwt_secret_vault: "CHANGE_ME"
+fleet_ingress_auth_lldap_jwt_secret_vault: "CHANGE_ME"  # spokes only; hub uses fleet_lldap_* when shared
+
+# Per-cluster LLDAP (spoke ingress auth) — one key per cluster, min 12 chars; enable via API after Ready
+# lab_int01_lldap_password_vault: "CHANGE_ME"
+# beta_lab02_lldap_password_vault: "CHANGE_ME"   # preferred
+# lab_ext02_lldap_password_vault: "CHANGE_ME"    # legacy alias for beta-lab02
+
+# Harbor
+harbor_admin_password_vault: "CHANGE_ME"
+
+# Velero backup (hub MinIO + encrypted repo password)
+fleet_velero_minio_access_key_vault: "CHANGE_ME"
+fleet_velero_minio_secret_key_vault: "CHANGE_ME"
+fleet_velero_repo_password_vault: "CHANGE_ME"
+
+# Gitea chart default admin (optional; used when installing Gitea via FleetApp)
+fleet_gitea_admin_password_vault: "CHANGE_ME"

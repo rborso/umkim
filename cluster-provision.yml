@@ -1,0 +1,8 @@
+---
+# Full 3-node HA provision (hub Job fallback — local + hub plays).
+#
+#   ansible-playbook cluster-provision.yml -e fleet_cluster_name=virt01-k3s \
+#     -i inventory/from-controller.ini
+
+- ansible.builtin.import_playbook: cluster-provision-local.yml
+- ansible.builtin.import_playbook: cluster-provision-hub.yml

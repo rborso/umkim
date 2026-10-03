@@ -1,0 +1,53 @@
+---
+# Fleet platform operators: OLM + cert-manager on hub; push to spokes via ManifestWork.
+# Prerequisites: host_prepare, wireguard, ocm.yml, spokes.yml (for push)
+#
+# Usage:
+#   ansible-playbook fleet-platform.yml
+#   ansible-playbook fleet-platform.yml --tags platform_hub -l hub
+#   ansible-playbook fleet-platform.yml --tags platform_push_spokes -l hub
+#
+# Hub platform ManifestWorks (OLM, cert-manager, …).
+
+- name: Fleet platform on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: olm
+      tags: [platform, platform_hub, phase4, phase4_hub, olm]
+    - role: cert_manager
+      tags: [platform, platform_hub, phase4, phase4_hub, cert_manager]
+    - role: kubevirt_stack
+      when: hardware_kvm_capable | default(false) | bool
+      tags: [platform, platform_hub, phase4, phase4_hub, kubevirt]
+
+- name: Fleet platform | Warm Harbor cache for spoke images
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: olm
+        tasks_from: warm_harbor
+      tags: [platform, platform_warm_harbor, phase4, phase4_warm_harbor, olm]
+
+- name: Fleet platform | Push OLM and cert-manager to spokes
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: olm
+        tasks_from: push_spokes
+      tags: [platform, platform_push_spokes, phase4, phase4_push, olm]
+
+- name: Fleet platform | Verify spoke platform components
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: olm
+        tasks_from: verify_spokes
+      tags: [platform, platform_verify_spokes, phase4, phase4_verify]

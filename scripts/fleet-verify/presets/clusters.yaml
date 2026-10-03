@@ -1,0 +1,24 @@
+# Homelab-profile labels. This public tree does not ship flow extra-vars.
+# Reinstall with --cluster-spec and a local extra-vars file.
+# Hub inventory: examples/inventory/hub-only (replace CHANGE_ME).
+#   lab-sn01 — single node, one control
+#   lab-3n01 — three controls, no workers
+#   lab-ha01 — three controls plus two workers
+
+lab-sn01:
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]
+
+lab-3n01:
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]
+
+lab-ha01:
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]

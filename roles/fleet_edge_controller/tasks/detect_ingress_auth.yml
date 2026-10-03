@@ -1,0 +1,22 @@
+---
+# Console FleetIngressAuth can enable hub forward-auth while inventory keeps
+# fleet_ingress_auth_enabled: false. Do not clobber controller env on redeploy.
+- name: Fleet edge controller | Detect FleetIngressAuth CR
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get fleetingressauth fleet-ingress-auth
+      -n {{ fleet_ingress_auth_cr_namespace | default('fleet-console') }}
+      -o jsonpath='{.spec.hubEnabled}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fec_fia_hub
+  changed_when: false
+  failed_when: false
+
+- name: Fleet edge controller | Enable ingress auth from FleetIngressAuth CR
+  ansible.builtin.set_fact:
+    fleet_ingress_auth_enabled: true
+  when:
+    - fec_fia_hub.rc == 0
+    - fec_fia_hub.stdout | trim == 'true'

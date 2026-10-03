@@ -1,0 +1,38 @@
+# Guest sizing (overridable from Apps → Install chart)
+cpu: 2
+memory: 2Gi
+
+disk:
+  # Must be >= virtual size of the cloud image (Rocky GenericCloud is typically 10Gi).
+  size: 20Gi
+  # Prefer a storage class with Immediate binding for CDI HTTP imports.
+  storageClass: local-path
+  # Filesystem avoids Longhorn block-device permission issues with cdi-importer.
+  volumeMode: Filesystem
+  accessMode: ReadWriteOnce
+
+image:
+  url: https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2
+
+# Optional: pin the VM to a node (empty = scheduler decides)
+nodeSelector: {}
+
+network:
+  # pod = masquerade on the pod network; lan = Multus bridge (requires NAD)
+  mode: pod
+  multusNetwork: default/mgmt-l2
+  # LAN static IPv4 (Rocky GenericCloud ignores cloud-init network: v2; chart uses NetworkManager).
+  staticIP: ""
+  gateway: ""
+  dns: []
+  interface: enp1s0
+
+cloudInit:
+  # Default local user for serial/VNC console smoke tests. Override in production.
+  user: rocky
+  password: CHANGE_ME
+  sshAuthorizedKeys: []
+  # Extra cloud-config YAML merged under the generated user-data (advanced).
+  extraUserData: ""
+
+runStrategy: Always

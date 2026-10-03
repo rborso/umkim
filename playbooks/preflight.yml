@@ -1,0 +1,13 @@
+---
+# Run before hub-install.yml:
+#   ansible-playbook playbooks/preflight.yml --vault-password-file ~/.umkim-vault-pass
+
+- name: UMKIM hub preflight
+  hosts: hub
+  gather_facts: false
+  become: false
+  tasks:
+    - ansible.builtin.import_tasks: tasks/preflight-rocky10.yml
+
+    - name: Preflight | Hub install checks
+      ansible.builtin.import_tasks: tasks/preflight-hub.yml

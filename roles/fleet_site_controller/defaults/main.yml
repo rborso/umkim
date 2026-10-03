@@ -1,0 +1,21 @@
+---
+fleet_site_controller_enabled: true
+fleet_site_controller_namespace: fleet-console
+fleet_site_controller_replicas: 1
+fleet_site_controller_http_port: 8080
+fleet_site_controller_hub_wg_pubkey_secret: fleet-site-hub-wg-pubkey
+fleet_site_controller_kubeconfig_secret: fleet-site-controller-kubeconfig
+# Harbor + chart OCI creds for console provider install jobs (helm/olm SP ManifestWorks).
+fleet_site_hub_ansible_secrets_name: fleet-site-hub-ansible-secrets
+# Private key used by validate/provision Jobs (linux@site overlay). Set on hub inventory if non-default.
+# Rocky 10 ssh-keygen defaults to ed25519; older hubs often still have id_rsa.
+fleet_site_controller_ansible_ssh_key_candidates:
+  - "/home/{{ ansible_user | default('linux') }}/.ssh/id_ed25519"
+  - "/home/{{ ansible_user | default('linux') }}/.ssh/id_rsa"
+fleet_site_controller_ansible_ssh_key_path: "{{ fleet_site_controller_ansible_ssh_key_candidates[1] }}"
+fleet_site_controller_ansible_ssh_key_local_candidates:
+  - "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519"
+  - "{{ lookup('env', 'HOME') }}/.ssh/id_rsa"
+fleet_site_controller_ansible_ssh_key_local_path: "{{ fleet_site_controller_ansible_ssh_key_local_candidates[1] }}"
+# When true, mutating fleet-site APIs require X-Fleet-Subject-* headers (fail closed).
+fleet_site_require_identity: true

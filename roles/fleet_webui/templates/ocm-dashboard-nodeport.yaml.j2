@@ -1,0 +1,19 @@
+# NodePort for OCM Lab Dashboard UI (helm chart service is ClusterIP only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ ocm_lab_helm_release }}-nodeport
+  namespace: {{ fleet_console_namespace }}
+  labels:
+    app.kubernetes.io/name: ocm-dashboard
+    app.kubernetes.io/instance: {{ ocm_lab_helm_release }}
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: ocm-dashboard
+    app.kubernetes.io/instance: {{ ocm_lab_helm_release }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: {{ ocm_lab_nodeport }}

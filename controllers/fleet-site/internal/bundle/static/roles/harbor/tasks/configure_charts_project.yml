@@ -1,0 +1,38 @@
+---
+- name: Harbor | Create charts hosted project
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/projects"
+    method: POST
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [201, 409]
+    body_format: json
+    body:
+      project_name: "{{ harbor_charts_project }}"
+      public: true
+      metadata:
+        public: "true"
+  register: harbor_charts_project_create
+  changed_when: harbor_charts_project_create.status == 201
+  tags: [harbor, harbor_install, harbor_push_charts]
+
+- name: Harbor | Create mirror hosted project
+  ansible.builtin.uri:
+    url: "{{ harbor_external_url }}/api/v2.0/projects"
+    method: POST
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [201, 409]
+    body_format: json
+    body:
+      project_name: "{{ harbor_mirror_project | default('mirror') }}"
+      public: true
+      metadata:
+        public: "true"
+  register: harbor_mirror_project_create
+  changed_when: harbor_mirror_project_create.status == 201
+  tags: [harbor, harbor_install, harbor_push_charts]

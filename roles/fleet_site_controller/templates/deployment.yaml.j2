@@ -1,0 +1,158 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-site-controller
+  namespace: {{ fleet_site_controller_namespace }}
+  labels:
+    app: fleet-site-controller
+spec:
+  replicas: {{ fleet_site_controller_replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fleet-site-controller
+  template:
+    metadata:
+      labels:
+        app: fleet-site-controller
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: fleet-site-controller
+      containers:
+        - name: controller
+          image: {{ fleet_site_controller_image }}
+          imagePullPolicy: Always
+          args:
+            - --leader-elect=false
+            - --api-bind-address=:18080
+            - --health-probe-bind-address=:18081
+            - --metrics-bind-address=:18082
+          ports:
+            - name: http
+              containerPort: 18080
+            - name: health
+              containerPort: 18081
+          env:
+            - name: KUBECONFIG
+              value: /etc/kube/config
+            - name: FLEET_SITE_NAMESPACE
+              value: "{{ fleet_site_controller_namespace }}"
+            - name: FLEET_SITE_HUB_WG_IP
+              value: "{{ fleet_hub_wireguard_ip }}"
+            - name: FLEET_SITE_ENROLLMENT_BASE_URL
+              value: "{{ fleet_site_enrollment_base_url }}"
+            - name: FLEET_SITE_WG_ENDPOINT_HOST
+              value: "{{ wireguard_endpoint_host }}"
+            - name: FLEET_SITE_WG_ENDPOINT_PORT
+              value: "{{ wireguard_endpoint_port | string }}"
+            - name: FLEET_SITE_WG_KEEPALIVE
+              value: "{{ wireguard_persistent_keepalive | string }}"
+            - name: FLEET_SITE_WG_SUBNET
+              value: "{{ wireguard_subnet }}"
+            - name: FLEET_SITE_WG_POOL_START
+              value: "{{ fleet_site_wireguard_pool_start | string }}"
+            - name: FLEET_SITE_WG_POOL_END
+              value: "{{ fleet_site_wireguard_pool_end | string }}"
+            - name: FLEET_SITE_ANSIBLE_RUNNER_IMAGE
+              value: "{{ fleet_site_ansible_runner_image }}"
+            - name: FLEET_SITE_HUB_INVENTORY_NAME
+              value: "{{ groups['hub'] | first }}"
+            - name: FLEET_SITE_SSH_USER
+              value: "{{ fleet_site_bootstrap_ssh_user }}"
+            - name: FLEET_EDGE_DOMAINS_CM_NS
+              value: "{{ fleet_edge_controller_namespace | default('fleet-system') }}"
+            - name: FLEET_EDGE_DOMAINS_CM_NAME
+              value: fleet-edge-domains
+            - name: FLEET_EDGE_CLUSTERS_CM_NS
+              value: "{{ fleet_edge_controller_namespace | default('fleet-system') }}"
+            - name: FLEET_EDGE_CLUSTERS_CM_NAME
+              value: fleet-edge-clusters
+            - name: FLEET_HUB_EDGE_DOMAIN
+              value: "{{ fleet_edge_domain }}"
+            - name: FLEET_SITE_HUB_PUBLIC_IPV4
+              value: "{{ fleet_hub_public_ipv4 | default('') }}"
+            - name: FLEET_EDGE_ACME_ENABLED
+              value: "{{ fleet_edge_acme_enabled | default(true) | bool | ternary('true', 'false') }}"
+            - name: FLEET_EDGE_ACME_EMAIL
+              value: "{{ fleet_edge_acme_email }}"
+            - name: FLEET_INGRESS_AUTH_ENABLED
+              value: "{{ fleet_ingress_auth_enabled | default(false) | bool | ternary('true', 'false') }}"
+            - name: FLEET_INGRESS_AUTH_BOOTSTRAP_PASSWORD
+              value: "{{ fleet_ingress_auth_bootstrap_password | default(fleet_auth_lldap_admin_password | default('')) }}"
+            - name: FLEET_FCJ_DEFAULT_ACME_ENABLED
+              value: "{{ fleet_fcj_default_acme_enabled | default(fleet_edge_acme_enabled | default(false)) | bool | ternary('true', 'false') }}"
+            - name: FLEET_FCJ_DEFAULT_INGRESS_AUTH_ENABLED
+              value: "{{ fleet_fcj_default_ingress_auth_enabled | default(false) | bool | ternary('true', 'false') }}"
+            - name: FLEET_LLM_ENABLED
+              value: "{{ fleet_llm_enabled | default(false) | bool | ternary('true', 'false') }}"
+            - name: FLEET_INGRESS_AUTH_LDAP_BASE_DN
+              value: "{{ fleet_auth_ldap_base_dn | default(fleet_ingress_auth_lldap_base_dn | default('dc=umkim,dc=com')) }}"
+            - name: FLEET_CONSOLE_NAMESPACE
+              value: "{{ fleet_site_controller_namespace }}"
+            - name: FLEET_LLAP_WEBUI_NODEPORT
+              value: "{{ fleet_lldap_webui_nodeport | string }}"
+            - name: FLEET_SITE_REQUIRE_IDENTITY
+              value: "{{ fleet_site_require_identity | default(true) | bool | ternary('true', 'false') }}"
+            - name: FLEET_MANAGEMENT_SITE_ID
+              value: "{{ fleet_management_site_id }}"
+            - name: FLEET_MANAGEMENT_CLUSTER_NAME
+              value: "{{ fleet_management_cluster_name }}"
+            - name: FLEET_SITE_ROCKY_MAJOR
+              value: "{{ fleet_site_rocky_major | default('10') }}"
+            - name: FLEET_ROUTE_NAMESPACE
+              value: "{{ fleet_edge_controller_namespace | default('fleet-system') }}"
+            - name: FLEET_HELM_OCI_PREFIXES
+              value: "{{ helm_chart_oci_prefixes | default('oci://' ~ harbor_host ~ ':' ~ harbor_nodeport_https ~ '/charts') | regex_replace('\\s+', '') }}"
+            - name: FLEET_CHART_INBOX
+              value: /var/lib/umkim/chart-inbox
+            - name: FLEET_SITE_HUB_WG_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ fleet_site_controller_hub_wg_pubkey_secret }}
+                  key: publickey
+                  optional: true
+          volumeMounts:
+            - name: kube
+              mountPath: /etc/kube
+              readOnly: true
+            - name: chart-inbox
+              mountPath: /var/lib/umkim/chart-inbox
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 18081
+              host: 127.0.0.1
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 18081
+              host: 127.0.0.1
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: kube
+          secret:
+            secretName: {{ fleet_site_controller_kubeconfig_secret }}
+        - name: chart-inbox
+          hostPath:
+            path: /var/lib/umkim/chart-inbox
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-site-controller
+  namespace: {{ fleet_site_controller_namespace }}
+  labels:
+    app: fleet-site-controller
+spec:
+  selector:
+    app: fleet-site-controller
+  ports:
+    - name: http
+      port: 18080
+      targetPort: http

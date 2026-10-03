@@ -1,0 +1,33 @@
+---
+- name: K3s cluster | Wait for join token from init node
+  ansible.builtin.assert:
+    that:
+      - hostvars[k3s_cluster_init_host].k3s_cluster_token | default('') | length > 0
+    fail_msg: "Join token not available from {{ k3s_cluster_init_host }} yet."
+  register: k3s_agent_token_wait
+  until: k3s_agent_token_wait is succeeded
+  retries: 60
+  delay: 5
+  tags: [k3s, k3s_cluster, k3s_agent]
+
+- name: K3s cluster | Install agent node
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      # Prefer VIP when set; --disable is server-only and must not be passed to agents.
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="{{ k3s_channel }}" \
+        K3S_TOKEN="{{ hostvars[k3s_cluster_init_host].k3s_cluster_token }}" sh -s - agent \
+        --server {{ k3s_cluster_join_server | default('https://' ~ hostvars[k3s_cluster_init_host].ansible_host ~ ':6443') }} \
+        --node-ip={{ k3s_node_ip }}
+  args:
+    creates: /etc/rancher/k3s/k3s-agent.yaml
+  notify: Restart k3s
+  tags: [k3s, k3s_cluster, k3s_agent]
+
+- name: K3s cluster | Enable agent
+  ansible.builtin.systemd:
+    name: k3s-agent
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [k3s, k3s_cluster, k3s_agent]

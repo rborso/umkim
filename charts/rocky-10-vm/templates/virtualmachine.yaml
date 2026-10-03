@@ -1,0 +1,139 @@
+{{- $vm := include "rocky-10-vm.fullname" . -}}
+{{- $dv := printf "%s-root" $vm -}}
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: {{ $vm }}
+  labels:
+    {{- include "rocky-10-vm.labels" . | nindent 4 }}
+spec:
+  runStrategy: {{ .Values.runStrategy | default "Always" | quote }}
+  dataVolumeTemplates:
+    - metadata:
+        name: {{ $dv }}
+        labels:
+          {{- include "rocky-10-vm.labels" . | nindent 10 }}
+      spec:
+        source:
+          http:
+            url: {{ .Values.image.url | quote }}
+        storage:
+          accessModes:
+            - {{ .Values.disk.accessMode | default "ReadWriteOnce" | quote }}
+          volumeMode: {{ .Values.disk.volumeMode | default "Filesystem" | quote }}
+          resources:
+            requests:
+              storage: {{ .Values.disk.size | quote }}
+          {{- with .Values.disk.storageClass }}
+          storageClassName: {{ . | quote }}
+          {{- end }}
+  template:
+    metadata:
+      labels:
+        kubevirt.io/vm: {{ $vm }}
+        {{- include "rocky-10-vm.labels" . | nindent 8 }}
+      {{- if eq (.Values.network.mode | default "pod") "lan" }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ .Values.network.multusNetwork | quote }}
+      {{- end }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      domain:
+        cpu:
+          cores: {{ int .Values.cpu }}
+        devices:
+          autoattachSerialConsole: true
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          consoles:
+            - name: default
+              serial: {}
+          interfaces:
+            {{- if eq (.Values.network.mode | default "pod") "lan" }}
+            - name: lan
+              bridge: {}
+            {{- else }}
+            - name: default
+              masquerade: {}
+            {{- end }}
+        machine:
+          type: q35
+        resources:
+          requests:
+            memory: {{ .Values.memory | quote }}
+            cpu: {{ .Values.cpu | quote }}
+      networks:
+        {{- if eq (.Values.network.mode | default "pod") "lan" }}
+        - name: lan
+          multus:
+            networkName: {{ .Values.network.multusNetwork | quote }}
+        {{- else }}
+        - name: default
+          pod: {}
+        {{- end }}
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: {{ $dv }}
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: {{ $vm }}
+              users:
+                - name: {{ .Values.cloudInit.user | default "rocky" | quote }}
+                  sudo: ALL=(ALL) NOPASSWD:ALL
+                  shell: /bin/bash
+                  lock_passwd: false
+                  {{- with .Values.cloudInit.sshAuthorizedKeys }}
+                  ssh_authorized_keys:
+                    {{- toYaml . | nindent 20 }}
+                  {{- end }}
+              ssh_pwauth: true
+              chpasswd:
+                expire: false
+                list: |
+                  {{ .Values.cloudInit.user | default "rocky" }}:{{ .Values.cloudInit.password | default "CHANGE_ME" }}
+              {{- if .Values.network.staticIP }}
+              {{- $iface := .Values.network.interface | default "enp1s0" }}
+              write_files:
+                - path: /etc/NetworkManager/system-connections/{{ $iface }}-static.nmconnection
+                  permissions: "0600"
+                  content: |
+                    [connection]
+                    id={{ $iface }}-static
+                    type=ethernet
+                    interface-name={{ $iface }}
+                    autoconnect=true
+
+                    [ethernet]
+
+                    [ipv4]
+                    method=manual
+                    address1={{ .Values.network.staticIP }}{{ if .Values.network.gateway }},{{ .Values.network.gateway }}{{ end }}
+                    {{- with .Values.network.dns }}
+                    dns={{ join ";" . }};
+                    {{- end }}
+
+                    [ipv6]
+                    method=ignore
+              {{- end }}
+              runcmd:
+                - systemctl enable --now serial-getty@ttyS0.service
+              {{- if .Values.network.staticIP }}
+              {{- $iface := .Values.network.interface | default "enp1s0" }}
+                - nmcli con delete "Wired connection 1" 2>/dev/null || true
+                - nmcli con load /etc/NetworkManager/system-connections/{{ $iface }}-static.nmconnection
+                - nmcli con up {{ $iface }}-static
+              {{- end }}
+              {{- with .Values.cloudInit.extraUserData }}
+              {{ . | nindent 14 }}
+              {{- end }}

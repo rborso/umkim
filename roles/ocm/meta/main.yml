@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  role_name: ocm
+  description: Open Cluster Management hub init via clusteradm (ARCHITECTURE Phase 3).
+  license: MIT
+  min_ansible_version: "2.14"
+
+dependencies: []

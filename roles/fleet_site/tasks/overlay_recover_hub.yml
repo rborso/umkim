@@ -1,0 +1,16 @@
+---
+# Hub-side overlay recovery after fleet-site detects tunnel degradation.
+
+- name: Fleet site overlay | Require WG facts
+  ansible.builtin.assert:
+    that:
+      - fleet_site_wg_public_key is defined
+      - fleet_site_wg_public_key | length > 0
+      - fleet_site_wg_address is defined
+      - fleet_site_wg_address | length > 0
+    fail_msg: fleet_site_wg_public_key and fleet_site_wg_address required for overlay recovery
+  run_once: true
+
+- name: Fleet site overlay | Re-apply hub WG peer and route
+  ansible.builtin.import_tasks: hub_wg_peer.yml
+  run_once: true

@@ -1,0 +1,12 @@
+---
+# Hub: approve klusterlet CSRs for each cluster; poll join host until klusterlet is healthy.
+- name: OCM | Approve registration and wait for klusterlet per cluster
+  ansible.builtin.include_tasks: approve_cluster_csr.yml
+  loop: "{{ ocm_register_cluster_names }}"
+  loop_control:
+    loop_var: ocm_cluster_item
+    label: "{{ ocm_cluster_item }}"
+  vars:
+    ocm_spoke_host: "{{ ocm_spoke_join_hosts[ocm_cluster_item] | default(ocm_cluster_item) }}"
+    ocm_clusters_to_accept: "{{ [ocm_cluster_item] }}"
+  tags: [ocm, ocm_approve_csr, ocm_spoke]

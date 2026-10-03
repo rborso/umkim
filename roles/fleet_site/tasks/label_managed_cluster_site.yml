@@ -1,0 +1,13 @@
+---
+# Label greenfield FleetSite ManagedCluster with fleet.site (datacenter id).
+- name: Fleet site | Label ManagedCluster fleet.site
+  ansible.builtin.command:
+    cmd: >-
+      kubectl label managedcluster "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+      "fleet.site={{ fleet_site_id | default(fleet_site_name) }}"
+      --overwrite
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  tags: [fleet_site, ocm_cluster_labels, fleet_site_provision]

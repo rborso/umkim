@@ -1,0 +1,32 @@
+---
+- name: Fleet WebUI lab | Assert hub-only
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups['hub']
+    fail_msg: Fleet WebUI lab extras deploy only on the hub.
+  tags: [fleet_webui_lab, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI lab | Deploy OCM Lab Dashboard
+  ansible.builtin.import_tasks: ocm_lab.yml
+  when: ocm_lab_enabled | default(false) | bool
+  tags: [fleet_webui_lab, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI lab | Gateway /fleet/ routes for console
+  ansible.builtin.import_role:
+    name: fleet_console_helm
+    tasks_from: gateway_routes.yml
+  when: umkim_console_gateway_path | default(false) | bool
+  tags: [fleet_webui_lab, umkim_console, fleet_console, fleet_console_gateway_routes]
+
+- name: Fleet WebUI lab | Access URLs
+  ansible.builtin.debug:
+    msg: "{{ fleet_webui_lab_access_urls }}"
+  vars:
+    fleet_webui_lab_access_urls: >-
+      {{
+        ([] if not (ocm_lab_enabled | default(false) | bool) else
+          ['OCM Lab Dashboard: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ ocm_lab_nodeport ~ '/'])
+        + (['UMKIM console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ umkim_console_nodeport ~ '/fleet/login']
+           if umkim_console_enabled | default(true) | bool else [])
+      }}
+  tags: [fleet_webui_lab, fleet_webui_verify]

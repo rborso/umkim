@@ -1,0 +1,47 @@
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: dc-admin
+spec:
+  rules:
+    - resources: ["*"]
+      verbs: ["*"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: site-admin
+spec:
+  rules:
+    - resources: ["sites", "clusters", "apps", "charts", "llama-profiles", "infrastructure", "ingress-auth", "acme", "edge"]
+      verbs: ["get", "list", "create", "update", "delete", "patch"]
+    - resources: ["health"]
+      verbs: ["get"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: cluster-admin
+spec:
+  rules:
+    - resources: ["apps"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["llama-profiles"]
+      verbs: ["get", "list", "create", "update", "patch", "delete"]
+    - resources: ["charts"]
+      verbs: ["get", "list"]
+    - resources: ["clusters"]
+      verbs: ["get", "list", "update", "patch"]
+    - resources: ["sites"]
+      verbs: ["get", "list"]
+    - resources: ["health"]
+      verbs: ["get"]
+---
+apiVersion: console.umkim.com/v1alpha1
+kind: FleetRole
+metadata:
+  name: viewer
+spec:
+  rules:
+    - resources: ["sites", "clusters", "apps", "charts", "llama-profiles", "infrastructure", "health"]
+      verbs: ["get", "list"]

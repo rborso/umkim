@@ -1,0 +1,118 @@
+---
+- name: Fleet ingress auth | Initialize spoke cluster config list
+  ansible.builtin.set_fact:
+    fia_cluster_config_items: []
+  tags: [fleet_ingress_auth, fleet_ingress_auth_spokes]
+
+- name: Fleet ingress auth | Resolve per-cluster auth configs from map
+  ansible.builtin.set_fact:
+    fia_cluster_config_items: "{{ fleet_ingress_auth_cluster_configs | dict2items }}"
+  when: (fleet_ingress_auth_cluster_configs | default({}) | length) > 0
+  tags: [fleet_ingress_auth, fleet_ingress_auth_spokes]
+
+- name: Fleet ingress auth | Resolve per-cluster auth configs from spoke list
+  ansible.builtin.set_fact:
+    fia_cluster_config_items: "{{ fia_cluster_config_items | default([]) + [{'key': item, 'value': {}}] }}"
+  loop: "{{ fleet_ingress_auth_spoke_clusters | default([]) }}"
+  when: (fleet_ingress_auth_cluster_configs | default({}) | length) == 0
+  tags: [fleet_ingress_auth, fleet_ingress_auth_spokes]
+
+- name: Fleet ingress auth | Push auth stack to spokes
+  when: fia_cluster_config_items | length > 0
+  block:
+    - name: Fleet ingress auth | Ensure spoke secret files exist
+      ansible.builtin.import_tasks: ensure_spoke_secrets.yml
+
+    - name: Fleet ingress auth | Stage chart for spoke render
+      ansible.builtin.copy:
+        src: "{{ fleet_ingress_auth_chart_src | default(playbook_dir + '/charts/fleet-ingress-auth') }}/"
+        dest: /tmp/fleet-ingress-auth-chart/
+        mode: preserve
+
+    - name: Fleet ingress auth | Capture default access domains for spoke render
+      ansible.builtin.set_fact:
+        fia_global_access_domains: "{{ fleet_ingress_auth_access_domains | default([]) }}"
+
+    - name: Fleet ingress auth | Render spoke values per cluster
+      ansible.builtin.template:
+        src: values-spoke.yaml.j2
+        dest: "/tmp/fleet-ingress-auth-values-spoke-{{ item.key }}.yaml"
+        mode: "0600"
+      loop: "{{ fia_cluster_config_items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        ocm_target_cluster: "{{ item.key }}"
+        _cfg: "{{ item.value | default({}) }}"
+        _secrets_dir: "{{ _cfg.secrets_dir | default('/secrets/ingress-auth/clusters/' + item.key) }}"
+        _portal_host: >-
+          {{ _cfg.portal_host
+             | default('auth.' + item.key + '.' + (fleet_edge_domain | default('mgmt.umkim.com'))) }}
+        _cookie_domain: >-
+          {{ _cfg.cookie_domain
+             | default(_portal_host | regex_replace('^auth\\.', '')) }}
+        _access_domains: >-
+          {{ _cfg.access_domains
+             if (_cfg.access_domains | default([]) | length > 0)
+             else fia_global_access_domains }}
+        fleet_ingress_auth_portal_host: "{{ _portal_host }}"
+        fleet_ingress_auth_authelia_public_url: "https://{{ _portal_host }}"
+        fleet_ingress_auth_cookie_domain: "{{ _cookie_domain }}"
+        fia_spoke_access_domains: "{{ _access_domains }}"
+        _expose_lldap_webui: "{{ (_cfg.expose_lldap_webui | default(false)) | bool }}"
+        fleet_ingress_auth_lldap_expose_webui: "{{ _expose_lldap_webui }}"
+        fleet_ingress_auth_lldap_webui_host: >-
+          {{ _cfg.lldap_webui_host | default('lldap.' + _cookie_domain)
+             if _expose_lldap_webui else '' }}
+
+    - name: Fleet ingress auth | Helm template manifests for spoke
+      ansible.builtin.command:
+        cmd: >-
+          helm template {{ fleet_ingress_auth_helm_release }}
+          /tmp/fleet-ingress-auth-chart
+          --namespace {{ fleet_ingress_auth_namespace }}
+          -f /tmp/fleet-ingress-auth-values-spoke-{{ item.key }}.yaml
+      environment:
+        PATH: "{{ k3s_command_path }}"
+      loop: "{{ fia_cluster_config_items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      register: fia_helm_template_results
+      changed_when: false
+
+    - name: Fleet ingress auth | Build spoke manifest lists
+      ansible.builtin.set_fact:
+        fia_spoke_manifests_by_cluster: >-
+          {{
+            fia_spoke_manifests_by_cluster | default({}) | combine({
+              item.item.key: (item.stdout | from_yaml_all | list)
+            })
+          }}
+      loop: "{{ fia_helm_template_results.results }}"
+      loop_control:
+        label: "{{ item.item.key }}"
+
+    - name: Fleet ingress auth | Render ManifestWork per spoke
+      ansible.builtin.template:
+        src: manifestwork-auth.yaml.j2
+        dest: "/tmp/manifestwork-{{ fleet_ingress_auth_manifestwork_name }}-{{ item.key }}.yaml"
+        mode: "0600"
+      loop: "{{ fia_cluster_config_items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        ocm_target_cluster: "{{ item.key }}"
+        auth_manifests: "{{ fia_spoke_manifests_by_cluster[item.key] }}"
+
+    - name: Fleet ingress auth | Apply ManifestWork on hub
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/manifestwork-{{ fleet_ingress_auth_manifestwork_name }}-{{ item.key }}.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      loop: "{{ fia_cluster_config_items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      register: fia_mw_apply
+      changed_when: "'created' in fia_mw_apply.stdout or 'configured' in fia_mw_apply.stdout"
+  tags: [fleet_ingress_auth, fleet_ingress_auth_spokes]

@@ -1,0 +1,25 @@
+---
+# Phase 2 + 3 targeted redeploy: Harbor fleet images + registry mirrors.
+#
+#   ansible-playbook playbooks/redeploy-phase2-3.yml
+#   ansible-playbook playbooks/redeploy-phase2-3.yml -e harbor_fleet_push_force=true
+
+- name: Phase 2/3 | Push fleet images to Harbor
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: push_fleet
+      tags: [harbor_push_fleet]
+
+- name: Phase 2/3 | K3s registry mirrors
+  hosts: fleet_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: registries
+      tags: [harbor_registries]

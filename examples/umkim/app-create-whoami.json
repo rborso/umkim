@@ -1,0 +1,10 @@
+{
+  "clusterName": "lab-ha-0",
+  "chart": "whoami",
+  "version": "0.1.0",
+  "releaseName": "whoami",
+  "namespace": "default",
+  "route": {
+    "mode": "none"
+  }
+}

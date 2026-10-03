@@ -1,0 +1,103 @@
+---
+- name: Fleet cluster longhorn | Skip disk prep when not enabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_cluster_longhorn_enabled | default(false) | bool)
+
+- name: Fleet cluster longhorn | Install node dependencies
+  ansible.builtin.dnf:
+    name:
+      - iscsi-initiator-utils
+      - nfs-utils
+    state: present
+
+- name: Fleet cluster longhorn | Enable iscsid
+  ansible.builtin.systemd:
+    name: iscsid
+    enabled: true
+    state: started
+
+# Directory mode: no dedicated block device — use a path on the root filesystem.
+- name: Fleet cluster longhorn | Ensure data directory on root filesystem
+  ansible.builtin.file:
+    path: "{{ fleet_cluster_longhorn_mount_path }}"
+    state: directory
+    mode: "0755"
+  when: (fleet_cluster_longhorn_device | default('') | length) == 0
+
+- name: Fleet cluster longhorn | Skip block-device prep in directory mode
+  ansible.builtin.meta: end_host
+  when: (fleet_cluster_longhorn_device | default('') | length) == 0
+
+- name: Fleet cluster longhorn | Stat block device
+  ansible.builtin.stat:
+    path: "{{ fleet_cluster_longhorn_device }}"
+  register: fleet_lh_device_stat
+
+- name: Fleet cluster longhorn | Require block device
+  ansible.builtin.assert:
+    that:
+      - fleet_lh_device_stat.stat.exists
+      - fleet_lh_device_stat.stat.isblk | default(false)
+    fail_msg: "Longhorn device {{ fleet_cluster_longhorn_device }} missing or not a block device on {{ inventory_hostname }}"
+
+- name: Fleet cluster longhorn | Read device size
+  ansible.builtin.command:
+    cmd: lsblk -bdno SIZE {{ fleet_cluster_longhorn_device }}
+  register: fleet_lh_device_size
+  changed_when: false
+
+- name: Fleet cluster longhorn | Require minimum data disk size
+  ansible.builtin.assert:
+    that:
+      - (fleet_lh_device_size.stdout | trim | int) >= (fleet_cluster_min_data_disk_gi | int) * 1024 * 1024 * 1024
+    fail_msg: >-
+      {{ fleet_cluster_longhorn_device }} is smaller than {{ fleet_cluster_min_data_disk_gi }} GiB on {{ inventory_hostname }}
+
+- name: Fleet cluster longhorn | Wipe existing filesystem signatures when unformatted
+  ansible.builtin.command:
+    cmd: wipefs -a {{ fleet_cluster_longhorn_device }}
+  when:
+    - ansible_mounts | selectattr('device', 'search', fleet_cluster_longhorn_device | basename) | list | length == 0
+    - ansible_mounts | selectattr('mount', 'equalto', fleet_cluster_longhorn_mount_path) | list | length == 0
+  register: fleet_lh_wipefs
+  changed_when: fleet_lh_wipefs.rc == 0
+  failed_when: false
+
+- name: Fleet cluster longhorn | Create partition on data disk
+  community.general.parted:
+    device: "{{ fleet_cluster_longhorn_device }}"
+    label: gpt
+    number: 1
+    state: present
+    part_end: 100%
+  register: fleet_lh_parted
+
+- name: Fleet cluster longhorn | Set partition fact
+  ansible.builtin.set_fact:
+    fleet_lh_partition: "{{ fleet_cluster_longhorn_device }}1"
+  when: fleet_cluster_longhorn_device is match('/dev/sd.*') or fleet_cluster_longhorn_device is match('/dev/vd.*')
+
+- name: Fleet cluster longhorn | Set partition fact for nvme
+  ansible.builtin.set_fact:
+    fleet_lh_partition: "{{ fleet_cluster_longhorn_device }}p1"
+  when: fleet_cluster_longhorn_device is match('/dev/nvme.*')
+
+- name: Fleet cluster longhorn | Create XFS on Longhorn partition
+  community.general.filesystem:
+    fstype: xfs
+    dev: "{{ fleet_lh_partition }}"
+    force: "{{ fleet_lh_parted.changed | default(false) }}"
+
+- name: Fleet cluster longhorn | Ensure mount directory exists
+  ansible.builtin.file:
+    path: "{{ fleet_cluster_longhorn_mount_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Fleet cluster longhorn | Mount Longhorn data path
+  ansible.posix.mount:
+    path: "{{ fleet_cluster_longhorn_mount_path }}"
+    src: "{{ fleet_lh_partition }}"
+    fstype: xfs
+    opts: defaults
+    state: mounted

@@ -1,0 +1,37 @@
+---
+- name: Harbor | Ensure K3s config directory for registries.yaml
+  ansible.builtin.file:
+    path: "{{ k3s_registries_yaml | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [harbor, harbor_registries]
+
+- name: Harbor | Deploy K3s registries.yaml
+  ansible.builtin.template:
+    src: "{{ role_path | default(playbook_dir + '/roles/harbor') }}/templates/registries.yaml.j2"
+    dest: "{{ k3s_registries_yaml }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: harbor_registries_deploy
+  tags: [harbor, harbor_registries]
+
+- name: Harbor | Resolve K3s unit for registry reload
+  ansible.builtin.set_fact:
+    harbor_k3s_unit: >-
+      {{ 'k3s-agent'
+         if (inventory_hostname in (groups['fleet_cluster_workers'] | default([]))
+             or inventory_hostname in (groups['k3s_agents'] | default([]))
+             or (k3s_role | default('') == 'agent'))
+         else 'k3s' }}
+  tags: [harbor, harbor_registries]
+
+- name: Harbor | Restart K3s to apply registry mirrors
+  ansible.builtin.systemd:
+    name: "{{ harbor_k3s_unit }}"
+    state: restarted
+    daemon_reload: true
+  when: harbor_registries_deploy is changed
+  tags: [harbor, harbor_registries]

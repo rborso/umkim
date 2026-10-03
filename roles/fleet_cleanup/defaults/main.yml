@@ -1,0 +1,45 @@
+---
+fleet_cleanup_wait_manifestwork_seconds: 120
+fleet_cleanup_delete_harbor: false
+fleet_cleanup_delete_hub_platform: true
+
+fleet_cleanup_manifestworks:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase6-spoke-ingress
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp
+  - phase4-platform-bootstrap
+
+# Detach keeps spoke Traefik + platform (cert-manager) so site-routed apps stay reachable.
+fleet_cleanup_manifestworks_detach:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp
+
+fleet_cleanup_legacy_manifestworks:
+  - phase6-spoke-ingress-demo
+  - phase5-k8s-container-sp
+
+fleet_cleanup_hub_namespaces:
+  - dcm
+  - fleet-console
+  - fleet-ingress
+  - fleet-ingress-auth
+  - fleet-system
+  - fleet-bootstrap
+  - harbor
+  - open-cluster-management
+  - cert-manager
+  - operators
+
+fleet_cleanup_platform_namespaces:
+  - olm
+  - openshift-operators
+  - kubevirt
+  - cdi

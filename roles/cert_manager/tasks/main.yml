@@ -1,0 +1,78 @@
+---
+- name: cert-manager | Check if already installed
+  ansible.builtin.command:
+    cmd: kubectl -n cert-manager get deployment cert-manager
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: cm_check
+  changed_when: false
+  failed_when: false
+  tags: [cert_manager, phase4]
+
+- name: cert-manager | Remove stale OLM subscription (manifest install; avoids catalog CPU loop)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl delete subscription cert-manager -n cert-manager --ignore-not-found
+    kubectl delete csv -n cert-manager -l operators.coreos.com/cert-manager.cert-manager --ignore-not-found
+    kubectl delete operatorgroup cert-manager -n cert-manager --ignore-not-found
+    kubectl delete catalogsource operatorhubio-catalog -n olm --ignore-not-found
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: false
+  failed_when: false
+  tags: [cert_manager, phase4]
+
+- name: cert-manager | Create namespace
+  ansible.builtin.command:
+    cmd: kubectl create namespace cert-manager --dry-run=client -o yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: cm_ns
+  changed_when: false
+  when: cm_check.rc != 0
+  tags: [cert_manager, phase4]
+
+- name: cert-manager | Apply namespace
+  ansible.builtin.command:
+    cmd: kubectl apply -f -
+    stdin: "{{ cm_ns.stdout }}"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when: cm_check.rc != 0
+  tags: [cert_manager, phase4]
+
+- name: cert-manager | Install from upstream manifest
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ phase4_cert_manager_manifest_url }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: cm_manifest
+  changed_when: "'created' in cm_manifest.stdout or 'configured' in cm_manifest.stdout"
+  when: cm_check.rc != 0
+  tags: [cert_manager, phase4]
+
+- name: cert-manager | Wait for deployments
+  ansible.builtin.command:
+    cmd: kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [cert_manager, phase4]
+
+- name: cert-manager | Wait for webhook
+  ansible.builtin.command:
+    cmd: kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager-webhook --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  failed_when: false
+  tags: [cert_manager, phase4]

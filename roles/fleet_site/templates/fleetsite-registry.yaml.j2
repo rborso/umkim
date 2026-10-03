@@ -1,0 +1,67 @@
+apiVersion: fleet.umkim.com/v1alpha1
+kind: FleetSite
+metadata:
+  name: {{ item.key }}
+  namespace: {{ fleet_site_namespace }}
+{% if item.value.management_site | default(false) | bool %}
+  annotations:
+    fleet.umkim.com/management-site: "true"
+{% endif %}
+spec:
+  siteName: {{ item.key }}
+  siteId: {{ item.key }}
+  provisioningMode: registry
+  displayName: {{ item.value.display_name | default(item.key) }}
+{% if item.value.region is defined %}
+  region: "{{ item.value.region }}"
+{% endif %}
+{% if item.value.failure_domain is defined %}
+  failureDomain: "{{ item.value.failure_domain }}"
+{% endif %}
+{% if item.value.jumphost is defined %}
+  jumphost: "{{ item.value.jumphost }}"
+{% endif %}
+  edge:
+{% if item.value.hub_gateway | default(false) | bool %}
+    hubGateway: true
+{% endif %}
+{% if item.value.hub_zone is defined %}
+    hubZone: "{{ item.value.hub_zone }}"
+{% elif item.value.edge_domain is defined and (item.value.hub_gateway | default(false) | bool) %}
+    hubZone: "{{ item.value.edge_domain }}"
+{% endif %}
+{% if item.value.hub_wildcard is defined %}
+    hubWildcard: "{{ item.value.hub_wildcard }}"
+{% elif item.value.edge_wildcard is defined and (item.value.hub_gateway | default(false) | bool) %}
+    hubWildcard: "{{ item.value.edge_wildcard }}"
+{% endif %}
+{% if item.value.ingress is defined %}
+    ingress:
+{% for ing in item.value.ingress %}
+      - id: {{ ing.id }}
+        method: {{ ing.method }}
+{% if ing.address is defined %}
+        address: "{{ ing.address }}"
+{% endif %}
+{% if ing.zone is defined %}
+        zone: "{{ ing.zone }}"
+{% endif %}
+{% if ing.wildcard is defined %}
+        wildcard: "{{ ing.wildcard }}"
+{% endif %}
+{% if ing.description is defined %}
+        description: "{{ ing.description }}"
+{% endif %}
+{% if ing.operator_notes is defined %}
+        operatorNotes: "{{ ing.operator_notes }}"
+{% endif %}
+{% endfor %}
+{% endif %}
+    wanEgress:
+      enabled: {{ (item.value.wan_egress.enabled if item.value.wan_egress is defined else item.value.external_access.enabled | default(true)) | bool }}
+      dnsTargetNote: "{{ item.value.dns_target_note | default('') }}"
+{% if item.value.wan_egress is defined and item.value.wan_egress.expected_wan_ip is defined %}
+      expectedWanIp: "{{ item.value.wan_egress.expected_wan_ip }}"
+{% elif item.value.external_access is defined and item.value.external_access.expected_wan_ip is defined %}
+      expectedWanIp: "{{ item.value.external_access.expected_wan_ip }}"
+{% endif %}

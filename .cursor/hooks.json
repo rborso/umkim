@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "subagentStart": [
+      {
+        "command": ".cursor/hooks/subagent-model.sh",
+        "failClosed": false
+      }
+    ],
+    "stop": [
+      {
+        "type": "prompt",
+        "prompt": "Did this turn change fleet behavior (playbooks, inventory, controllers, UI, versions, security)? If yes, list which doc files were updated per the change→doc map in AGENTS.md.",
+        "timeout": 10
+      }
+    ]
+  }
+}

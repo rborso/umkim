@@ -1,0 +1,16 @@
+# Managed by Ansible role: wireguard (spoke client)
+# Hub endpoint: {{ wireguard_endpoint_host }}:{{ wireguard_endpoint_port }}
+
+[Interface]
+Address = {{ wireguard_address }}
+PrivateKey = {{ wireguard_private_key }}
+{% if wireguard_endpoint_route_via_mgmt | default(false) | bool %}
+PostUp = {{ wireguard_endpoint_route_script }} up
+PreDown = {{ wireguard_endpoint_route_script }} down
+{% endif %}
+
+[Peer]  # {{ wireguard_hub_host }}
+PublicKey = {{ wireguard_hub_public_key }}
+Endpoint = {{ wireguard_endpoint_host }}:{{ wireguard_endpoint_port }}
+AllowedIPs = {{ wireguard_allowed_ips }}
+PersistentKeepalive = {{ wireguard_persistent_keepalive }}

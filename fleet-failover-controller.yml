@@ -1,0 +1,15 @@
+---
+# Deploy fleet-failover-controller on hub (hub-path degrade + relocate/standby actuation).
+#
+#   ansible-playbook fleet-edge-crd.yml -l hub
+#   ansible-playbook fleet-failover-controller.yml -l hub
+#
+# Prereqs: fleet-edge-controller, Harbor image fleet/fleet-failover-controller:<release-tag>
+
+- name: Fleet failover controller on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_failover_controller
+      tags: [fleet_failover_controller]

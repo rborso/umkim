@@ -1,0 +1,5 @@
+---
+# Deprecated: manifests moved to charts/fleet-console. Delegates to Helm role.
+- name: Fleet console auth | Deploy via Helm chart
+  ansible.builtin.import_role:
+    name: fleet_console_helm

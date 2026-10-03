@@ -1,0 +1,17 @@
+# Parity operation definitions (API vs console).
+operations:
+  site.create:
+    resource_prefix: verify-synth
+    api:
+      create: POST /fleet/api/v1alpha1/sites
+      delete: DELETE /fleet/api/v1alpha1/sites/{name}
+    console:
+      spec: e2e/parity/site-create.spec.ts
+    compare_fields: [name, phase]
+
+  deploy.submit:
+    api:
+      script: scripts/verify-fleet-app.sh
+    console:
+      spec: e2e/parity/deploy-submit.spec.ts
+    compare_fields: [name, phase]

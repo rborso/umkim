@@ -1,0 +1,119 @@
+---
+- name: Fleet hub firewall | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_hub_firewall_enabled | default(false) | bool)
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Install nftables
+  ansible.builtin.dnf:
+    name: nftables
+    state: present
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Ensure nftables config directory
+  ansible.builtin.file:
+    path: "{{ fleet_hub_firewall_nftables_conf | dirname }}"
+    state: directory
+    mode: "0755"
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Allow hairpin to local NodePorts/API (route_localnet)
+  ansible.posix.sysctl:
+    name: net.ipv4.conf.all.route_localnet
+    value: "1"
+    sysctl_set: true
+    reload: true
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Render filter rules
+  ansible.builtin.template:
+    src: fleet-hub.nft.j2
+    dest: "{{ fleet_hub_firewall_nftables_conf }}"
+    mode: "0644"
+  register: fleet_hub_firewall_render
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Sync firewalld public ports
+  ansible.builtin.import_tasks: firewalld.yml
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | WAN REDIRECT to gateway NodePorts
+  ansible.builtin.import_tasks: wan_redirect.yml
+  when:
+    - fleet_hub_firewall_public_ingress_enabled | bool
+    - fleet_hub_firewall_public_ingress_dnat | bool
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Remove WAN REDIRECT rules
+  ansible.builtin.import_tasks: wan_redirect_remove.yml
+  when: not (fleet_hub_firewall_public_ingress_enabled | bool and fleet_hub_firewall_public_ingress_dnat | bool)
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Remove legacy nft WAN NAT include
+  ansible.builtin.lineinfile:
+    path: "{{ fleet_hub_firewall_nftables_main_conf }}"
+    regexp: 'fleet-hub-nat\.nft'
+    state: absent
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Drop legacy nft WAN NAT table
+  ansible.builtin.command:
+    cmd: nft delete table ip fleet_hub_nat
+  register: fleet_hub_firewall_nat_drop
+  failed_when: false
+  changed_when: fleet_hub_firewall_nat_drop.rc == 0
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Register filter include in main nftables config
+  ansible.builtin.lineinfile:
+    path: "{{ fleet_hub_firewall_nftables_main_conf }}"
+    line: 'include "{{ fleet_hub_firewall_nftables_conf }}"'
+    regexp: 'fleet-hub\.nft'
+    create: true
+    mode: "0644"
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Load rules
+  ansible.builtin.shell: |
+    set -euo pipefail
+    nft delete table inet fleet_hub 2>/dev/null || true
+    nft -f {{ fleet_hub_firewall_nftables_conf }}
+  args:
+    executable: /bin/bash
+  register: fleet_hub_firewall_load
+  changed_when: >-
+    fleet_hub_firewall_render.changed
+    or (fleet_hub_firewall_wan_redirect.changed | default(false))
+    or fleet_hub_firewall_load.rc == 0
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Enable nftables service
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+    state: started
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Verify prerouting filter exists
+  ansible.builtin.command:
+    cmd: nft list chain inet fleet_hub prerouting
+  register: fleet_hub_firewall_chain
+  changed_when: false
+  tags: [fleet_hub_firewall, hub_firewall]
+
+- name: Fleet hub firewall | Summary
+  ansible.builtin.debug:
+    msg: >-
+      {% if fleet_hub_firewall_public_ingress_enabled | bool and fleet_hub_firewall_public_ingress_dnat | bool %}
+      Public {{ fleet_hub_firewall_public_interface }}: SSH, UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }},
+      HTTP/S :80/:443 REDIRECT → NodePorts {{ fleet_hub_firewall_gateway_http_nodeport }}/{{ fleet_hub_firewall_gateway_https_nodeport }} (gateway HA).
+      Management NodePorts still blocked on WAN IP; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
+      {% elif fleet_hub_firewall_public_ingress_enabled | bool %}
+      Public {{ fleet_hub_firewall_public_interface }}: SSH, UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }},
+      HTTP/S :80/:443 on gateway Traefik hostNetwork (single replica).
+      Management NodePorts still blocked on WAN IP; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
+      {% else %}
+      Public interface {{ fleet_hub_firewall_public_interface }}: SSH + UDP {{ fleet_hub_firewall_public_udp_allow | join(',') }} only.
+      Fleet/Harbor NodePorts blocked on WAN; use {{ wireguard_address | ansible.utils.ipaddr('address') }} over WireGuard.
+      {% endif %}
+  tags: [fleet_hub_firewall, hub_firewall]

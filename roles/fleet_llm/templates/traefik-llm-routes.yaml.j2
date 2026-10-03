@@ -1,0 +1,50 @@
+# Hub LLM API — public OpenAI-compatible endpoint via fleet-console-auth (FleetLLMApiKey).
+http:
+  routers:
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+    fleet-llm-api:
+      rule: "Host(`{{ fleet_llm_public_host | default('llm.api.' + fleet_edge_domain) }}`) && PathPrefix(`/v1`)"
+      service: fleet-llm-auth
+      entryPoints:
+        - web
+      middlewares:
+        - fleet-llm-redirect-https
+        - fleet-llm-auth-prefix
+    fleet-llm-api-tls:
+      rule: "Host(`{{ fleet_llm_public_host | default('llm.api.' + fleet_edge_domain) }}`) && PathPrefix(`/v1`)"
+      service: fleet-llm-auth
+      entryPoints:
+        - websecure
+      middlewares:
+        - fleet-llm-auth-prefix
+        - fleet-llm-forward-https
+      tls:
+        certResolver: letsencrypt
+{% else %}
+    fleet-llm-api:
+      rule: "Host(`{{ fleet_llm_public_host | default('llm.api.' + fleet_edge_domain) }}`) && PathPrefix(`/v1`)"
+      service: fleet-llm-auth
+      entryPoints:
+        - web
+      middlewares:
+        - fleet-llm-auth-prefix
+{% endif %}
+  middlewares:
+    fleet-llm-auth-prefix:
+      addPrefix:
+        prefix: /proxy/llm
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+    fleet-llm-redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    fleet-llm-forward-https:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+{% endif %}
+  services:
+    fleet-llm-auth:
+      loadBalancer:
+        servers:
+          - url: "http://{{ fleet_llm_auth_service }}"

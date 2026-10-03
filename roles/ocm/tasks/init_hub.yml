@@ -1,0 +1,95 @@
+---
+- name: OCM | Ensure K3s API is ready
+  ansible.builtin.command:
+    cmd: kubectl get nodes
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_k3s_nodes
+  until: ocm_k3s_nodes.rc == 0
+  retries: 12
+  delay: 10
+  changed_when: false
+  tags: [ocm, ocm_init]
+
+- name: OCM | Check if hub already initialized
+  ansible.builtin.command:
+    cmd: kubectl -n {{ ocm_namespace }} get deploy cluster-manager
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_hub_deploy
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_init]
+
+- name: OCM | Check cluster-manager pods are running
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ ocm_namespace }} get deploy cluster-manager
+      -o jsonpath={.status.readyReplicas}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_hub_ready
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_init]
+
+- name: OCM | Ensure OCM config directory
+  ansible.builtin.file:
+    path: "{{ ocm_join_command_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [ocm, ocm_init]
+
+- name: OCM | Initialize hub with clusteradm
+  ansible.builtin.command:
+    cmd: >-
+      {{ ocm_clusteradm_path }} init
+      --bundle-version {{ ocm_bundle_version }}
+      {% if ocm_wait | bool %}--wait{% endif %}
+      {% if ocm_create_namespace | bool %}--create-namespace{% endif %}
+      --registration-drivers {{ ocm_registration_drivers }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_init
+  changed_when: ocm_init.rc == 0
+  when:
+    - ocm_force_init | bool or ocm_hub_deploy.rc != 0
+    - ocm_force_init | bool or (ocm_hub_ready.stdout | default('') | trim | int(0)) < 1
+  tags: [ocm, ocm_init]
+
+- name: OCM | Save join command template for spokes
+  ansible.builtin.copy:
+    dest: "{{ ocm_join_command_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      # Managed by Ansible (ocm role). Run on spoke clusters after their K3s is up.
+      # Hub API (WireGuard overlay): {{ ocm_hub_apiserver }}
+      #
+      # Generate a fresh join command:
+      #   clusteradm get token --hub-apiserver {{ ocm_hub_apiserver }} --context default
+      #
+      # Example join (replace token and cluster name):
+      #   clusteradm join --hub-token <token> --hub-apiserver {{ ocm_hub_apiserver }} \
+      #     --cluster-name <name> --wait --force-internal-endpoint-lookup
+      #
+      # Accept on hub:
+      #   clusteradm accept --clusters <name>
+      #
+      # Last init output:
+      {{ (ocm_init.stdout | default('')) if (ocm_init is defined and not (ocm_init is skipped)) else '# OCM already initialized' }}
+  when: ocm_hub_deploy.rc == 0 or (ocm_init is defined and not (ocm_init is skipped))
+  tags: [ocm, ocm_init]
+
+- name: OCM | Show init output
+  ansible.builtin.debug:
+    msg: "{{ ocm_init.stdout_lines | default(['OCM hub already initialized']) }}"
+  tags: [ocm, ocm_init]
+
+- name: OCM | Patch cluster-info hub API server
+  ansible.builtin.import_tasks: patch_cluster_info_apiserver.yml
+  when: ocm_hub | default(false) | bool
+  tags: [ocm, ocm_init, ocm_patch_cluster_info]

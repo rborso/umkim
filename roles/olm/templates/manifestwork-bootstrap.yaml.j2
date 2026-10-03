@@ -1,0 +1,93 @@
+# OCM ManifestWork — bootstrap OLM + cert-manager on spoke {{ ocm_target_cluster }}
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  name: {{ phase4_manifestwork_name }}
+  namespace: {{ ocm_target_cluster }}
+  labels:
+    fleet.umkim.com/phase: "4"
+spec:
+  workload:
+    manifests:
+      - apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: {{ phase4_bootstrap_namespace }}
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: platform-bootstrap
+          namespace: {{ phase4_bootstrap_namespace }}
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: fleet-{{ ocm_target_cluster }}-bootstrap
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-admin
+        subjects:
+          - kind: ServiceAccount
+            name: platform-bootstrap
+            namespace: {{ phase4_bootstrap_namespace }}
+      - apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: platform-bootstrap
+          namespace: {{ phase4_bootstrap_namespace }}
+        spec:
+          backoffLimit: 3
+          ttlSecondsAfterFinished: 86400
+          template:
+            metadata:
+              labels:
+                app: platform-bootstrap
+            spec:
+              serviceAccountName: platform-bootstrap
+              restartPolicy: Never
+              containers:
+                - name: bootstrap
+                  image: {{ phase4_bootstrap_image }}
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: OLM_VERSION
+                      value: "{{ phase4_olm_version }}"
+                    - name: CM_VERSION
+                      value: "{{ phase4_cert_manager_version }}"
+                    - name: OLM_CRDS_URL
+                      value: "{{ phase4_olm_crds_url }}"
+                    - name: OLM_DEPLOY_URL
+                      value: "{{ phase4_olm_deploy_url }}"
+                    - name: CM_MANIFEST_URL
+                      value: "{{ phase4_cert_manager_manifest_url }}"
+                    - name: CATALOG_IMAGE
+                      value: "{{ phase4_operatorhub_catalog_image }}"
+                  command:
+                    - /bin/bash
+                    - -ec
+                    - |
+                      set -o pipefail
+                      if kubectl -n olm get deployment olm-operator >/dev/null 2>&1; then
+                        echo "OLM already installed"
+                      else
+                        curl -sfL "${OLM_CRDS_URL}" | kubectl apply --server-side --force-conflicts -f -
+                        kubectl wait --for condition=Established --timeout=600s \
+                          crd/catalogsources.operators.coreos.com \
+                          crd/clusterserviceversions.operators.coreos.com \
+                          crd/installplans.operators.coreos.com \
+                          crd/olmconfigs.operators.coreos.com \
+                          crd/operatorconditions.operators.coreos.com \
+                          crd/operatorgroups.operators.coreos.com \
+                          crd/operators.operators.coreos.com \
+                          crd/subscriptions.operators.coreos.com
+                        curl -sfL "${OLM_DEPLOY_URL}" | kubectl apply -f -
+                        kubectl -n olm wait --for=condition=Available deployment -l app=olm-operator --timeout=600s
+                      fi
+                      if kubectl -n cert-manager get deployment cert-manager >/dev/null 2>&1; then
+                        echo "cert-manager already installed"
+                        exit 0
+                      fi
+                      kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
+                      curl -sfL "${CM_MANIFEST_URL}" | kubectl apply -f -
+                      kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager --timeout=600s
+                      kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager-webhook --timeout=600s

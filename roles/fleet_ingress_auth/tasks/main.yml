@@ -1,0 +1,63 @@
+---
+- name: Fleet ingress auth | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_ingress_auth_enabled | default(true) | bool)
+
+- name: Fleet ingress auth | Warm Harbor GHCR cache
+  ansible.builtin.import_tasks: warm_harbor.yml
+  tags: [fleet_ingress_auth, fleet_ingress_auth_harbor]
+
+- name: Fleet ingress auth | Stage chart on hub
+  ansible.builtin.copy:
+    src: "{{ fleet_ingress_auth_chart_src }}/"
+    dest: /tmp/fleet-ingress-auth-chart/
+    mode: preserve
+  tags: [fleet_ingress_auth, fleet_ingress_auth_hub]
+
+- name: Fleet ingress auth | Render Helm values
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: /tmp/fleet-ingress-auth-values.yaml
+    mode: "0600"
+  tags: [fleet_ingress_auth, fleet_ingress_auth_hub]
+
+- name: Fleet ingress auth | Install chart on hub
+  ansible.builtin.command:
+    cmd: >-
+      helm upgrade --install {{ fleet_ingress_auth_helm_release }}
+      /tmp/fleet-ingress-auth-chart
+      --namespace {{ fleet_ingress_auth_namespace }}
+      --create-namespace
+      -f /tmp/fleet-ingress-auth-values.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fia_helm
+  changed_when: "'has been upgraded' in fia_helm.stdout or 'has been installed' in fia_helm.stdout or 'REVISION' in fia_helm.stdout"
+  tags: [fleet_ingress_auth, fleet_ingress_auth_hub]
+
+- name: Fleet ingress auth | Wait for lldap
+  ansible.builtin.command:
+    cmd: kubectl -n {{ fleet_ingress_auth_namespace }} rollout status deployment/lldap --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [fleet_ingress_auth, fleet_ingress_auth_hub]
+
+- name: Fleet ingress auth | Wait for authelia
+  ansible.builtin.command:
+    cmd: kubectl -n {{ fleet_ingress_auth_namespace }} rollout status deployment/authelia --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [fleet_ingress_auth, fleet_ingress_auth_hub]
+
+- name: Fleet ingress auth | Load console-generated secrets when present
+  ansible.builtin.import_tasks: load_console_secrets.yml
+  tags: [fleet_ingress_auth, fleet_ingress_auth_spokes]
+
+- name: Fleet ingress auth | Push auth stack to spokes
+  ansible.builtin.import_tasks: push_spokes.yml
+  tags: [fleet_ingress_auth, fleet_ingress_auth_spokes]

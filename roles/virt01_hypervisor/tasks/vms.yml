@@ -1,0 +1,216 @@
+---
+- name: Virt01 hypervisor | Destroy existing cluster VMs when recreating
+  ansible.builtin.shell: |
+    set -euo pipefail
+    virsh destroy "{{ item.name }}" 2>/dev/null || true
+    virsh undefine "{{ item.name }}" --remove-all-storage 2>/dev/null || true
+    rm -f "{{ virt01_k3s_vm_image_dir }}/{{ item.name }}.qcow2"
+  args:
+    executable: /bin/bash
+  loop: "{{ virt01_k3s_vms }}"
+  when: virt01_k3s_recreate_vms | default(false) | bool
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Install virtualization packages
+  ansible.builtin.dnf:
+    name:
+      - qemu-kvm
+      - libvirt
+      - libvirt-client
+      - virt-install
+      - cloud-init
+      - guestfs-tools
+      - qemu-img
+    state: present
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Ensure image and cloud-init directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ virt01_k3s_vm_image_dir }}"
+    - "{{ virt01_k3s_cloudinit_dir }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Check cloud image
+  ansible.builtin.stat:
+    path: "{{ virt01_k3s_cloud_image_path }}"
+  register: virt01_cloud_image
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Download Rocky cloud image
+  ansible.builtin.get_url:
+    url: "{{ virt01_k3s_cloud_image_url }}"
+    dest: "{{ virt01_k3s_cloud_image_path }}"
+    checksum: "{{ virt01_k3s_cloud_image_checksum }}"
+    mode: "0644"
+  when: not virt01_cloud_image.stat.exists
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Read linux user SSH authorized keys
+  ansible.builtin.slurp:
+    src: /home/linux/.ssh/authorized_keys
+  register: virt01_linux_authorized_keys
+  failed_when: false
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Build SSH key list for cloud-init
+  ansible.builtin.set_fact:
+    virt01_k3s_ssh_authorized_keys: >-
+      {{
+        (
+          (virt01_linux_authorized_keys.content | b64decode).splitlines()
+          | select('match', '^ssh-')
+          | list
+        )
+        if virt01_linux_authorized_keys.content is defined
+        else []
+      }}
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Fail without SSH keys for VM access
+  ansible.builtin.fail:
+    msg: >-
+      No ssh-ed25519/rsa keys in /home/linux/.ssh/authorized_keys on virt01.
+      Add your key before provisioning VMs.
+  when: virt01_k3s_ssh_authorized_keys | length == 0
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Ensure per-VM cloud-init directories
+  ansible.builtin.file:
+    path: "{{ virt01_k3s_cloudinit_dir }}/{{ item.name }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Render cloud-init meta-data
+  ansible.builtin.template:
+    src: cloud-init-meta-data.j2
+    dest: "{{ virt01_k3s_cloudinit_dir }}/{{ item.name }}/meta-data"
+    mode: "0644"
+  vars:
+    vm_name: "{{ item.name }}"
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Render cloud-init network-config
+  ansible.builtin.template:
+    src: cloud-init-network-config.j2
+    dest: "{{ virt01_k3s_cloudinit_dir }}/{{ item.name }}/network-config"
+    mode: "0644"
+  vars:
+    vm_name: "{{ item.name }}"
+    vm_ip: "{{ item.ansible_host }}"
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Render cloud-init user-data
+  ansible.builtin.template:
+    src: cloud-init-user-data.j2
+    dest: "{{ virt01_k3s_cloudinit_dir }}/{{ item.name }}/user-data"
+    mode: "0644"
+  vars:
+    vm_name: "{{ item.name }}"
+    vm_ip: "{{ item.ansible_host }}"
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Check VM disk exists
+  ansible.builtin.stat:
+    path: "{{ virt01_k3s_vm_image_dir }}/{{ item.name }}.qcow2"
+  register: virt01_vm_disks
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Create VM overlay disks
+  ansible.builtin.command:
+    cmd: >-
+      qemu-img create -f qcow2 -F qcow2 -b {{ virt01_k3s_cloud_image_path }}
+      {{ virt01_k3s_vm_image_dir }}/{{ item.item.name }}.qcow2
+      {{ virt01_k3s_vm_disk_gb }}G
+    creates: "{{ virt01_k3s_vm_image_dir }}/{{ item.item.name }}.qcow2"
+  loop: "{{ virt01_vm_disks.results }}"
+  when: not item.stat.exists
+  loop_control:
+    label: "{{ item.item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Check VM defined in libvirt
+  ansible.builtin.command:
+    cmd: virsh dominfo {{ item.name }}
+  register: virt01_dominfo
+  changed_when: false
+  failed_when: false
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Define and start VMs
+  ansible.builtin.command:
+    cmd: >-
+      virt-install
+      --name {{ item.item.name }}
+      --memory {{ virt01_k3s_vm_memory_mib }}
+      --vcpus {{ virt01_k3s_vm_vcpus }}
+      --import
+      --disk path={{ virt01_k3s_vm_image_dir }}/{{ item.item.name }}.qcow2,format=qcow2
+      --network bridge={{ virt01_hypervisor_bridge }},model=virtio
+      --os-variant {{ virt01_k3s_os_variant }}
+      --cloud-init user-data={{ virt01_k3s_cloudinit_dir }}/{{ item.item.name }}/user-data,meta-data={{ virt01_k3s_cloudinit_dir }}/{{ item.item.name }}/meta-data,network-config={{ virt01_k3s_cloudinit_dir }}/{{ item.item.name }}/network-config
+      --noautoconsole
+      --autostart
+  loop: "{{ virt01_dominfo.results }}"
+  when: item.rc != 0
+  register: virt01_virt_install
+  changed_when: virt01_virt_install.rc == 0
+  loop_control:
+    label: "{{ item.item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Ensure VMs are running
+  ansible.builtin.command:
+    cmd: virsh start {{ item.name }}
+  register: virt01_vm_start
+  changed_when: "'started' in virt01_vm_start.stdout"
+  failed_when: false
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Wait for SSH on cluster VMs
+  ansible.builtin.wait_for:
+    host: "{{ item.ansible_host }}"
+    port: 22
+    delay: 10
+    timeout: 600
+  delegate_to: localhost
+  become: false
+  loop: "{{ virt01_k3s_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | VM summary
+  ansible.builtin.debug:
+    msg: >-
+      VMs ready: {{ virt01_k3s_vms | map(attribute='name') | list }} on
+      bridge {{ virt01_hypervisor_bridge }}
+      ({{ virt01_k3s_vms | map(attribute='ansible_host') | list }}).
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]

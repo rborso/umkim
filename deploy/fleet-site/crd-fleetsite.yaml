@@ -1,0 +1,256 @@
+# FleetSite — datacenter registry and greenfield site provisioning.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: fleetsites.fleet.umkim.com
+spec:
+  group: fleet.umkim.com
+  names:
+    kind: FleetSite
+    listKind: FleetSiteList
+    plural: fleetsites
+    singular: fleetsite
+    shortNames:
+      - fsite
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - siteName
+              properties:
+                siteName:
+                  type: string
+                  description: OCM ManagedCluster name for greenfield sites (DNS-safe)
+                  pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+                  maxLength: 63
+                siteId:
+                  type: string
+                  description: Datacenter id for fleet.site OCM label
+                provisioningMode:
+                  type: string
+                  enum: [greenfield, registry]
+                  default: greenfield
+                displayName:
+                  type: string
+                region:
+                  type: string
+                  description: Geographic or logical region for placement metadata
+                failureDomain:
+                  type: string
+                  description: Optional failure domain within region
+                edge:
+                  type: object
+                  properties:
+                    hubGateway:
+                      type: boolean
+                      default: false
+                    hubZone:
+                      type: string
+                    hubWildcard:
+                      type: string
+                    ingress:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, method]
+                        properties:
+                          id:
+                            type: string
+                          method:
+                            type: string
+                            enum: [port_forward, reverse_proxy]
+                          address:
+                            type: string
+                          wanAddressMode:
+                            type: string
+                            enum: [fixed, dns]
+                            description: WAN address validation mode for port_forward (fixed = strict DNS IP match; dns = resolve host only)
+                          zone:
+                            type: string
+                          wildcard:
+                            type: string
+                          description:
+                            type: string
+                          operatorNotes:
+                            type: string
+                          assignedClusters:
+                            type: array
+                            items:
+                              type: string
+                    wanEgress:
+                      type: object
+                      description: Site has internet egress (not cluster ingress)
+                      properties:
+                        enabled:
+                          type: boolean
+                        dnsTargetNote:
+                          type: string
+                        expectedWanIp:
+                          type: string
+                    externalAccess:
+                      type: object
+                      description: Deprecated; use wanEgress
+                      properties:
+                        enabled:
+                          type: boolean
+                        dnsTargetNote:
+                          type: string
+                        expectedWanIp:
+                          type: string
+                bootstrapHost:
+                  type: string
+                jumphost:
+                  type: string
+                  description: Default SSH bastion (user@host:port) for clusters in this site when the cluster does not set spec.jumphost.
+                provision:
+                  type: object
+                  description: Optional metal/VM provisioner connector binding (YAIDAP, OpenTofu, …).
+                  properties:
+                    provider:
+                      type: string
+                      enum: [noop, yaidap, opentofu, terraform]
+                    jumphost:
+                      type: string
+                    sshSecretRef:
+                      type: string
+                    inventoryPath:
+                      type: string
+                    yaidapRoot:
+                      type: string
+                    yaidapRepo:
+                      type: string
+                      description: Git remote for hub-managed YAIDAP checkout sync on the jumphost.
+                    yaidapRef:
+                      type: string
+                      description: Branch, tag, or commit to checkout (default main).
+                    yaidapGitSecretRef:
+                      type: string
+                      description: Hub Secret with deploy key for private SSH git remotes.
+                    workspacePath:
+                      type: string
+                    defaultExtraVars:
+                      type: object
+                      additionalProperties:
+                        type: string
+                mgmtLanIp:
+                  type: string
+                rockyVersion:
+                  type: string
+                  default: "9"
+                clusterRegion:
+                  type: string
+                minRootDiskGi:
+                  type: integer
+                  minimum: 10
+                  default: 40
+                clusterCapabilities:
+                  type: object
+                  additionalProperties:
+                    type: boolean
+                gpu:
+                  type: boolean
+                  default: false
+                storage:
+                  type: object
+                  description: Deprecated on FleetSite; use FleetClusterJoin storage
+                  properties:
+                    minDataDiskGi:
+                      type: integer
+                    rwo:
+                      type: boolean
+                    rwx:
+                      type: boolean
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Draft
+                    - ScriptIssued
+                    - Enrolled
+                    - Validated
+                    - Provisioning
+                    - Ready
+                    - Failed
+                message:
+                  type: string
+                wireguardAddress:
+                  type: string
+                wireguardPublicKey:
+                  type: string
+                enrolledAt:
+                  type: string
+                  format: date-time
+                enrolledHostname:
+                  type: string
+                validationErrors:
+                  type: array
+                  items:
+                    type: string
+                validateJobName:
+                  type: string
+                provisionJobName:
+                  type: string
+                managedClusterAvailable:
+                  type: boolean
+                provision:
+                  type: object
+                  description: Optional provisioner connector status (not greenfield ProvisionJobName).
+                  properties:
+                    phase:
+                      type: string
+                    message:
+                      type: string
+                    lastActionID:
+                      type: string
+                    lastActionType:
+                      type: string
+                    yaidapRevision:
+                      type: string
+                    yaidapSyncedAt:
+                      type: string
+                    current:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    history:
+                      type: array
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: WG
+          type: string
+          jsonPath: .status.wireguardAddress
+        - name: Site
+          type: string
+          jsonPath: .spec.siteName
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

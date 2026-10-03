@@ -1,0 +1,28 @@
+---
+# Build fleet-owned images on the hub and push to Harbor hosted project (not quay-proxy).
+- name: Harbor | Ensure fleet hosted project exists
+  ansible.builtin.include_tasks: configure_hosted.yml
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Install build tools for fleet image push
+  ansible.builtin.dnf:
+    name:
+      - podman
+      - git
+    state: present
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Ensure fleet source directory parent
+  ansible.builtin.file:
+    path: "{{ harbor_fleet_src_parent_dir }}"
+    state: directory
+    mode: "0755"
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Push fleet-built images
+  ansible.builtin.include_tasks: push_fleet_image.yml
+  loop: "{{ harbor_fleet_push_images }}"
+  loop_control:
+    loop_var: fleet_image
+    label: "{{ fleet_image.repository }}:{{ fleet_image.tag }}"
+  tags: [harbor, harbor_push_fleet]

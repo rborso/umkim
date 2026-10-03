@@ -1,0 +1,12 @@
+---
+openwrt_homelab_subnet: 172.16.10.0/24
+openwrt_lan_ip: 172.16.10.1
+# Set openwrt_spoke_inventory_host in inventory (lab: virt01).
+openwrt_hub_dest_ip: >-
+  {{ hostvars[openwrt_spoke_inventory_host].spoke_ingress_forward_target
+     | default(hostvars[openwrt_spoke_inventory_host].ansible_host) }}
+openwrt_spoke_forwards: []
+openwrt_hub_forwards: []
+# ACME / fleet TLS terminate on VPS hub; homelab uses spoke forwards only.
+openwrt_hub_forwards_https: []
+openwrt_port_forwards: "{{ openwrt_spoke_forwards + openwrt_hub_forwards + openwrt_hub_forwards_https }}"

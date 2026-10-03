@@ -1,0 +1,252 @@
+---
+- name: Fleet site controller | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_site_controller_enabled | default(true) | bool)
+
+- name: Fleet site controller | Ensure namespace
+  ansible.builtin.command:
+    cmd: kubectl create namespace {{ fleet_site_controller_namespace }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_ns_create
+  failed_when: fsc_ns_create.rc != 0 and ('AlreadyExists' not in (fsc_ns_create.stderr | default('')))
+  changed_when: fsc_ns_create.rc == 0
+
+- name: Fleet site controller | Slurp hub WireGuard public key
+  ansible.builtin.slurp:
+    src: "{{ wireguard_public_key_path | default('/etc/wireguard/publickey') }}"
+  register: fsc_hub_wg_pubkey
+  changed_when: false
+
+- name: Fleet site controller | Hub WG public key Secret
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      kubectl -n {{ fleet_site_controller_namespace }} delete secret {{ fleet_site_controller_hub_wg_pubkey_secret }} --ignore-not-found
+      kubectl -n {{ fleet_site_controller_namespace }} create secret generic {{ fleet_site_controller_hub_wg_pubkey_secret }} \
+        --from-literal=publickey='{{ fsc_hub_wg_pubkey.content | b64decode | trim }}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+
+- name: Fleet site controller | Controller kubeconfig Secret
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      kubectl -n {{ fleet_site_controller_namespace }} delete secret {{ fleet_site_controller_kubeconfig_secret }} --ignore-not-found
+      kubectl -n {{ fleet_site_controller_namespace }} create secret generic {{ fleet_site_controller_kubeconfig_secret }} \
+        --from-file=config=/etc/rancher/k3s/k3s.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+
+- name: Fleet site controller | Find Ansible SSH private key on hub
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ fleet_site_controller_ansible_ssh_key_candidates }}"
+  register: fsc_ssh_key_hub_candidates
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Select hub SSH private key path
+  ansible.builtin.set_fact:
+    fleet_site_controller_ansible_ssh_key_path: "{{ (fsc_ssh_key_hub_candidates.results | selectattr('stat.exists') | map(attribute='item') | list | first) | default(fleet_site_controller_ansible_ssh_key_path) }}"
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Check Ansible SSH private key on hub
+  ansible.builtin.stat:
+    path: "{{ fleet_site_controller_ansible_ssh_key_path }}"
+  register: fsc_ansible_ssh_key_hub
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Find Ansible SSH private key on controller
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ fleet_site_controller_ansible_ssh_key_local_candidates }}"
+  delegate_to: localhost
+  become: false
+  register: fsc_ssh_key_local_candidates
+  run_once: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Select controller SSH private key path
+  ansible.builtin.set_fact:
+    fleet_site_controller_ansible_ssh_key_local_path: "{{ (fsc_ssh_key_local_candidates.results | selectattr('stat.exists') | map(attribute='item') | list | first) | default(fleet_site_controller_ansible_ssh_key_local_path) }}"
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Check Ansible SSH private key on controller
+  ansible.builtin.stat:
+    path: "{{ fleet_site_controller_ansible_ssh_key_local_path }}"
+  delegate_to: localhost
+  become: false
+  register: fsc_ansible_ssh_key_local
+  run_once: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Slurp bootstrap SSH key from hub
+  ansible.builtin.slurp:
+    src: "{{ fleet_site_controller_ansible_ssh_key_path }}"
+  register: fsc_ansible_ssh_key_slurp_hub
+  when: fsc_ansible_ssh_key_hub.stat.exists
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Slurp bootstrap SSH key from Ansible controller
+  ansible.builtin.slurp:
+    src: "{{ fleet_site_controller_ansible_ssh_key_local_path }}"
+  delegate_to: localhost
+  become: false
+  register: fsc_ansible_ssh_key_slurp_local
+  when:
+    - not fsc_ansible_ssh_key_hub.stat.exists
+    - fsc_ansible_ssh_key_local.stat.exists
+  run_once: true
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Select bootstrap SSH key material
+  ansible.builtin.set_fact:
+    fsc_ansible_ssh_key_b64: >-
+      {{
+        fsc_ansible_ssh_key_slurp_hub.content
+        if fsc_ansible_ssh_key_hub.stat.exists
+        else fsc_ansible_ssh_key_slurp_local.content
+      }}
+  when: fsc_ansible_ssh_key_hub.stat.exists or fsc_ansible_ssh_key_local.stat.exists
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Write bootstrap SSH key to hub temp
+  ansible.builtin.copy:
+    content: "{{ fsc_ansible_ssh_key_b64 | b64decode }}"
+    dest: /tmp/fleet-site-ansible-ssh-id_rsa
+    mode: "0600"
+  when: fsc_ansible_ssh_key_hub.stat.exists or fsc_ansible_ssh_key_local.stat.exists
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Render hub Ansible secrets for provider jobs
+  ansible.builtin.template:
+    src: hub-ansible-secrets.yml.j2
+    dest: /tmp/fleet-site-hub-ansible-secrets.yml
+    mode: "0600"
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Hub Ansible secrets for provider jobs
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      kubectl -n {{ fleet_site_controller_namespace }} create secret generic {{ fleet_site_hub_ansible_secrets_name }} \
+        --from-file=ansible_vars.yml=/tmp/fleet-site-hub-ansible-secrets.yml \
+        --dry-run=client -o yaml | kubectl apply -f -
+      rm -f /tmp/fleet-site-hub-ansible-secrets.yml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Shared Ansible SSH secret for site Jobs
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      kubectl -n {{ fleet_site_controller_namespace }} create secret generic fleet-site-ansible-ssh \
+        --from-file=id_rsa=/tmp/fleet-site-ansible-ssh-id_rsa \
+        --dry-run=client -o yaml | kubectl apply -f -
+      rm -f /tmp/fleet-site-ansible-ssh-id_rsa
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when: fsc_ansible_ssh_key_hub.stat.exists or fsc_ansible_ssh_key_local.stat.exists
+  changed_when: true
+  no_log: true
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Authorize Ansible SSH key on hub (provision jobs delegate here)
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user | default('linux') }}"
+    key: "{{ lookup('file', fleet_site_controller_ansible_ssh_key_path + '.pub') }}"
+    state: present
+  when: fsc_ansible_ssh_key_hub.stat.exists
+  tags: [fleet_site_controller]
+
+- name: Fleet site controller | Ensure skopeo for image preflight
+  ansible.builtin.dnf:
+    name: skopeo
+    state: present
+
+- name: Fleet site controller | Verify controller image in Harbor
+  ansible.builtin.command:
+    cmd: skopeo inspect --tls-verify=false docker://{{ fleet_site_controller_image }}
+  register: fsc_image_check
+  changed_when: false
+  failed_when: false
+
+- name: Fleet site controller | Require controller image in Harbor
+  ansible.builtin.assert:
+    that:
+      - fsc_image_check.rc == 0
+    fail_msg: >-
+      Missing {{ fleet_site_controller_image }} in Harbor.
+      Run: ansible-playbook harbor.yml -l hub -t harbor_push_fleet
+
+- name: Fleet site controller | Render RBAC
+  ansible.builtin.template:
+    src: rbac.yaml.j2
+    dest: /tmp/fleet-site-controller-rbac.yaml
+    mode: "0644"
+
+- name: Fleet site controller | Apply RBAC
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-site-controller-rbac.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+
+- name: Fleet site controller | Chart upload inbox
+  ansible.builtin.file:
+    path: /var/lib/umkim/chart-inbox
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Fleet site controller | Render Deployment
+  ansible.builtin.template:
+    src: deployment.yaml.j2
+    dest: /tmp/fleet-site-controller-deploy.yaml
+    mode: "0644"
+
+- name: Fleet site controller | Apply Deployment
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-site-controller-deploy.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_deploy
+  changed_when: "'created' in fsc_deploy.stdout or 'configured' in fsc_deploy.stdout"
+
+- name: Fleet site controller | Rollout status
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} rollout status
+      deployment/fleet-site-controller --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+
+- name: Fleet site registry | Seed inventory datacenter FleetSites
+  ansible.builtin.import_tasks: ../fleet_site/tasks/seed_registry_sites.yml
+  tags: [fleet_site_seed_registry]
+
+- name: Fleet site controller | Seed ACME and ingress auth from inventory
+  ansible.builtin.import_tasks: seed_infrastructure.yml
+  when: (fleet_edge_acme_enabled | default(false) | bool) or (fleet_ingress_auth_enabled | default(false) | bool)
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]

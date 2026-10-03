@@ -1,0 +1,33 @@
+---
+# Apply one FleetSite overlay peer on hub wg0 (no full wireguard_server — inventory spokes may be absent).
+
+- name: Fleet site | Require peer facts
+  ansible.builtin.assert:
+    that:
+      - fleet_site_wg_public_key is defined
+      - fleet_site_wg_public_key | length > 0
+      - fleet_site_wg_address is defined
+      - fleet_site_wg_address | length > 0
+    fail_msg: fleet_site_wg_public_key and fleet_site_wg_address must be set before hub_wg_peer
+  run_once: true
+
+- name: Fleet site | Apply site peer on hub wg0
+  ansible.builtin.command:
+    cmd: >-
+      wg set {{ wireguard_interface | default('wg0') }}
+      peer {{ fleet_site_wg_public_key }}
+      allowed-ips {{ fleet_site_wg_address | ansible.utils.ipaddr('host') }}
+  delegate_to: "{{ groups['hub'] | first }}"
+  become: true
+  changed_when: true
+  run_once: true
+
+- name: Fleet site | Route site overlay via wg0 on hub
+  ansible.builtin.command:
+    cmd: >-
+      ip route replace {{ fleet_site_wg_address | ansible.utils.ipaddr('host') }}
+      dev {{ wireguard_interface | default('wg0') }}
+  delegate_to: "{{ groups['hub'] | first }}"
+  become: true
+  changed_when: true
+  run_once: true

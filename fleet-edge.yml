@@ -1,0 +1,40 @@
+---
+# Fleet edge: global active-active app ingress on UMKIM hub + per-cluster DNS docs.
+# Prerequisites: phase5 gateway on hub; phase6 Traefik on target clusters.
+#
+# Usage:
+#   ansible-playbook fleet-edge.yml
+#   ansible-playbook fleet-edge-cleanup.yml
+#   ansible-playbook fleet-edge.yml --tags fleet_edge_traefik
+#   ansible-playbook fleet-edge.yml --tags fleet_edge_phase6
+#   ansible-playbook fleet-edge-crd.yml -l hub
+#   ansible-playbook fleet-edge-controller.yml -l hub
+
+- name: Fleet edge | Bootstrap IngressClass on extra clusters
+  hosts: virt01_k3s_cluster
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: bootstrap_spoke
+      when: inventory_hostname == groups['virt01_k3s_cluster'][0]
+      tags: [fleet_edge, fleet_edge_phase6, spoke_ingress]
+
+- name: Fleet edge | Refresh spoke ingress ManifestWorks (fleet hostnames)
+  hosts: fleet_edge
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: push_spokes.yml
+      tags: [fleet_edge, fleet_edge_phase6, spoke_ingress]
+
+- name: Fleet edge | Apply hub Traefik routes and verify
+  hosts: fleet_edge
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_edge
+      tags: [fleet_edge, fleet_edge_traefik, fleet_edge_verify]

@@ -1,0 +1,14 @@
+---
+- name: OCM | Wait for ManagedCluster objects on hub
+  ansible.builtin.command:
+    cmd: kubectl get managedcluster {{ item }} -o name
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_register_cluster_names }}"
+  register: ocm_mc_wait
+  until: ocm_mc_wait.rc == 0
+  retries: 36
+  delay: 10
+  changed_when: false
+  tags: [ocm, ocm_register, ocm_spoke, ocm_join]

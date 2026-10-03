@@ -1,0 +1,40 @@
+---
+- name: Fleet WebUI | Render OCM console manifest
+  ansible.builtin.template:
+    src: ocm-console.yaml.j2
+    dest: /tmp/fleet-webui-ocm.yaml
+    mode: "0600"
+  when: ocm_console_enabled | bool
+  tags: [fleet_webui, ocm_webui]
+
+- name: Fleet WebUI | Apply OCM console
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-webui-ocm.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_webui_ocm_apply
+  changed_when: "'created' in fleet_webui_ocm_apply.stdout or 'configured' in fleet_webui_ocm_apply.stdout"
+  when: ocm_console_enabled | bool
+  tags: [fleet_webui, ocm_webui]
+
+- name: Fleet WebUI | Wait for OCM console
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_console_namespace }} wait
+      --for=condition=Available deployment/ocm-console --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  when: ocm_console_enabled | bool
+  tags: [fleet_webui, ocm_webui]
+
+- name: Fleet WebUI | Probe OCM console HTTP
+  ansible.builtin.command:
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:{{ ocm_console_nodeport }}/
+  register: fleet_webui_ocm_http
+  changed_when: false
+  failed_when: fleet_webui_ocm_http.stdout | trim != '200'
+  when: ocm_console_enabled | bool
+  tags: [fleet_webui, ocm_webui, fleet_webui_verify]

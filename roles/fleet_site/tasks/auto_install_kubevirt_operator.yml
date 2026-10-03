@@ -1,0 +1,13 @@
+---
+# Optional KubeVirt is a spoke platform add-on (not a catalog/service provider).
+# This task is a no-op so leftover extra-vars stay harmless.
+- name: Fleet site | KubeVirt is not installed via catalog
+  ansible.builtin.debug:
+    msg: >-
+      fleet_site_auto_install_kubevirt_operator is ignored.
+      Use umkim cluster platform enable-kubevirt (or console Operations /
+      providers.install.kubevirt at create), or roles/kubevirt_stack via
+      cluster-configure-kubevirt.yml / site-provision when fleet_site_enable_kubevirt=true.
+      See docs/components/fleet-kubevirt.md.
+  when: fleet_site_auto_install_kubevirt_operator | default(false) | bool
+  tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision]

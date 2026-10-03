@@ -1,0 +1,21 @@
+# Merge under fleet_sites: in inventory/group_vars/all/fleet_sites.yml
+# Reverse-proxy — TLS on edge router; HTTP to cluster NodePort 30080.
+edge_rp_example:
+  display_name: Edge reverse-proxy site
+  region: edge
+  ingress:
+    - id: edge-rp
+      method: reverse_proxy
+      address: "203.0.113.51"   # RFC5737 — optional WAN hint
+      operator_notes: "Edge router — host-based reverse proxy, TLS on router"
+    - id: site-pf
+      method: port_forward
+      address: "203.0.113.52"
+      zone: pf.site.example.com
+      wildcard: "*.pf.site.example.com"
+      description: "Optional port-forward path on same site"
+  dns_target_note: "RP vhosts on 203.0.113.51 → node :30080; PF zone pf.site.example.com → 203.0.113.52"
+  wan_egress:
+    enabled: true
+    expected_wan_ip: "203.0.113.51"
+  wireguard_pool: null

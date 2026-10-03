@@ -1,0 +1,86 @@
+UMKIM — Unified Multi Kubernetes Infrastructure Management
+Copyright 2026 Robert Borso
+
+This product includes software developed as part of the UMKIM fleet project
+(https://github.com/rborso/umkim), licensed under the Apache License 2.0.
+
+================================================================================
+Upstream and runtime components
+================================================================================
+
+Version pins are listed in VERSIONS.md. The following third-party projects are
+deployed or bundled at runtime (names and licenses are indicative; see upstream
+for authoritative terms):
+
+  - Open Cluster Management (OCM) / clusteradm — Apache-2.0
+  - K3s — Apache-2.0
+  - Calico — Apache-2.0
+  - Operator Lifecycle Manager (OLM) — Apache-2.0
+  - cert-manager — Apache-2.0
+  - Harbor — Apache-2.0
+  - KubeVirt, CDI — Apache-2.0
+  - Traefik — MIT
+  - WireGuard tools — GPL-2.0
+  - PostgreSQL — PostgreSQL License
+  - NATS — Apache-2.0
+  - PatternFly, React, Vite (fleet console UI) — MIT / Apache-2.0
+  - Ansible collections: ansible.posix, community.general, ansible.utils
+  - Kubernetes client libraries (Go controllers) — Apache-2.0
+  - lldap — GPL-3.0 (optional console LDAP)
+  - Authelia — Apache-2.0 (optional ingress forward-auth)
+
+================================================================================
+UMKIM-original fleet components (Robert Borso, Apache-2.0)
+================================================================================
+
+  - fleet-site-controller, fleet-edge-controller
+  - fleet-console-auth, fleet-failover-controller
+  - fleet-ansible-runner, umkim-console
+
+================================================================================
+Copyleft and GPL-licensed components in images
+================================================================================
+
+Some UMKIM-built container images bundle or install copyleft software:
+
+  - wireguard-tools (GPL-2.0) — included in fleet-ansible-runner and node
+    bootstrap images for WireGuard overlay configuration
+  - lldap (GPL-3.0) — optional LDAP server in the fleet-console / fleet-ingress-auth
+    Helm charts when console LDAP is enabled
+
+Corresponding source code is available from the upstream projects listed above.
+UMKIM does not modify wireguard-tools or lldap source; images install distribution
+packages or upstream release artifacts at build time.
+
+================================================================================
+UBI and Red Hat base images
+================================================================================
+
+Fleet-built images that use Red Hat Universal Base Image (UBI) as a base layer
+are subject to the Red Hat Universal Base Image End User License Agreement.
+See https://www.redhat.com/en/about/agreements and the /licenses/ directory
+copied into each image at build time (LICENSE, NOTICE).
+
+================================================================================
+Distribution compliance
+================================================================================
+
+UMKIM v0.2 is distributed under the Apache License 2.0 (see LICENSE).
+
+To obtain source code for GPL-licensed binaries bundled in UMKIM images:
+
+  1. Clone this repository: https://github.com/rborso/umkim
+     (current image tag is `umkim_version` / `harbor_fleet_image_tag`, e.g.
+     `0.2.0`). Sibling DCM service-provider repositories are not required
+     for the v0.2 hub image set.
+  2. Follow build instructions in images/README.md and each component's
+     Containerfile to reproduce the image layers that include copyleft software.
+  3. For upstream components (wireguard-tools, lldap), obtain source from the
+     upstream project URLs cited in VERSIONS.md.
+
+For written source offers or compliance questions, open an issue or pull request in [UMKIM](https://github.com/rborso/umkim).
+
+UBI-based images: redistribution of UBI layers must comply with Red Hat's
+container terms (link above). UMKIM source repositories do not include Red Hat
+proprietary packages beyond what is installed from public UBI repositories at
+image build time.

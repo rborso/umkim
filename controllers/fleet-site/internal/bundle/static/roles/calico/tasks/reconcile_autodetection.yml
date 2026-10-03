@@ -1,0 +1,49 @@
+---
+# Re-point Calico node IP autodetection after management IP moved to kubevirt host bridge.
+- name: Calico | Resolve post-bridge autodetection interface
+  ansible.builtin.set_fact:
+    calico_ip_autodetection_method: "interface={{ kubevirt_bridge_host_bridge | default('n0p0_mgmt_nw') }}"
+
+- name: Calico | Check calico-node daemonset exists
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system get daemonset calico-node
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_reconcile_ds
+  changed_when: false
+  failed_when: false
+  tags: [calico, kubevirt_host_bridge]
+
+- name: Calico | Clear stale IPv4Address annotations on all nodes
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl get nodes -o name | while read -r n; do
+      kubectl annotate "$n" projectcalico.org/IPv4Address- 2>/dev/null || true
+    done
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  when: calico_reconcile_ds.rc == 0
+  changed_when: false
+  failed_when: false
+  tags: [calico, kubevirt_host_bridge]
+
+- name: Calico | Set IP autodetection on calico-node (post-bridge)
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n kube-system set env daemonset/calico-node
+      IP_AUTODETECTION_METHOD={{ calico_ip_autodetection_method }}
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  when: calico_reconcile_ds.rc == 0
+  register: calico_reconcile_env
+  changed_when: calico_reconcile_env.rc == 0
+  tags: [calico, kubevirt_host_bridge]
+
+- name: Calico | Wait for calico-node rollout after bridge reconcile
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status daemonset/calico-node --timeout={{ calico_rollout_timeout }}s
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  when: calico_reconcile_ds.rc == 0
+  changed_when: false
+  tags: [calico, kubevirt_host_bridge]

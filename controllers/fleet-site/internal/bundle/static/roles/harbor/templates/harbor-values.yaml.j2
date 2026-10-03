@@ -1,0 +1,72 @@
+# Harbor Helm values — homelab fleet cache on virt03 (WireGuard {{ harbor_host }}).
+expose:
+  type: nodePort
+  tls:
+    enabled: true
+    certSource: auto
+    auto:
+      commonName: "{{ harbor_host }}"
+  nodePort:
+    ports:
+      http:
+        port: 80
+        nodePort: {{ harbor_nodeport_http }}
+      https:
+        port: 443
+        nodePort: {{ harbor_nodeport_https }}
+
+externalURL: {{ harbor_external_url }}
+
+harborAdminPassword: "{{ harbor_admin_password }}"
+
+persistence:
+  enabled: true
+  persistentVolumeClaim:
+    registry:
+      size: {{ harbor_registry_pvc_size }}
+    database:
+      size: 2Gi
+    redis:
+      size: 1Gi
+    trivy:
+      size: 5Gi
+
+# Homelab sizing — reduce footprint on virt03.
+core:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+jobservice:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+registry:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+portal:
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+database:
+  internal:
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+redis:
+  internal:
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 50m
+trivy:
+  enabled: true
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m

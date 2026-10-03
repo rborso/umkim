@@ -1,0 +1,29 @@
+# nginx reverse-proxy vhost template (commented).
+# TLS terminates on the edge router; cluster Traefik listens HTTP on NodePort 30080 (web).
+# reverse_proxy clusters do not enable spoke HTTP→HTTPS redirect (TLS is off-cluster).
+# Cluster VIP: 203.0.113.101 — must be reachable from the router LAN.
+# See examples/site-profiles/reverse-proxy/README.md
+
+# server {
+#   listen 80;
+#   server_name .rp.site.example.com;
+#   # ACME HTTP-01 or redirect to HTTPS
+#   location / {
+#     return 301 https://$host$request_uri;
+#   }
+# }
+
+# server {
+#   listen 443 ssl;
+#   server_name .rp.site.example.com;
+#
+#   ssl_certificate     /etc/nginx/certs/rp.site.example.com/fullchain.pem;
+#   ssl_certificate_key /etc/nginx/certs/rp.site.example.com/privkey.pem;
+#
+#   location / {
+#     proxy_pass http://203.0.113.101:30080;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Forwarded-Proto https;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#   }
+# }

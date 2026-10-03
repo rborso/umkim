@@ -1,0 +1,91 @@
+---
+# K3s binds kubelet to the node InternalIP (mgmt or WireGuard). Pod-network
+# scrapes to :10250 hit firewalld REJECT ("no route to host") on hosts that keep
+# firewalld (GPU/hypervisor). Run metrics-server on hostNetwork + secure-port
+# 10251 so it can scrape kubelet.
+#
+# K3s may extract/overwrite the stock Addon YAML shortly after creating the
+# manifests dir — stage our render outside the Addon path, then copy+apply in a
+# retry loop until the live Deployment shows hostNetwork.
+#
+# Do not wait for rollout in the early k3s role: with flannel-backend=none the
+# node stays NotReady until Calico (cluster-provision-local.yml re-runs this
+# after Calico, then waits for rollout).
+- name: K3s | Wait for metrics-server Addon manifest dir
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/k3s/server/manifests/metrics-server
+    timeout: 180
+  when:
+    - k3s_role == 'server'
+    - k3s_metrics_server_host_network | default(true) | bool
+  tags: [k3s, k3s_metrics_server]
+
+- name: K3s | Ensure umkim staging dir for metrics-server manifest
+  ansible.builtin.file:
+    path: /var/lib/rancher/k3s/server/umkim
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when:
+    - k3s_role == 'server'
+    - k3s_metrics_server_host_network | default(true) | bool
+  tags: [k3s, k3s_metrics_server]
+
+- name: K3s | Stage hostNetwork metrics-server deployment manifest
+  ansible.builtin.template:
+    src: metrics-server-deployment.yaml.j2
+    dest: /var/lib/rancher/k3s/server/umkim/metrics-server-deployment.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - k3s_role == 'server'
+    - k3s_metrics_server_host_network | default(true) | bool
+  tags: [k3s, k3s_metrics_server]
+
+- name: K3s | Install and verify hostNetwork metrics-server
+  ansible.builtin.shell: |
+    set -euo pipefail
+    SRC="/var/lib/rancher/k3s/server/umkim/metrics-server-deployment.yaml"
+    MANIFEST="/var/lib/rancher/k3s/server/manifests/metrics-server/metrics-server-deployment.yaml"
+    WANT_PORT="{{ k3s_metrics_server_secure_port }}"
+
+    [[ -f "${SRC}" ]] || { echo "ERROR: missing staged manifest ${SRC}" >&2; exit 1; }
+    grep -q 'hostNetwork: true' "${SRC}" || { echo "ERROR: staged manifest missing hostNetwork" >&2; exit 1; }
+
+    for attempt in $(seq 1 36); do
+      cp -f "${SRC}" "${MANIFEST}"
+      chmod 0600 "${MANIFEST}"
+      # Strategic merge of stock Addon + our port rename can create duplicate
+      # container ports both named "https" — replace the Deployment cleanly.
+      kubectl -n kube-system delete deploy metrics-server --ignore-not-found >/dev/null 2>&1 || true
+      if ! APPLY_OUTPUT="$(kubectl apply -f "${MANIFEST}" 2>&1)"; then
+        echo "WARN: metrics-server apply failed (attempt ${attempt}): ${APPLY_OUTPUT}" >&2
+        sleep 5
+        continue
+      fi
+
+      HN="$(kubectl -n kube-system get deploy metrics-server -o jsonpath='{.spec.template.spec.hostNetwork}' 2>/dev/null || true)"
+      PORT="$(kubectl -n kube-system get deploy metrics-server -o jsonpath='{.spec.template.spec.containers[0].ports[0].containerPort}' 2>/dev/null || true)"
+      if [[ "${HN}" == "true" && "${PORT}" == "${WANT_PORT}" ]]; then
+        echo "metrics-server hostNetwork ok (attempt ${attempt})"
+        exit 0
+      fi
+      echo "WARN: live deploy hostNetwork=${HN:-unset} port=${PORT:-unset} (attempt ${attempt})" >&2
+      sleep 5
+    done
+
+    echo "ERROR: metrics-server never reached hostNetwork=true secure-port=${WANT_PORT}" >&2
+    grep -E 'hostNetwork|secure-port' "${MANIFEST}" || true
+    kubectl -n kube-system get deploy metrics-server -o yaml | grep -E 'hostNetwork|secure-port|containerPort' || true
+    exit 1
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when:
+    - k3s_role == 'server'
+    - k3s_metrics_server_host_network | default(true) | bool
+  tags: [k3s, k3s_metrics_server]

@@ -1,0 +1,70 @@
+---
+# Configure host Linux bridge + bridge CNI on each node (day-0 bootstrap or day-2).
+- name: KubeVirt host bridge | Ensure CNI bin directory
+  ansible.builtin.file:
+    path: "{{ kubevirt_bridge_cni_bin_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+  tags: [kubevirt, kubevirt_host_bridge, kubevirt_bridge_nad]
+
+- name: KubeVirt host bridge | Install bridge CNI plugin
+  ansible.builtin.shell: |
+    set -euo pipefail
+    BIN="{{ kubevirt_bridge_cni_bin_dir }}/bridge"
+    if [[ -x "$BIN" ]]; then
+      echo "bridge CNI already present"
+      exit 0
+    fi
+    TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+    VER="v1.5.1"
+    curl -fsSL "https://github.com/containernetworking/plugins/releases/download/${VER}/cni-plugins-linux-amd64-${VER}.tgz" \
+      | tar -xz -C "$TMP" ./bridge ./host-device ./tuning
+    install -m 0755 "$TMP/bridge" "$BIN"
+    install -m 0755 "$TMP/tuning" "{{ kubevirt_bridge_cni_bin_dir }}/tuning" 2>/dev/null || true
+    echo "installed bridge CNI"
+  args:
+    executable: /bin/bash
+  become: true
+  register: kubevirt_host_bridge_cni
+  changed_when: "'installed bridge CNI' in kubevirt_host_bridge_cni.stdout"
+  tags: [kubevirt, kubevirt_host_bridge, kubevirt_bridge_nad]
+
+- name: KubeVirt host bridge | Stage configure script
+  ansible.builtin.copy:
+    src: configure-kubevirt-bridge.sh
+    dest: /tmp/configure-kubevirt-bridge.sh
+    mode: "0755"
+  become: true
+  tags: [kubevirt, kubevirt_host_bridge]
+
+- name: KubeVirt host bridge | Configure host bridge (idempotent)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export BRIDGE_NAME="{{ kubevirt_bridge_host_bridge }}"
+    export SLAVE_NIC_OVERRIDE="{{ kubevirt_bridge_slave_nic | default('') }}"
+    export KEEP_IP="{{ (kubevirt_bridge_keep_ip | default(true)) | bool | ternary('true', 'false') }}"
+    MGMT_IP="{{ kubevirt_bridge_mgmt_ip }}"
+    # systemd-run survives brief SSH drops when mgmt IP moves onto the bridge.
+    if command -v systemd-run >/dev/null 2>&1; then
+      systemd-run --quiet --collect --wait --unit="fleet-kubevirt-bridge-{{ inventory_hostname | regex_replace('[^A-Za-z0-9_-]', '-') }}" \
+        bash /tmp/configure-kubevirt-bridge.sh "${MGMT_IP}" \
+        || bash /tmp/configure-kubevirt-bridge.sh "${MGMT_IP}"
+    else
+      bash /tmp/configure-kubevirt-bridge.sh "${MGMT_IP}"
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  register: kubevirt_host_bridge_cfg
+  changed_when: >-
+    'nothing to do' not in (kubevirt_host_bridge_cfg.stdout | default(''))
+  tags: [kubevirt, kubevirt_host_bridge]
+
+- name: KubeVirt host bridge | Verify bridge present
+  ansible.builtin.command:
+    cmd: ip link show {{ kubevirt_bridge_host_bridge }}
+  become: true
+  changed_when: false
+  tags: [kubevirt, kubevirt_host_bridge]

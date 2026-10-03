@@ -1,0 +1,22 @@
+---
+# Deploy gitea-local from Harbor onto a selected Ready cluster.
+#
+#   ansible-playbook $INV playbooks/flows/gitea-deploy.yml \
+#     -e fleet_flow_cluster_name=lab-single-0 \
+#     -e fleet_flow_release_name=gitea
+
+- name: Fleet flow | Gitea Helm chart
+  ansible.builtin.import_playbook: app-install.yml
+  vars:
+    fleet_flow_cluster_name: "{{ fleet_flow_cluster_name | default(fleet_flow_cluster | default('')) }}"
+    fleet_flow_chart: "{{ fleet_flow_chart | default('gitea-local') }}"
+    fleet_flow_version: "{{ fleet_flow_version | default('0.1.0') }}"
+    fleet_flow_release_name: "{{ fleet_flow_release_name | default('gitea') }}"
+    fleet_flow_namespace: "{{ fleet_flow_namespace | default('gitea') }}"
+    fleet_flow_route_mode: "{{ fleet_flow_route_mode | default('hub') }}"
+    fleet_flow_values_yaml: |
+      gitea:
+        gitea:
+          admin:
+            username: {{ fleet_flow_admin_user | default('fleet') | to_json }}
+            password: {{ fleet_flow_admin_password | default(fleet_gitea_admin_password_vault | default('CHANGE_ME')) | to_json }}

@@ -1,0 +1,21 @@
+---
+- name: Reload sysctl
+  ansible.builtin.command:
+    cmd: sysctl --system
+  changed_when: false
+
+- name: Restart NetworkManager
+  ansible.builtin.systemd:
+    name: NetworkManager
+    state: restarted
+  when: fleet_node | bool
+
+- name: Reload OpenWrt network
+  ansible.builtin.command:
+    cmd: /etc/init.d/network reload
+  when: openwrt_node | bool
+
+- name: Reload OpenWrt firewall
+  ansible.builtin.command:
+    cmd: /etc/init.d/firewall reload
+  when: openwrt_node | bool

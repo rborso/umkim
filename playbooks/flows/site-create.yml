@@ -1,0 +1,43 @@
+---
+# API-first site creation (registry FleetSite).
+#
+# Run on the hub (or any host that can reach fleet-site-controller :18080):
+#   ansible-playbook $INV playbooks/flows/site-create.yml -e @/path/to/site-extra-vars.yml
+#
+# Required extra-vars (operator-local file; not shipped in this tree):
+#   fleet_flow_site_name, fleet_flow_site_spec (dict merged into POST body)
+
+- name: Fleet flow | Create registry site via API
+  hosts: hub
+  gather_facts: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+  tasks:
+    - name: Build FleetSite create payload
+      ansible.builtin.set_fact:
+        fleet_flow_site_payload:
+          apiVersion: fleet.umkim.com/v1alpha1
+          kind: FleetSite
+          metadata:
+            name: "{{ fleet_flow_site_name }}"
+          spec: "{{ fleet_flow_site_spec }}"
+
+    - name: POST /sites
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/sites"
+        method: POST
+        body_format: json
+        headers:
+          X-Fleet-Subject-Kind: User
+          X-Fleet-Subject-Name: fleet-flow
+          X-Fleet-DC-Admin: "true"
+        body: "{{ fleet_flow_site_payload }}"
+        status_code: [201, 409]
+        return_content: true
+      register: fleet_flow_site_create
+
+    - name: Site create result
+      ansible.builtin.debug:
+        msg: >-
+          Site {{ fleet_flow_site_name }}:
+          {{ 'created' if fleet_flow_site_create.status == 201 else 'already exists' }}

@@ -1,0 +1,11 @@
+---
+# CRDs are installed by the fleet-console Helm chart (crds/ directory).
+# This playbook is kept for compatibility; runs the same Helm release.
+
+- name: Fleet console CRDs via Helm on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_console_helm
+      tags: [fleet_console_auth_crd, fleet_console_helm]

@@ -1,0 +1,5 @@
+---
+# Full install (single play): optional local NFS server + node prep + provisioner.
+- ansible.builtin.import_tasks: nfs_local_server.yml
+- ansible.builtin.import_tasks: nfs_nodes.yml
+- ansible.builtin.import_tasks: nfs_cluster.yml

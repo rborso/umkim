@@ -1,0 +1,32 @@
+---
+# NVIDIA container toolkit + device plugin on a Ready FCJ cluster (hub Ansible Job).
+#
+#   ansible-playbook cluster-gpu-enable.yml -e fleet_cluster_name=lab-gpu-0 \
+#     -i /inventory/inventory.ini
+
+- name: Fleet cluster GPU | Container runtime and device plugin
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: true
+  vars:
+    gpu_host_catalog_path: "{{ playbook_dir }}/data/gpu/catalog.yaml"
+    gpu_host_install_container_toolkit: true
+    gpu_host_configure_k3s_runtime: true
+    gpu_host_install_device_plugin: true
+    gpu_host_reboot_after_driver: false
+    gpu_host_require_nvidia_smi: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: gpu_host
+        tasks_from: container_toolkit
+      tags: [gpu_host, gpu_host_container_toolkit]
+    - ansible.builtin.import_role:
+        name: gpu_host
+        tasks_from: device_plugin
+      tags: [gpu_host, gpu_host_device_plugin]
+    - ansible.builtin.import_role:
+        name: fleet_spoke_firewall
+      tags: [fleet_spoke_firewall, gpu_firewall]
+      vars:
+        configure_firewalld: true
+        fleet_spoke_firewall_enabled: true

@@ -1,0 +1,203 @@
+---
+# Seed FleetAcme / FleetIngressAuth from inventory after fleet-site-controller is running.
+# Controller env vars mirror these flags; this task patches CRs immediately and triggers reconcile Jobs.
+
+- name: Fleet site controller | Bootstrap FleetAcme CR via fleet-site API
+  ansible.builtin.uri:
+    url: "{{ fleet_site_controller_api_url | default('http://127.0.0.1:18080/api/v1alpha1') }}/acme"
+    method: GET
+    status_code: 200
+  register: fsc_acme_bootstrap
+  until: fsc_acme_bootstrap.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: fleet_edge_acme_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Wait for FleetAcme CR
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }}
+      get fleetacme {{ fleet_acme_cr_name | default('fleet-acme') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_acme_cr
+  until: fsc_acme_cr.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: fleet_edge_acme_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Enable hub ACME from inventory
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} patch fleetacme
+      {{ fleet_acme_cr_name | default('fleet-acme') }}
+      --type merge
+      -p {{ {'spec': {'hubEnabled': true, 'email': fleet_edge_acme_email}} | to_json | quote }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_acme_patch
+  changed_when: "'patched' in fsc_acme_patch.stdout or 'configured' in fsc_acme_patch.stdout"
+  when: fleet_edge_acme_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Trigger ACME reconcile from inventory
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} annotate fleetacme
+      {{ fleet_acme_cr_name | default('fleet-acme') }}
+      fleet.umkim.com/acme-reconcile=inventory --overwrite
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  when: fleet_edge_acme_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Require LLDAP password when ingress auth enabled
+  ansible.builtin.assert:
+    that:
+      - (fleet_auth_lldap_admin_password | default('')) | length >= 12
+    fail_msg: >-
+      fleet_ingress_auth_enabled requires fleet_lldap_admin_password_vault (≥12 chars) in vault.yml.
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Render hub ingress-auth secrets manifest
+  ansible.builtin.template:
+    src: fleet-ingress-auth-secrets.yml.j2
+    dest: /tmp/fleet-ingress-auth-secrets.yml
+    mode: "0600"
+  no_log: true
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Apply hub ingress-auth secrets
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-ingress-auth-secrets.yml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  no_log: true
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Bootstrap FleetIngressAuth CR via fleet-site API
+  ansible.builtin.uri:
+    url: "{{ fleet_site_controller_api_url | default('http://127.0.0.1:18080/api/v1alpha1') }}/ingress-auth"
+    method: GET
+    status_code: 200
+  register: fsc_auth_bootstrap
+  until: fsc_auth_bootstrap.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Wait for FleetIngressAuth CR
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }}
+      get fleetingressauth {{ fleet_ingress_auth_cr_name | default('fleet-ingress-auth') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_auth_cr
+  until: fsc_auth_cr.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Enable hub ingress auth from inventory
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} patch fleetingressauth
+      {{ fleet_ingress_auth_cr_name | default('fleet-ingress-auth') }}
+      --type merge
+      -p {{ {'spec': {'hubEnabled': true, 'portalHost': fleet_ingress_auth_portal_host | default('auth.' ~ fleet_edge_domain), 'cookieDomain': fleet_edge_domain}} | to_json | quote }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_auth_patch
+  changed_when: "'patched' in fsc_auth_patch.stdout or 'configured' in fsc_auth_patch.stdout"
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Trigger ingress-auth reconcile from inventory
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} annotate fleetingressauth
+      {{ fleet_ingress_auth_cr_name | default('fleet-ingress-auth') }}
+      fleet.umkim.com/ingress-auth-reconcile=inventory --overwrite
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  when: fleet_ingress_auth_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Bootstrap FleetLLM CR via fleet-site API
+  ansible.builtin.uri:
+    url: "{{ fleet_site_controller_api_url | default('http://127.0.0.1:18080/api/v1alpha1') }}/llm"
+    method: GET
+    status_code: 200
+  register: fsc_llm_bootstrap
+  until: fsc_llm_bootstrap.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: fleet_llm_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Wait for FleetLLM CR
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }}
+      get fleetllm {{ fleet_llm_cr_name | default('fleet-llm') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_llm_cr
+  until: fsc_llm_cr.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: fleet_llm_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Enable hub LLM from inventory
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} patch fleetllm
+      {{ fleet_llm_cr_name | default('fleet-llm') }}
+      --type merge
+      -p {{ {'spec': {'hubEnabled': true}} | to_json | quote }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fsc_llm_patch
+  changed_when: "'patched' in fsc_llm_patch.stdout or 'configured' in fsc_llm_patch.stdout"
+  when: fleet_llm_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]
+
+- name: Fleet site controller | Trigger LLM reconcile from inventory
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_site_controller_namespace }} annotate fleetllm
+      {{ fleet_llm_cr_name | default('fleet-llm') }}
+      fleet.umkim.com/llm-reconcile=inventory --overwrite
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  when: fleet_llm_enabled | default(false) | bool
+  tags: [fleet_site_controller, fleet_site_seed_infrastructure]

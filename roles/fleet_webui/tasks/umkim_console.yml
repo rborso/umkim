@@ -1,0 +1,39 @@
+---
+# Deprecated — dashboard deploy moved to fleet-console-auth.yml (Helm).
+# Gateway routes: roles/fleet_console_helm/tasks/gateway_routes.yml (fleet-webui-lab.yml).
+- name: Fleet WebUI | Deploy UMKIM console chart (auth + dashboard)
+  ansible.builtin.import_role:
+    name: fleet_console_helm
+  when: umkim_console_enabled | bool
+  tags: [fleet_webui, umkim_console, fleet_console]
+
+- name: Fleet WebUI | Gateway /fleet/ routes
+  ansible.builtin.import_role:
+    name: fleet_console_helm
+    tasks_from: gateway_routes.yml
+  when:
+    - umkim_console_enabled | bool
+    - umkim_console_gateway_path | default(false) | bool
+  tags: [fleet_webui, umkim_console, fleet_console, fleet_console_gateway_routes]
+
+- name: Fleet WebUI | Probe UMKIM console NodePort
+  ansible.builtin.command:
+    cmd: >-
+      curl -sf -o /dev/null -w "%{http_code}"
+      http://127.0.0.1:{{ umkim_console_nodeport }}/fleet/login
+  register: fleet_webui_umkim_console_http
+  changed_when: false
+  failed_when: fleet_webui_umkim_console_http.stdout | trim not in ['200', '302']
+  when: umkim_console_enabled | bool
+  tags: [fleet_webui, umkim_console, fleet_console, fleet_webui_verify]
+
+- name: Fleet WebUI | Probe UMKIM console via gateway /fleet/
+  ansible.builtin.command:
+    cmd: curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:80/fleet/
+  register: fleet_webui_umkim_console_gw_http
+  changed_when: false
+  failed_when: fleet_webui_umkim_console_gw_http.stdout | trim not in ['200', '302']
+  when:
+    - umkim_console_enabled | bool
+    - umkim_console_gateway_path | default(false) | bool
+  tags: [fleet_webui, umkim_console, fleet_console, fleet_webui_verify]

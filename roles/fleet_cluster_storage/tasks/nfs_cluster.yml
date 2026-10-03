@@ -1,0 +1,161 @@
+---
+- name: Fleet cluster storage | Skip cluster install when local_path
+  ansible.builtin.meta: end_host
+  when: >-
+    not (
+      (fleet_cluster_nfs_enabled | default(false) | bool)
+      or (fleet_cluster_storage_backend | default('local_path') in ['nfs_external', 'nfs_local'])
+    )
+
+# Provisioner install uses kubectl on the bootstrap control plane only (workers/agents have no kubectl).
+- name: Fleet cluster storage | Skip NFS provisioner on non-bootstrap nodes
+  ansible.builtin.meta: end_host
+  when: >-
+    (groups.get('site_bootstrap', []) | length > 0)
+    and inventory_hostname not in groups['site_bootstrap']
+
+- name: Fleet cluster storage | Resolve nfs_local server from host when unset
+  ansible.builtin.set_fact:
+    fleet_cluster_nfs_server: "{{ ansible_host | default(inventory_hostname) }}"
+  when:
+    - fleet_cluster_storage_backend | default('local_path') == 'nfs_local'
+    - fleet_cluster_nfs_server | default('') | length == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Validate NFS settings
+  ansible.builtin.assert:
+    that:
+      - fleet_cluster_nfs_server | length > 0
+      - fleet_cluster_nfs_cluster_path | length > 0
+    fail_msg: "nfs_external/nfs_local requires NFS server and cluster path"
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Normalize delegate host for install
+  ansible.builtin.set_fact:
+    fleet_nfs_delegate_effective: >-
+      {{
+        (
+          fleet_cluster_nfs_delegate_host
+          | default(cluster_storage_nfs_delegate_host | default(''))
+          | trim
+        )
+        if (
+          fleet_cluster_nfs_delegate_host
+          | default(cluster_storage_nfs_delegate_host | default(''))
+          | trim
+        ) not in ['', 'fleet_nfs_delegate']
+        else ''
+      }}
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Ensure cluster export subdirectory on delegate host via SSH
+  ansible.builtin.command:
+    argv:
+      - ssh
+      - -o
+      - BatchMode=yes
+      - -o
+      - StrictHostKeyChecking=no
+      - -o
+      - UserKnownHostsFile=/dev/null
+      - -i
+      - "{{ ansible_ssh_private_key_file | default('/root/.ssh/id_rsa') }}"
+      - "{{ (fleet_cluster_nfs_delegate_user | default(ansible_user | default('linux'))) }}@{{ fleet_nfs_delegate_effective }}"
+      - "mkdir -p {{ fleet_cluster_nfs_path }} && chmod 1777 {{ fleet_cluster_nfs_path }}"
+  register: fleet_nfs_delegate_mkdir
+  failed_when: false
+  changed_when: fleet_nfs_delegate_mkdir.rc == 0
+  when: fleet_nfs_delegate_effective | length > 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Require delegate mkdir when configured
+  ansible.builtin.assert:
+    that:
+      - fleet_nfs_delegate_mkdir.rc == 0
+    fail_msg: >-
+      Could not create {{ fleet_cluster_nfs_path }} on delegate host {{ fleet_nfs_delegate_effective }}
+      via SSH (check delegateHost and SSH access).
+  when: fleet_nfs_delegate_effective | length > 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Ensure cluster export subdirectory locally
+  ansible.builtin.file:
+    path: "{{ fleet_cluster_nfs_path }}"
+    state: directory
+    mode: "0777"
+  when:
+    - fleet_nfs_delegate_effective | default('') | length == 0
+    - fleet_cluster_nfs_delegate_host | default('') | length == 0
+    - fleet_cluster_nfs_server == ansible_host | default('')
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Resolve NFS client mount path
+  ansible.builtin.include_tasks: nfs_resolve_mount_path.yml
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Require resolvable NFS client mount path
+  ansible.builtin.assert:
+    that:
+      - fleet_cluster_nfs_client_path | default('') | length > 0
+    fail_msg: >-
+      Could not mount NFS export from bootstrap node. Tried {{ fleet_cluster_nfs_path }}
+      and /{{ fleet_cluster_nfs_cluster_path }} on {{ fleet_cluster_nfs_server }}.
+      For NFSv4 per-cluster exports, the client mount path is often /{{ fleet_cluster_nfs_cluster_path }}.
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Deploy NFS provisioner manifests
+  ansible.builtin.template:
+    src: nfs-provisioner.yaml.j2
+    dest: "/tmp/fleet-nfs-provisioner-{{ fleet_cluster_storage_cluster_name }}.yaml"
+    mode: "0644"
+  register: fleet_nfs_manifest
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Apply NFS provisioner
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-nfs-provisioner-{{ fleet_cluster_storage_cluster_name }}.yaml
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+  register: fleet_nfs_apply
+  changed_when: "'created' in fleet_nfs_apply.stdout or 'configured' in fleet_nfs_apply.stdout"
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Wait for core DNS before NFS provisioner
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status deployment/coredns --timeout=300s
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+  changed_when: false
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Wait for provisioner rollout
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_cluster_nfs_namespace }} rollout status
+      deployment/nfs-client-provisioner --timeout=180s
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+  changed_when: false
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Clear default from local-path StorageClass
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if kubectl get storageclass local-path &>/dev/null; then
+      kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' || true
+    fi
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+  when: fleet_cluster_nfs_set_default_sc | default(true) | bool
+  changed_when: true
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Verify NFS StorageClass exists
+  ansible.builtin.command:
+    cmd: kubectl get storageclass {{ fleet_cluster_nfs_storage_class }}
+  environment:
+    KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
+  changed_when: false
+  tags: [fleet_cluster_storage]

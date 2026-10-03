@@ -1,0 +1,13 @@
+---
+description: UMKIM global agent constraints and doc routing
+alwaysApply: true
+---
+
+# UMKIM global
+
+- Patterns: [docs/design.md](../../docs/design.md) · Host layout: `inventory/`
+- Agent entry: `AGENTS.md` → `.cursor/skills/`
+- Shared Ansible vars: `inventory/group_vars/all/common.yml` (directory `all/` shadows `all.yml`).
+- Lab SSH user `linux`; hub host from `inventory/hosts.yml` `[hub]` group.
+- Prefer playbook **tags** over full `fleet-deploy.yml` when scope is narrow.
+- Do not commit unless asked; no secrets in new files.

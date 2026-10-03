@@ -1,0 +1,38 @@
+---
+# Full fleet redeploy (after fleet-cleanup.yml or fresh spokes).
+# Prerequisites: host_prepare + wireguard on all fleet nodes.
+#
+# Usage:
+#   ansible-playbook fleet-deploy.yml
+#   ansible-playbook playbooks/preflight.yml --vault-password-file …
+#   ansible-playbook fleet-deploy.yml --vault-password-file …
+
+- name: UMKIM hub preflight
+  ansible.builtin.import_playbook: playbooks/preflight.yml
+
+- name: OCM hub (K3s + Calico + clusteradm)
+  ansible.builtin.import_playbook: ocm.yml
+
+- name: Spoke clusters (K3s + Calico + OCM join + accept + CSR)
+  ansible.builtin.import_playbook: spokes.yml
+
+- name: Harbor registry cache
+  ansible.builtin.import_playbook: harbor.yml
+
+- name: Phase 4 platform (OLM, cert-manager, KubeVirt hub)
+  ansible.builtin.import_playbook: fleet-platform.yml
+
+- name: Fleet console CRDs (Helm)
+  ansible.builtin.import_playbook: fleet-console-auth-crd.yml
+
+- name: Fleet console auth + dashboard (Helm)
+  ansible.builtin.import_playbook: fleet-console-auth.yml
+
+- name: Fleet WebUI lab extras (OCM Lab, Swagger, gateway /fleet/)
+  ansible.builtin.import_playbook: fleet-webui-lab.yml
+
+- name: Phase 6 spoke ingress
+  ansible.builtin.import_playbook: fleet-spoke-ingress.yml
+
+- name: Fleet edge global ingress (active-active via hub)
+  ansible.builtin.import_playbook: fleet-edge.yml

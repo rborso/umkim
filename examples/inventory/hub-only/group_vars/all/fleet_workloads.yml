@@ -1,0 +1,11 @@
+---
+# Current topology notes (hub-only inventory template).
+# Replace CHANGE_ME placeholders in examples/inventory/hub-only before install.
+# Maintainer lab inventory and flow extra-vars are not in this public tree.
+# Pass your own extra-vars file to playbooks/flows/*.yml, for example:
+#   ansible-playbook $INV playbooks/flows/site-create.yml -e @/path/to/site-extra-vars.yml
+#   ansible-playbook $INV playbooks/flows/cluster-create.yml -e @/path/to/cluster-extra-vars.yml
+#
+# Hub gateway (also in group_vars/hub/main.yml + vault.yml)
+# fleet_edge_acme_enabled: true
+# fleet_ingress_auth_enabled: true

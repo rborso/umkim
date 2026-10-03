@@ -1,0 +1,36 @@
+---
+- name: OCM | Check clusteradm binary
+  ansible.builtin.stat:
+    path: "{{ ocm_clusteradm_path }}"
+  register: ocm_clusteradm_stat
+  tags: [ocm, ocm_install]
+
+- name: OCM | Download clusteradm install script
+  ansible.builtin.get_url:
+    url: "{{ ocm_clusteradm_install_url }}"
+    dest: /tmp/clusteradm-install.sh
+    mode: "0755"
+  when: not ocm_clusteradm_stat.stat.exists
+  tags: [ocm, ocm_install]
+
+- name: OCM | Run clusteradm install script
+  ansible.builtin.command:
+    cmd: /tmp/clusteradm-install.sh
+    creates: "{{ ocm_clusteradm_path }}"
+  environment:
+    INSTALL_DIR: "{{ ocm_clusteradm_path | dirname }}"
+  when: not ocm_clusteradm_stat.stat.exists
+  tags: [ocm, ocm_install]
+
+- name: OCM | Verify clusteradm version
+  ansible.builtin.command:
+    cmd: "{{ ocm_clusteradm_path }} version"
+  register: ocm_clusteradm_version_out
+  changed_when: false
+  failed_when: ocm_clusteradm_version_out.rc != 0
+  tags: [ocm, ocm_install]
+
+- name: OCM | Report clusteradm version
+  ansible.builtin.debug:
+    msg: "{{ ocm_clusteradm_version_out.stdout_lines }}"
+  tags: [ocm, ocm_install]

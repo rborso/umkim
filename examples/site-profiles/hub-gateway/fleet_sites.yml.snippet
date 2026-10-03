@@ -1,0 +1,14 @@
+# Merge under fleet_sites: in inventory/group_vars/all/fleet_sites.yml
+# Hub gateway — maps to live site "umkim" (management datacenter).
+management:
+  display_name: Management DC
+  region: management
+  hub_gateway: true
+  hub_zone: apps.example.com
+  hub_wildcard: "*.apps.example.com"
+  management_site: true
+  dns_target_note: "A/AAAA *.apps.example.com → hub WAN"
+  wan_egress:
+    enabled: true
+    expected_wan_ip: "203.0.113.10"   # RFC5737 — VPS public IP
+  wireguard_pool: null

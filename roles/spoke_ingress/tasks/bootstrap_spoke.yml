@@ -1,0 +1,22 @@
+---
+# IngressClass is cluster-scoped; OCM klusterlet-work-sa cannot apply it via ManifestWork.
+- name: Spoke ingress | Ensure Traefik IngressClass on spoke
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export KUBECONFIG={{ k3s_kubeconfig }}
+    if kubectl get ingressclass traefik &>/dev/null; then
+      echo unchanged
+      exit 0
+    fi
+    kubectl apply -f - <<'EOF'
+    apiVersion: networking.k8s.io/v1
+    kind: IngressClass
+    metadata:
+      name: traefik
+    spec:
+      controller: traefik.io/ingress-controller
+    EOF
+  args:
+    executable: /bin/bash
+  register: spoke_ingressclass
+  changed_when: "'ingressclass.networking.k8s.io/traefik created' in spoke_ingressclass.stdout"

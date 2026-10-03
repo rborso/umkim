@@ -1,0 +1,16 @@
+# Merge under fleet_sites: in inventory/group_vars/all/fleet_sites.yml
+# Port-forward with dynamic WAN (DDNS) — no fixed public IP stored on ingress.
+homelab_ddns_example:
+  display_name: Example DDNS homelab
+  region: homelab
+  ingress:
+    - id: site-pf
+      method: port_forward
+      wan_address_mode: dns
+      zone: site.example.com
+      wildcard: "*.site.example.com"
+      description: "Router WAN — port-forward :80/:443 to cluster NodePorts"
+  wan_egress:
+    enabled: true
+    dns_target_note: "A/AAAA *.site.example.com → current WAN (DDNS); router DNAT to node :30080/:30443"
+  wireguard_pool: null

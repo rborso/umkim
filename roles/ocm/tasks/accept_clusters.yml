@@ -1,0 +1,50 @@
+---
+- name: OCM | Accept managed clusters
+  ansible.builtin.command:
+    cmd: "{{ ocm_clusteradm_path }} accept --clusters {{ item }}"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_clusters_to_accept }}"
+  register: ocm_accept
+  changed_when: ocm_accept.rc == 0
+  failed_when: false
+  tags: [ocm, ocm_accept]
+
+- name: OCM | Verify managed clusters accepted
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get managedcluster {{ item }}
+      -o jsonpath={.spec.hubAcceptsClient}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_clusters_to_accept }}"
+  register: ocm_accept_check
+  changed_when: false
+  tags: [ocm, ocm_accept]
+
+- name: OCM | Assert clusters accepted on hub
+  ansible.builtin.assert:
+    that: result.stdout | trim == 'true'
+    fail_msg: "ManagedCluster {{ result.item }} not accepted (hubAcceptsClient={{ result.stdout | default('') }})"
+  loop: "{{ ocm_accept_check.results }}"
+  loop_control:
+    loop_var: result
+    label: "{{ result.item }}"
+  tags: [ocm, ocm_accept]
+
+- name: OCM | List fleet clusters
+  ansible.builtin.command:
+    cmd: "{{ ocm_clusteradm_path }} get clusters"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_clusters_list
+  changed_when: false
+  tags: [ocm, ocm_accept]
+
+- name: OCM | Show fleet clusters
+  ansible.builtin.debug:
+    var: ocm_clusters_list.stdout_lines
+  tags: [ocm, ocm_accept]

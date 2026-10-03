@@ -1,0 +1,11 @@
+---
+fleet_edge_enable: false
+fleet_edge_domain: apps.example.com
+fleet_edge_cluster_configmap_namespace: fleet-system
+fleet_edge_cluster_configmap_name: fleet-edge-clusters
+fleet_edge_direct_ingress_default: true
+fleet_edge_umkim_hostname: "umkim.{{ fleet_edge_domain }}"
+fleet_edge_public_nodeport: "{{ 80 if (fleet_edge_acme_enabled | default(false) | bool) else 9080 }}"
+fleet_edge_clusters: {}
+fleet_edge_apps: []
+fleet_edge_phase6_clusters: []

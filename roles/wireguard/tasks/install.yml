@@ -1,0 +1,45 @@
+---
+- name: WireGuard | Add temporary default route via mgmt for package downloads
+  ansible.builtin.command:
+    cmd: >-
+      ip route replace default via {{ wireguard_dnf_mgmt_gateway }}
+      dev {{ wireguard_dnf_mgmt_device }} metric {{ wireguard_dnf_temp_route_metric }}
+  register: wireguard_dnf_temp_route
+  changed_when: wireguard_dnf_temp_route.rc == 0
+  when: wireguard_dnf_via_mgmt | default(false) | bool
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Install packages
+  ansible.builtin.dnf:
+    name: "{{ wireguard_packages }}"
+    state: present
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Remove temporary mgmt default route
+  ansible.builtin.command:
+    cmd: >-
+      ip route del default via {{ wireguard_dnf_mgmt_gateway }}
+      dev {{ wireguard_dnf_mgmt_device }} metric {{ wireguard_dnf_temp_route_metric }}
+  register: wireguard_dnf_temp_route_del
+  changed_when: wireguard_dnf_temp_route_del.rc == 0
+  failed_when: false
+  when: wireguard_dnf_via_mgmt | default(false) | bool
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Ensure config directory exists
+  ansible.builtin.file:
+    path: "{{ wireguard_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Enable IPv4 forwarding for overlay routing
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+  tags: [wireguard, wireguard_install]

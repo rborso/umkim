@@ -1,0 +1,19 @@
+---
+virt01_hypervisor_cleanup_k3s: true
+virt01_hypervisor_bridge: n0p0_mgmt_nw
+virt01_k3s_vm_image_dir: /var/lib/libvirt/images
+virt01_k3s_cloudinit_dir: /var/lib/libvirt/cloud-init
+virt01_k3s_cloud_image_url: >-
+  https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2
+virt01_k3s_cloud_image_checksum: sha256:92c206cc6f790c61583247eefe87890f8828420662c17cacf247cec78ab4eec8
+virt01_k3s_cloud_image_path: "{{ virt01_k3s_vm_image_dir }}/Rocky-9-GenericCloud-Base.qcow2"
+virt01_k3s_os_variant: rocky9
+virt01_k3s_vm_memory_mib: 8192
+virt01_k3s_vm_vcpus: 4
+virt01_k3s_vm_disk_gb: 40
+virt01_k3s_vm_network:
+  gateway: 192.168.1.1
+  prefix: 24
+  dns:
+    - 192.168.1.1
+virt01_k3s_vms: []

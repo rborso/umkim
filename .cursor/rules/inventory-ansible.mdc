@@ -1,0 +1,13 @@
+---
+description: Ansible inventory and group_vars conventions
+globs: inventory/**,ansible.cfg
+alwaysApply: false
+---
+
+# Inventory (S1)
+
+- Hosts: `inventory/hosts.yml`; groups `hub`, `spokes`, `nested_parents`, `fleet_edge`, etc.
+- Fleet-wide defaults: `inventory/group_vars/all/common.yml`.
+- Hub overrides: `inventory/group_vars/hub.yml`.
+- Per-host: `inventory/host_vars/<host>.yml`.
+- Skill: `.cursor/skills/fleet-inventory/SKILL.md`.

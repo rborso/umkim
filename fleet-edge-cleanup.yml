@@ -1,0 +1,15 @@
+---
+# Remove fleet-edge Spoke ManifestWorks and clear hub Traefik fleet routes.
+#
+# Usage:
+#   ansible-playbook fleet-edge-cleanup.yml
+#   ansible-playbook fleet-edge.yml
+
+- name: Fleet edge | Cleanup ManifestWorks and hub routes
+  hosts: fleet_edge
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_edge
+        tasks_from: cleanup.yml

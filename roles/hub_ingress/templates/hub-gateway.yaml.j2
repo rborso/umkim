@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ hub_ingress_gateway_name }}
+  namespace: {{ hub_ingress_namespace }}
+  labels:
+    app: hub-gateway
+    fleet.umkim.com/component: hub-ingress
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hub-gateway
+  template:
+    metadata:
+      labels:
+        app: hub-gateway
+      annotations:
+        checksum/hub-traefik-static: "{{ hub_ingress_static_checksum }}"
+        checksum/hub-traefik-dynamic: "{{ hub_ingress_dynamic_checksum }}"
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: traefik
+          image: {{ hub_ingress_traefik_image }}
+          args:
+            - --configFile=/etc/traefik/traefik.yml
+          ports:
+            - name: http
+              containerPort: {{ 80 if (fleet_edge_acme_enabled | default(false) | bool) else 9080 }}
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+            - name: https
+              containerPort: 443
+{% endif %}
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 10
+          volumeMounts:
+            - name: static
+              mountPath: /etc/traefik/traefik.yml
+              subPath: traefik.yml
+              readOnly: true
+            - name: traefik-dynamic
+              mountPath: /etc/traefik/dynamic
+              readOnly: true
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+            - name: acme
+              mountPath: /var/traefik
+{% endif %}
+      volumes:
+        - name: static
+          configMap:
+            name: {{ hub_ingress_static_cm }}
+        - name: traefik-dynamic
+          projected:
+            sources:
+              - configMap:
+                  name: {{ hub_ingress_dynamic_cm }}
+                  items:
+                    - key: routes.yml
+                      path: routes.yml
+              - configMap:
+                  name: {{ hub_ingress_fleet_routes_cm }}
+                  items:
+                    - key: fleet-routes.yml
+                      path: fleet-routes.yml
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+        - name: acme
+          hostPath:
+            path: {{ hub_ingress_acme_host_path }}
+            type: DirectoryOrCreate
+{% endif %}
+
+---
+# hostNetwork gateway has no pod IP. The edge controller probes
+# http://gateway.<ns>.svc; without this Service that lookup fails and hub
+# routes stay Degraded even when Traefik is serving :80 on the node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ hub_ingress_gateway_name }}
+  namespace: {{ hub_ingress_namespace }}
+  labels:
+    app: hub-gateway
+    fleet.umkim.com/component: hub-ingress
+spec:
+  selector:
+    app: hub-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+    - name: https
+      port: 443
+      targetPort: https
+{% endif %}
+

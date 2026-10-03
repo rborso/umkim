@@ -1,0 +1,77 @@
+---
+- name: Fleet edge | Classify clusters by ingress mode
+  ansible.builtin.set_fact:
+    fleet_edge_hub_only_cluster_names: >-
+      {{
+        fleet_edge_clusters | dict2items
+        | rejectattr('value.direct_ingress', 'defined')
+        | map(attribute='key') | list
+        + (
+          fleet_edge_clusters | dict2items
+          | selectattr('value.direct_ingress', 'defined')
+          | rejectattr('value.direct_ingress')
+          | map(attribute='key') | list
+        )
+      }}
+    fleet_edge_direct_cluster_names: >-
+      {{
+        fleet_edge_clusters | dict2items
+        | selectattr('value.direct_ingress', 'defined')
+        | selectattr('value.direct_ingress')
+        | map(attribute='key') | list
+        + (
+          fleet_edge_clusters | dict2items
+        | rejectattr('value.direct_ingress', 'defined')
+        | map(attribute='key') | list
+          if fleet_edge_direct_ingress_default | default(true) | bool
+          else []
+        )
+      }}
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Collect direct-cluster DNS notes
+  ansible.builtin.set_fact:
+    fleet_edge_direct_dns_notes: >-
+      {{
+        fleet_edge_direct_dns_notes | default([]) + [item.value.external_dns_note]
+      }}
+  loop: "{{ fleet_edge_clusters | dict2items | selectattr('key', 'in', fleet_edge_direct_cluster_names) }}"
+  when: item.value.external_dns_note is defined
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Collect direct-cluster port-forward notes
+  ansible.builtin.set_fact:
+    fleet_edge_direct_forward_notes: >-
+      {{
+        fleet_edge_direct_forward_notes | default([]) + [item.value.port_forward_note]
+      }}
+  loop: "{{ fleet_edge_clusters | dict2items | selectattr('key', 'in', fleet_edge_direct_cluster_names) }}"
+  when: item.value.port_forward_note is defined
+  tags: [fleet_edge, fleet_edge_verify]
+
+- name: Fleet edge | Build manual DNS checklist
+  ansible.builtin.set_fact:
+    fleet_edge_dns_summary_lines: >-
+      {{
+        [
+          '=== Fleet edge manual DNS (' ~ fleet_edge_domain ~ ') ===',
+          'DNS: *.mgmt.umkim.com (and app hostnames) → OpenWrt WAN',
+          'OpenWrt port-forward: WAN TCP 80 → virt03:' ~ (fleet_edge_public_nodeport | string),
+          'UMKIM hostname: ' ~ fleet_edge_umkim_hostname,
+          '',
+          'Hub-only (no *.cluster public DNS): ' ~ (
+            fleet_edge_hub_only_cluster_names | join(', ')
+            if fleet_edge_hub_only_cluster_names | length > 0 else '(none)'
+          ),
+          '',
+          'Direct ingress (*.cluster.' ~ fleet_edge_domain ~ '): ' ~ (
+            fleet_edge_direct_cluster_names | join(', ')
+            if fleet_edge_direct_cluster_names | length > 0 else '(none)'
+          )
+        ]
+        + (fleet_edge_direct_dns_notes | default([]))
+        + (fleet_edge_direct_forward_notes | default([]))
+        + ['', 'Fleet apps (active-active via hub):']
+        + (fleet_edge_apps | map(attribute='host') | list)
+      }}
+  tags: [fleet_edge, fleet_edge_verify]

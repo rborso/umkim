@@ -1,0 +1,9 @@
+fleet-console-auth
+Copyright 2026 Robert Borso
+
+Original UMKIM fleet component — LDAP/session auth proxy for the fleet console and DCM API
+Licensed under the Apache License 2.0 (see LICENSE).
+
+Distribution compliance: see the UMKIM project NOTICE at
+https://github.com/rborso/umkim (tag v0.1.0).
+For source requests, open an issue or pull request in [UMKIM](https://github.com/rborso/umkim).

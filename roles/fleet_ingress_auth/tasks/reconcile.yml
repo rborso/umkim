@@ -1,0 +1,127 @@
+---
+- name: Fleet ingress auth | Resolve chart source path
+  ansible.builtin.set_fact:
+    fleet_ingress_auth_chart_src: >-
+      {{ fleet_ingress_auth_chart_src
+         | default(playbook_dir + '/charts/fleet-ingress-auth') }}
+
+- name: Fleet ingress auth | Warm Harbor GHCR cache
+  ansible.builtin.import_tasks: warm_harbor.yml
+  when: fleet_ingress_auth_warm_harbor | default(false) | bool
+
+- name: Fleet ingress auth | Hub apply or teardown
+  when: fleet_ingress_auth_hub_enabled | default(false) | bool
+  block:
+    - name: Fleet ingress auth | Stage chart on hub
+      ansible.builtin.copy:
+        src: "{{ fleet_ingress_auth_chart_src }}/"
+        dest: /tmp/fleet-ingress-auth-chart/
+        mode: preserve
+
+    - name: Fleet ingress auth | Detect shared fleet-console LLDAP
+      ansible.builtin.import_tasks: detect_console_lldap.yml
+
+    - name: Fleet ingress auth | Load console-managed secrets
+      ansible.builtin.import_tasks: load_console_secrets.yml
+
+    - name: Fleet ingress auth | Render Helm values
+      ansible.builtin.template:
+        src: values.yaml.j2
+        dest: /tmp/fleet-ingress-auth-values.yaml
+        mode: "0600"
+
+    - name: Fleet ingress auth | Install chart on hub
+      ansible.builtin.command:
+        cmd: >-
+          helm upgrade --install {{ fleet_ingress_auth_helm_release }}
+          /tmp/fleet-ingress-auth-chart
+          --namespace {{ fleet_ingress_auth_namespace }}
+          --create-namespace
+          -f /tmp/fleet-ingress-auth-values.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+      register: fia_helm
+      changed_when: >-
+        'has been upgraded' in fia_helm.stdout
+        or 'has been installed' in fia_helm.stdout
+        or 'REVISION' in fia_helm.stdout
+
+    - name: Fleet ingress auth | Wait for lldap
+      ansible.builtin.command:
+        cmd: kubectl -n {{ fleet_ingress_auth_namespace }} rollout status deployment/lldap --timeout=300s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+      changed_when: false
+      when: fleet_ingress_auth_lldap_deploy | default(true) | bool
+
+    - name: Fleet ingress auth | Verify LDAP admin bind
+      ansible.builtin.command:
+        cmd: >-
+          kubectl -n {{ fleet_ingress_auth_namespace }} run fia-ldap-verify-{{ lookup('pipe', 'date +%s') }}
+          --rm -i --restart=Never --image=alpine:3.20
+          --env=LLDAP_BIND_DN=uid=admin,ou=people,{{ fleet_ingress_auth_lldap_base_dn }}
+          --env=LLDAP_BIND_PASSWORD={{ fleet_ingress_auth_lldap_admin_password }}
+          --command -- sh -ec
+          "apk add --no-cache openldap-clients >/dev/null &&
+          ldapwhoami -H {{ _ldap_url }}
+          -x -D \"$LLDAP_BIND_DN\" -w \"$LLDAP_BIND_PASSWORD\""
+      vars:
+        _ldap_url: >-
+          {{ fleet_ingress_auth_lldap_external_url
+             if not (fleet_ingress_auth_lldap_deploy | default(true) | bool)
+             else 'ldap://lldap.' + fleet_ingress_auth_namespace + '.svc.cluster.local:' + (fleet_ingress_auth_lldap_ldap_port | string) }}
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+      register: fia_ldap_bind
+      retries: 12
+      delay: 10
+      until: fia_ldap_bind.rc == 0
+      changed_when: false
+      when:
+        - fleet_ingress_auth_lldap_deploy | default(true) | bool or (fleet_ingress_auth_lldap_external_url | default('') | length > 0)
+
+    - name: Fleet ingress auth | Wait for authelia
+      ansible.builtin.command:
+        cmd: kubectl -n {{ fleet_ingress_auth_namespace }} rollout status deployment/authelia --timeout=300s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+      changed_when: false
+
+- name: Fleet ingress auth | Teardown hub stack
+  ansible.builtin.import_tasks: teardown_hub.yml
+  when: not (fleet_ingress_auth_hub_enabled | default(false) | bool)
+
+- name: Fleet ingress auth | Push auth stack to enabled spokes
+  ansible.builtin.import_tasks: push_spokes.yml
+  when: >
+    (fleet_ingress_auth_spoke_clusters | default([]) | length) > 0
+    or (fleet_ingress_auth_cluster_configs | default({}) | length) > 0
+
+- name: Fleet ingress auth | Remove auth ManifestWorks from disabled spokes
+  ansible.builtin.import_tasks: teardown_spoke.yml
+  when: (fleet_ingress_auth_teardown_spoke_clusters | default([]) | length) > 0
+
+- name: Fleet ingress auth | Reconcile spoke Traefik auth-dynamic mounts
+  ansible.builtin.import_role:
+    name: spoke_ingress
+    tasks_from: push_spokes.yml
+  when:
+    - fleet_ingress_auth_reconcile_phase6 | default(true) | bool
+    - (ocm_manifestwork_phase6_clusters | default([]) | length) > 0
+
+- name: Fleet ingress auth | Refresh hub Traefik static routes
+  ansible.builtin.import_role:
+    name: hub_ingress
+    tasks_from: update_routes.yml
+  when:
+    - fleet_ingress_auth_reconcile_fleet_edge | default(true) | bool
+    - fleet_edge_enable | default(false) | bool
+
+- name: Fleet ingress auth | Rollout fleet-edge-controller with auth env
+  ansible.builtin.import_role:
+    name: fleet_edge_controller
+  when: fleet_ingress_auth_reconcile_controller | default(true) | bool

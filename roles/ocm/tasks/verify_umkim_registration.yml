@@ -1,0 +1,30 @@
+---
+- name: UMKIM | ManagedCluster status
+  ansible.builtin.command:
+    cmd: kubectl get managedcluster {{ item }} -o wide
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_register_cluster_names }}"
+  register: ocm_verify_mc
+  changed_when: false
+  tags: [ocm, ocm_register, ocm_spoke, ocm_spoke_verify]
+
+- name: UMKIM | ManifestWorks per cluster
+  ansible.builtin.command:
+    cmd: kubectl -n {{ item }} get manifestwork
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_register_cluster_names }}"
+  register: ocm_verify_mw
+  changed_when: false
+  tags: [ocm, ocm_register, ocm_spoke, ocm_spoke_verify]
+
+- name: UMKIM | Registration summary
+  ansible.builtin.debug:
+    msg:
+      clusters: "{{ ocm_register_cluster_names }}"
+      managedclusters: "{{ ocm_verify_mc.results | map(attribute='stdout_lines') | list }}"
+      manifestworks: "{{ ocm_verify_mw.results | map(attribute='stdout_lines') | list }}"
+  tags: [ocm, ocm_register, ocm_spoke, ocm_spoke_verify]

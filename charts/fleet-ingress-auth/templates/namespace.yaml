@@ -1,0 +1,8 @@
+{{- if and .Values.enabled .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "fleet-ingress-auth.namespace" . }}
+  labels:
+    app.kubernetes.io/name: fleet-ingress-auth
+{{- end }}

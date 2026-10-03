@@ -1,0 +1,12 @@
+---
+- name: Fleet ingress auth | Delete spoke ManifestWork
+  ansible.builtin.command:
+    cmd: >-
+      kubectl delete manifestwork {{ fleet_ingress_auth_manifestwork_name }}
+      -n {{ item }} --ignore-not-found
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  loop: "{{ fleet_ingress_auth_teardown_spoke_clusters | default([]) }}"
+  register: fia_spoke_mw_delete
+  changed_when: "'deleted' in fia_spoke_mw_delete.stdout"

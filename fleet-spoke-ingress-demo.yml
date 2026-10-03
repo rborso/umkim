@@ -1,0 +1,38 @@
+---
+# Deploy and test spoke demo app (http-echo behind Traefik).
+# Requires: fleet-spoke-ingress.yml already applied.
+#
+# Usage:
+#   ansible-playbook fleet-spoke-ingress-demo.yml
+#
+# Legacy: phase6-demo.yml imports this playbook.
+
+- name: Spoke ingress demo | Bootstrap IngressClass on spokes
+  hosts: spokes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: bootstrap_spoke
+      tags: [spoke_ingress, spoke_ingress_demo, phase6, phase6_demo]
+
+- name: Spoke ingress demo | Push fleet-demo to spokes
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: push_demo
+      tags: [spoke_ingress, spoke_ingress_demo, phase6, phase6_demo]
+
+- name: Spoke ingress demo | Test on each spoke
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: test_demo
+      tags: [spoke_ingress, spoke_ingress_demo, phase6, phase6_demo]

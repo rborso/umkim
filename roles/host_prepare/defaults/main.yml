@@ -1,0 +1,58 @@
+---
+host_prepare:
+  disable_swap: true
+  disable_firewalld: true
+  disable_ipv6: true
+  enable_ip_forward: true
+  enable_br_netfilter: true
+  configure_nm_routing: true
+host_prepare_sysctl:
+  net.ipv4.ip_forward: 1
+  net.ipv4.conf.all.forwarding: 1
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 0
+  net.ipv6.conf.all.disable_ipv6: 1
+  net.ipv6.conf.default.disable_ipv6: 1
+host_prepare_packages:
+  - python3-libselinux
+  - kernel-modules-extra
+  - iproute
+  - NetworkManager
+host_prepare_nm_connections: []
+host_prepare_nm_extra: []
+host_prepare_openwrt: {}
+
+fleet_node: false
+openwrt_node: false
+
+host_prepare_sysctl_file: /etc/sysctl.d/99-fleet-host-prepare.conf
+host_prepare_modules_load_file: /etc/modules-load.d/fleet-br-netfilter.conf
+host_prepare_ipv6_sysctl_file: /etc/sysctl.d/99-fleet-disable-ipv6.conf
+host_prepare_nm_ipv6_method: disabled
+host_prepare_nm_ipv6_connection_types:
+  - bridge
+  - ethernet
+
+# Used only when configure_firewalld is true (see tasks/firewalld_cluster.yml).
+host_prepare_firewalld_trusted_sources:
+  - 10.10.0.0/16
+  - 192.168.0.0/16
+  - 10.43.0.0/16
+host_prepare_firewalld_trusted_interfaces:
+  - wg-umkim
+  - wg0
+host_prepare_firewalld_tcp_ports:
+  - 22
+  - 80
+  - 443
+  - 30080
+  - 30443
+  - 30081
+  - 6443
+  - 2379
+  - 2380
+  - 10250
+  # Calico BGP. Peers are management-LAN node IPs, not the trusted overlay
+  # CIDRs, so bird stays unready unless 179/tcp is open.
+  - 179
+

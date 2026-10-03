@@ -1,0 +1,14 @@
+title = "UMKIM Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Templated credentials and non-secret test/example values"
+paths = [
+  '''(^|/)roles/harbor/tasks/configure_proxy\.yml$''',
+  '''(^|/)controllers/fleet-site/internal/bundle/static/roles/harbor/tasks/configure_proxy\.yml$''',
+  '''^docs/vault\.example\.yml$''',
+  '''^docs/install\.md$''',
+  '''^ui/umkim-console/src/catalog/fieldUtils\.test\.ts$''',
+]

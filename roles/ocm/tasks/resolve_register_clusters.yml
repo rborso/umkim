@@ -1,0 +1,32 @@
+---
+- name: OCM | Resolve ManagedCluster names to register
+  ansible.builtin.set_fact:
+    ocm_register_cluster_names: >-
+      {{
+        ocm_target_clusters
+        if ocm_target_clusters is defined
+        else (
+          groups[ocm_register_group]
+          | map('extract', hostvars, 'ocm_cluster_name')
+          | list
+        )
+      }}
+  run_once: true
+  tags: [ocm, ocm_register, ocm_spoke]
+
+- name: OCM | Resolve Ansible join hosts for registration
+  ansible.builtin.set_fact:
+    ocm_register_join_hosts: "{{ ocm_register_join_hosts | default([]) + [join_host] }}"
+  vars:
+    join_host: "{{ ocm_spoke_join_hosts[item] | default(item) }}"
+  loop: "{{ ocm_register_cluster_names }}"
+  run_once: true
+  tags: [ocm, ocm_register, ocm_spoke]
+
+- name: OCM | Build dynamic join batch inventory group
+  ansible.builtin.add_host:
+    name: "{{ item }}"
+    groups: ocm_register_batch
+  loop: "{{ ocm_register_join_hosts }}"
+  run_once: true
+  tags: [ocm, ocm_register, ocm_spoke]

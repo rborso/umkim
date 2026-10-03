@@ -1,0 +1,34 @@
+---
+fleet_site_namespace: fleet-system
+fleet_site_wireguard_pool_start: "{{ fleet_site_wireguard_pool_start | default(10) }}"
+fleet_site_wireguard_pool_end: "{{ fleet_site_wireguard_pool_end | default(99) }}"
+fleet_site_enrollment_base_url: "{{ fleet_site_enrollment_base_url | default('http://10.10.0.1:30912/fleet/api/v1alpha1') }}"
+fleet_site_hub_wireguard_ip: "{{ fleet_hub_wireguard_ip | default('10.10.0.1') }}"
+fleet_site_wireguard_endpoint_host: "{{ wireguard_endpoint_host | default('wg.umkim.com') }}"
+fleet_site_wireguard_endpoint_port: "{{ wireguard_endpoint_port | default(51820) }}"
+fleet_site_wireguard_persistent_keepalive: "{{ wireguard_persistent_keepalive | default(25) }}"
+fleet_site_bootstrap_script_filename: bootstrap.sh
+fleet_site_secrets_dir: "{{ playbook_dir }}/secrets/fleet-sites"
+fleet_site_output_dir: "{{ playbook_dir }}/output/fleet-sites"
+# Console hub finalize: Traefik NodePort + IngressClass on new clusters.
+fleet_cluster_spoke_ingress_enabled: true
+
+# Hub-delivered spoke ManifestWorks removed on cluster delete (reset removes all).
+fleet_cleanup_manifestworks:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase6-spoke-ingress
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp
+  - phase4-platform-bootstrap
+
+# Detach keeps spoke Traefik + platform (cert-manager) so site-routed apps stay reachable.
+fleet_cleanup_manifestworks_detach:
+  - fleet-ingress-auth
+  - phase6-spoke-demo
+  - phase5-helm-release-sp
+  - phase5-olm-subscription-sp
+  - phase5-k8s-container-sp
+  - phase5-kubevirt-sp

@@ -1,0 +1,22 @@
+---
+# WAN :80/:443 → gateway NodePorts when gateway HA (no hostNetwork).
+# Uses iptables REDIRECT so kube-proxy NODEPORT rules handle the flow.
+- name: Fleet hub firewall | Install WAN REDIRECT rules
+  ansible.builtin.shell: |
+    set -euo pipefail
+    PUB="{{ fleet_hub_firewall_public_ipv4 }}"
+    HTTP="{{ fleet_hub_firewall_gateway_http_nodeport }}"
+    HTTPS="{{ fleet_hub_firewall_gateway_https_nodeport }}"
+    CMT="fleet-hub-wan-redirect"
+    for spec in "${PUB}:80:${HTTP}" "${PUB}:443:${HTTPS}"; do
+      IFS=: read -r ip dport rport <<< "$spec"
+      iptables-nft -t nat -C PREROUTING -d "${ip}/32" -p tcp --dport "${dport}" \
+        -m comment --comment "${CMT}" -j REDIRECT --to-ports "${rport}" 2>/dev/null \
+        || iptables-nft -t nat -I PREROUTING 1 -d "${ip}/32" -p tcp --dport "${dport}" \
+          -m comment --comment "${CMT}" -j REDIRECT --to-ports "${rport}"
+    done
+  args:
+    executable: /bin/bash
+  register: fleet_hub_firewall_wan_redirect
+  changed_when: fleet_hub_firewall_wan_redirect.rc == 0
+  tags: [fleet_hub_firewall, hub_firewall]

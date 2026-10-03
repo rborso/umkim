@@ -1,0 +1,65 @@
+---
+- name: WireGuard | Load hub public key from hostvars
+  ansible.builtin.set_fact:
+    wireguard_hub_public_key: "{{ hostvars[wireguard_hub_host]['wireguard_public_key'] }}"
+  when:
+    - hostvars[wireguard_hub_host]['wireguard_public_key'] is defined
+    - hostvars[wireguard_hub_host]['wireguard_public_key'] | length > 0
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Fetch hub public key from hub node
+  ansible.builtin.slurp:
+    src: "{{ wireguard_public_key_path }}"
+  delegate_to: "{{ wireguard_hub_host }}"
+  register: wireguard_hub_pubkey_slurp
+  run_once: true
+  when: wireguard_hub_public_key is not defined
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Set hub public key from slurp
+  ansible.builtin.set_fact:
+    wireguard_hub_public_key: "{{ wireguard_hub_pubkey_slurp.content | b64decode | trim }}"
+  when: wireguard_hub_public_key is not defined
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Validate hub public key is available
+  ansible.builtin.assert:
+    that:
+      - wireguard_hub_public_key is defined
+      - wireguard_hub_public_key | length > 0
+    fail_msg: >-
+      Hub {{ wireguard_hub_host }} has no wireguard public key.
+      Run wireguard_install and wireguard_server on the hub first.
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Deploy endpoint route helper script
+  ansible.builtin.template:
+    src: wg-endpoint-route.sh.j2
+    dest: "{{ wireguard_endpoint_route_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: wireguard_endpoint_route_via_mgmt | default(false) | bool
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Deploy spoke client configuration
+  ansible.builtin.template:
+    src: wg0-client.conf.j2
+    dest: "{{ wireguard_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart WireGuard interface
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Install DNS-ready drop-in for wg-quick
+  ansible.builtin.import_tasks: install_dns_ready.yml
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Enable and start wg-quick service
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ wireguard_interface }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [wireguard, wireguard_client]

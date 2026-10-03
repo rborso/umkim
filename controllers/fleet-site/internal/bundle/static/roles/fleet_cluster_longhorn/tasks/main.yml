@@ -1,0 +1,4 @@
+---
+- name: Fleet cluster longhorn | Skip when not enabled
+  ansible.builtin.meta: end_play
+  when: not (fleet_cluster_longhorn_enabled | default(false) | bool)

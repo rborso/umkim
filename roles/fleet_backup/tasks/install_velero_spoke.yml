@@ -1,0 +1,93 @@
+---
+- name: "Fleet backup | Check kubeconfig secret for {{ fleet_backup_cluster }}"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n fleet-system get secret "fleet-kubeconfig-{{ fleet_backup_cluster }}"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_backup_kc_secret
+  failed_when: false
+  changed_when: false
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: "Fleet backup | Skip {{ fleet_backup_cluster }} without kubeconfig secret"
+  ansible.builtin.debug:
+    msg: "Skipping Velero on {{ fleet_backup_cluster }} (no fleet-kubeconfig secret on hub)"
+  when: fleet_backup_kc_secret.rc != 0
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: "Fleet backup | Fetch kubeconfig for {{ fleet_backup_cluster }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl -n fleet-system get secret "fleet-kubeconfig-{{ fleet_backup_cluster }}" \
+      -o jsonpath='{.data.kubeconfig}' | base64 -d > "/tmp/fleet-kc-{{ fleet_backup_cluster }}.yaml"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: fleet_backup_kc_secret.rc == 0
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: "Fleet backup | Check Velero on {{ fleet_backup_cluster }}"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig /tmp/fleet-kc-{{ fleet_backup_cluster }}.yaml
+      -n {{ fleet_velero_namespace }} get deployment velero
+  register: fleet_velero_existing
+  failed_when: false
+  changed_when: false
+  when: fleet_backup_kc_secret.rc == 0
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: "Fleet backup | velero install on {{ fleet_backup_cluster }}"
+  ansible.builtin.command:
+    cmd: >-
+      {{ fleet_velero_cli_path }} install
+      --kubeconfig /tmp/fleet-kc-{{ fleet_backup_cluster }}.yaml
+      --namespace {{ fleet_velero_namespace }}
+      --image {{ fleet_velero_image }}
+      --provider aws
+      --plugins {{ fleet_velero_aws_plugin_image }}
+      --bucket {{ fleet_velero_minio_bucket }}
+      --secret-file /tmp/fleet-velero-credentials
+      --backup-location-config
+      region={{ fleet_velero_s3_region }},s3ForcePathStyle={{ fleet_velero_s3_force_path_style | string | lower }},s3Url={{ fleet_velero_s3_url }}
+      --use-node-agent
+      --default-volumes-to-fs-backup
+      --use-volume-snapshots=false
+      --wait
+  when: fleet_backup_kc_secret.rc == 0 and fleet_velero_existing.rc != 0
+  register: fleet_velero_install
+  changed_when: fleet_velero_install.rc == 0
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: "Fleet backup | Wait for Velero on {{ fleet_backup_cluster }}"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig /tmp/fleet-kc-{{ fleet_backup_cluster }}.yaml
+      -n {{ fleet_velero_namespace }} rollout status deployment/velero --timeout=300s
+  changed_when: false
+  when: fleet_backup_kc_secret.rc == 0
+  tags: [fleet_backup, fleet_backup_spokes]
+
+- name: "Fleet backup | Initialize encrypted backup repo on {{ fleet_backup_cluster }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export KUBECONFIG="/tmp/fleet-kc-{{ fleet_backup_cluster }}.yaml"
+    if {{ fleet_velero_cli_path }} repo get default >/dev/null 2>&1; then
+      echo "repo already initialized"
+      exit 0
+    fi
+    {{ fleet_velero_cli_path }} repo init \
+      --backup-location-config region={{ fleet_velero_s3_region }},s3ForcePathStyle={{ fleet_velero_s3_force_path_style | string | lower }},s3Url={{ fleet_velero_s3_url }} \
+      --password "{{ fleet_velero_repo_password }}"
+  args:
+    executable: /bin/bash
+  register: fleet_velero_repo_init
+  changed_when: "'Initialize repository' in fleet_velero_repo_init.stdout"
+  failed_when: false
+  when: fleet_backup_kc_secret.rc == 0
+  tags: [fleet_backup, fleet_backup_spokes]

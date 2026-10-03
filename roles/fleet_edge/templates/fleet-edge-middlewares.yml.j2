@@ -1,0 +1,33 @@
+    fleet-edge-forward-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "http"
+{% if fleet_edge_acme_enabled | default(false) | bool %}
+    fleet-edge-forward-headers-https:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+    fleet-edge-redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+{% endif %}
+{% if fleet_ingress_auth_enabled | default(false) | bool %}
+    fleet-edge-authelia:
+      forwardAuth:
+        address: "{{ fleet_ingress_auth_forward_auth_url | default('http://authelia.fleet-ingress-auth.svc.cluster.local:9091/api/authz/forward-auth') }}"
+        trustForwardHeader: true
+        authRequestHeaders:
+          - Accept
+          - Cookie
+          - X-Forwarded-For
+          - X-Forwarded-Proto
+          - X-Forwarded-Host
+          - X-Forwarded-Uri
+          - X-Forwarded-Method
+        authResponseHeaders:
+          - Remote-User
+          - Remote-Groups
+          - Remote-Email
+          - Remote-Name
+{% endif %}

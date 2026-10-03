@@ -1,0 +1,41 @@
+---
+# Compute a single Calico IP_AUTODETECTION_METHOD for the cluster from per-node detect_iface facts.
+
+- name: Calico | Collect detected interfaces from cluster nodes
+  ansible.builtin.set_fact:
+    _calico_detected_ifaces: >-
+      {{
+        groups['fleet_cluster_nodes'] | default([inventory_hostname])
+        | map('extract', hostvars, 'calico_detected_iface')
+        | select('defined')
+        | map('trim')
+        | reject('equalto', '')
+        | unique
+        | list
+      }}
+    _calico_mgmt_ips: >-
+      {{
+        groups['fleet_cluster_nodes'] | default([inventory_hostname])
+        | map('extract', hostvars, 'calico_node_ipv4')
+        | select('defined')
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+
+- name: Calico | Use uniform detected interface for autodetection
+  ansible.builtin.set_fact:
+    calico_ip_autodetection_method: "interface={{ _calico_detected_ifaces[0] }}"
+  when: _calico_detected_ifaces | length == 1
+
+- name: Calico | Use management subnet when interfaces differ across nodes
+  ansible.builtin.set_fact:
+    calico_ip_autodetection_method: "cidr={{ _calico_mgmt_ips | first | ansible.utils.ipaddr('network/prefix') }}"
+  when:
+    - _calico_detected_ifaces | length > 1
+    - _calico_mgmt_ips | length > 0
+
+- name: Calico | Fallback when auto-detection could not resolve a method
+  ansible.builtin.set_fact:
+    calico_ip_autodetection_method: "{{ calico_ip_autodetection_fallback }}"
+  when: calico_ip_autodetection_method | default('auto') == 'auto'

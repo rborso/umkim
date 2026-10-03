@@ -1,0 +1,64 @@
+---
+# clusteradm init publishes kube-public/cluster-info with https://0.0.0.0:6443 on single-homed hubs.
+- name: OCM | Read cluster-info kubeconfig server
+  ansible.builtin.command:
+    cmd: kubectl -n kube-public get cm cluster-info -o jsonpath={.data.kubeconfig}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_cluster_info_kc
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_init, ocm_patch_cluster_info]
+
+- name: OCM | Read cluster-info ConfigMap manifest
+  ansible.builtin.command:
+    cmd: kubectl -n kube-public get cm cluster-info -o yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_cluster_info_cm
+  changed_when: false
+  failed_when: false
+  when:
+    - ocm_cluster_info_kc.rc == 0
+    - ocm_cluster_info_kc.stdout | length > 0
+    - ocm_hub_apiserver | default('') | length > 0
+  tags: [ocm, ocm_init, ocm_patch_cluster_info]
+
+- name: OCM | Compute fixed cluster-info ConfigMap manifest
+  ansible.builtin.set_fact:
+    ocm_cluster_info_cm_fixed: >-
+      {{ ocm_cluster_info_cm.stdout
+         | replace('https://0.0.0.0:6443', ocm_hub_apiserver)
+         | replace('https://127.0.0.1:6443', ocm_hub_apiserver) }}
+  when:
+    - ocm_cluster_info_cm is defined
+    - ocm_cluster_info_cm.rc == 0
+    - ocm_cluster_info_cm.stdout | length > 0
+  tags: [ocm, ocm_init, ocm_patch_cluster_info]
+
+- name: OCM | Fix cluster-info hub API server URL
+  when:
+    - ocm_cluster_info_cm_fixed is defined
+    - ocm_cluster_info_cm.stdout != ocm_cluster_info_cm_fixed
+  tags: [ocm, ocm_init, ocm_patch_cluster_info]
+  block:
+    - name: OCM | Write fixed cluster-info manifest
+      ansible.builtin.copy:
+        dest: /tmp/cluster-info-fixed.yaml
+        content: "{{ ocm_cluster_info_cm_fixed }}\n"
+        mode: "0600"
+
+    - name: OCM | Replace immutable cluster-info ConfigMap
+      ansible.builtin.command:
+        cmd: kubectl -n kube-public delete cm cluster-info --ignore-not-found
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+      changed_when: true
+
+    - name: OCM | Apply fixed cluster-info ConfigMap
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/cluster-info-fixed.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+      register: ocm_patch_cluster_info
+      changed_when: ocm_patch_cluster_info.rc == 0

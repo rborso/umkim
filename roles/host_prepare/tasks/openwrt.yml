@@ -1,0 +1,108 @@
+---
+- name: Host prepare | OpenWrt disable LAN IPv6 assignment
+  ansible.builtin.command:
+    cmd: "uci set network.lan.ip6assign={{ host_prepare_openwrt.network_lan_ip6assign }}"
+  register: host_prepare_owrt_uci
+  changed_when: host_prepare_owrt_uci.rc == 0
+  when: host_prepare_openwrt.network_lan_ip6assign is defined
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt disable wan6 interface
+  ansible.builtin.command:
+    cmd: uci set network.wan6.disabled='1'
+  when: host_prepare_openwrt.network_wan6_disabled | default(false) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt disable RA on LAN
+  ansible.builtin.command:
+    cmd: "uci set dhcp.lan.ra={{ host_prepare_openwrt.dhcp_lan_ra }}"
+  when: host_prepare_openwrt.dhcp_lan_ra is defined
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt disable DHCPv6 on LAN
+  ansible.builtin.command:
+    cmd: "uci set dhcp.lan.dhcpv6={{ host_prepare_openwrt.dhcp_lan_dhcpv6 }}"
+  when: host_prepare_openwrt.dhcp_lan_dhcpv6 is defined
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt disable SLAAC on LAN
+  ansible.builtin.command:
+    cmd: "uci set dhcp.lan.ra_slaac={{ host_prepare_openwrt.dhcp_lan_ra_slaac }}"
+  when: host_prepare_openwrt.dhcp_lan_ra_slaac is defined
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt remove wan6 from firewall wan zone
+  ansible.builtin.command:
+    cmd: uci del_list firewall.@zone[1].network='wan6'
+  register: host_prepare_owrt_del_wan6
+  changed_when: host_prepare_owrt_del_wan6.rc == 0
+  failed_when: false
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt commit UCI changes
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - uci commit network
+    - uci commit dhcp
+    - uci commit firewall
+  changed_when: true
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt persist IPv6 sysctl
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^net\.ipv6\.conf\.{{ item.key | regex_escape }}\.disable_ipv6='
+    line: "net.ipv6.conf.{{ item.key }}.disable_ipv6={{ item.value }}"
+    create: true
+    mode: "0644"
+  loop:
+    - { key: all, value: 1 }
+    - { key: default, value: 1 }
+  when: host_prepare.disable_ipv6 | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt apply IPv6 sysctl live
+  ansible.builtin.command:
+    cmd: "sysctl -w net.ipv6.conf.{{ item.key }}.disable_ipv6={{ item.value }}"
+  loop:
+    - { key: all, value: 1 }
+    - { key: default, value: 1 }
+  changed_when: true
+  when: host_prepare.disable_ipv6 | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt stop odhcpd
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - /etc/init.d/odhcpd stop
+    - /etc/init.d/odhcpd disable
+  register: host_prepare_owrt_odhcpd
+  changed_when: host_prepare_owrt_odhcpd.rc == 0
+  failed_when: false
+  when:
+    - host_prepare_openwrt.odhcpd_disable | default(false) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt reload network and firewall
+  ansible.builtin.command:
+    cmd: /etc/init.d/network restart
+  changed_when: true
+  async: 30
+  poll: 5
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt reload firewall
+  ansible.builtin.command:
+    cmd: /etc/init.d/firewall reload
+  changed_when: true
+  tags: [host_prepare]
+
+- name: Host prepare | OpenWrt verify IPv4 internet
+  ansible.builtin.command:
+    cmd: ping -c 1 -W 3 8.8.8.8
+  register: host_prepare_owrt_ping
+  changed_when: false
+  failed_when: host_prepare_owrt_ping.rc != 0
+  tags: [host_prepare]

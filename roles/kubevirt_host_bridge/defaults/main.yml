@@ -1,0 +1,12 @@
+---
+# Day-0/day-2 host Linux bridge for Multus L2 KubeVirt VMs (all cluster nodes).
+kubevirt_bridge_host_bridge: n0p0_mgmt_nw
+kubevirt_bridge_slave_nic: ""
+kubevirt_bridge_keep_ip: true
+kubevirt_bridge_cni_bin_dir: /opt/cni/bin
+# Management IPv4 used to discover the NIC to enslave (inventory ansible_host).
+kubevirt_bridge_mgmt_ip: "{{ fleet_node_mgmt_address | default(ansible_host) }}"
+# After day-2 bridge, Calico must autodetect the bridge interface (not the enslaved NIC).
+kubevirt_bridge_reconcile_calico: true
+calico_kubeconfig: /etc/rancher/k3s/k3s.yaml
+calico_rollout_timeout: 600

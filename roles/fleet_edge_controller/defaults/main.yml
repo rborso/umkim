@@ -1,0 +1,29 @@
+---
+fleet_edge_controller_enabled: true
+fleet_edge_controller_namespace: fleet-system
+fleet_edge_controller_tag: "{{ harbor_fleet_image_tag | default(umkim_version | default('0.2.0')) }}"
+fleet_edge_controller_image: "{{ harbor_fleet_image_prefix }}/fleet-edge-controller:{{ fleet_edge_controller_tag }}"
+fleet_edge_controller_replicas: 1
+fleet_edge_route_sync_enabled: false
+fleet_edge_route_sync_host_network: true
+fleet_edge_route_sync_interval_sec: 30
+fleet_edge_cluster_configmap_namespace: fleet-system
+fleet_edge_cluster_configmap_name: fleet-edge-clusters
+fleet_routes_cm_namespace: "{{ hub_ingress_namespace | default('fleet-ingress') }}"
+fleet_routes_cm_name: "{{ hub_ingress_fleet_routes_cm | default('fleet-traefik-fleet-routes') }}"
+catalog_manager_api_url: ""
+fleet_edge_hub_gateway_url: "{{ 'https://gateway.' ~ (hub_ingress_namespace | default('fleet-ingress')) ~ '.svc.cluster.local' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://gateway.' ~ (hub_ingress_namespace | default('fleet-ingress')) ~ '.svc.cluster.local:80' }}"
+fleet_edge_hub_gateway_http_url: "http://gateway.{{ hub_ingress_namespace | default('fleet-ingress') }}.svc.cluster.local:80"
+fleet_edge_route_health_interval_sec: 60
+fleet_edge_route_requeue_interval_sec: 60
+fleet_edge_route_health_failure_threshold: 3
+fleet_edge_route_health_success_threshold: 2
+fleet_edge_acme_preflight_enabled: true
+fleet_edge_acme_queue_retry_interval_sec: 60
+fleet_edge_acme_debounce_sec: 30
+fleet_edge_acme_dns_check_enabled: true
+fleet_spoke_acme_preflight_enabled: true
+fleet_edge_gateway_deployment_ns: "{{ hub_ingress_namespace | default('fleet-ingress') }}"
+fleet_edge_gateway_deployment_name: "{{ hub_ingress_gateway_name | default('gateway') }}"
+fleet_edge_acme_solver_enabled: false
+fleet_edge_acme_legacy_gateway_scale: false

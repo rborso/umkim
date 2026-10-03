@@ -1,0 +1,22 @@
+---
+- name: Fleet cluster longhorn | Install Longhorn dependencies
+  ansible.builtin.dnf:
+    name:
+      - iscsi-initiator-utils
+      - nfs-utils
+    state: present
+
+- name: Fleet cluster longhorn | Enable iscsid
+  ansible.builtin.systemd:
+    name: iscsid
+    enabled: true
+    state: started
+
+# Longhorn nsenter into the host mount NS uses a minimal PATH (no /usr/sbin).
+# Rocky/RHEL ship iscsiadm only under /usr/sbin.
+- name: Fleet cluster longhorn | Symlink iscsiadm into /usr/bin for Longhorn
+  ansible.builtin.file:
+    src: /usr/sbin/iscsiadm
+    dest: /usr/bin/iscsiadm
+    state: link
+    force: true

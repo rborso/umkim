@@ -1,0 +1,48 @@
+---
+- name: GPU host | Gather hardware facts
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+      - kernel
+  tags: [gpu_host, gpu_host_detect]
+
+- name: GPU host | Install pciutils for detection
+  ansible.builtin.dnf:
+    name: pciutils
+    state: present
+  tags: [gpu_host, gpu_host_detect]
+
+- name: GPU host | List NVIDIA PCI devices
+  ansible.builtin.command: lspci -nn
+  register: gpu_host_lspci
+  changed_when: false
+  tags: [gpu_host, gpu_host_detect]
+
+- name: GPU host | Require at least one NVIDIA device
+  ansible.builtin.assert:
+    that:
+      - gpu_host_lspci.stdout is search('NVIDIA|nvidia|10de:', ignorecase=true)
+    fail_msg: >-
+      No NVIDIA GPU found (lspci). Install drivers only on nodes with a discrete NVIDIA GPU.
+  tags: [gpu_host, gpu_host_detect]
+
+- name: GPU host | Secure Boot state
+  ansible.builtin.command: mokutil --sb-state
+  register: gpu_host_secure_boot
+  changed_when: false
+  failed_when: false
+  tags: [gpu_host, gpu_host_detect]
+
+- ansible.builtin.import_tasks: catalog.yml
+  tags: [gpu_host, gpu_host_detect]
+
+- name: GPU host | Running kernel
+  ansible.builtin.debug:
+    msg:
+      kernel: "{{ ansible_kernel }}"
+      pci_id: "{{ gpu_host_pci_id | default('unknown') }}"
+      marketing_name: "{{ gpu_host_marketing_name | default('unknown') }}"
+      driver_branch: "{{ gpu_host_driver_branch_effective | default(gpu_host_driver_branch) }}"
+      nvidia_pci: "{{ gpu_host_lspci.stdout_lines | select('search', 'NVIDIA|nvidia|10de:', ignorecase=true) | list }}"
+      secure_boot: "{{ gpu_host_secure_boot.stdout | default('unknown') }}"
+  tags: [gpu_host, gpu_host_detect]

@@ -1,0 +1,16 @@
+---
+hub_ingress_namespace: fleet-ingress
+hub_ingress_gateway_name: gateway
+hub_ingress_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+hub_ingress_acme_host_path: /var/lib/umkim/traefik-acme
+hub_ingress_static_cm: fleet-traefik-static
+hub_ingress_dynamic_cm: fleet-traefik-dynamic
+hub_ingress_fleet_routes_cm: fleet-traefik-fleet-routes
+hub_ingress_force_gateway_rollout: false
+
+# fleet-edge controller reads these (inventory overrides).
+fleet_routes_cm_namespace: "{{ hub_ingress_namespace }}"
+fleet_routes_cm_name: "{{ hub_ingress_fleet_routes_cm }}"
+fleet_edge_hub_gateway_url: "{{ 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
+fleet_edge_hub_gateway_http_url: "http://127.0.0.1:80"
+fleet_edge_route_sync_enabled: false
