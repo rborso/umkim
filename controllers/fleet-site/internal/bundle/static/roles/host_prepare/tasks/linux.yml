@@ -38,7 +38,9 @@
     enabled: false
     masked: true
   failed_when: false
-  when: host_prepare.disable_firewalld | default(true) | bool
+  when:
+    - host_prepare.disable_firewalld | default(true) | bool
+    - not (configure_firewalld | default(false) | bool)
   tags: [host_prepare]
 
 - name: Host prepare | Probe br_netfilter module
@@ -234,4 +236,9 @@
   changed_when: false
   failed_when: host_prepare_verify_ipv6.stdout | trim != '1'
   when: host_prepare.disable_ipv6 | default(true) | bool
+  tags: [host_prepare]
+
+- name: Host prepare | Apply cluster firewalld profile when requested
+  ansible.builtin.import_tasks: firewalld_cluster.yml
+  when: configure_firewalld | default(false) | bool
   tags: [host_prepare]

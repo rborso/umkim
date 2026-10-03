@@ -32,3 +32,24 @@ host_prepare_nm_ipv6_method: disabled
 host_prepare_nm_ipv6_connection_types:
   - bridge
   - ethernet
+
+# Used only when configure_firewalld is true (see tasks/firewalld_cluster.yml).
+host_prepare_firewalld_trusted_sources:
+  - 10.10.0.0/16
+  - 192.168.0.0/16
+  - 10.43.0.0/16
+host_prepare_firewalld_trusted_interfaces:
+  - wg-umkim
+  - wg0
+host_prepare_firewalld_tcp_ports:
+  - 22
+  - 80
+  - 443
+  - 30080
+  - 30443
+  - 30081
+  - 6443
+  - 2379
+  - 2380
+  - 10250
+

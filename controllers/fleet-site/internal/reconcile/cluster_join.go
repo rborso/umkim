@@ -791,6 +791,26 @@ func nodeAnsibleHost(n wg.NodeWG, fallback string, hubRunner, useMgmtLAN bool) s
 	return fallback
 }
 
+const clusterLabelConfigureFirewalld = "fleet.configure/firewalld"
+
+func configureFirewalldEnabled(fcj *fleetv1alpha1.FleetClusterJoin) bool {
+	if fcj == nil || fcj.Spec.ClusterLabels == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(fcj.Spec.ClusterLabels[clusterLabelConfigureFirewalld])) {
+	case "true", "yes", "1":
+		return true
+	default:
+		return false
+	}
+}
+
+func writeConfigureFirewalldVar(b *strings.Builder, fcj *fleetv1alpha1.FleetClusterJoin) {
+	if configureFirewalldEnabled(fcj) {
+		b.WriteString("configure_firewalld=true\n")
+	}
+}
+
 func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string, nodeWG []wg.NodeWG, hubRunner bool) string {
 	if len(nodeWG) == 0 {
 		return ""
@@ -856,6 +876,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 		writeNodeGroups(&b)
 		b.WriteString("\n[fleet_cluster_nodes:vars]\n")
 		b.WriteString("fleet_node=true\n")
+		writeConfigureFirewalldVar(&b, fcj)
 		b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
 		b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
 		b.WriteString(fmt.Sprintf("fleet_cluster_kvm=%s\n", kubevirtEnable))
@@ -927,6 +948,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	writeNodeGroups(&b)
 	b.WriteString("\n[fleet_cluster_nodes:vars]\n")
 	b.WriteString("fleet_node=true\n")
+	writeConfigureFirewalldVar(&b, fcj)
 	b.WriteString(fmt.Sprintf("ansible_ssh_common_args=%s\n", sshArgs))
 	b.WriteString(fmt.Sprintf("ansible_ssh_private_key_file=%s\n", sshKeyFile))
 	b.WriteString("k3s_cluster_mode=false\n")

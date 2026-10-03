@@ -237,3 +237,36 @@ func assertInventoryLANNetworking(t *testing.T, ini string) {
 		}
 	}
 }
+func TestBuildClusterInventoryINI_configureFirewalld(t *testing.T) {
+	r := testClusterJoinReconciler()
+	fcj := &fleetv1alpha1.FleetClusterJoin{
+		Spec: fleetv1alpha1.FleetClusterJoinSpec{
+			ClusterName:     "lab-ha-0",
+			SiteId:          "homelab",
+			BootstrapHost:   "172.16.10.101",
+			Topology:        fleetv1alpha1.ClusterTopologyHA3Node,
+			ControlPlaneVip: "172.16.10.100",
+			ClusterLabels:   map[string]string{"fleet.configure/firewalld": "true"},
+			Nodes: []fleetv1alpha1.FleetClusterJoinNodeSpec{
+				{Hostname: "lab-ha-0-cp1", Address: "172.16.10.101", Role: fleetv1alpha1.NodeRoleControl},
+				{Hostname: "lab-ha-0-cp2", Address: "172.16.10.102", Role: fleetv1alpha1.NodeRoleControl},
+				{Hostname: "lab-ha-0-cp5", Address: "172.16.10.144", Role: fleetv1alpha1.NodeRoleControl},
+			},
+		},
+	}
+	nodes := []wg.NodeWG{
+		{Hostname: "lab-ha-0-cp1", Address: "172.16.10.101", WGAddress: "10.10.0.11/32", Role: fleetv1alpha1.NodeRoleControl},
+		{Hostname: "lab-ha-0-cp2", Address: "172.16.10.102", WGAddress: "10.10.0.12/32", Role: fleetv1alpha1.NodeRoleControl},
+		{Hostname: "lab-ha-0-cp5", Address: "172.16.10.144", WGAddress: "10.10.0.13/32", Role: fleetv1alpha1.NodeRoleControl},
+	}
+	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, false)
+	if !strings.Contains(ini, "configure_firewalld=true") {
+		t.Fatal("expected configure_firewalld=true in inventory")
+	}
+	off := fcj.DeepCopy()
+	off.Spec.ClusterLabels = nil
+	ini = r.buildClusterInventoryINI(context.Background(), off, "lab-ha-0", nodes, false)
+	if strings.Contains(ini, "configure_firewalld=") {
+		t.Fatal("configure_firewalld must stay unset unless labeled")
+	}
+}
