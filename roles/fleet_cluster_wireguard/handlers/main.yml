@@ -1,0 +1,7 @@
+---
+- name: Restart fleet cluster wireguard
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
+    enabled: true
+    state: restarted
+  failed_when: false

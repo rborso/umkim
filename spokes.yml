@@ -1,0 +1,92 @@
+---
+# Phase 3: standalone K3s + Calico + OCM join on spokes.
+# After join, run fleet-deploy.yml (accept, CSR, phase4/5 ManifestWorks).
+#
+# Prerequisites: host_prepare, wireguard, ocm hub on umkim-hub.
+#
+# Usage:
+#   ansible-playbook spokes.yml
+#   ansible-playbook spokes.yml --tags k3s -l spokes
+#   ansible-playbook spokes.yml --tags ocm_join -l spokes
+#   ansible-playbook spokes.yml   # join only
+#   ansible-playbook fleet-deploy.yml   # complete UMKIM registration on hub
+
+- name: K3s standalone clusters on spokes
+  hosts: spokes
+  become: true
+  gather_facts: false
+  roles:
+    - role: k3s
+      tags: [k3s, fleet_spoke]
+
+- name: Calico CNI on spokes
+  hosts: spokes
+  become: true
+  gather_facts: false
+  roles:
+    - role: calico
+      tags: [calico, fleet_spoke]
+
+- name: NFS server for fleet cluster storage
+  hosts: spokes
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_nfs_server
+      when: fleet_nfs_server_enabled | default(false) | bool
+      tags: [fleet_nfs_server, fleet_spoke]
+
+- name: Cluster storage (NFS provisioner) on spokes
+  hosts: spokes
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_cluster_storage
+      tags: [fleet_cluster_storage, fleet_spoke]
+
+- name: OCM klusterlet join on spokes
+  hosts: spokes
+  become: true
+  gather_facts: false
+  roles:
+    - role: ocm
+      tags: [ocm_join, fleet_spoke]
+
+- name: OCM accept spokes and approve registration CSRs on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    ocm_register_group: spokes
+  tasks:
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: resolve_register_clusters.yml
+      tags: [ocm, ocm_register, ocm_spoke, fleet_spoke]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: wait_managedclusters.yml
+      tags: [ocm, ocm_join, ocm_spoke, fleet_spoke]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: accept_clusters.yml
+      vars:
+        ocm_clusters_to_accept: "{{ ocm_register_cluster_names }}"
+      tags: [ocm, ocm_accept, ocm_spoke, fleet_spoke]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: approve_registration_csrs.yml
+      tags: [ocm, ocm_approve_csr, ocm_spoke, fleet_spoke]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: sync_cluster_labels.yml
+      tags: [ocm, ocm_cluster_labels, ocm_spoke, fleet_spoke]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: sync_spoke_kubeconfig_secret.yml
+      tags: [ocm, ocm_spoke_kubeconfig, ocm_spoke, fleet_spoke]

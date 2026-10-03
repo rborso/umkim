@@ -1,0 +1,15 @@
+---
+- name: Preflight | Gather OS facts
+  ansible.builtin.setup:
+    gather_subset:
+      - min
+  become: false
+  tags: [hub_install_preflight, preflight]
+
+- name: Preflight | Require Rocky Linux 10 hub
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == 'Rocky'
+      - ansible_facts['distribution_major_version'] == '10'
+    fail_msg: "UMKIM v0.2 hub requires Rocky Linux 10 (found {{ ansible_facts['distribution'] | default('?') }} {{ ansible_facts['distribution_major_version'] | default('?') }})"
+  tags: [hub_install_preflight, preflight]

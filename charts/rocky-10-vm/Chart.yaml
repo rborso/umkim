@@ -1,0 +1,10 @@
+apiVersion: v2
+name: rocky-10-vm
+description: KubeVirt Rocky Linux 10 guest VM (CDI import + cloud-init)
+type: application
+version: 0.1.3
+appVersion: "10"
+keywords:
+  - kubevirt
+  - rocky
+  - vm

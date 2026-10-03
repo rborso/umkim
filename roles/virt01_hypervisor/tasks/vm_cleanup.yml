@@ -1,0 +1,14 @@
+---
+- name: Virt01 VM cleanup | Stop K3s on cluster VMs
+  ansible.builtin.systemd:
+    name: k3s
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [virt01_k3s_vm_cleanup, virt01_hypervisor]
+
+- name: Virt01 VM cleanup | Uninstall K3s on cluster VMs
+  ansible.builtin.import_role:
+    name: k3s
+    tasks_from: cleanup.yml
+  tags: [virt01_k3s_vm_cleanup, virt01_hypervisor]

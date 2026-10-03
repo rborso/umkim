@@ -1,0 +1,39 @@
+{{- if and .Values.enabled .Values.traefik.deploySpokeMiddleware }}
+# Spoke Traefik file-provider fragment (hub fleet-edge uses controller-generated middleware).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleet-ingress-auth-traefik
+  namespace: {{ .Values.traefik.middlewareNamespace }}
+  labels:
+    app.kubernetes.io/name: fleet-ingress-auth
+data:
+  authelia-middleware.yml: |
+    http:
+      middlewares:
+        {{ .Values.traefik.middlewareName }}:
+          forwardAuth:
+            address: "http://authelia.{{ include "fleet-ingress-auth.namespace" . }}.svc.cluster.local:{{ .Values.authelia.port }}/api/authz/forward-auth"
+            trustForwardHeader: true
+            authRequestHeaders:
+              - Accept
+              - Cookie
+              - X-Forwarded-For
+              - X-Forwarded-Proto
+              - X-Forwarded-Host
+              - X-Forwarded-Uri
+              - X-Forwarded-Method
+            authResponseHeaders:
+              - Remote-User
+              - Remote-Groups
+              - Remote-Email
+              - Remote-Name
+        {{ .Values.traefik.redirectMiddlewareName | default "homelab-redirect-https" }}:
+          redirectScheme:
+            scheme: https
+            permanent: true
+        {{ .Values.traefik.stripAuthorizationMiddlewareName | default "strip-authorization" }}:
+          headers:
+            customRequestHeaders:
+              Authorization: ""
+{{- end }}

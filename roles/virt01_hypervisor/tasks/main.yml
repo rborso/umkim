@@ -1,0 +1,21 @@
+---
+- name: Virt01 hypervisor | Assert KVM
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: virt01_kvm
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Fail without KVM
+  ansible.builtin.fail:
+    msg: "/dev/kvm missing on {{ inventory_hostname }}."
+  when: not virt01_kvm.stat.exists
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup, virt01_hypervisor_vms]
+
+- name: Virt01 hypervisor | Cleanup bare-metal K3s
+  ansible.builtin.import_tasks: cleanup.yml
+  when: virt01_hypervisor_cleanup_k3s | default(true) | bool
+  tags: [virt01_hypervisor, virt01_hypervisor_cleanup]
+
+- name: Virt01 hypervisor | Provision K3s cluster VMs
+  ansible.builtin.import_tasks: vms.yml
+  tags: [virt01_hypervisor, virt01_hypervisor_vms]

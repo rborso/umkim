@@ -1,0 +1,36 @@
+---
+# Install FleetAppRoute CRD on the hub (required before route-sync / controller).
+#
+#   ansible-playbook fleet-edge-crd.yml -l hub
+
+- name: Fleet edge CRD on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Fleet edge | Copy CRD manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/deploy/fleet-edge/crd-fleetapproute.yaml"
+        dest: /tmp/fleetapproute-crd.yaml
+        mode: "0644"
+
+    - name: Fleet edge | Apply CRD
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleetapproute-crd.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_edge_crd_apply
+      changed_when: >-
+        'created' in fleet_edge_crd_apply.stdout
+        or 'configured' in fleet_edge_crd_apply.stdout
+
+    - name: Fleet edge | Wait for CRD Established
+      ansible.builtin.command:
+        cmd: >-
+          kubectl wait --for=condition=Established crd/fleetapproutes.edge.umkim.com
+          --timeout=120s
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      changed_when: false

@@ -1,0 +1,63 @@
+---
+# Generate split-tunnel WireGuard configs for operator PCs and register peers on the hub.
+# Vars: inventory/group_vars/all/wg_operator_clients.yml
+#
+# 1. ./scripts/wg-dev-client.sh <name>   OR edit inventory/group_vars/all/wg_operator_clients.yml
+# 2. Run: ansible-playbook wireguard-clients.yml
+# 3. Copy output/wireguard-clients/<name>/wg-umkim.conf to your laptop and connect.
+#
+# Only 10.10.0.0/16 goes through the VPN (not full-tunnel).
+# Requires hub WireGuard server already up (wireguard.yml -t wireguard_server).
+
+- name: WireGuard operator clients | Load hub public key
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.slurp:
+        src: "{{ wireguard_public_key_path | default('/etc/wireguard/publickey') }}"
+      register: wireguard_hub_pubkey_slurp
+      tags: [wireguard_clients, wireguard_operator_clients]
+
+    - ansible.builtin.set_fact:
+        wireguard_hub_public_key: "{{ wireguard_hub_pubkey_slurp.content | b64decode | trim }}"
+      tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WireGuard operator clients | Generate keys and configs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    wireguard_hub_public_key: "{{ hostvars[groups['hub'] | first]['wireguard_hub_public_key'] }}"
+  roles:
+    - role: wireguard_operator_clients
+      tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WireGuard operator clients | Load spoke keys for hub template
+  hosts: spokes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: keys.yml
+      tags: [wireguard_clients, wireguard_install]
+
+- name: WireGuard operator clients | Register peers on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    wireguard_role: server
+    wireguard_operator_dynamic_peers: "{{ hostvars['localhost']['wireguard_operator_dynamic_peers'] | default([]) }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: wireguard
+        tasks_from: keys.yml
+      tags: [wireguard_clients, wireguard_install]
+
+    - ansible.builtin.import_role:
+        name: wireguard_operator_clients
+        tasks_from: hub_peers.yml
+      tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]

@@ -1,0 +1,134 @@
+---
+# Provision single-node K3s site and join UMKIM (ansible-runner Job or manual).
+#
+#   ansible-playbook site-provision.yml -e fleet_site_name=lab-site1 \
+#     -i inventory/from-controller.ini
+#
+# Required extra vars: fleet_site_wg_ip (e.g. 10.10.0.10), fleet_site_ocm_name (= site name)
+
+- name: Fleet site provision | K3s on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    k3s_role: server
+    k3s_standalone: true
+    wireguard_role: client
+    wireguard_address: "{{ fleet_site_wg_cidr }}"
+    ocm_hub: false
+    ocm_cluster_name: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    ocm_hub_host: "{{ fleet_site_hub_inventory_name | default(groups['hub'] | first | default('umkim-hub')) }}"
+    harbor_enable_quay_mirror: false
+    fleet_role: spoke
+  roles:
+    - role: k3s
+      tags: [k3s, fleet_site_provision]
+    - role: calico
+      tags: [calico, fleet_site_provision]
+
+  tasks:
+    - name: Load Harbor admin password from the hub Ansible secret
+      ansible.builtin.set_fact:
+        harbor_admin_password: "{{ (lookup('file', '/secrets/hub/ansible_vars.yml') | from_yaml).harbor_admin_password }}"
+      when: harbor_admin_password | default('') | length == 0
+    - ansible.builtin.import_role:
+        name: harbor
+        tasks_from: registries.yml
+      tags: [harbor, harbor_registries, fleet_site_provision]
+
+- name: Fleet site provision | OCM join on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    ocm_cluster_name: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    ocm_hub_host: "{{ fleet_site_hub_inventory_name | default(groups['hub'] | first | default('umkim-hub')) }}"
+    ocm_hub_apiserver: >-
+      https://{{ hostvars[ocm_hub_host].wireguard_address | ansible.utils.ipaddr('address') }}:6443
+  tasks:
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: install_clusteradm.yml
+      tags: [ocm, ocm_install, ocm_join, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+      tags: [ocm, ocm_join, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: post_join_spoke.yml
+      tags: [ocm, ocm_post_join, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: spoke_ingress
+        tasks_from: bootstrap_spoke
+      when: fleet_cluster_spoke_ingress_enabled | default(true) | bool
+      tags: [phase6, phase6_bootstrap, spoke_ingress, fleet_site_provision]
+
+- name: Fleet site provision | KubeVirt platform on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: push_site_kubevirt_platform.yml
+      tags: [fleet_site, fleet_site_kubevirt, fleet_site_provision]
+
+- name: Fleet site provision | Hub registration and ManifestWorks
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    ocm_register_group: site_bootstrap
+    ocm_register_cluster_names: ["{{ fleet_site_ocm_name | default(fleet_site_name) }}"]
+  tasks:
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: resolve_register_clusters.yml
+      tags: [ocm, ocm_register, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: wait_managedclusters.yml
+      tags: [ocm, ocm_join, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: accept_clusters.yml
+      vars:
+        ocm_clusters_to_accept: "{{ ocm_register_cluster_names }}"
+      tags: [ocm, ocm_accept, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: approve_registration_csrs.yml
+      tags: [ocm, ocm_approve_csr, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: sync_cluster_labels.yml
+      tags: [ocm, ocm_cluster_labels, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: label_managed_cluster_site.yml
+      vars:
+        fleet_site_id: "{{ fleet_site_id | default(fleet_site_name) }}"
+      tags: [ocm, ocm_cluster_labels, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: push_cluster_spoke_ingress.yml
+      when: fleet_cluster_spoke_ingress_enabled | default(true) | bool
+      tags: [phase6, phase6_push, spoke_ingress, fleet_site_provision]
+
+    - ansible.builtin.import_role:
+        name: ocm
+        tasks_from: verify_umkim_registration.yml
+      tags: [ocm, ocm_register, fleet_site_provision]

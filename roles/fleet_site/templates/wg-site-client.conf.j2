@@ -1,0 +1,10 @@
+# UMKIM fleet site overlay — split tunnel ({{ wireguard_subnet | default('10.10.0.0/16') }}).
+[Interface]
+Address = {{ fleet_site_wg_address }}
+PrivateKey = {{ fleet_site_wg_private_key }}
+
+[Peer]
+PublicKey = {{ fleet_site_hub_public_key }}
+Endpoint = {{ fleet_site_wireguard_endpoint_host }}:{{ fleet_site_wireguard_endpoint_port }}
+AllowedIPs = {{ wireguard_subnet | default('10.10.0.0/16') }}
+PersistentKeepalive = {{ fleet_site_wireguard_persistent_keepalive }}

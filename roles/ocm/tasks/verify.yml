@@ -1,0 +1,55 @@
+---
+- name: OCM | Wait for cluster-manager deployment
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ ocm_namespace }} rollout status deploy/cluster-manager
+      --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_rollout
+  until: ocm_rollout.rc == 0
+  retries: 3
+  delay: 30
+  changed_when: false
+  tags: [ocm, ocm_verify]
+
+- name: OCM | Wait for hub addon controllers
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n open-cluster-management-hub rollout status
+      deploy/cluster-manager-registration-controller --timeout=600s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_hub_rollout
+  until: ocm_hub_rollout.rc == 0
+  retries: 3
+  delay: 30
+  changed_when: false
+  failed_when: false
+  tags: [ocm, ocm_verify]
+
+- name: OCM | List OCM pods
+  ansible.builtin.command:
+    cmd: kubectl get pods -n {{ ocm_namespace }} -o wide
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_pods
+  changed_when: false
+  tags: [ocm, ocm_verify]
+
+- name: OCM | Report pod status
+  ansible.builtin.debug:
+    var: ocm_pods.stdout_lines
+  tags: [ocm, ocm_verify]
+
+- name: OCM | Verify hub cluster manager pods are running
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ ocm_namespace }} get pods -l app=cluster-manager
+      -o jsonpath={.items[*].status.phase}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+  register: ocm_cm_phase
+  changed_when: false
+  failed_when: "'Running' not in ocm_cm_phase.stdout"
+  tags: [ocm, ocm_verify]

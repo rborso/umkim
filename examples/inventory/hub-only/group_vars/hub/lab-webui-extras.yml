@@ -1,0 +1,8 @@
+---
+# Optional maintainer-lab console extras (OCM Lab :30910, gateway /fleet/).
+# Not copied by bootstrap-hub-inventory.sh. Greenfield: leave unset (defaults false).
+# To enable on a private lab only: copy this file into inventory/group_vars/hub/ and set true.
+
+fleet_lab_webui_extras: false
+ocm_lab_enabled: false
+umkim_console_gateway_path: false

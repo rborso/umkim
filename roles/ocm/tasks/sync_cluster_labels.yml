@@ -1,0 +1,56 @@
+---
+# Sync fleet capability/topology labels from inventory to OCM ManagedCluster (hub).
+- name: OCM | Patch ManagedCluster fleet labels from inventory
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! kubectl get managedcluster "{{ item.ocm_name }}" >/dev/null 2>&1; then
+      echo "skip missing {{ item.ocm_name }}"
+      exit 0
+    fi
+    managed=$(kubectl get managedcluster "{{ item.ocm_name }}" \
+      -o jsonpath='{.metadata.annotations.fleet\.umkim\.com/console-managed}' 2>/dev/null || true)
+    if [ "$managed" = "true" ]; then
+      echo "skip console-managed {{ item.ocm_name }}"
+      exit 0
+    fi
+    kubectl label managedcluster "{{ item.ocm_name }}" {{ _label_args }} --overwrite
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_managed_cluster_label_targets }}"
+  loop_control:
+    label: "{{ item.ocm_name }}"
+  vars:
+    _caps: >-
+      {{
+        hostvars[item.inventory_host].cluster_capabilities
+        | default(cluster_capabilities_defaults)
+      }}
+    _kvm: "{{ (_caps.kvm | default(false) | bool) or (hostvars[item.inventory_host].kvm_capable | default(false) | bool) }}"
+    _storage_rwo: "{{ _caps.storage_rwo | default(true) | bool }}"
+    _storage_rwx: "{{ _caps.storage_rwx | default(false) | bool }}"
+    _ha_topology: "{{ (_caps.ha_topology | default(false) | bool) or (_caps.ha_cluster | default(false) | bool) }}"
+    _ha_storage_alias: "{{ _storage_rwo or _storage_rwx }}"
+    _region: "{{ hostvars[item.inventory_host].cluster_region | default(cluster_region) }}"
+    _site: "{{ item.site | default(hostvars[item.inventory_host].fleet_site | default('')) }}"
+    _label_list: >-
+      {{
+        (['fleet.site=' ~ _site] if (_site | length > 0) else [])
+        + [
+          'fleet.capability/gpu=' ~ (_caps.gpu | default(false) | bool | lower),
+          'fleet.capability/storage.rwo=' ~ (_storage_rwo | lower),
+          'fleet.capability/storage.rwx=' ~ (_storage_rwx | lower),
+          'fleet.capability/kvm=' ~ (_kvm | lower),
+          'fleet.capability/ha_storage=' ~ (_ha_storage_alias | lower),
+          'fleet.topology/ha=' ~ (_ha_topology | lower),
+          'fleet.capability/ha_cluster=' ~ (_ha_topology | lower),
+          'fleet.topology/region=' ~ _region,
+          'fleet.topology/nest_depth=' ~ (item.nest_depth | default(0)),
+          'fleet.topology/provisioner=' ~ (item.provisioner | default('k3s')),
+        ]
+      }}
+    _label_args: "{{ _label_list | join(' ') }}"
+  changed_when: true
+  tags: [ocm, ocm_cluster_labels]

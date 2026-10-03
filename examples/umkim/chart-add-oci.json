@@ -1,0 +1,6 @@
+{
+  "name": "example-whoami",
+  "origin": "oci://ghcr.io/example/charts/whoami",
+  "version": "0.1.0",
+  "imagePolicy": "external"
+}

@@ -1,0 +1,252 @@
+---
+# API-first cluster create → bootstrap → provision (console-equivalent).
+#
+# Run from the hub (~/umkim) with SSH reachability to bootstrapHost (optional jumphost).
+#
+#   ansible-playbook $INV playbooks/flows/cluster-create.yml \
+#     -e fleet_flow_cluster_name=lab-ext01 \
+#     -e fleet_flow_site_id=homelab \
+#     -e fleet_flow_bootstrap_host=198.51.100.20 \
+#     -e fleet_flow_jumphost=198.51.100.5
+#
+# Inventory flags fleet_fcj_default_acme_enabled / fleet_fcj_default_ingress_auth_enabled
+# (plus vault LLDAP password) auto-apply ACME and Authelia after the cluster reaches Ready.
+
+- name: Fleet flow | Cluster create, bootstrap, provision
+  hosts: hub
+  gather_facts: true
+  become: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+    _flow_remote_user_default: linux
+    _flow_topology_default: single_node
+    _flow_poll_interval_default: 20
+    _flow_poll_retries_default: 90
+  tasks:
+    - name: Require flow variables
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster_name | length > 0
+          - fleet_flow_site_id | length > 0
+          - fleet_flow_bootstrap_host | length > 0
+
+    - name: Initialize flow defaults
+      ansible.builtin.set_fact:
+        fleet_flow_bundle_dir: "{{ fleet_flow_bundle_dir | default(ansible_env.HOME + '/.fleet-flow/' + fleet_flow_cluster_name) }}"
+        fleet_flow_ssh_proxy: "{{ fleet_flow_ssh_proxy | default('') }}"
+        fleet_flow_identity_headers:
+          X-Fleet-Subject-Kind: User
+          X-Fleet-Subject-Name: fleet-flow
+          X-Fleet-DC-Admin: "true"
+
+    - name: Parse jumphost user@host:port for ProxyCommand
+      ansible.builtin.set_fact:
+        fleet_flow_jump_ssh_user: "{{ fleet_flow_jumphost.split('@')[0] if ('@' in fleet_flow_jumphost) else (fleet_flow_ssh_user | default(_flow_remote_user_default)) }}"
+        fleet_flow_jump_hostport: "{{ fleet_flow_jumphost.split('@')[-1] }}"
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Build SSH ProxyCommand options
+      ansible.builtin.set_fact:
+        fleet_flow_jump_host: "{{ fleet_flow_jump_hostport.split(':')[0] }}"
+        fleet_flow_jump_port: "{{ fleet_flow_jump_hostport.split(':')[1] if (':' in fleet_flow_jump_hostport) else '22' }}"
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Set fleet_flow_ssh_proxy
+      ansible.builtin.set_fact:
+        fleet_flow_ssh_proxy: >-
+          -o "ProxyCommand=ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -p {{ fleet_flow_jump_port }} -W %h:%p {{ fleet_flow_jump_ssh_user }}@{{ fleet_flow_jump_host }}"
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Build cluster create body
+      ansible.builtin.set_fact:
+        fleet_flow_cluster_body:
+          clusterName: "{{ fleet_flow_cluster_name }}"
+          siteId: "{{ fleet_flow_site_id }}"
+          bootstrapHost: "{{ fleet_flow_bootstrap_host }}"
+          topology: "{{ fleet_flow_topology | default(_flow_topology_default) }}"
+          networkMode: wireguard
+          providers:
+            install:
+              k8s: "{{ fleet_flow_install_k8s | default(true) | bool }}"
+              helm: "{{ fleet_flow_install_helm | default(false) | bool }}"
+
+    - name: Add optional jumphost to create body
+      ansible.builtin.set_fact:
+        fleet_flow_cluster_body: "{{ fleet_flow_cluster_body | combine({'jumphost': fleet_flow_jumphost}) }}"
+      when: fleet_flow_jumphost | default('') | length > 0
+
+    - name: Merge optional nodes, edge, VIP, and storage into create body
+      ansible.builtin.set_fact:
+        fleet_flow_cluster_body: "{{ fleet_flow_cluster_body | combine(item) }}"
+      loop:
+        - "{{ {'nodes': fleet_flow_nodes} if (fleet_flow_nodes | default([]) | length > 0) else {} }}"
+        - "{{ {'edge': fleet_flow_edge} if (fleet_flow_edge | default({}) | length > 0) else {} }}"
+        - "{{ {'edge': {'ingressId': fleet_flow_ingress_id}} if (fleet_flow_ingress_id | default('') | length > 0) else {} }}"
+        - "{{ {'providers': fleet_flow_providers} if (fleet_flow_providers | default({}) | length > 0) else {} }}"
+        - "{{ {'controlPlaneVip': fleet_flow_control_plane_vip} if (fleet_flow_control_plane_vip | default('') | length > 0) else {} }}"
+        - "{{ {'storage': fleet_flow_storage} if (fleet_flow_storage | default({}) | length > 0) else {} }}"
+        - "{{ {'clusterRegion': fleet_flow_cluster_region} if (fleet_flow_cluster_region | default('') | length > 0) else {} }}"
+        - "{{ {'clusterLabels': fleet_flow_cluster_labels} if (fleet_flow_cluster_labels | default({}) | length > 0) else {} }}"
+        - "{{ {'minRootDiskGi': fleet_flow_min_root_disk_gi | int} if (fleet_flow_min_root_disk_gi | default('') | string | length > 0) else {} }}"
+
+    - name: POST /clusters
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters"
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers }}"
+        body: "{{ fleet_flow_cluster_body }}"
+        status_code: [201, 409]
+
+    - name: Ensure bundle download directory
+      ansible.builtin.file:
+        path: "{{ fleet_flow_bundle_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Wait for bootstrap bundle
+      ansible.builtin.shell:
+        cmd: >-
+          curl -sf -o "{{ fleet_flow_bundle_dir }}.tar.gz"
+          "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/bootstrap-bundle"
+      register: fleet_flow_bundle_dl
+      until: fleet_flow_bundle_dl.rc == 0
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+      changed_when: fleet_flow_bundle_dl.rc == 0
+
+    - name: Ensure bundle extract directory
+      ansible.builtin.file:
+        path: "{{ fleet_flow_bundle_dir }}"
+        state: directory
+        mode: "0755"
+      when: fleet_flow_run_bootstrap | default(true) | bool
+
+    - name: Extract bootstrap bundle on hub
+      ansible.builtin.unarchive:
+        src: "{{ fleet_flow_bundle_dir }}.tar.gz"
+        dest: "{{ fleet_flow_bundle_dir }}"
+        remote_src: true
+      when: fleet_flow_run_bootstrap | default(true) | bool
+
+    - name: Copy bundle and run bootstrap via jumphost
+      ansible.builtin.shell:
+        cmd: |
+          set -euo pipefail
+          PROXY=( -o "ProxyCommand=ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p -p {{ fleet_flow_jump_port }} {{ fleet_flow_jump_ssh_user }}@{{ fleet_flow_jump_host }}" )
+          BUNDLE="{{ fleet_flow_bundle_dir }}.tar.gz"
+          TARGET="{{ fleet_flow_ssh_user | default(_flow_remote_user_default) }}@{{ fleet_flow_bootstrap_host }}"
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${PROXY[@]}" "$BUNDLE" "${TARGET}:/tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${PROXY[@]}" "$TARGET" bash -s <<'REMOTE'
+          set -euo pipefail
+          sudo dnf install -y tar gzip
+          rm -rf "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
+          mkdir -p "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
+          tar -xzf "/tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz" -C "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
+          chmod +x "/tmp/bootstrap-{{ fleet_flow_cluster_name }}/bootstrap.sh"
+          cd "/tmp/bootstrap-{{ fleet_flow_cluster_name }}"
+          sudo ./bootstrap.sh
+          REMOTE
+      become: false
+      when:
+        - fleet_flow_run_bootstrap | default(true) | bool
+        - fleet_flow_jumphost | default('') | length > 0
+      async: 7200
+      poll: 30
+      register: fleet_flow_bootstrap_job
+      changed_when: true
+
+    - name: Copy bundle tarball to bootstrap host (direct)
+      ansible.builtin.shell:
+        cmd: >-
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          {{ fleet_flow_bundle_dir | default('/tmp/fleet-flow-' + fleet_flow_cluster_name) }}.tar.gz
+          {{ fleet_flow_ssh_user | default(_flow_remote_user_default) }}@{{ fleet_flow_bootstrap_host }}:/tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz
+      when:
+        - fleet_flow_run_bootstrap | default(true) | bool
+        - fleet_flow_jumphost | default('') | length == 0
+      changed_when: true
+
+    - name: Run bootstrap.sh on first control node (direct)
+      ansible.builtin.shell:
+        cmd: >-
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          {{ fleet_flow_ssh_user | default(_flow_remote_user_default) }}@{{ fleet_flow_bootstrap_host }}
+          'set -euo pipefail;
+          sudo dnf install -y tar gzip;
+          rm -rf /tmp/bootstrap-{{ fleet_flow_cluster_name }};
+          mkdir -p /tmp/bootstrap-{{ fleet_flow_cluster_name }};
+          tar -xzf /tmp/bootstrap-{{ fleet_flow_cluster_name }}.tar.gz -C /tmp/bootstrap-{{ fleet_flow_cluster_name }};
+          chmod +x /tmp/bootstrap-{{ fleet_flow_cluster_name }}/bootstrap.sh;
+          cd /tmp/bootstrap-{{ fleet_flow_cluster_name }} && sudo ./bootstrap.sh'
+      when:
+        - fleet_flow_run_bootstrap | default(true) | bool
+        - fleet_flow_jumphost | default('') | length == 0
+      async: 7200
+      poll: 30
+      register: fleet_flow_bootstrap_job
+      changed_when: true
+
+    - name: Wait for Validated
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}"
+        method: GET
+        return_content: true
+      register: fleet_flow_validated
+      until: >-
+        (fleet_flow_validated.json.provisioning_phase | default('')) == 'Validated'
+        or (fleet_flow_validated.json.phase | default('')) == 'Validated'
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+      when: fleet_flow_run_bootstrap | default(true) | bool
+
+    - name: POST /clusters/{name}/provision
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/provision"
+        method: POST
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: [200, 202, 409]
+
+    - name: Wait for cluster Ready
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}"
+        method: GET
+        return_content: true
+      register: fleet_flow_cluster_status
+      until: >-
+        (fleet_flow_cluster_status.json.provisioning_phase | default('')) == 'Ready'
+        or (fleet_flow_cluster_status.json.phase | default('')) == 'Ready'
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+
+    - name: Install k8s provider when requested
+      when: fleet_flow_install_k8s | default(true) | bool
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/providers/k8s/install"
+        method: POST
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: [200, 202, 409]
+
+    - name: Install helm provider when requested
+      when: fleet_flow_install_helm | default(false) | bool
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/providers/helm/install"
+        method: POST
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: [200, 202, 409]
+
+    - name: Enable per-cluster ingress auth when password supplied
+      when: fleet_flow_ingress_auth_password | default('') | length >= 12
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/ingress-auth/enable"
+        method: POST
+        headers: "{{ fleet_flow_identity_headers }}"
+        body_format: json
+        body:
+          lldapAdminPassword: "{{ fleet_flow_ingress_auth_password }}"
+          exposeLldapWebUI: "{{ fleet_flow_expose_lldap_webui | default(false) | bool }}"
+        status_code: [200, 409]
+
+    - name: Flow complete
+      ansible.builtin.debug:
+        msg: "Cluster {{ fleet_flow_cluster_name }} is Ready on site {{ fleet_flow_site_id }}"

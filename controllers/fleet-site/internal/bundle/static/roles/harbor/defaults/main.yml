@@ -1,0 +1,87 @@
+---
+harbor_namespace: harbor
+harbor_release: harbor
+harbor_chart_version: "1.18.4"
+harbor_helm_repo: https://helm.goharbor.io
+harbor_host: "10.10.0.1"
+harbor_external_url: "https://{{ harbor_host }}:{{ harbor_nodeport_https }}"
+harbor_nodeport_http: 30080
+harbor_nodeport_https: 30443
+harbor_admin_password: "{{ harbor_admin_password_vault | default('CHANGE_ME') }}"
+harbor_proxy_project_quay: quay-proxy
+harbor_proxy_project_ghcr: ghcr-proxy
+# Hosted project for fleet-built images (accepts push; survives fleet-cleanup when Harbor is kept).
+harbor_fleet_project: fleet
+harbor_charts_project: charts
+harbor_mirror_project: mirror
+harbor_charts_oci_prefix: "oci://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_charts_project }}"
+harbor_charts_to_push:
+  - name: whoami
+    version: 0.1.0
+  - name: pet-clinic-helm
+    version: 0.1.1
+  - name: llama-cpp-helm
+    version: 0.1.4
+  - name: rocky-10-vm
+    version: 0.1.3
+harbor_chart_repositories: []
+harbor_fleet_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}"
+harbor_fleet_image_prefix: "{{ harbor_fleet_registry }}/{{ harbor_fleet_project }}"
+harbor_fleet_src_parent_dir: /opt/fleet-src
+# Sync from Ansible controller (avoids GitHub egress from hub).
+harbor_umkim_root: "{{ playbook_dir | regex_replace('/playbooks/?$', '') }}"
+harbor_fleet_use_local_src: true
+harbor_fleet_push_force: false
+harbor_fleet_local_staging_dir: "{{ harbor_umkim_root }}/.cache/harbor-push"
+harbor_fleet_edge_controller_local_src: "{{ harbor_umkim_root }}/controllers/fleet-edge"
+harbor_fleet_failover_controller_local_src: "{{ harbor_umkim_root }}/controllers"
+harbor_fleet_console_auth_local_src: "{{ harbor_umkim_root }}/controllers/fleet-console-auth"
+harbor_fleet_site_controller_local_src: "{{ harbor_umkim_root }}/controllers"
+harbor_fleet_ansible_runner_local_src: "{{ harbor_umkim_root }}/images/fleet-ansible-runner"
+harbor_fleet_umkim_console_local_src: "{{ harbor_umkim_root }}/ui/umkim-console"
+# Images built from UMKIM repo root — stage UMKIM LICENSE/NOTICE (sibling repos carry their own).
+harbor_fleet_umkim_legal_images:
+  - fleet-site-controller
+  - fleet-edge-controller
+  - fleet-console-auth
+  - fleet-failover-controller
+  - umkim-console
+  - fleet-ansible-runner
+harbor_fleet_push_images:
+  - repository: fleet-site-controller
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
+    local_src: "{{ harbor_umkim_root }}/controllers"
+    clone_dir: "{{ harbor_fleet_src_parent_dir }}/controllers"
+    containerfile: fleet-site/Containerfile
+  - repository: fleet-ansible-runner
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
+    local_src: "{{ harbor_umkim_root }}/images/fleet-ansible-runner"
+    clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-ansible-runner"
+    containerfile: Dockerfile
+  - repository: fleet-edge-controller
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
+    local_src: "{{ harbor_fleet_edge_controller_local_src }}"
+    clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-edge"
+    containerfile: Containerfile
+  - repository: fleet-failover-controller
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
+    local_src: "{{ harbor_umkim_root }}/controllers"
+    clone_dir: "{{ harbor_fleet_src_parent_dir }}/controllers"
+    containerfile: fleet-failover/Containerfile
+  - repository: umkim-console
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
+    local_src: "{{ harbor_fleet_umkim_console_local_src }}"
+    clone_dir: "{{ harbor_fleet_src_parent_dir }}/umkim-console"
+    containerfile: Containerfile
+  - repository: fleet-console-auth
+    tag: "{{ harbor_fleet_image_tag | default('0.2.0') }}"
+    local_src: "{{ harbor_fleet_console_auth_local_src }}"
+    clone_dir: "{{ harbor_fleet_src_parent_dir }}/fleet-console-auth"
+    containerfile: Containerfile
+harbor_registry_pvc_size: 80Gi
+harbor_seed_local_images: true
+harbor_helm_install_dir: /usr/local/bin
+harbor_kubeconfig: /etc/rancher/k3s/k3s.yaml
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+k3s_registries_yaml: /etc/rancher/k3s/registries.yaml
+ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml

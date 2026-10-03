@@ -1,0 +1,93 @@
+---
+# Enable KubeVirt and/or day-2 LAN Multus (host bridge + NAD) on a Ready cluster.
+#
+#   ansible-playbook $INV playbooks/flows/cluster-enable-kubevirt-lan.yml -l hub \
+#     -e fleet_flow_cluster_name=lab-ha-0 \
+#     -e fleet_flow_lan_bridge=true \
+#     -e fleet_flow_wait=true
+#
+# fleet_flow_lan_bridge=true configures host bridges on all nodes and Multus NAD
+# default/mgmt-l2 (sets capability network.multus_l2 after discovery).
+# When KubeVirt is already Ready, LAN Multus does not require force.
+
+- name: Fleet flow | Enable KubeVirt / LAN Multus
+  hosts: hub
+  gather_facts: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+    _flow_poll_interval_default: 15
+    _flow_poll_retries_default: 120
+  tasks:
+    - name: Require cluster name
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster_name | default('') | length > 0
+        fail_msg: Set fleet_flow_cluster_name.
+
+    - name: Initialize flow defaults
+      ansible.builtin.set_fact:
+        fleet_flow_identity_headers:
+          X-Fleet-Subject-Kind: User
+          X-Fleet-Subject-Name: fleet-flow
+          X-Fleet-DC-Admin: "true"
+        fleet_flow_lan_bridge: "{{ fleet_flow_lan_bridge | default(true) | bool }}"
+        fleet_flow_force: "{{ fleet_flow_force | default(false) | bool }}"
+        fleet_flow_bridge_name: "{{ fleet_flow_bridge_name | default('n0p0_mgmt_nw') }}"
+        fleet_flow_keep_ip: "{{ fleet_flow_keep_ip | default(true) | bool }}"
+        fleet_flow_wait: "{{ fleet_flow_wait | default(true) | bool }}"
+
+    - name: Build platform/kubevirt body
+      ansible.builtin.set_fact:
+        fleet_flow_kv_body:
+          lanBridge: "{{ fleet_flow_lan_bridge | bool }}"
+          force: "{{ fleet_flow_force | bool }}"
+          bridgeName: "{{ fleet_flow_bridge_name }}"
+          keepIp: "{{ fleet_flow_keep_ip | bool }}"
+
+    - name: POST /clusters/{name}/platform/kubevirt
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/platform/kubevirt"
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers }}"
+        body: "{{ fleet_flow_kv_body | to_json }}"
+        status_code: [200, 202]
+      register: fleet_flow_kv_post
+
+    - name: Accept result
+      ansible.builtin.debug:
+        msg: >-
+          {{ fleet_flow_cluster_name }}:
+          {{ fleet_flow_kv_post.json.message | default('accepted') }}
+          (phase={{ fleet_flow_kv_post.json.phase | default('?') }},
+          lanBridge={{ fleet_flow_kv_post.json.lanBridge | default(fleet_flow_lan_bridge) }})
+
+    - name: Wait for KubeVirt platform Ready
+      when: fleet_flow_wait | bool
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}/platform/kubevirt"
+        method: GET
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: 200
+      register: fleet_flow_kv_status
+      until: >-
+        fleet_flow_kv_status.json.phase | default('') in ['Ready', 'Failed']
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+
+    - name: Fail if platform job failed
+      when: fleet_flow_wait | bool
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_kv_status.json.phase | default('') == 'Ready'
+        fail_msg: >-
+          KubeVirt/LAN Multus failed:
+          {{ fleet_flow_kv_status.json.message | default('unknown') }}
+
+    - name: Final status
+      when: fleet_flow_wait | bool
+      ansible.builtin.debug:
+        msg: >-
+          {{ fleet_flow_cluster_name }} KubeVirt Ready
+          lanBridge={{ fleet_flow_kv_status.json.lanBridge | default(false) }}
+          bridge={{ fleet_flow_kv_status.json.bridgeName | default('') }}

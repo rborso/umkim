@@ -1,0 +1,76 @@
+---
+# Expose hub API on mgmt LAN for clusters without WireGuard (e.g. virt01-k3s VMs).
+# K3s may keep listening on wg0 only; DNAT enp2s0:6443 -> wireguard IP:6443 on the same host.
+
+- name: K3s | Ensure config directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | Read existing config.yaml
+  ansible.builtin.slurp:
+    src: /etc/rancher/k3s/config.yaml
+  register: k3s_existing_config
+  failed_when: false
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | Deploy TLS SAN config (mgmt LAN + WireGuard)
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0644"
+  register: k3s_config_deploy
+  notify: Restart k3s
+  vars:
+    _k3s_config_text: >-
+      {{
+        (k3s_existing_config.content | b64decode)
+        if (k3s_existing_config.content is defined)
+        else ''
+      }}
+  when: >-
+    k3s_existing_config.failed | default(false)
+    or (ansible_host not in _k3s_config_text)
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | Flush handlers after TLS SAN update
+  ansible.builtin.meta: flush_handlers
+  when: k3s_config_deploy is changed
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | DNAT mgmt LAN port 6443 to WireGuard API listener
+  ansible.builtin.command:
+    cmd: >-
+      iptables -t nat -C PREROUTING -d {{ ansible_host }}/32 -p tcp --dport 6443
+      -j DNAT --to-destination {{ wireguard_address | ansible.utils.ipaddr('address') }}:6443
+  register: k3s_api_dnat_check
+  changed_when: false
+  failed_when: false
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | Add mgmt LAN API DNAT rule
+  ansible.builtin.command:
+    cmd: >-
+      iptables -t nat -A PREROUTING -d {{ ansible_host }}/32 -p tcp --dport 6443
+      -j DNAT --to-destination {{ wireguard_address | ansible.utils.ipaddr('address') }}:6443
+  when: k3s_api_dnat_check.rc != 0
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | Wait for API on mgmt LAN
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: 6443
+    delay: 10
+    timeout: 300
+  tags: [k3s, k3s_api_bind]
+
+- name: K3s | Verify API responds locally
+  ansible.builtin.command:
+    cmd: kubectl get --raw=/readyz
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [k3s, k3s_api_bind]

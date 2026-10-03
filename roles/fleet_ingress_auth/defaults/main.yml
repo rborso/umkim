@@ -1,0 +1,51 @@
+---
+fleet_ingress_auth_enabled: true
+fleet_ingress_auth_hub_enabled: "{{ fleet_ingress_auth_enabled | default(false) | bool }}"
+fleet_ingress_auth_namespace: fleet-ingress-auth
+fleet_ingress_auth_helm_release: fleet-ingress-auth
+# Runner Job mounts hub kubeconfig at /etc/kube/config; hub Ansible play overrides via inventory.
+ocm_kubeconfig: /etc/kube/config
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Spoke auth data is small; prefer local-path over cluster default (often nfs-client).
+fleet_ingress_auth_persistence_storage_class: local-path
+fleet_ingress_auth_spoke_traefik_namespace: "{{ phase6_spoke_ingress_namespace | default('fleet-ingress') }}"
+
+fleet_ingress_auth_lldap_image: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8"
+fleet_ingress_auth_lldap_ldap_port: 3890
+fleet_ingress_auth_lldap_http_port: 17170
+# Ingress-auth LLDAP base DN; when console LLDAP is enabled use fleet_auth_ldap_base_dn from site.yml.
+fleet_ingress_auth_lldap_base_dn: "{{ fleet_auth_ldap_base_dn | default('dc=umkim,dc=com') }}"
+fleet_ingress_auth_lldap_admin_email: "admin@{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+fleet_ingress_auth_lldap_jwt_secret: "{{ fleet_ingress_auth_lldap_jwt_secret_vault | default('CHANGE_ME') }}"
+fleet_ingress_auth_lldap_admin_password: "{{ fleet_ingress_auth_bootstrap_password | default('CHANGE_ME') }}"
+
+fleet_ingress_auth_authelia_image: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/authelia/authelia:4.38.19"
+fleet_ingress_auth_authelia_port: 9091
+fleet_ingress_auth_authelia_nodeport: 30921
+fleet_ingress_auth_portal_host: "auth.{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+fleet_ingress_auth_authelia_public_url: "https://{{ fleet_ingress_auth_portal_host }}"
+fleet_ingress_auth_session_secret: "{{ fleet_ingress_auth_session_secret_vault | default('CHANGE_ME') }}"
+fleet_ingress_auth_storage_encryption_key: "{{ fleet_ingress_auth_storage_key_vault | default('CHANGE_ME') }}"
+fleet_ingress_auth_reset_jwt_secret: "{{ fleet_ingress_auth_reset_jwt_secret_vault | default('CHANGE_ME') }}"
+fleet_ingress_auth_cookie_domain: "{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+fleet_ingress_auth_access_domains:
+  - "*.{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+  - "{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+  - "*.{{ fleet_homelab_edge_domain | default('homelab.' ~ fleet_edge_domain) }}"
+  - "{{ fleet_homelab_edge_domain | default('homelab.' ~ fleet_edge_domain) }}"
+
+fleet_ingress_auth_traefik_middleware_name: fleet-ingress-authelia
+fleet_ingress_auth_forward_auth_url: "http://authelia.{{ fleet_ingress_auth_namespace }}.svc.cluster.local:{{ fleet_ingress_auth_authelia_port }}/api/authz/forward-auth"
+
+# Clusters receiving auth stack via ManifestWork (OCM names).
+fleet_ingress_auth_spoke_clusters: "{{ groups['spokes'] | default([]) }}"
+
+fleet_ingress_auth_manifestwork_name: fleet-ingress-auth
+
+fleet_ingress_auth_chart_src: "{{ playbook_dir }}/charts/fleet-ingress-auth"
+fleet_ingress_auth_teardown_spoke_clusters: []
+fleet_ingress_auth_reconcile_phase6: false
+fleet_ingress_auth_reconcile_fleet_edge: false
+fleet_ingress_auth_reconcile_controller: false
+fleet_ingress_auth_warm_harbor: false
+fleet_ingress_auth_skip_harbor_warm: false

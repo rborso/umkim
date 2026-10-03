@@ -1,0 +1,7 @@
+---
+wireguard_operator_client_pool_octet: 100
+wireguard_operator_client_allowed_ips: "{{ wireguard_subnet | default('10.10.0.0/16') }}"
+wireguard_operator_clients_secrets_dir: "{{ playbook_dir }}/secrets/wireguard-clients"
+wireguard_operator_clients_output_dir: "{{ playbook_dir }}/output/wireguard-clients"
+wireguard_operator_clients_interface_name: wg-umkim
+wireguard_operator_clients_config_filename: "{{ wireguard_operator_clients_interface_name }}.conf"

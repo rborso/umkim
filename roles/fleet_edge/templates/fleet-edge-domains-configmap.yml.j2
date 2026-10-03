@@ -1,0 +1,12 @@
+# Domain registry for fleet console + hostname validation.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleet-edge-domains
+  namespace: {{ fleet_edge_controller_namespace | default('fleet-system') }}
+  labels:
+    app.kubernetes.io/name: fleet-edge
+    app.kubernetes.io/component: domain-registry
+data:
+  domains.json: |
+    {{ fleet_edge_domain_registry | to_json }}

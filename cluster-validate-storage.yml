@@ -1,0 +1,15 @@
+---
+# Pre-apply NFS connectivity probe from cluster bootstrap (hub Ansible Job).
+#
+#   ansible-playbook cluster-validate-storage.yml -e fleet_cluster_name=virt01 \
+#     -e cluster_storage_nfs_server=10.10.0.3 -i /inventory/inventory.ini
+
+- name: Fleet cluster storage | Validate NFS from bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_cluster_storage
+        tasks_from: nfs_validate
+      tags: [fleet_cluster_storage]

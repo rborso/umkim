@@ -1,0 +1,15 @@
+---
+# Deploy fleet-console Helm chart (auth + dashboard + optional lldap).
+#
+#   ansible-playbook harbor.yml -t harbor_push_fleet -l hub
+#   ansible-playbook fleet-console-auth.yml -l hub
+#
+# Replaces legacy kubectl-apply roles; CRDs ship in charts/fleet-console/crds/.
+
+- name: Fleet console (Helm) on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_console_helm
+      tags: [fleet_console_auth, fleet_console_helm, lldap]

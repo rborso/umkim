@@ -1,0 +1,27 @@
+---
+# Push phase4 platform bootstrap (OLM operator framework + cert-manager) for a console cluster.
+- name: Fleet site | Resolve cluster
+  ansible.builtin.set_fact:
+    fleet_site_ocm_cluster: "{{ fleet_site_ocm_name | default(fleet_site_name) }}"
+
+- name: Fleet site | Register synthetic host for platform ManifestWork
+  ansible.builtin.add_host:
+    name: "{{ fleet_site_ocm_cluster }}"
+    ansible_host: "{{ fleet_site_sp_endpoint | default((fleet_site_wg_ip | regex_replace('/.*$', ''))) }}"
+  tags: [fleet_site, fleet_site_provision, phase4]
+
+- name: Fleet site | Push phase4 platform ManifestWork
+  ansible.builtin.import_role:
+    name: olm
+    tasks_from: push_spokes.yml
+  vars:
+    ocm_manifestwork_clusters: ["{{ fleet_site_ocm_cluster }}"]
+  tags: [fleet_site, fleet_site_provision, phase4]
+
+- name: Fleet site | Verify phase4 platform ManifestWork
+  ansible.builtin.import_role:
+    name: olm
+    tasks_from: verify_spokes.yml
+  vars:
+    ocm_manifestwork_clusters: ["{{ fleet_site_ocm_cluster }}"]
+  tags: [fleet_site, fleet_site_provision, phase4]

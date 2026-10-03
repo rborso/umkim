@@ -1,0 +1,24 @@
+---
+- name: K3s cluster | Wait for all nodes Ready
+  ansible.builtin.command:
+    cmd: kubectl wait node --all --for=condition=Ready --timeout=600s
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [k3s, k3s_cluster, k3s_cluster_verify]
+
+- name: K3s cluster | Show nodes
+  ansible.builtin.command:
+    cmd: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: k3s_cluster_nodes
+  changed_when: false
+  tags: [k3s, k3s_cluster, k3s_cluster_verify]
+
+- name: K3s cluster | Report
+  ansible.builtin.debug:
+    var: k3s_cluster_nodes.stdout_lines
+  tags: [k3s, k3s_cluster, k3s_cluster_verify]

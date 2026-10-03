@@ -1,0 +1,69 @@
+---
+- name: Kube-vip | Skip when no control plane VIP
+  ansible.builtin.meta: end_host
+  when: k3s_control_plane_vip | default('') | length == 0
+
+- name: Kube-vip | Gather network facts
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+  when: ansible_default_ipv4 is not defined
+
+- name: Kube-vip | Require VIP and management interface
+  ansible.builtin.assert:
+    that:
+      - k3s_control_plane_vip | length > 0
+      - ansible_default_ipv4.interface is defined
+    fail_msg: k3s_control_plane_vip and ansible_default_ipv4.interface are required for kube-vip
+
+- name: Kube-vip | Create K3s static manifests directory
+  ansible.builtin.file:
+    path: /var/lib/rancher/k3s/server/manifests
+    state: directory
+    mode: "0755"
+
+- name: Kube-vip | Install podman for manifest generation
+  ansible.builtin.dnf:
+    name: podman
+    state: present
+
+- name: Kube-vip | Pull kube-vip container image
+  ansible.builtin.command:
+    cmd: podman pull {{ kube_vip_image }}
+  register: kube_vip_pull
+  changed_when: "'Downloading' in kube_vip_pull.stderr or 'Writing' in kube_vip_pull.stderr or kube_vip_pull.rc == 0"
+  failed_when: kube_vip_pull.rc != 0
+
+- name: Kube-vip | Deploy RBAC manifest for DaemonSet
+  ansible.builtin.get_url:
+    url: https://kube-vip.io/manifests/rbac.yaml
+    dest: /var/lib/rancher/k3s/server/manifests/kube-vip-rbac.yaml
+    mode: "0644"
+    force: true
+  when: not (ansible_check_mode | default(false))
+
+- name: Kube-vip | Remove legacy static pod manifest
+  ansible.builtin.file:
+    path: /var/lib/rancher/k3s/server/manifests/kube-vip.yaml
+    state: absent
+  when: not (ansible_check_mode | default(false))
+
+- name: Kube-vip | Generate DaemonSet manifest via container
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      podman run --rm --network host {{ kube_vip_image }} \
+        manifest daemonset \
+        --interface {{ ansible_default_ipv4.interface }} \
+        --address {{ k3s_control_plane_vip }} \
+        --inCluster \
+        --taint \
+        --controlplane \
+        --services false \
+        --arp \
+        --leaderElection \
+        > /var/lib/rancher/k3s/server/manifests/kube-vip-daemonset.yaml
+    executable: /bin/bash
+  register: kube_vip_manifest
+  changed_when: kube_vip_manifest.rc == 0
+  when: not (ansible_check_mode | default(false))

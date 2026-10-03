@@ -1,0 +1,69 @@
+---
+- name: Fleet edge | Check cluster registry console-managed
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get configmap {{ fleet_edge_cluster_configmap_name }}
+      -n {{ fleet_edge_cluster_configmap_namespace }}
+      -o jsonpath={.metadata.annotations.fleet\.umkim\.com/console-managed}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_clusters_cm_managed
+  failed_when: false
+  changed_when: false
+  run_once: true
+  tags: [fleet_edge, fleet_edge_registry]
+
+- name: Fleet edge | Check cluster registry ConfigMap exists
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get configmap {{ fleet_edge_cluster_configmap_name }}
+      -n {{ fleet_edge_cluster_configmap_namespace }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_clusters_cm_exists
+  failed_when: false
+  changed_when: false
+  run_once: true
+  tags: [fleet_edge, fleet_edge_registry]
+
+- name: Fleet edge | Ensure fleet-system namespace
+  when:
+    - fleet_edge_clusters_cm_managed.stdout | default('') != 'true'
+    - fleet_edge_clusters_cm_exists.rc != 0
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create namespace {{ fleet_edge_cluster_configmap_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  tags: [fleet_edge, fleet_edge_registry]
+
+- name: Fleet edge | Render cluster registry ConfigMap
+  when:
+    - fleet_edge_clusters_cm_managed.stdout | default('') != 'true'
+    - fleet_edge_clusters_cm_exists.rc != 0
+  ansible.builtin.template:
+    src: fleet-edge-clusters-configmap.yml.j2
+    dest: /tmp/fleet-edge-clusters-configmap.yaml
+    mode: "0644"
+  tags: [fleet_edge, fleet_edge_registry]
+
+- name: Fleet edge | Apply cluster registry ConfigMap
+  when:
+    - fleet_edge_clusters_cm_managed.stdout | default('') != 'true'
+    - fleet_edge_clusters_cm_exists.rc != 0
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-edge-clusters-configmap.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_cluster_cm_apply
+  changed_when: >-
+    'created' in fleet_edge_cluster_cm_apply.stdout
+    or 'configured' in fleet_edge_cluster_cm_apply.stdout
+  tags: [fleet_edge, fleet_edge_registry]

@@ -1,0 +1,53 @@
+---
+- name: OCM | Approve pending registration CSRs for fleet clusters
+  ansible.builtin.shell: |
+    set -euo pipefail
+    changed=0
+    for cluster in {{ ocm_clusters_to_accept | join(' ') }}; do
+      mapfile -t csrs < <(kubectl get csr -o name 2>/dev/null \
+        | sed 's|certificatesigningrequest.certificates.k8s.io/||' \
+        | grep "^${cluster}-" || true)
+      for csr in "${csrs[@]}"; do
+        [ -z "$csr" ] && continue
+        approved="$(kubectl get csr "$csr" -o jsonpath='{.status.conditions[?(@.type=="Approved")].type}' 2>/dev/null || true)"
+        if [ "$approved" != "Approved" ]; then
+          if kubectl get csr "$csr" >/dev/null 2>&1; then
+            kubectl certificate approve "$csr"
+            changed=1
+          fi
+        fi
+      done
+    done
+    [ "$changed" -eq 0 ] || echo "approved"
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ocm_csr_batch
+  changed_when: "'approved' in ocm_csr_batch.stdout"
+
+- name: OCM | Poll spoke hub-kubeconfig-secret
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management-agent get secret hub-kubeconfig-secret
+  environment:
+    KUBECONFIG: >-
+      {{ ocm_spoke_kubeconfig | default(
+           hostvars[ocm_spoke_host].ocm_kubeconfig
+           | default(hostvars[ocm_spoke_host].k3s_kubeconfig)
+         ) }}
+    PATH: "{{ k3s_command_path }}"
+  delegate_to: "{{ ocm_spoke_host }}"
+  become: true
+  register: ocm_hub_kc_wait
+  failed_when: false
+  changed_when: false
+
+- name: OCM | Record spoke registration ready
+  ansible.builtin.set_fact:
+    ocm_hub_kc_ok: "{{ (ocm_hub_kc_wait.rc | default(1) | int) == 0 }}"
+
+- name: OCM | Brief pause before next registration poll
+  ansible.builtin.pause:
+    seconds: 5
+  when: not (ocm_hub_kc_ok | default(false) | bool)

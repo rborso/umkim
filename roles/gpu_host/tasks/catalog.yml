@@ -1,0 +1,133 @@
+---
+- name: GPU host | Resolve catalog file path
+  ansible.builtin.set_fact:
+    gpu_host_catalog_resolved: >-
+      {{
+        gpu_host_catalog_path
+        if (gpu_host_catalog_path | default('') | length > 0)
+        else (playbook_dir + '/data/gpu/catalog.yaml')
+      }}
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Load GPU catalog
+  ansible.builtin.include_vars:
+    file: "{{ gpu_host_catalog_resolved }}"
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Pick primary NVIDIA PCI ID
+  ansible.builtin.set_fact:
+    gpu_host_pci_matches: >-
+      {{
+        gpu_host_lspci.stdout_lines
+        | select('search', '10de:[0-9a-f]{4}', ignorecase=true)
+        | map('regex_search', '10de:[0-9a-f]{4}', ignorecase=true)
+        | select
+        | map('lower')
+        | list
+      }}
+  when: gpu_host_lspci is defined
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Set PCI ID fact
+  ansible.builtin.set_fact:
+    gpu_host_pci_id: "{{ (gpu_host_pci_matches | unique | first) | default('') }}"
+  when: gpu_host_pci_matches is defined
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Lookup PCI device in catalog
+  ansible.builtin.set_fact:
+    gpu_host_catalog_entry: "{{ pci_devices.get(gpu_host_pci_id, {}) }}"
+  when: gpu_host_pci_id | default('') | length > 0
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Require known PCI device
+  ansible.builtin.assert:
+    that:
+      - gpu_host_catalog_entry | length > 0
+    fail_msg: >-
+      Unknown NVIDIA PCI ID {{ gpu_host_pci_id }} — add an entry to data/gpu/catalog.yaml.
+  when:
+    - gpu_host_require_catalog_match | default(true) | bool
+    - gpu_host_pci_id | default('') | length > 0
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Resolve driver branch
+  ansible.builtin.set_fact:
+    gpu_host_driver_branch_effective: >-
+      {{
+        gpu_host_driver_branch
+        if (gpu_host_driver_branch_override | default(false) | bool)
+        else (gpu_host_catalog_entry.driver_branch | default(gpu_host_driver_branch | default('535')))
+      }}
+    gpu_host_marketing_name: "{{ gpu_host_catalog_entry.marketing_name | default('NVIDIA GPU') }}"
+    gpu_host_vram_gb: "{{ gpu_host_catalog_entry.vram_gb | default(0) }}"
+    gpu_host_el10_kmod_flavor: "{{ gpu_host_catalog_entry.el10_kmod_flavor | default('open') }}"
+    gpu_host_el10_driver_version: "{{ gpu_host_catalog_entry.el10_driver_version | default('') }}"
+  when: gpu_host_catalog_entry is defined and (gpu_host_catalog_entry | length > 0)
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Default driver branch when catalog entry missing
+  ansible.builtin.set_fact:
+    gpu_host_driver_branch_effective: "{{ gpu_host_driver_branch | default('535') }}"
+    gpu_host_marketing_name: "{{ gpu_host_marketing_name | default('NVIDIA GPU') }}"
+    gpu_host_el10_kmod_flavor: "{{ gpu_host_el10_kmod_flavor | default('open') }}"
+    gpu_host_el10_driver_version: "{{ gpu_host_el10_driver_version | default('') }}"
+  when: gpu_host_driver_branch_effective is not defined
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | OS major for CUDA repo
+  ansible.builtin.set_fact:
+    gpu_host_os_major: "{{ ansible_distribution_major_version | default('9') }}"
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Resolve CUDA repo from catalog
+  ansible.builtin.set_fact:
+    gpu_host_cuda_repo_el_key: "{{ 'el' ~ gpu_host_os_major }}"
+    gpu_host_cuda_repo_entry: "{{ driver_branches[gpu_host_driver_branch_effective].cuda_repo | default({}) }}"
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Set CUDA repo URL and filename
+  ansible.builtin.set_fact:
+    gpu_host_cuda_repo_url: >-
+      {{
+        gpu_host_cuda_repo_entry.get(gpu_host_cuda_repo_el_key, {})
+        .get('url', gpu_host_cuda_repo_url | default(''))
+      }}
+    gpu_host_cuda_repo_filename: >-
+      {{
+        gpu_host_cuda_repo_entry.get(gpu_host_cuda_repo_el_key, {})
+        .get('filename', gpu_host_cuda_repo_filename | default('cuda.repo'))
+      }}
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Require CUDA repo for OS major
+  ansible.builtin.assert:
+    that:
+      - gpu_host_cuda_repo_url | length > 0
+    fail_msg: >-
+      No CUDA repo in catalog for driver branch {{ gpu_host_driver_branch_effective }}
+      on EL{{ gpu_host_os_major }}. Extend data/gpu/catalog.yaml.
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | Require EL10 proprietary driver version in catalog
+  ansible.builtin.assert:
+    that:
+      - gpu_host_el10_driver_version | default('') | length > 0
+    fail_msg: >-
+      PCI {{ gpu_host_pci_id }} requires el10_kmod_flavor=proprietary but el10_driver_version
+      is missing in data/gpu/catalog.yaml.
+  when:
+    - (gpu_host_os_major | default('9') | int) >= 10
+    - (gpu_host_el10_kmod_flavor | default('open')) == 'proprietary'
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend, gpu_host_driver]
+
+- name: GPU host | Use effective driver branch for install
+  ansible.builtin.set_fact:
+    gpu_host_driver_branch: "{{ gpu_host_driver_branch_effective }}"
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend]
+
+- name: GPU host | EL10 uses direct CUDA packages (no DNF module stream)
+  ansible.builtin.set_fact:
+    gpu_host_use_module_stream: "{{ (gpu_host_os_major | default('9') | int) < 10 }}"
+    gpu_host_use_dkms_effective: "{{ gpu_host_use_dkms | default(true) | bool }}"
+  tags: [gpu_host, gpu_host_detect, gpu_host_recommend, gpu_host_driver]

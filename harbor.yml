@@ -1,0 +1,56 @@
+---
+# Harbor pull-through cache on umkim-hub; fleet registry mirrors over WireGuard.
+#
+# Usage:
+#   ansible-playbook harbor.yml
+#   ansible-playbook harbor.yml --tags harbor_install -l hub
+#   ansible-playbook harbor.yml --tags harbor_seed -l hub
+#   ansible-playbook harbor.yml --tags harbor_registries
+
+- name: Install Harbor on hub (umkim-hub)
+  hosts: hub
+  become: true
+  gather_facts: true
+  roles:
+    - role: harbor
+      tags: [harbor, harbor_install]
+
+- name: Seed Harbor proxy cache from images already on umkim-hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: seed
+      tags: [harbor, harbor_seed]
+
+- name: Build and push fleet-owned images to Harbor hosted project
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: push_fleet
+      tags: [harbor, harbor_push_fleet]
+
+- name: Push Helm charts to Harbor OCI (charts project)
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: push_charts
+      tags: [harbor, harbor_push_charts]
+
+- name: Configure K3s registry mirrors on all fleet nodes
+  hosts: fleet_nodes
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role:
+        name: harbor
+        tasks_from: registries
+      tags: [harbor, harbor_registries]

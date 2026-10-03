@@ -1,0 +1,14 @@
+---
+- name: Fleet cluster storage | Skip node prep when local_path
+  ansible.builtin.meta: end_host
+  when: >-
+    not (
+      (fleet_cluster_nfs_enabled | default(false) | bool)
+      or (fleet_cluster_storage_backend | default('local_path') in ['nfs_external', 'nfs_local'])
+    )
+
+- name: Fleet cluster storage | Install nfs-utils on nodes
+  ansible.builtin.package:
+    name: nfs-utils
+    state: present
+  tags: [fleet_cluster_storage]

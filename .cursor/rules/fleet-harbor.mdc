@@ -1,0 +1,12 @@
+---
+description: Harbor registry, OLM ManifestWorks, FleetApp charts
+globs: roles/harbor/**,roles/olm/**,harbor.yml,fleet-platform.yml
+alwaysApply: false
+---
+
+# Harbor & platform (S3)
+
+- Harbor hosted project `fleet`; push built images with `harbor_push_fleet`.
+- OLM/cert-manager on spokes: `phase4-platform-bootstrap` ManifestWork (`roles/olm`).
+- Helm onto a selected Ready cluster uses `FleetApp`, not a catalog or service provider.
+- Skill: `.cursor/skills/fleet-harbor/SKILL.md`.

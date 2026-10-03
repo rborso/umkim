@@ -1,0 +1,197 @@
+---
+- name: WG operator clients | Require client list
+  ansible.builtin.assert:
+    that: wireguard_operator_clients | length > 0
+    fail_msg: >-
+      Define wireguard_operator_clients in inventory/group_vars/wg_operator_clients.yml
+      (at least one entry with name: my-pc).
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Require hub public key
+  ansible.builtin.assert:
+    that:
+      - wireguard_hub_public_key is defined
+      - wireguard_hub_public_key | length > 0
+    fail_msg: >-
+      Hub public key missing. Run the first play in wireguard-clients.yml
+      (or wireguard_server on the hub) before generating client configs.
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Ensure secrets and output directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - "{{ wireguard_operator_clients_secrets_dir }}"
+    - "{{ wireguard_operator_clients_output_dir }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Ensure per-client secret directories
+  ansible.builtin.file:
+    path: "{{ wireguard_operator_clients_secrets_dir }}/{{ item.name }}"
+    state: directory
+    mode: "0700"
+  loop: "{{ wireguard_operator_clients }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Check for existing private key
+  ansible.builtin.stat:
+    path: "{{ wireguard_operator_clients_secrets_dir }}/{{ item.name }}/privatekey"
+  loop: "{{ wireguard_operator_clients }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: wireguard_op_client_key_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Generate private key
+  ansible.builtin.command:
+    cmd: wg genkey
+  loop: "{{ wireguard_op_client_key_stat.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  register: wireguard_op_client_genkey
+  when: not item.stat.exists
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Save private key
+  ansible.builtin.copy:
+    dest: "{{ wireguard_operator_clients_secrets_dir }}/{{ item.item.item.name }}/privatekey"
+    content: "{{ item.stdout | trim }}\n"
+    mode: "0600"
+  loop: "{{ wireguard_op_client_genkey.results | default([]) }}"
+  when: item.stdout is defined
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Read private keys
+  ansible.builtin.slurp:
+    src: "{{ wireguard_operator_clients_secrets_dir }}/{{ item.name }}/privatekey"
+  loop: "{{ wireguard_operator_clients }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: wireguard_op_client_priv_slurp
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Derive public keys
+  ansible.builtin.shell:
+    cmd: set -euo pipefail; printf '%s\n' "{{ item.content | b64decode | trim }}" | wg pubkey
+  loop: "{{ wireguard_op_client_priv_slurp.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  register: wireguard_op_client_pubkey
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Build client records
+  ansible.builtin.set_fact:
+    wireguard_operator_client_records: >-
+      {%- set pool = wireguard_operator_client_pool_octet | int -%}
+      {%- set out = [] -%}
+      {%- for i in range(wireguard_operator_clients | length) -%}
+      {%- set name = wireguard_operator_clients[i].name -%}
+      {%- set priv = wireguard_op_client_priv_slurp.results[i].content | b64decode | trim -%}
+      {%- set pub = wireguard_op_client_pubkey.results[i].stdout | trim -%}
+      {%- set addr = wireguard_operator_clients[i].address
+          | default('10.10.0.' ~ (pool + i) ~ '/32', true) -%}
+      {%- set _ = out.append({
+        'name': name,
+        'address': addr,
+        'private_key': priv,
+        'public_key': pub
+      }) -%}
+      {%- endfor -%}
+      {{ out }}
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Ensure per-client output directories
+  ansible.builtin.file:
+    path: "{{ wireguard_operator_clients_output_dir }}/{{ item.name }}"
+    state: directory
+    mode: "0700"
+  loop: "{{ wireguard_operator_client_records }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Write WireGuard config on controller
+  ansible.builtin.template:
+    src: wg-operator-client.conf.j2
+    dest: >-
+      {{ wireguard_operator_clients_output_dir }}/{{ item.name }}/{{ wireguard_operator_clients_config_filename }}
+    mode: "0600"
+  loop: "{{ wireguard_operator_client_records }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Write README on controller
+  ansible.builtin.template:
+    src: client-README.md.j2
+    dest: "{{ wireguard_operator_clients_output_dir }}/{{ item.name }}/README.md"
+    mode: "0644"
+  loop: "{{ wireguard_operator_client_records }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Build hub dynamic peer list
+  ansible.builtin.set_fact:
+    wireguard_operator_dynamic_peers: >-
+      {%- set out = [] -%}
+      {%- for c in wireguard_operator_client_records -%}
+      {%- set _ = out.append({
+        'name': 'operator-' ~ c.name,
+        'public_key': c.public_key,
+        'allowed_ips': c.address | ansible.utils.ipaddr('host')
+      }) -%}
+      {%- endfor -%}
+      {{ out }}
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]
+
+- name: WG operator clients | Summary
+  ansible.builtin.debug:
+    msg: >-
+      Client {{ item.name }}: {{ item.address | ansible.utils.ipaddr('address') }}
+      → {{ wireguard_operator_clients_output_dir }}/{{ item.name }}/{{ wireguard_operator_clients_config_filename }}
+  loop: "{{ wireguard_operator_client_records }}"
+  loop_control:
+    label: "{{ item.name }}"
+  run_once: true
+  tags: [wireguard_clients, wireguard_operator_clients]

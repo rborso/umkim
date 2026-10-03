@@ -1,0 +1,16 @@
+---
+# Deploy the Harbor whoami chart onto a selected Ready cluster.
+#
+#   ansible-playbook $INV playbooks/flows/whoami-helm-deploy.yml \
+#     -e fleet_flow_cluster_name=lab-single-0 \
+#     -e fleet_flow_release_name=whoami
+
+- name: Fleet flow | whoami Helm chart
+  ansible.builtin.import_playbook: app-install.yml
+  vars:
+    fleet_flow_chart: whoami
+    fleet_flow_version: "{{ fleet_flow_version | default('0.1.0') }}"
+    fleet_flow_release_name: "{{ fleet_flow_release_name | default('whoami') }}"
+    fleet_flow_namespace: "{{ fleet_flow_namespace | default('default') }}"
+    fleet_flow_route_mode: "{{ fleet_flow_route_mode | default('none') }}"
+    fleet_flow_cluster_name: "{{ fleet_flow_cluster_name | default(fleet_flow_cluster | default('')) }}"

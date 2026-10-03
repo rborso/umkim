@@ -1,0 +1,32 @@
+---
+# Hub + spoke overlay recovery after tunnel degradation (fleet-site controller Job).
+#
+#   ansible-playbook cluster-overlay-recover.yml -e fleet_cluster_name=my-cluster \
+#     -e fleet_site_wg_public_key=... -e fleet_site_wg_address=10.10.0.15/32 \
+#     -i inventory/from-controller.ini
+
+- name: Fleet cluster overlay | Hub peer
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    fleet_site_ocm_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    fleet_site_ocm_cluster: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: overlay_recover_hub.yml
+      tags: [fleet_overlay_recover]
+
+- name: Fleet cluster overlay | Spoke WireGuard restart
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: overlay_recover_spoke.yml
+      tags: [fleet_overlay_recover]

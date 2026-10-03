@@ -1,0 +1,38 @@
+---
+- name: Fleet WebUI | Deprecated entrypoint notice
+  ansible.builtin.debug:
+    msg: >-
+      Prefer fleet-console-auth-crd.yml + fleet-console-auth.yml (+ fleet-webui-lab.yml for OCM Lab).
+      This role main.yml remains for direct role invocation only.
+  tags: [fleet_webui, ocm_webui, ocm_lab, umkim_console, fleet_console]
+
+- name: Fleet WebUI | Ensure fleet-console namespace
+  ansible.builtin.import_tasks: ensure_namespace.yml
+
+- name: Fleet WebUI | Deploy OCM Lab Dashboard
+  ansible.builtin.import_tasks: ocm_lab.yml
+  when: ocm_lab_enabled | bool
+  tags: [fleet_webui, ocm_webui, ocm_lab]
+
+- name: Fleet WebUI | Deploy legacy OCM console
+  ansible.builtin.import_tasks: ocm.yml
+  when: ocm_console_enabled | bool
+  tags: [fleet_webui, ocm_webui]
+
+- name: Fleet WebUI | Deploy UMKIM console (Helm)
+  ansible.builtin.import_tasks: umkim_console.yml
+  when: umkim_console_enabled | bool
+  tags: [fleet_webui, umkim_console, fleet_console]
+
+- name: Fleet WebUI | Access URLs
+  ansible.builtin.debug:
+    msg: "{{ fleet_webui_access_urls }}"
+  vars:
+    fleet_webui_access_urls: >-
+      {{
+        ([] if not (ocm_lab_enabled | default(false) | bool) else
+          ['OCM Lab Dashboard: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ ocm_lab_nodeport ~ '/'])
+        + (['UMKIM console: http://' ~ phase5_hub_wireguard_ip ~ ':' ~ umkim_console_nodeport ~ '/fleet/login']
+           if umkim_console_enabled | default(true) | bool else [])
+      }}
+  tags: [fleet_webui, ocm_webui, ocm_lab, umkim_console, fleet_console, fleet_webui_verify]

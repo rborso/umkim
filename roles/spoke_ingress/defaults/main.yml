@@ -1,0 +1,17 @@
+---
+phase6_spoke_ingress_namespace: fleet-ingress
+phase6_manifestwork_name: phase6-spoke-ingress
+
+phase6_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+phase6_http_nodeport: 30080
+phase6_https_nodeport: 30443
+spoke_ingress_hub_http_nodeport: 30081
+
+phase6_deploy_whoami_demo: true
+phase6_whoami_image: docker.io/traefik/whoami:v1.10@sha256:1699d99cb4b9acc17f74ca670b3d8d0b7ba27c948b3445f0593b58ebece92f04
+
+# k3s default RWO provisioner for Traefik ACME state.
+phase6_traefik_acme_storage_class: local-path
+
+phase6_demo_manifestwork_name: phase6-spoke-demo
+phase6_demo_image: hashicorp/http-echo:0.2.3@sha256:ba27d460cd1f22a1a4331bdf74f4fccbc025552357e8a3249c40ae216275de96

@@ -1,0 +1,32 @@
+---
+- name: Spoke ingress | Push ManifestWork to each spoke
+  ansible.builtin.template:
+    src: manifestwork-ingress.yaml.j2
+    dest: "/tmp/manifestwork-phase6-{{ item }}.yaml"
+    mode: "0600"
+  loop: "{{ ocm_manifestwork_phase6_clusters | default(groups['spokes']) }}"
+  vars:
+    ocm_target_cluster: "{{ item }}"
+    spoke_ingress_http_nodeport: "{{ hostvars[item].spoke_ingress_http_nodeport | default(phase6_http_nodeport) }}"
+    spoke_ingress_https_nodeport: "{{ hostvars[item].spoke_ingress_https_nodeport | default(phase6_https_nodeport) }}"
+    fleet_edge_direct_ingress: >-
+      {{ fleet_edge_clusters[item].direct_ingress
+         | default(fleet_edge_direct_ingress_default | default(true))
+         if item in fleet_edge_clusters else false }}
+    fleet_site_spoke_ingress_method: >-
+      {{ fleet_edge_clusters[item].method | default('')
+         if item in fleet_edge_clusters else '' }}
+    # TLS-ALPN for spoke port_forward ACME (see push_cluster_spoke_ingress.yml).
+    phase6_spoke_acme_http_challenge: false
+  tags: [spoke_ingress, phase6, spoke_ingress_push, phase6_push]
+
+- name: Spoke ingress | Apply ManifestWork on hub
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/manifestwork-phase6-{{ item }}.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ ocm_manifestwork_phase6_clusters | default(groups['spokes']) }}"
+  register: spoke_ingress_mw_apply
+  changed_when: "'created' in spoke_ingress_mw_apply.stdout or 'configured' in spoke_ingress_mw_apply.stdout"
+  tags: [spoke_ingress, phase6, spoke_ingress_push, phase6_push]

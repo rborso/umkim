@@ -1,0 +1,146 @@
+---
+- name: Fleet site validate | Require site name
+  ansible.builtin.assert:
+    that: fleet_site_name | length > 0
+    fail_msg: Set fleet_site_name
+
+- name: Fleet site validate | Ping hub overlay
+  ansible.builtin.command:
+    cmd: ping -c3 -W3 {{ fleet_hub_wireguard_ip | default('10.10.0.1') }}
+  register: fleet_site_ping_hub
+  changed_when: false
+  failed_when: fleet_site_ping_hub.rc != 0
+
+- name: Fleet cluster validate | Ensure nmap-ncat for WireGuard UDP probe
+  ansible.builtin.dnf:
+    name: nmap-ncat
+    state: present
+  when: inventory_hostname == (k3s_cluster_init_host | default(groups['fleet_cluster_nodes'] | default([]) | first))
+
+- name: Fleet cluster validate | Check WireGuard endpoint UDP egress
+  ansible.builtin.command:
+    cmd: nc -zvu -w5 {{ wireguard_endpoint_host | default('wg.umkim.com') }} {{ wireguard_endpoint_port | default(51820) }}
+  register: fleet_wg_egress
+  changed_when: false
+  failed_when: fleet_wg_egress.rc != 0
+  when: inventory_hostname == (k3s_cluster_init_host | default(groups['fleet_cluster_nodes'] | default([]) | first))
+
+- name: Fleet site validate | Gather facts on bootstrap host
+  ansible.builtin.setup:
+    gather_subset:
+      - min
+      - hardware
+  when: ansible_connection != 'local'
+
+- name: Fleet site validate | Assert Rocky Linux
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'RedHat'
+      - ansible_facts['distribution_major_version'] == (fleet_site_rocky_major | default('10') | string)
+    fail_msg: "Rocky Linux {{ fleet_site_rocky_major | default('10') }} required"
+  when: ansible_connection != 'local'
+
+- name: Fleet site validate | Check root disk size
+  ansible.builtin.assert:
+    that:
+      - (ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_total') | first | int) >=
+        ((fleet_site_min_root_disk_gi | default(fleet_site_min_root_disk_gi_default) | int) * 1024 * 1024 * 1024)
+    fail_msg: >-
+      Root filesystem smaller than {{ fleet_site_min_root_disk_gi | default(fleet_site_min_root_disk_gi_default) }} GiB
+  when: ansible_connection != 'local'
+
+- name: Fleet cluster validate | Check KVM device
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: fleet_cluster_kvm_device
+  when:
+    - ansible_connection != 'local'
+    - fleet_cluster_kvm | default(false) | bool or fleet_site_enable_kubevirt | default(false) | bool
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Fail without KVM
+  ansible.builtin.fail:
+    msg: "/dev/kvm missing on {{ inventory_hostname }} — KubeVirt provider requires hardware virtualization."
+  when:
+    - ansible_connection != 'local'
+    - fleet_cluster_kvm | default(false) | bool or fleet_site_enable_kubevirt | default(false) | bool
+    - not fleet_cluster_kvm_device.stat.exists
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Stat Longhorn block device
+  ansible.builtin.stat:
+    path: "{{ fleet_cluster_longhorn_device }}"
+  register: fleet_lh_validate_device
+  when:
+    - ansible_connection != 'local'
+    - fleet_cluster_longhorn_enabled | default(false) | bool
+    - (fleet_cluster_longhorn_device | default('') | length) > 0
+    - inventory_hostname in groups.get('fleet_cluster_control', [])
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Require Longhorn block device
+  ansible.builtin.assert:
+    that:
+      - fleet_lh_validate_device.stat.exists
+      - fleet_lh_validate_device.stat.isblk | default(false)
+    fail_msg: "Longhorn device {{ fleet_cluster_longhorn_device }} missing on {{ inventory_hostname }}"
+  when:
+    - ansible_connection != 'local'
+    - fleet_cluster_longhorn_enabled | default(false) | bool
+    - (fleet_cluster_longhorn_device | default('') | length) > 0
+    - inventory_hostname in groups.get('fleet_cluster_control', [])
+    - fleet_lh_validate_device is defined
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Read Longhorn device size
+  ansible.builtin.command:
+    cmd: lsblk -bdno SIZE {{ fleet_cluster_longhorn_device }}
+  register: fleet_lh_validate_size
+  changed_when: false
+  when:
+    - ansible_connection != 'local'
+    - fleet_cluster_longhorn_enabled | default(false) | bool
+    - (fleet_cluster_longhorn_device | default('') | length) > 0
+    - inventory_hostname in groups.get('fleet_cluster_control', [])
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Require Longhorn device capacity
+  ansible.builtin.assert:
+    that:
+      - (fleet_lh_validate_size.stdout | trim | int) >= ((fleet_cluster_min_data_disk_gi | default(40) | int) * 1024 * 1024 * 1024)
+    fail_msg: >-
+      Longhorn device too small on {{ inventory_hostname }} (need {{ fleet_cluster_min_data_disk_gi | default(40) }} GiB)
+  when:
+    - ansible_connection != 'local'
+    - fleet_cluster_longhorn_enabled | default(false) | bool
+    - (fleet_cluster_longhorn_device | default('') | length) > 0
+    - inventory_hostname in groups.get('fleet_cluster_control', [])
+    - fleet_lh_validate_size is defined
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Stat K3s kubeconfig for VIP pre-check
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: fleet_k3s_kubeconfig_stat
+  when:
+    - ansible_connection != 'local'
+    - k3s_control_plane_vip | default('') | length > 0
+    - inventory_hostname == (k3s_cluster_init_host | default(groups['fleet_cluster_nodes'] | default([]) | first))
+  tags: [fleet_cluster_validate]
+
+- name: Fleet cluster validate | Ensure control plane VIP is not already assigned
+  ansible.builtin.command:
+    cmd: ping -c1 -W1 {{ k3s_control_plane_vip }}
+  register: fleet_cp_vip_ping
+  changed_when: false
+  failed_when: fleet_cp_vip_ping.rc == 0
+  when:
+    - ansible_connection != 'local'
+    - k3s_control_plane_vip | default('') | length > 0
+    - inventory_hostname == (k3s_cluster_init_host | default(groups['fleet_cluster_nodes'] | default([]) | first))
+    - not fleet_k3s_kubeconfig_stat.stat.exists | default(false)
+  tags: [fleet_cluster_validate]
+
+- name: Fleet site validate | Success
+  ansible.builtin.debug:
+    msg: "Site {{ fleet_site_name }} validation passed on {{ inventory_hostname }}"

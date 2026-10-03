@@ -1,0 +1,87 @@
+---
+- name: Fleet console Helm | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_console_helm_enabled | default(true) | bool)
+
+- name: Fleet console Helm | Generate htpasswd line
+  ansible.builtin.command:
+    argv:
+      - htpasswd
+      - -nbB
+      - "{{ fleet_console_auth_htpasswd_admin_user }}"
+      - "{{ fleet_console_auth_htpasswd_admin_password }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: fch_htpasswd
+  changed_when: false
+
+- name: Fleet console Helm | Set htpasswd fact
+  ansible.builtin.set_fact:
+    fleet_console_helm_htpasswd_line: "{{ fch_htpasswd.stdout | trim }}"
+
+- name: Fleet console Helm | Stage chart on hub
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/charts/fleet-console/"
+    dest: /tmp/fleet-console-chart/
+    mode: preserve
+
+- name: Fleet console Helm | Render values
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: /tmp/fleet-console-helm-values.yaml
+    mode: "0600"
+
+- name: Fleet console Helm | Upgrade install chart
+  ansible.builtin.command:
+    cmd: >-
+      helm upgrade --install {{ fleet_console_helm_release }}
+      /tmp/fleet-console-chart
+      --namespace {{ fleet_console_helm_namespace }}
+      --create-namespace
+      -f /tmp/fleet-console-helm-values.yaml
+      --wait --timeout 20m
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fch_helm
+  changed_when: "'has been upgraded' in fch_helm.stdout or 'has been installed' in fch_helm.stdout or 'REVISION' in fch_helm.stdout"
+
+- name: Fleet console Helm | Restart dashboard after upgrade (same image tag, new digest)
+  ansible.builtin.command:
+    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout restart deployment/umkim-console
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: true
+  when: umkim_console_enabled | default(true) | bool
+
+- name: Fleet console Helm | Wait for LLDAP bootstrap job
+  ansible.builtin.command:
+    cmd: kubectl -n {{ fleet_console_helm_namespace }} wait --for=condition=complete job/lldap-bootstrap --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - fleet_auth_lldap_enabled | default(false) | bool
+    - fleet_auth_lldap_bootstrap_enabled | default(true) | bool
+
+- name: Fleet console Helm | Wait for auth deployment
+  ansible.builtin.command:
+    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout status deployment/fleet-console-auth --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  when: fleet_console_auth_enabled | default(true) | bool
+
+- name: Fleet console Helm | Wait for dashboard deployment
+  ansible.builtin.command:
+    cmd: kubectl -n {{ fleet_console_helm_namespace }} rollout status deployment/umkim-console --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  when: umkim_console_enabled | default(true) | bool

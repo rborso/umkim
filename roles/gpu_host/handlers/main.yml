@@ -1,0 +1,19 @@
+---
+- name: GPU host | Rebuild initramfs
+  ansible.builtin.command:
+    cmd: dracut --force
+  listen: GPU host | Rebuild initramfs
+
+- name: GPU host | Restart K3s agent
+  ansible.builtin.systemd:
+    name: k3s-agent
+    state: restarted
+  listen: GPU host | Restart K3s agent
+  failed_when: false
+
+- name: GPU host | Restart K3s server
+  ansible.builtin.systemd:
+    name: k3s
+    state: restarted
+  listen: GPU host | Restart K3s agent
+  failed_when: false

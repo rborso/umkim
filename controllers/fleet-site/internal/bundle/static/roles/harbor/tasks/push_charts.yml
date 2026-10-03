@@ -1,0 +1,49 @@
+---
+- name: Harbor | Ensure charts project exists
+  ansible.builtin.include_tasks: configure_charts_project.yml
+  tags: [harbor, harbor_push_charts]
+
+- name: Harbor | Charts to push
+  ansible.builtin.set_fact:
+    harbor_charts_to_push_effective: "{{ harbor_charts_to_push }}"
+  tags: [harbor, harbor_push_charts]
+
+- name: Harbor | Package charts on controller
+  ansible.builtin.command:
+    cmd: helm package {{ item.chart_dir | default(harbor_umkim_root ~ '/charts/' ~ item.name) }} -d /tmp
+  delegate_to: localhost
+  become: false
+  loop: "{{ harbor_charts_to_push_effective }}"
+  register: harbor_chart_package
+  changed_when: true
+  tags: [harbor, harbor_push_charts]
+
+- name: Harbor | Upload chart tgz to hub
+  ansible.builtin.copy:
+    src: "/tmp/{{ item.name }}-{{ item.version }}.tgz"
+    dest: "/tmp/{{ item.name }}-{{ item.version }}.tgz"
+    mode: "0644"
+  loop: "{{ harbor_charts_to_push_effective }}"
+  tags: [harbor, harbor_push_charts]
+
+- name: Harbor | Helm registry login on hub
+  ansible.builtin.command:
+    cmd: >-
+      helm registry login {{ harbor_host }}:{{ harbor_nodeport_https }}
+      -u admin -p {{ harbor_admin_password }} --insecure
+  environment:
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  changed_when: true
+  tags: [harbor, harbor_push_charts]
+
+- name: Harbor | Push charts to Harbor OCI
+  ansible.builtin.command:
+    cmd: >-
+      helm push /tmp/{{ item.name }}-{{ item.version }}.tgz
+      oci://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_charts_project }}
+      --insecure-skip-tls-verify
+  environment:
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  loop: "{{ harbor_charts_to_push_effective }}"
+  changed_when: true
+  tags: [harbor, harbor_push_charts]

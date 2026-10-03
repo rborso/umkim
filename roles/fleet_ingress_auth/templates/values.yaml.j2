@@ -1,0 +1,35 @@
+namespace: {{ fleet_ingress_auth_namespace }}
+
+enabled: true
+
+lldap:
+  deploy: {{ fleet_ingress_auth_lldap_deploy | default(true) | bool }}
+  externalUrl: {{ fleet_ingress_auth_lldap_external_url | default('') | quote }}
+  image: {{ fleet_ingress_auth_lldap_image }}
+  ldapPort: {{ fleet_ingress_auth_lldap_ldap_port }}
+  baseDN: {{ fleet_ingress_auth_lldap_base_dn }}
+  adminEmail: {{ fleet_ingress_auth_lldap_admin_email | quote }}
+  jwtSecret: {{ fleet_ingress_auth_lldap_jwt_secret }}
+  adminPassword: {{ fleet_ingress_auth_lldap_admin_password }}
+
+authelia:
+  image: {{ fleet_ingress_auth_authelia_image }}
+  port: {{ fleet_ingress_auth_authelia_port }}
+  sessionSecret: {{ fleet_ingress_auth_session_secret }}
+  storageEncryptionKey: {{ fleet_ingress_auth_storage_encryption_key }}
+  resetPasswordJWTSecret: {{ fleet_ingress_auth_reset_jwt_secret }}
+  portalHost: {{ fleet_ingress_auth_portal_host }}
+  publicURL: "{{ fleet_ingress_auth_authelia_public_url }}"
+  cookieDomain: {{ fleet_ingress_auth_cookie_domain }}
+  accessDomains:
+{% for d in fleet_ingress_auth_access_domains %}
+    - {{ d | quote }}
+{% endfor %}
+
+traefik:
+  deploySpokeMiddleware: false
+  middlewareName: {{ fleet_ingress_auth_traefik_middleware_name }}
+  middlewareNamespace: {{ fleet_ingress_auth_spoke_traefik_namespace }}
+
+registry:
+  prefix: ""

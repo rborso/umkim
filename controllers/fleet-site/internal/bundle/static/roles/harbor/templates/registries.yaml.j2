@@ -1,0 +1,34 @@
+# K3s registry mirrors — fleet pull-through via Harbor on virt03 (WireGuard).
+# Managed by Ansible (harbor role). Restart k3s after changes.
+#
+# Spokes set harbor_enable_quay_mirror: false — Harbor proxy + digest-pinned OLM
+# manifests can poison containerd; spokes pull quay.io directly until resolved.
+mirrors:
+{% if harbor_enable_quay_mirror | default(true) | bool %}
+  quay.io:
+    endpoint:
+      - "https://admin:{{ harbor_admin_password | urlencode }}@{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_quay }}"
+{% if fleet_autonomous | default(false) | bool %}
+      - "https://quay.io"
+{% endif %}
+  ghcr.io:
+    endpoint:
+      - "https://admin:{{ harbor_admin_password | urlencode }}@{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}"
+{% if fleet_autonomous | default(false) | bool %}
+      - "https://ghcr.io"
+{% endif %}
+{% endif %}
+
+configs:
+  "{{ harbor_host }}":
+    tls:
+      insecure_skip_verify: true
+    auth:
+      username: admin
+      password: "{{ harbor_admin_password }}"
+  "{{ harbor_host }}:{{ harbor_nodeport_https }}":
+    tls:
+      insecure_skip_verify: true
+    auth:
+      username: admin
+      password: "{{ harbor_admin_password }}"

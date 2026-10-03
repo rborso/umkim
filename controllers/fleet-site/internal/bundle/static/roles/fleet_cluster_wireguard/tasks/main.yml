@@ -1,0 +1,111 @@
+---
+- name: Fleet cluster wireguard | Require bundle config path
+  ansible.builtin.assert:
+    that:
+      - fleet_cluster_bundle_dir is defined
+      - fleet_cluster_bundle_dir | length > 0
+    fail_msg: Set fleet_cluster_bundle_dir to the bootstrap bundle root
+
+- name: Fleet cluster wireguard | Set overlay interface facts
+  ansible.builtin.set_fact:
+    fleet_wg_iface: "{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
+    fleet_wg_conf_path: "/etc/wireguard/{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}.conf"
+    fleet_wg_bundle_conf: >-
+      {{ fleet_cluster_bundle_dir }}/wireguard/{{ inventory_hostname }}/{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}.conf
+    fleet_wg_unit: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
+
+- name: Fleet cluster wireguard | Install wireguard-tools
+  ansible.builtin.package:
+    name: wireguard-tools
+    state: present
+
+- name: Fleet cluster wireguard | Install umkim DNS-ready helper
+  ansible.builtin.copy:
+    src: umkim-wg-wait-dns.sh
+    dest: /usr/local/libexec/umkim-wg-wait-dns.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Fleet cluster wireguard | Ensure wg-quick systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/wg-quick@.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Fleet cluster wireguard | Install wg-quick DNS-ready drop-in
+  ansible.builtin.copy:
+    src: wg-quick-umkim-dns-ready.conf
+    dest: /etc/systemd/system/wg-quick@.service.d/umkim-dns-ready.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: fleet_wg_dns_dropin
+
+- name: Fleet cluster wireguard | Reload systemd after DNS-ready drop-in
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: fleet_wg_dns_dropin is changed
+
+- name: Fleet cluster wireguard | Stat existing overlay config
+  ansible.builtin.stat:
+    path: "{{ fleet_wg_conf_path }}"
+  register: fleet_wg_existing
+
+- name: Fleet cluster wireguard | Compare bundle config with installed
+  ansible.builtin.command:
+    cmd: cmp -s "{{ fleet_wg_bundle_conf }}" "{{ fleet_wg_conf_path }}"
+  register: fleet_wg_cmp
+  changed_when: false
+  failed_when: false
+  when: fleet_wg_existing.stat.exists
+
+- name: Fleet cluster wireguard | Check if overlay interface is up
+  ansible.builtin.command:
+    cmd: wg show {{ fleet_wg_iface }}
+  register: fleet_wg_show
+  changed_when: false
+  failed_when: false
+
+- name: Fleet cluster wireguard | Set config changed flag
+  ansible.builtin.set_fact:
+    fleet_wg_config_changed: >-
+      {{
+        (not fleet_wg_existing.stat.exists)
+        or (fleet_wg_cmp is defined and fleet_wg_cmp.rc != 0)
+      }}
+
+- name: Fleet cluster wireguard | Install overlay WireGuard config from bundle
+  ansible.builtin.copy:
+    src: "{{ fleet_wg_bundle_conf }}"
+    dest: "{{ fleet_wg_conf_path }}"
+    mode: "0600"
+  when: fleet_wg_config_changed | bool
+  register: fleet_wg_config_copy
+
+- name: Fleet cluster wireguard | Enable overlay WireGuard systemd unit
+  ansible.builtin.systemd:
+    name: "{{ fleet_wg_unit }}"
+    enabled: true
+    daemon_reload: true
+
+- name: Fleet cluster wireguard | Restart overlay WireGuard after config update
+  ansible.builtin.systemd:
+    name: "{{ fleet_wg_unit }}"
+    state: restarted
+  when: fleet_wg_config_changed | bool
+
+- name: Fleet cluster wireguard | Start overlay WireGuard when down
+  ansible.builtin.systemd:
+    name: "{{ fleet_wg_unit }}"
+    state: started
+  when:
+    - not (fleet_wg_config_changed | bool)
+    - fleet_wg_show.rc != 0
+
+- name: Fleet cluster wireguard | Ping hub overlay
+  ansible.builtin.command:
+    cmd: ping -c3 -W3 {{ fleet_hub_wireguard_ip | default('10.10.0.1') }}
+  changed_when: false

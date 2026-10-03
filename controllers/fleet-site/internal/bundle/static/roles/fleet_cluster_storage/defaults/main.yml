@@ -1,0 +1,33 @@
+---
+# Cluster storage backend: local_path (K3s default) or nfs_external.
+fleet_cluster_storage_backend: "{{ cluster_storage.backend | default('local_path') }}"
+fleet_cluster_storage_kubeconfig: "{{ ocm_kubeconfig | default(k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml')) }}"
+
+# Resolved cluster name for per-cluster NFS subdirectory.
+fleet_cluster_storage_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name | default(inventory_hostname)) }}"
+
+# NFS external provisioner (nfs-subdir-external-provisioner).
+# Flat vars (from controller inventory.ini) override nested cluster_storage.*.
+fleet_cluster_nfs_server: "{{ cluster_storage_nfs_server | default(cluster_storage.nfs.server | default('')) }}"
+fleet_cluster_nfs_export_base: "{{ cluster_storage_nfs_export_base | default(cluster_storage.nfs.export_base | default('/srv/fleet-nfs')) }}"
+fleet_cluster_nfs_cluster_path: "{{ cluster_storage_nfs_cluster_path | default(cluster_storage.nfs.cluster_path | default(fleet_cluster_storage_cluster_name)) }}"
+fleet_cluster_nfs_path: "{{ fleet_cluster_nfs_export_base }}/{{ fleet_cluster_nfs_cluster_path }}"
+# Optional explicit client mount path (NFSv4 pseudo-path, e.g. /virt01). Resolved at runtime when empty.
+_fleet_cluster_nfs_mount_path_raw: "{{ cluster_storage_nfs_mount_path | default(cluster_storage.nfs.mount_path | default('')) | trim }}"
+fleet_cluster_nfs_mount_path: >-
+  {{
+    (
+      _fleet_cluster_nfs_mount_path_raw
+      if (_fleet_cluster_nfs_mount_path_raw | length == 0 or _fleet_cluster_nfs_mount_path_raw[0] == '/')
+      else '/' ~ _fleet_cluster_nfs_mount_path_raw
+    )
+  }}
+fleet_cluster_nfs_client_path: "{{ fleet_cluster_nfs_mount_path | default(fleet_cluster_nfs_path, true) }}"
+fleet_cluster_nfs_storage_class: "{{ cluster_storage_nfs_storage_class | default(cluster_storage.nfs.storage_class | default('nfs-client')) }}"
+fleet_cluster_nfs_delegate_host: "{{ cluster_storage_nfs_delegate_host | default('') }}"
+fleet_cluster_nfs_provisioner_name: "fleet.umkim.com/nfs-subdir-external-provisioner"
+fleet_cluster_nfs_provisioner_image: "registry.k8s.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2"
+fleet_cluster_nfs_namespace: nfs-provisioner
+fleet_cluster_nfs_set_default_sc: true
+fleet_cluster_nfs_mount_options:
+  - nfsvers=4.1

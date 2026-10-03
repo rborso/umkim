@@ -1,0 +1,23 @@
+---
+# NVIDIA host driver prep on fleet cluster nodes (hub Ansible Job).
+#
+#   ansible-playbook cluster-gpu-host-prep.yml -e fleet_cluster_name=lab-gpu-0 \
+#     -i /inventory/inventory.ini
+
+- name: Fleet cluster GPU | Host driver prep
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: true
+  vars:
+    gpu_host_catalog_path: "{{ playbook_dir }}/data/gpu/catalog.yaml"
+    gpu_host_install_container_toolkit: false
+    gpu_host_install_device_plugin: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: gpu_host
+        tasks_from: detect
+      tags: [gpu_host, gpu_host_detect]
+    - ansible.builtin.import_role:
+        name: gpu_host
+        tasks_from: driver
+      tags: [gpu_host, gpu_host_driver]

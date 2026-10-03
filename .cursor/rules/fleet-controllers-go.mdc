@@ -1,0 +1,13 @@
+---
+description: Go fleet-edge and fleet-site controllers
+globs: controllers/**
+alwaysApply: false
+---
+
+# Go controllers (S5)
+
+- `controllers/fleet-edge` — fleet Traefik route generation.
+- `controllers/fleet-site` — FleetSite CR, enrollment, Ansible Jobs on hub.
+- Deploy: `fleet-edge-controller.yml`, `fleet-site-controller.yml`; images via `harbor_push_fleet`.
+- CRDs: `deploy/fleet-site/`, `fleet-edge-crd.yml`.
+- Skill: `.cursor/skills/fleet-controllers-go/SKILL.md`.

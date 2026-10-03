@@ -1,0 +1,54 @@
+{% set _cc = (fleet_ingress_auth_cluster_configs | default({})).get(ocm_target_cluster, {}) %}
+{% set _portal = _cc.portal_host | default(fleet_ingress_auth_portal_host) %}
+{% set _cookie = _cc.cookie_domain | default(_portal | regex_replace('^auth\\.', '')) %}
+{% set _access = _cc.access_domains | default(fia_spoke_access_domains | default(fleet_ingress_auth_access_domains | default([]))) %}
+{% set _expose_lldap = _cc.expose_lldap_webui | default(fleet_ingress_auth_lldap_expose_webui | default(false)) | bool %}
+{% set _secrets = _cc.secrets_dir | default('/secrets/ingress-auth/clusters/' + ocm_target_cluster) %}
+{% set _lldap_host = _cc.lldap_webui_host | default(fleet_ingress_auth_lldap_webui_host | default('')) %}
+{# Prefer per-cluster Secret files (console enable / Job mounts); fall back to hub defaults. #}
+{% set _lldap_pass = lookup('ansible.builtin.file', _secrets + '/lldapAdminPassword', errors='ignore') | default(fleet_ingress_auth_lldap_admin_password, true) | trim %}
+{% set _lldap_jwt = lookup('ansible.builtin.file', _secrets + '/lldapJwtSecret', errors='ignore') | default(fleet_ingress_auth_lldap_jwt_secret, true) | trim %}
+{% set _session = lookup('ansible.builtin.file', _secrets + '/sessionSecret', errors='ignore') | default(fleet_ingress_auth_session_secret, true) | trim %}
+{% set _storage = lookup('ansible.builtin.file', _secrets + '/storageEncryptionKey', errors='ignore') | default(fleet_ingress_auth_storage_encryption_key, true) | trim %}
+{% set _reset = lookup('ansible.builtin.file', _secrets + '/resetJwtSecret', errors='ignore') | default(fleet_ingress_auth_reset_jwt_secret, true) | trim %}
+namespace: {{ fleet_ingress_auth_namespace }}
+
+enabled: true
+createNamespace: true
+
+persistence:
+  storageClass: {{ fleet_ingress_auth_persistence_storage_class | default('local-path') | quote }}
+
+lldap:
+  deploy: true
+  externalUrl: ""
+  image: {{ fleet_ingress_auth_lldap_image }}
+  ldapPort: {{ fleet_ingress_auth_lldap_ldap_port }}
+  httpPort: {{ fleet_ingress_auth_lldap_http_port | default(17170) }}
+  baseDN: {{ fleet_ingress_auth_lldap_base_dn }}
+  jwtSecret: {{ _lldap_jwt | quote }}
+  adminPassword: {{ _lldap_pass | quote }}
+  exposeWebUI: {{ _expose_lldap }}
+  webUIHost: {{ (_lldap_host if _expose_lldap else '') | quote }}
+
+authelia:
+  image: {{ fleet_ingress_auth_authelia_image }}
+  port: {{ fleet_ingress_auth_authelia_port }}
+  sessionSecret: {{ _session | quote }}
+  storageEncryptionKey: {{ _storage | quote }}
+  resetPasswordJWTSecret: {{ _reset | quote }}
+  portalHost: {{ _portal }}
+  publicURL: "https://{{ _portal }}"
+  cookieDomain: {{ _cookie }}
+  accessDomains:
+{% for d in _access %}
+    - {{ d | quote }}
+{% endfor %}
+
+traefik:
+  deploySpokeMiddleware: true
+  middlewareName: {{ fleet_ingress_auth_traefik_middleware_name }}
+  middlewareNamespace: {{ fleet_ingress_auth_spoke_traefik_namespace }}
+
+registry:
+  prefix: ""

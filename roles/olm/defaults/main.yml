@@ -1,0 +1,19 @@
+---
+phase4_olm_version: "0.45.0"
+phase4_olm_crds_url: "https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v{{ phase4_olm_version }}/crds.yaml"
+phase4_olm_deploy_url: "https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v{{ phase4_olm_version }}/olm.yaml"
+phase4_cert_manager_version: "1.20.4"
+phase4_cert_manager_manifest_url: "https://github.com/cert-manager/cert-manager/releases/download/v{{ phase4_cert_manager_version }}/cert-manager.yaml"
+phase4_operatorhub_catalog_image: quay.io/operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
+phase4_bootstrap_namespace: fleet-bootstrap
+phase4_manifestwork_name: phase4-platform-bootstrap
+phase4_bootstrap_image: registry.k8s.io/kubectl:v1.36.4@sha256:b8d523e7b8cdc5e3caa0f8891ee9f504abf137dec786e6e0ddd33e4f272c2f13
+# Warm Harbor quay-proxy cache before spokes pull OLM/cert-manager (digest mismatch if skipped).
+phase4_harbor_warm_images:
+  - operator-framework/olm@sha256:f228c7a6b8c53e32f21a7cb855d9bc1c8f355fa5124cfc6c82552502e0a8481e
+  - operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
+  - jetstack/cert-manager-controller:v1.20.4
+  - jetstack/cert-manager-webhook:v1.20.4
+  - jetstack/cert-manager-cainjector:v1.20.4
+ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

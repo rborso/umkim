@@ -1,0 +1,51 @@
+---
+- name: K3s cluster | Cordon retiring control plane node
+  ansible.builtin.command:
+    argv: [kubectl, cordon, "{{ inventory_hostname }}"]
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+  delegate_to: "{{ k3s_cluster_init_host }}"
+  failed_when: false
+  changed_when: true
+  tags: [k3s, k3s_cluster, k3s_leave]
+
+- name: K3s cluster | Drain retiring control plane node
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - drain
+      - "{{ inventory_hostname }}"
+      - --ignore-daemonsets
+      - --delete-emptydir-data
+      - --timeout=600s
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+  delegate_to: "{{ k3s_cluster_init_host }}"
+  failed_when: false
+  changed_when: true
+  tags: [k3s, k3s_cluster, k3s_leave]
+
+- name: K3s cluster | Stop K3s server on retiring node
+  ansible.builtin.systemd:
+    name: k3s
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [k3s, k3s_cluster, k3s_leave]
+
+- name: K3s cluster | Uninstall K3s server on retiring node
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-uninstall.sh
+  register: k3s_leave_uninstall
+  changed_when: k3s_leave_uninstall.rc == 0
+  failed_when: false
+  tags: [k3s, k3s_cluster, k3s_leave]
+
+- name: K3s cluster | Delete retiring node from API
+  ansible.builtin.command:
+    argv: [kubectl, delete, node, "{{ inventory_hostname }}", --ignore-not-found]
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+  delegate_to: "{{ k3s_cluster_init_host }}"
+  changed_when: true
+  tags: [k3s, k3s_cluster, k3s_leave]

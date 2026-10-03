@@ -1,0 +1,86 @@
+{{- if .Values.lldap.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: lldap-credentials
+  namespace: {{ include "fleet-console.namespace" . }}
+type: Opaque
+stringData:
+  LLDAP_JWT_SECRET: {{ .Values.lldap.jwtSecret | quote }}
+  LLDAP_LDAP_USER_PASS: {{ .Values.lldap.adminPassword | quote }}
+  LLDAP_LDAP_USER_EMAIL: "admin@umkim.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lldap-data
+  namespace: {{ include "fleet-console.namespace" . }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lldap
+  namespace: {{ include "fleet-console.namespace" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lldap
+  template:
+    metadata:
+      labels:
+        app: lldap
+    spec:
+      containers:
+        - name: lldap
+          image: {{ .Values.lldap.image | quote }}
+          ports:
+            - name: ldap
+              containerPort: 3890
+            - name: http
+              containerPort: 17170
+          envFrom:
+            - secretRef:
+                name: lldap-credentials
+          env:
+            - name: LLDAP_LDAP_BASE_DN
+              value: {{ .Values.lldap.baseDN | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: lldap-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lldap
+  namespace: {{ include "fleet-console.namespace" . }}
+spec:
+  type: {{ if gt (int .Values.lldap.webUINodePort) 0 }}NodePort{{ else }}ClusterIP{{ end }}
+  selector:
+    app: lldap
+  ports:
+    - name: ldap
+      port: {{ .Values.lldap.ldapPort }}
+      targetPort: ldap
+    - name: http
+      port: {{ .Values.lldap.httpPort }}
+      targetPort: http
+      {{- if gt (int .Values.lldap.webUINodePort) 0 }}
+      nodePort: {{ .Values.lldap.webUINodePort }}
+      {{- end }}
+{{- end }}

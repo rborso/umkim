@@ -1,0 +1,98 @@
+server {
+    listen 8080;
+    server_name _;
+    client_max_body_size 32m;
+
+    # Resolve upstream hostnames at request time (fleet-site-controller may not exist at nginx start).
+    resolver kube-dns.kube-system.svc.cluster.local valid=10s ipv6=off;
+
+    location /fleet/auth/ {
+        set $auth_upstream ${FLEET_AUTH_HOST};
+        rewrite ^/fleet/auth/(.*)$ /api/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+    }
+
+    location /fleet/api/v1alpha1/site-enrollments/ {
+        set $site_upstream ${FLEET_SITE_HOST};
+        rewrite ^/fleet/api/v1alpha1/site-enrollments/(.*)$ /api/v1alpha1/site-enrollments/$1 break;
+        proxy_pass http://$site_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /fleet/api/v1alpha1/cluster-enrollments/ {
+        set $site_upstream ${FLEET_SITE_HOST};
+        rewrite ^/fleet/api/v1alpha1/cluster-enrollments/(.*)$ /api/v1alpha1/cluster-enrollments/$1 break;
+        proxy_pass http://$site_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    # KubeVirt serial/VNC consoles (websocket); keep Upgrade off the general API location.
+    location ~ ^/fleet/api/v1alpha1/clusters/[^/]+/vms/[^/]+/[^/]+/(console|serial|vnc)$ {
+        set $auth_upstream ${FLEET_AUTH_HOST};
+        rewrite ^/fleet/api/(.*)$ /proxy/fleet/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location /fleet/api/ {
+        set $auth_upstream ${FLEET_AUTH_HOST};
+        rewrite ^/fleet/api/(.*)$ /proxy/fleet/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /llm/ {
+        set $auth_upstream ${FLEET_AUTH_HOST};
+        rewrite ^/llm/(.*)$ /proxy/llm/$1 break;
+        proxy_pass http://$auth_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location /fleet/ {
+        alias /usr/share/nginx/html/fleet/;
+        try_files $uri $uri/ /fleet/index.html;
+    }
+
+    location / {
+        root /usr/share/nginx/html/fleet;
+        try_files $uri $uri/ /index.html;
+    }
+}

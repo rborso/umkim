@@ -1,0 +1,9 @@
+{
+  "name": "llama-cpp-example",
+  "clusterName": "REPLACE_WITH_READY_GPU_CLUSTER",
+  "chart": "llama-cpp-helm",
+  "version": "0.1.4",
+  "releaseName": "llama-cpp",
+  "namespace": "llm",
+  "route": { "mode": "none" }
+}

@@ -1,0 +1,93 @@
+---
+- name: K3s | Skip when disabled on host
+  ansible.builtin.meta: end_host
+  when: not (k3s_enabled | default(true) | bool)
+
+- name: K3s | Install server
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="{{ k3s_channel }}" sh -s - server \
+        --flannel-backend={{ k3s_flannel_backend }} \
+        --disable-network-policy \
+        {% for item in k3s_disable_components %}--disable={{ item }} \
+        {% endfor %}--node-ip={{ k3s_node_ip }} \
+        --bind-address={{ k3s_bind_address }} \
+        --advertise-address={{ k3s_advertise_address | default(k3s_bind_address) }} \
+        --tls-san={{ fleet_node_mgmt_address | default(ansible_host) }} \
+        --tls-san={{ wireguard_address | ansible.utils.ipaddr('address') }}
+  args:
+    creates: /etc/rancher/k3s/k3s.yaml
+  when:
+    - k3s_role == 'server'
+    - not (k3s_cluster_mode | default(false) | bool)
+  notify: Restart k3s
+  tags: [k3s]
+
+- name: K3s | Enable and start server
+  ansible.builtin.systemd:
+    name: k3s
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - k3s_role == 'server'
+    - not (k3s_cluster_mode | default(false) | bool)
+  tags: [k3s]
+
+- name: K3s | Wait for kubeconfig
+  ansible.builtin.wait_for:
+    path: "{{ k3s_kubeconfig }}"
+    timeout: 180
+  when: k3s_role == 'server'
+  tags: [k3s]
+
+- name: K3s | Patch kubeconfig local server URL
+  ansible.builtin.import_tasks: patch_kubeconfig.yml
+  when: k3s_role == 'server'
+  tags: [k3s]
+
+- name: K3s | Install kubectl wrapper symlink
+  ansible.builtin.file:
+    src: /usr/local/bin/k3s
+    dest: /usr/bin/kubectl
+    state: link
+    force: true
+  when: k3s_role == 'server'
+  tags: [k3s]
+
+- name: K3s | Wait for API to answer
+  ansible.builtin.command:
+    cmd: kubectl get --raw=/readyz
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: k3s_readyz
+  until: k3s_readyz.rc == 0
+  retries: 36
+  delay: 10
+  changed_when: false
+  when: k3s_role == 'server'
+  tags: [k3s]
+
+- name: K3s | Show node status
+  ansible.builtin.command:
+    cmd: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: "{{ k3s_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: k3s_nodes
+  changed_when: false
+  when: k3s_role == 'server'
+  tags: [k3s]
+
+- name: K3s | Report nodes
+  ansible.builtin.debug:
+    var: k3s_nodes.stdout_lines
+  when: k3s_role == 'server'
+  tags: [k3s]
+
+- name: K3s | Patch metrics-server for WireGuard node-ip
+  ansible.builtin.import_tasks: patch_metrics_server.yml
+  when: k3s_role == 'server'
+  tags: [k3s, k3s_metrics_server]

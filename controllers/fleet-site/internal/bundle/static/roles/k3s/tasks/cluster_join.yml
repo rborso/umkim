@@ -1,0 +1,53 @@
+---
+- name: K3s cluster | Skip init node
+  ansible.builtin.meta: end_host
+  when: inventory_hostname == k3s_cluster_init_host
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Wait for cluster join token from init node
+  ansible.builtin.assert:
+    that:
+      - hostvars[k3s_cluster_init_host].k3s_cluster_token | default('') | length > 0
+    fail_msg: "Join token not available from {{ k3s_cluster_init_host }} yet."
+  register: k3s_token_wait
+  until: k3s_token_wait is succeeded
+  retries: 60
+  delay: 5
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Install additional server node
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL="{{ k3s_channel }}" \
+        K3S_TOKEN="{{ hostvars[k3s_cluster_init_host].k3s_cluster_token }}" sh -s - server \
+        --server {{ k3s_cluster_join_server | default('https://' ~ hostvars[k3s_cluster_init_host].ansible_host ~ ':6443') }} \
+        --flannel-backend={{ k3s_flannel_backend }} \
+        --disable-network-policy \
+        {% for item in k3s_disable_components %}--disable={{ item }} \
+        {% endfor %}--node-ip={{ k3s_node_ip }} \
+        --bind-address={{ k3s_bind_address }} \
+        --advertise-address={{ k3s_advertise_address | default(k3s_bind_address) }} \
+        --tls-san={{ ansible_host }} \
+        --tls-san={{ wireguard_address | ansible.utils.ipaddr('address') }}{% if k3s_control_plane_vip | default('') | length > 0 %} \
+        --tls-san={{ k3s_control_plane_vip }}{% endif %}
+  args:
+    creates: /etc/rancher/k3s/k3s.yaml
+  notify: Restart k3s
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Enable server
+  ansible.builtin.systemd:
+    name: k3s
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [k3s, k3s_cluster]
+
+- name: K3s cluster | Install kubectl wrapper symlink
+  ansible.builtin.file:
+    src: /usr/local/bin/k3s
+    dest: /usr/bin/kubectl
+    state: link
+    force: true
+  tags: [k3s, k3s_cluster]

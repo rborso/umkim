@@ -1,0 +1,28 @@
+# OpenWrt UCI port-forward template (commented).
+# Apply manually via LuCI (Network → Firewall → Port Forwards) or uci commit.
+# Cluster node LAN IP: 203.0.113.100 — must be reachable from OpenWrt LAN.
+# See examples/site-profiles/port-forward/README.md
+
+# config redirect 'fleet_http'
+#   option name 'fleet-http'
+#   option src 'wan'
+#   option src_dport '80'
+#   option dest 'lan'
+#   option dest_ip '203.0.113.100'
+#   option dest_port '30080'
+#   option proto 'tcp'
+#   option target 'DNAT'
+
+# config redirect 'fleet_https'
+#   option name 'fleet-https'
+#   option src 'wan'
+#   option src_dport '443'
+#   option dest 'lan'
+#   option dest_ip '203.0.113.100'
+#   option dest_port '30443'
+#   option proto 'tcp'
+#   option target 'DNAT'
+
+# After editing:
+#   uci commit firewall
+#   /etc/init.d/firewall reload

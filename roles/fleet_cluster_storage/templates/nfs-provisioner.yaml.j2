@@ -1,0 +1,130 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ fleet_cluster_nfs_namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-client-provisioner
+  namespace: {{ fleet_cluster_nfs_namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfs-client-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: run-nfs-client-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    namespace: {{ fleet_cluster_nfs_namespace }}
+roleRef:
+  kind: ClusterRole
+  name: nfs-client-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  namespace: {{ fleet_cluster_nfs_namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  namespace: {{ fleet_cluster_nfs_namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    namespace: {{ fleet_cluster_nfs_namespace }}
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-client-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner
+  namespace: {{ fleet_cluster_nfs_namespace }}
+  labels:
+    app: nfs-client-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+        - name: nfs-client-provisioner
+          image: {{ fleet_cluster_nfs_provisioner_image }}
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: {{ fleet_cluster_nfs_provisioner_name }}
+            - name: NFS_SERVER
+              value: {{ fleet_cluster_nfs_server }}
+            - name: NFS_PATH
+              value: {{ fleet_cluster_nfs_client_path | default(fleet_cluster_nfs_path) }}
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: {{ fleet_cluster_nfs_server }}
+            path: {{ fleet_cluster_nfs_client_path | default(fleet_cluster_nfs_path) }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ fleet_cluster_nfs_storage_class }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "{{ 'true' if (fleet_cluster_nfs_set_default_sc | default(true) | bool) else 'false' }}"
+provisioner: {{ fleet_cluster_nfs_provisioner_name }}
+parameters:
+  archiveOnDelete: "false"
+  pathPattern: "${.PVC.namespace}-${.PVC.name}"
+mountOptions:
+{% for opt in fleet_cluster_nfs_mount_options %}
+  - {{ opt }}
+{% endfor %}
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

@@ -1,0 +1,27 @@
+{{- if and .Values.enabled .Values.traefik.deploySpokeMiddleware .Values.authelia.portalHost }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: authelia-portal
+  namespace: {{ include "fleet-ingress-auth.namespace" . }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - {{ .Values.authelia.portalHost | quote }}
+  rules:
+    - host: {{ .Values.authelia.portalHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: authelia
+                port:
+                  number: {{ .Values.authelia.port }}
+{{- end }}

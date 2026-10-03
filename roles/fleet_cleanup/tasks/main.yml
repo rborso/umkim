@@ -1,0 +1,162 @@
+---
+- name: Fleet cleanup | Assert hub-only for cluster-scoped deletes
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups['hub']
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Delete OCM ManifestWorks on hub
+  ansible.builtin.command:
+    cmd: >-
+      kubectl delete manifestwork
+      {{ item.1 }}
+      -n {{ item.0 }}
+      --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ groups['spokes'] | product(fleet_cleanup_manifestworks) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1 }}"
+  register: fleet_cleanup_mw_delete
+  changed_when: "'deleted' in fleet_cleanup_mw_delete.stdout"
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Delete legacy phase6 ManifestWorks (pre-rename)
+  ansible.builtin.command:
+    cmd: kubectl delete manifestwork {{ item.1 }} -n {{ item.0 }} --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ groups['spokes'] | product(fleet_cleanup_legacy_manifestworks) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1 }}"
+  failed_when: false
+  changed_when: false
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Wait for ManifestWork deletions
+  ansible.builtin.pause:
+    seconds: "{{ fleet_cleanup_wait_manifestwork_seconds }}"
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Delete hub application namespaces
+  ansible.builtin.command:
+    cmd: kubectl delete namespace {{ item }} --ignore-not-found --wait=false
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  loop: "{{ fleet_cleanup_hub_namespaces }}"
+  register: fleet_cleanup_ns_delete
+  failed_when: false
+  changed_when: "'deleted' in fleet_cleanup_ns_delete.stdout"
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Uninstall Harbor Helm release
+  when: fleet_cleanup_delete_harbor | bool
+  block:
+    - name: Fleet cleanup | Helm uninstall Harbor
+      ansible.builtin.command:
+        cmd: helm uninstall {{ harbor_release }} -n {{ harbor_namespace }}
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cleanup_harbor_uninstall
+      failed_when: false
+      changed_when: fleet_cleanup_harbor_uninstall.rc == 0
+      tags: [fleet_cleanup]
+
+    - name: Fleet cleanup | Delete Harbor namespace
+      ansible.builtin.command:
+        cmd: kubectl delete namespace {{ harbor_namespace }} --ignore-not-found --wait=false
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      register: fleet_cleanup_harbor_ns
+      failed_when: false
+      changed_when: "'deleted' in fleet_cleanup_harbor_ns.stdout"
+      tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Delete hub platform stacks (OLM / cert-manager / KubeVirt)
+  when: fleet_cleanup_delete_hub_platform | bool
+  block:
+    - name: Fleet cleanup | Remove KubeVirt CR
+      ansible.builtin.command:
+        cmd: kubectl delete kubevirt kubevirt -n kubevirt --ignore-not-found --wait=false
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      failed_when: false
+      changed_when: false
+      tags: [fleet_cleanup]
+
+    - name: Fleet cleanup | Delete platform namespaces on hub
+      ansible.builtin.command:
+        cmd: kubectl delete namespace {{ item }} --ignore-not-found --wait=false
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      loop: "{{ fleet_cleanup_platform_namespaces }}"
+      register: fleet_cleanup_platform_ns
+      changed_when: "'deleted' in fleet_cleanup_platform_ns.stdout"
+      tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Brief wait for namespace deletions
+  ansible.builtin.pause:
+    seconds: 30
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Force-finalize stuck Terminating namespaces
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export KUBECONFIG={{ ocm_kubeconfig }}
+    for ns in $(kubectl get ns -o jsonpath='{range .items[?(@.status.phase=="Terminating")]}{.metadata.name}{"\n"}{end}'); do
+      [[ -z "$ns" ]] && continue
+      kubectl get namespace "$ns" -o json \
+        | python3 -c "import json,sys; d=json.load(sys.stdin); d['spec']['finalizers']=[]; print(json.dumps(d))" \
+        | kubectl replace --raw "/api/v1/namespaces/${ns}/finalize" -f - >/dev/null 2>&1 || true
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Remove staged config on hub
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/dcm-config
+    - /tmp/dcm-hub-stack.yaml
+    - /tmp/fleet-webui-ocm.yaml
+    - /tmp/fleet-webui-ocm-lab-nodeport.yaml
+    - /tmp/ocm-dashboard-values.yaml
+    - /tmp/ocm-lab-dashboard
+    - /tmp/fleet-webui-dcm.yaml
+    - /tmp/fleet-webui-umkim-console.yaml
+    - /tmp/fleet-webui-namespace.yaml
+    - /tmp/dcm-gateway-rollout-patch.yaml
+    - /tmp/manifestwork-phase4-virt01.yaml
+    - /tmp/manifestwork-phase4-virt02.yaml
+    - /tmp/manifestwork-phase5-virt01.yaml
+    - /tmp/manifestwork-phase5-virt02.yaml
+    - /tmp/manifestwork-phase6-virt01.yaml
+    - /tmp/manifestwork-phase6-virt02.yaml
+    - /tmp/manifestwork-phase6-demo-virt01.yaml
+    - /tmp/manifestwork-phase6-demo-virt02.yaml
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Remaining hub namespaces
+  ansible.builtin.command:
+    cmd: kubectl get ns -o name
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_cleanup_remaining_ns
+  changed_when: false
+  tags: [fleet_cleanup]
+
+- name: Fleet cleanup | Summary
+  ansible.builtin.debug:
+    msg: "Hub namespaces after cleanup: {{ fleet_cleanup_remaining_ns.stdout_lines }}"
+  tags: [fleet_cleanup]

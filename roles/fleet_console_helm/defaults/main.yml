@@ -1,0 +1,42 @@
+---
+fleet_console_helm_enabled: true
+fleet_console_helm_release: fleet-console
+fleet_console_helm_chart_path: "{{ playbook_dir }}/charts/fleet-console"
+fleet_console_helm_namespace: "{{ fleet_console_namespace | default('fleet-console') }}"
+
+# Passed through to charts/fleet-console/values.yaml
+fleet_console_helm_registry_prefix: "{{ harbor_fleet_image_prefix }}"
+fleet_console_auth_tag: "{{ harbor_fleet_image_tag }}"
+fleet_console_auth_image_name: fleet-console-auth
+umkim_console_tag: "{{ harbor_fleet_image_tag }}"
+umkim_console_image_name: umkim-console
+
+fleet_console_auth_session_secret: "{{ fleet_console_auth_session_secret_vault | default('CHANGE_ME') }}"
+fleet_console_auth_session_ttl: 8h
+# false: console is HTTP on the WireGuard overlay (NodePort 30912). Set true only
+# when the console is served exclusively over HTTPS (Secure cookies are dropped on http://).
+fleet_console_auth_session_secure: false
+fleet_console_auth_bypass: false
+fleet_console_auth_htpasswd_admin_user: localadmin
+fleet_console_auth_htpasswd_admin_password: "{{ fleet_console_auth_admin_password_vault | default('CHANGE_ME') }}"
+fleet_console_auth_bootstrap_admin: true
+fleet_console_auth_bootstrap_install_token: "{{ fleet_console_auth_bootstrap_install_token_vault | default('') }}"
+fleet_console_auth_fleet_upstream: "http://fleet-site-controller.{{ fleet_site_controller_namespace | default('fleet-console') }}.svc.cluster.local:18080"
+
+fleet_auth_ldap_url: "ldap://lldap.{{ fleet_console_namespace | default('fleet-console') }}.svc.cluster.local:{{ fleet_auth_lldap_ldap_port | default(3890) }}"
+fleet_auth_ldap_base_dn: "dc=umkim,dc=com"
+# LDAP service bind for fleet-console-auth (LLDAP requires authenticated search).
+fleet_auth_ldap_bind_dn: "{{ ('uid=admin,ou=people,' + fleet_auth_ldap_base_dn) if (fleet_auth_lldap_enabled | default(false) | bool) else '' }}"
+fleet_auth_ldap_bind_password: >-
+  {{ fleet_auth_ldap_bind_password_vault | default('')
+     if (fleet_auth_ldap_bind_password_vault | default('') | length > 0)
+     else (fleet_auth_lldap_admin_password | default('') if (fleet_auth_lldap_enabled | default(false) | bool) else '') }}
+
+fleet_auth_oidc_issuer: ""
+fleet_auth_oidc_client_id: ""
+fleet_auth_oidc_client_secret: ""
+fleet_auth_oidc_redirect_url: ""
+
+umkim_console_nodeport: 30912
+umkim_console_enabled: true
+fleet_console_auth_http_port: 18090

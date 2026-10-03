@@ -1,0 +1,10 @@
+---
+phase4_kubevirt_version: "v1.8.2"
+phase4_cdi_version: "v1.61.5"
+phase4_multus_manifest_url: https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/2e79055d7d00119bb53cb0e999539c50b45b896d/deployments/multus-daemonset-thick.yml
+phase4_kubevirt_operator_url: "https://github.com/kubevirt/kubevirt/releases/download/{{ phase4_kubevirt_version }}/kubevirt-operator.yaml"
+phase4_kubevirt_cr_url: "https://github.com/kubevirt/kubevirt/releases/download/{{ phase4_kubevirt_version }}/kubevirt-cr.yaml"
+phase4_cdi_operator_url: "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ phase4_cdi_version }}/cdi-operator.yaml"
+phase4_cdi_cr_url: "https://github.com/kubevirt/containerized-data-importer/releases/download/{{ phase4_cdi_version }}/cdi-cr.yaml"
+ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

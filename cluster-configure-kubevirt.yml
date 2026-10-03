@@ -1,0 +1,54 @@
+---
+# Post-Ready KubeVirt platform install on an existing K3s cluster (hub Ansible Job).
+#
+#   ansible-playbook cluster-configure-kubevirt.yml -e fleet_cluster_name=my-cluster \
+#     -i /inventory/inventory.ini
+#
+# Extra vars (from FCJ inventory / job):
+#   fleet_site_enable_kubevirt=true
+#   fleet_cluster_kubevirt_bridge_enabled=true|false
+#   kubevirt_bridge_host_bridge=... (when LAN Multus is requested)
+#   kubevirt_bridge_slave_nic=... (optional)
+#   kubevirt_bridge_keep_ip=true|false
+
+- name: Fleet cluster kubevirt | Host bridges + bridge CNI on all nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_enable_kubevirt: true
+  tasks:
+    - name: Fleet cluster kubevirt | Configure host Linux bridge for Multus L2
+      ansible.builtin.import_role:
+        name: kubevirt_host_bridge
+      when: fleet_cluster_kubevirt_bridge_enabled | default(false) | bool
+      tags: [fleet_site, fleet_site_kubevirt, kubevirt, kubevirt_host_bridge]
+
+- name: Fleet cluster kubevirt | Reconcile Calico after host bridge
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    calico_kubeconfig: /etc/rancher/k3s/k3s.yaml
+  tasks:
+    - name: Fleet cluster kubevirt | Point Calico at bridge interface
+      ansible.builtin.import_role:
+        name: calico
+        tasks_from: reconcile_autodetection.yml
+      when:
+        - fleet_cluster_kubevirt_bridge_enabled | default(false) | bool
+        - kubevirt_bridge_reconcile_calico | default(true) | bool
+      tags: [fleet_site, fleet_site_kubevirt, kubevirt, kubevirt_host_bridge, calico]
+
+- name: Fleet cluster kubevirt | Platform stack on bootstrap
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+    fleet_site_enable_kubevirt: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: push_site_kubevirt_platform.yml
+      tags: [fleet_site, fleet_site_kubevirt, kubevirt]

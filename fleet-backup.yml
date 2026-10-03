@@ -1,0 +1,13 @@
+---
+# Deploy hub MinIO + Velero on OCM workload clusters.
+#
+# Usage:
+#   ansible-playbook fleet-backup.yml -l hub --tags fleet_backup_hub,fleet_backup_spokes
+
+- name: Fleet backup | Hub + spokes
+  hosts: hub
+  become: true
+  gather_facts: false
+  roles:
+    - role: fleet_backup
+      tags: [fleet_backup, fleet_backup_hub, fleet_backup_spokes]

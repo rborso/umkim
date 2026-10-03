@@ -1,0 +1,29 @@
+#!/bin/sh
+# Route WireGuard endpoint (public DNS name) via mgmt uplink so spokes on homelab_nw
+# reach wg.umkim.com through the provider internet path, not a LAN shortcut to virt03.
+set -eu
+GW="{{ wireguard_endpoint_route_gateway }}"
+DEV="{{ wireguard_endpoint_route_device }}"
+METRIC="{{ wireguard_endpoint_route_metric }}"
+HOST="{{ wireguard_endpoint_host }}"
+
+resolve_endpoint() {
+  getent ahostsv4 "${HOST}" 2>/dev/null | awk '{print $1; exit}'
+}
+
+case "${1:-}" in
+  up)
+    IP="$(resolve_endpoint)"
+    [ -n "${IP}" ] || exit 0
+    ip route replace "${IP}/32" via "${GW}" dev "${DEV}" metric "${METRIC}"
+    ;;
+  down)
+    IP="$(resolve_endpoint)"
+    [ -n "${IP}" ] || exit 0
+    ip route del "${IP}/32" via "${GW}" dev "${DEV}" metric "${METRIC}" 2>/dev/null || true
+    ;;
+  *)
+    echo "Usage: $0 up|down" >&2
+    exit 1
+    ;;
+esac

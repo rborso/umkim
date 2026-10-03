@@ -1,0 +1,51 @@
+replicaCount: 1
+
+# Hugging Face GGUF repo (llama-server -hf); quant defaults to Q4_K_M.
+hfRepo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+hfQuant: Q4_K_M
+# OpenAI model id returned by /v1/models (LiteLLM model_name must match).
+model: Qwen2.5-0.5B-Instruct
+
+ctxSize: 2048
+nGpuLayers: 99
+parallel: 1
+
+# Qwen3 / thinking templates: disable reasoning-only replies (content stays in message.content).
+jinja: true
+chatTemplateKwargs: '{"enable_thinking":false}'
+extraArgs: []
+
+image:
+  repository: ghcr.io/ggml-org/llama.cpp
+  tag: server-cuda
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  limits:
+    nvidia.com/gpu: 1
+  requests:
+    nvidia.com/gpu: 1
+    cpu: "2"
+    memory: 4Gi
+
+hostNetwork: true
+# Default uses the node's resolv.conf (required when cluster CoreDNS cannot forward to the internet).
+dnsPolicy: Default
+
+# Use runtimeClassName when the device plugin does not advertise nvidia.com/gpu.
+useRuntimeClass: true
+runtimeClassName: nvidia
+useGpuResource: false
+
+nodeSelector: {}
+
+tolerations: []
+
+persistence:
+  enabled: true
+  size: 8Gi
+  storageClass: ""

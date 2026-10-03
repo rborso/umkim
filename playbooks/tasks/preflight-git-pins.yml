@@ -1,0 +1,4 @@
+---
+- name: Preflight | Sibling git pins are not used in v0.2
+  ansible.builtin.debug:
+    msg: v0.2 builds hub images from this checkout; sibling service-provider pins are ignored.

@@ -1,0 +1,17 @@
+---
+- ansible.builtin.import_tasks: detect.yml
+  vars:
+    gpu_host_require_nvidia_smi: false
+  tags: [gpu_host_recommend]
+
+- name: GPU host | Recommendation summary
+  ansible.builtin.debug:
+    msg:
+      pci_id: "{{ gpu_host_pci_id | default('unknown') }}"
+      marketing_name: "{{ gpu_host_marketing_name | default('unknown') }}"
+      driver_branch: "{{ gpu_host_driver_branch_effective | default(gpu_host_driver_branch) }}"
+      vram_gb: "{{ gpu_host_vram_gb | default(0) }}"
+      cuda_repo: "{{ gpu_host_cuda_repo_url | default('') }}"
+      kernel: "{{ ansible_kernel | default('unknown') }}"
+      secure_boot: "{{ gpu_host_secure_boot.stdout | default('unknown') }}"
+  tags: [gpu_host_recommend]

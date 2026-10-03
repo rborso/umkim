@@ -1,0 +1,139 @@
+---
+# Update hub Traefik ConfigMaps after fleet-edge fragment render (no DCM namespace).
+- name: Hub ingress | Render fleet edge route fragments
+  ansible.builtin.import_role:
+    name: fleet_edge
+    tasks_from: render_fragments.yml
+  when:
+    - fleet_edge_enable | default(false) | bool
+    - not (fleet_edge_skip_render | default(false) | bool)
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Ensure config staging directory
+  ansible.builtin.file:
+    path: /tmp/hub-ingress-config
+    state: directory
+    mode: "0755"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Stage static config
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: /tmp/hub-ingress-config/traefik.yml
+    mode: "0644"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Stage dynamic routes
+  ansible.builtin.template:
+    src: routes.yml.j2
+    dest: /tmp/hub-ingress-config/routes.yml
+    mode: "0644"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Stage fleet routes fragment
+  ansible.builtin.template:
+    src: fleet-routes-middlewares-only.yml.j2
+    dest: /tmp/hub-ingress-config/fleet-routes.yml
+    mode: "0644"
+  when: fleet_edge_skip_render | default(false) | bool
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Read existing fleet routes ConfigMap
+  ansible.builtin.command:
+    cmd: kubectl -n {{ hub_ingress_namespace }} get configmap {{ hub_ingress_fleet_routes_cm }} -o jsonpath='{.data.fleet-routes\.yml}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: hub_ingress_existing_fleet_routes
+  changed_when: false
+  failed_when: false
+  when: not (fleet_edge_skip_render | default(false) | bool)
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Keep controller-owned fleet routes when present
+  ansible.builtin.copy:
+    dest: /tmp/hub-ingress-config/fleet-routes.yml
+    mode: "0644"
+    content: "{{ hub_ingress_existing_fleet_routes.stdout }}\n"
+  when:
+    - not (fleet_edge_skip_render | default(false) | bool)
+    - hub_ingress_existing_fleet_routes.stdout | default('') | trim not in ['', '{}']
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Read staged static config
+  ansible.builtin.slurp:
+    src: /tmp/hub-ingress-config/traefik.yml
+  register: hub_ingress_static_slurp
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Read staged dynamic routes
+  ansible.builtin.slurp:
+    src: /tmp/hub-ingress-config/routes.yml
+  register: hub_ingress_dynamic_slurp
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Set config checksum facts
+  ansible.builtin.set_fact:
+    hub_ingress_static_checksum: "{{ hub_ingress_static_slurp.content | b64decode | hash('sha256') }}"
+    hub_ingress_dynamic_checksum: "{{ hub_ingress_dynamic_slurp.content | b64decode | hash('sha256') }}"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Apply static ConfigMap
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create configmap {{ hub_ingress_static_cm }} \
+      -n {{ hub_ingress_namespace }} \
+      --from-file=traefik.yml=/tmp/hub-ingress-config/traefik.yml \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  register: hub_ingress_static_apply
+  changed_when: "'created' in hub_ingress_static_apply.stdout or 'configured' in hub_ingress_static_apply.stdout"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Apply dynamic ConfigMap
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create configmap {{ hub_ingress_dynamic_cm }} \
+      -n {{ hub_ingress_namespace }} \
+      --from-file=routes.yml=/tmp/hub-ingress-config/routes.yml \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  register: hub_ingress_dynamic_apply
+  changed_when: "'created' in hub_ingress_dynamic_apply.stdout or 'configured' in hub_ingress_dynamic_apply.stdout"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Apply fleet routes ConfigMap
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create configmap {{ hub_ingress_fleet_routes_cm }} \
+      -n {{ hub_ingress_namespace }} \
+      --from-file=fleet-routes.yml=/tmp/hub-ingress-config/fleet-routes.yml \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  register: hub_ingress_fleet_routes_apply
+  changed_when: "'created' in hub_ingress_fleet_routes_apply.stdout or 'configured' in hub_ingress_fleet_routes_apply.stdout"
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]
+
+- name: Hub ingress | Rollout gateway after route update
+  ansible.builtin.command:
+    cmd: kubectl -n {{ hub_ingress_namespace }} rollout restart deployment/{{ hub_ingress_gateway_name }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  when: >-
+    hub_ingress_static_apply is changed or
+    hub_ingress_dynamic_apply is changed or
+    hub_ingress_fleet_routes_apply is changed
+  tags: [hub_ingress, fleet_edge, fleet_edge_traefik]

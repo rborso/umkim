@@ -1,0 +1,226 @@
+---
+- name: Harbor | Check artifact in fleet project
+  ansible.builtin.uri:
+    url: >-
+      {{ harbor_external_url }}/api/v2.0/projects/{{ harbor_fleet_project }}/repositories/{{ fleet_image.repository }}/artifacts
+    method: GET
+    user: admin
+    password: "{{ harbor_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200, 404]
+  register: harbor_fleet_artifact_check
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Set skip push when artifact exists
+  ansible.builtin.set_fact:
+    harbor_fleet_skip_push: >-
+      {{ harbor_fleet_artifact_check.status == 200
+         and (harbor_fleet_artifact_check.json | default([]) | length > 0)
+         and not (harbor_fleet_push_force | default(false) | bool) }}
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Resolve local source for fleet image
+  ansible.builtin.set_fact:
+    harbor_fleet_this_local_src: >-
+      {{
+        (fleet_image.local_src | default(''))
+        if (fleet_image.local_src | default('') | length > 0)
+        else ({
+          'fleet-edge-controller': harbor_fleet_edge_controller_local_src,
+          'fleet-failover-controller': harbor_fleet_failover_controller_local_src,
+          'umkim-console': harbor_fleet_umkim_console_local_src,
+          'fleet-site-controller': harbor_fleet_site_controller_local_src,
+          'fleet-console-auth': harbor_fleet_console_auth_local_src,
+          'fleet-ansible-runner': harbor_fleet_ansible_runner_local_src,
+        }.get(fleet_image.repository, ''))
+      }}
+    harbor_fleet_archive_name: "{{ fleet_image.repository }}-src.tar.gz"
+    harbor_fleet_local_archive: "{{ harbor_fleet_local_staging_dir }}/{{ fleet_image.repository }}-src.tar.gz"
+  when: not harbor_fleet_skip_push | bool
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Stat local fleet image source on controller
+  ansible.builtin.stat:
+    path: "{{ harbor_fleet_this_local_src }}/{{ fleet_image.containerfile | default('Containerfile') }}"
+  delegate_to: localhost
+  become: false
+  register: harbor_fleet_local_src
+  run_once: true
+  when: not harbor_fleet_skip_push | bool
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Ensure clone directory on hub
+  ansible.builtin.file:
+    path: "{{ fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository) }}"
+    state: directory
+    mode: "0755"
+  when: not harbor_fleet_skip_push | bool
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Remove stale empty clone dir when local_src basename differs
+  ansible.builtin.file:
+    path: "{{ harbor_fleet_src_parent_dir }}/{{ fleet_image.repository }}"
+    state: absent
+  when:
+    - not harbor_fleet_skip_push | bool
+    - fleet_image.local_src is defined
+    - (fleet_image.local_src | basename) != fleet_image.repository
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Stage fleet-ansible-runner build context from repo root
+  ansible.builtin.command:
+    cmd: "{{ harbor_fleet_this_local_src }}/build-context.sh"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when:
+    - not harbor_fleet_skip_push | bool
+    - fleet_image.repository == 'fleet-ansible-runner'
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Ensure local staging dir on controller
+  ansible.builtin.file:
+    path: "{{ harbor_fleet_local_staging_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when:
+    - not harbor_fleet_skip_push | bool
+    - harbor_fleet_use_local_src | default(true) | bool
+    - harbor_fleet_local_src.stat.exists | default(false)
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Archive fleet image source on controller
+  ansible.builtin.command:
+    argv:
+      - tar
+      - czf
+      - "{{ harbor_fleet_local_archive }}"
+      - "--exclude=.git"
+      - -C
+      - "{{ harbor_fleet_this_local_src | dirname }}"
+      - "{{ harbor_fleet_this_local_src | basename }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when:
+    - not harbor_fleet_skip_push | bool
+    - harbor_fleet_use_local_src | default(true) | bool
+    - harbor_fleet_local_src.stat.exists | default(false)
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Upload fleet image source to hub
+  ansible.builtin.copy:
+    src: "{{ harbor_fleet_local_archive }}"
+    dest: "/tmp/{{ harbor_fleet_archive_name }}"
+    mode: "0644"
+  when:
+    - not harbor_fleet_skip_push | bool
+    - harbor_fleet_use_local_src | default(true) | bool
+    - harbor_fleet_local_src.stat.exists | default(false)
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Extract fleet image source on hub
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ harbor_fleet_archive_name }}"
+    dest: "{{ harbor_fleet_src_parent_dir }}"
+    remote_src: true
+  when:
+    - not harbor_fleet_skip_push | bool
+    - harbor_fleet_use_local_src | default(true) | bool
+    - harbor_fleet_local_src.stat.exists | default(false)
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Require local fleet image source on controller
+  ansible.builtin.assert:
+    that:
+      - not (harbor_fleet_use_local_src | default(true) | bool) or (harbor_fleet_local_src.stat.exists | default(false))
+    fail_msg: >-
+      Fleet image source not found at {{ harbor_fleet_this_local_src }} on the
+      Ansible controller (repository {{ fleet_image.repository }}).
+  when: not harbor_fleet_skip_push | bool
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Clone fleet image source from GitHub (fallback, optional)
+  ansible.builtin.git:
+    repo: "{{ fleet_image.git_repo }}"
+    dest: "{{ fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository) }}"
+    version: "{{ fleet_image.git_version | default('v0.1.0') }}"
+    force: true
+  when:
+    - not harbor_fleet_skip_push | bool
+    - fleet_image.git_repo is defined
+    - not (harbor_fleet_use_local_src | default(true) | bool)
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Assert fleet image source present
+  ansible.builtin.stat:
+    path: "{{ (fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository)) }}/{{ fleet_image.containerfile | default('Containerfile') }}"
+  register: harbor_fleet_src_containerfile
+  when: not harbor_fleet_skip_push | bool
+  failed_when: not harbor_fleet_src_containerfile.stat.exists
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Stage LICENSE and NOTICE for image build
+  ansible.builtin.copy:
+    src: "{{ harbor_umkim_root }}/{{ item }}"
+    dest: "{{ (fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository)) }}/{{ item }}"
+    mode: "0644"
+  loop:
+    - LICENSE
+    - NOTICE
+  when:
+    - not harbor_fleet_skip_push | bool
+    - fleet_image.repository in harbor_fleet_umkim_legal_images
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Sync cluster-delete playbook into ansible-runner build context
+  ansible.builtin.copy:
+    src: "{{ harbor_umkim_root }}/cluster-delete-hub.yml"
+    dest: "{{ (fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository)) }}/cluster-delete-hub.yml"
+    mode: "0644"
+  when:
+    - not harbor_fleet_skip_push | bool
+    - fleet_image.repository == 'fleet-ansible-runner'
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Build image with podman
+  ansible.builtin.command:
+    cmd: >-
+      podman build
+      {% if harbor_fleet_push_force | default(false) | bool %}--no-cache{% endif %}
+      --build-arg CACHEBUST={{ lookup('pipe', 'date +%s') }}
+      {% if fleet_image.repository == 'umkim-console' %}
+      --build-arg VITE_BUILD_ID={{ umkim_build_id | default(lookup('pipe', 'date +%Y%m%d-%H%M')) }}
+      {% endif %}
+      -t localhost/{{ fleet_image.repository }}:{{ fleet_image.tag }}
+      -f {{ fleet_image.containerfile | default('Containerfile') }}
+      {{ fleet_image.clone_dir | default(harbor_fleet_src_parent_dir ~ '/' ~ fleet_image.repository) }}
+  when: not harbor_fleet_skip_push | bool
+  register: harbor_fleet_podman_build
+  changed_when: true
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Push image to Harbor fleet project
+  ansible.builtin.command:
+    cmd: >-
+      skopeo copy
+      containers-storage:localhost/{{ fleet_image.repository }}:{{ fleet_image.tag }}
+      docker://{{ harbor_fleet_image_prefix }}/{{ fleet_image.repository }}:{{ fleet_image.tag }}
+      --dest-creds=admin:{{ harbor_admin_password }}
+      --dest-tls-verify=false
+  when: not harbor_fleet_skip_push | bool
+  register: harbor_fleet_skopeo_push
+  changed_when: harbor_fleet_skopeo_push.rc == 0
+  tags: [harbor, harbor_push_fleet]
+
+- name: Harbor | Fleet image push result
+  ansible.builtin.debug:
+    msg: >-
+      {{ fleet_image.repository }}:{{ fleet_image.tag }} →
+      {{ harbor_fleet_image_prefix }}/{{ fleet_image.repository }}:{{ fleet_image.tag }}
+      ({{ 'skipped (already in Harbor)' if harbor_fleet_skip_push | bool else 'pushed' }})
+  tags: [harbor, harbor_push_fleet]

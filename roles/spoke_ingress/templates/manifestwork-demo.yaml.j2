@@ -1,0 +1,65 @@
+# OCM ManifestWork — Tier 1 demo app on spoke {{ ocm_target_cluster }}
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  name: {{ phase6_demo_manifestwork_name }}
+  namespace: {{ ocm_target_cluster }}
+  labels:
+    fleet.umkim.com/phase: "6"
+    fleet.umkim.com/tier: "1"
+    fleet.umkim.com/component: demo
+spec:
+  workload:
+    manifests:
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: fleet-demo
+          namespace: {{ phase6_spoke_ingress_namespace }}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: fleet-demo
+          template:
+            metadata:
+              labels:
+                app: fleet-demo
+            spec:
+              containers:
+                - name: http-echo
+                  image: {{ phase6_demo_image }}
+                  args:
+                    - "-listen=:8080"
+                    - "-text={{ spoke_demo_message }}"
+                  ports:
+                    - containerPort: 8080
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: fleet-demo
+          namespace: {{ phase6_spoke_ingress_namespace }}
+        spec:
+          selector:
+            app: fleet-demo
+          ports:
+            - port: 80
+              targetPort: 8080
+      - apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: fleet-demo
+          namespace: {{ phase6_spoke_ingress_namespace }}
+        spec:
+          ingressClassName: traefik
+          rules:
+            - host: demo.{{ ocm_target_cluster }}.{{ domain }}
+              http:
+                paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                      service:
+                        name: fleet-demo
+                        port:
+                          number: 80

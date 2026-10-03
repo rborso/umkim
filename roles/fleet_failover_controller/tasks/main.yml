@@ -1,0 +1,57 @@
+---
+- name: Fleet failover controller | Skip when disabled
+  ansible.builtin.meta: end_host
+  when: not (fleet_failover_controller_enabled | default(false) | bool)
+
+- name: Fleet failover controller | Ensure namespace
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl create namespace {{ fleet_failover_controller_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Fleet failover controller | Stage RBAC manifest
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/deploy/fleet-failover/rbac.yaml"
+    dest: /tmp/fleet-failover-rbac.yaml
+    mode: "0644"
+
+- name: Fleet failover controller | Apply RBAC
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-failover-rbac.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ffc_rbac_apply
+  changed_when: >-
+    'created' in ffc_rbac_apply.stdout or 'configured' in ffc_rbac_apply.stdout
+
+- name: Fleet failover controller | Render Deployment manifest
+  ansible.builtin.template:
+    src: deployment.yaml.j2
+    dest: /tmp/fleet-failover-controller-deploy.yaml
+    mode: "0644"
+
+- name: Fleet failover controller | Apply Deployment
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-failover-controller-deploy.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: ffc_deploy_apply
+  changed_when: >-
+    'created' in ffc_deploy_apply.stdout or 'configured' in ffc_deploy_apply.stdout
+
+- name: Fleet failover controller | Wait for rollout
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_failover_controller_namespace }} rollout status
+      deployment/fleet-failover-controller --timeout=300s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false

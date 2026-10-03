@@ -1,0 +1,48 @@
+---
+- name: Tier1 demo | Wait for fleet-demo pod on each spoke
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ phase6_spoke_ingress_namespace }} wait
+      --for=condition=Ready pod -l app=fleet-demo --timeout=180s
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ groups['spokes'] }}"
+  register: spoke_demo_wait
+  changed_when: false
+  tags: [spoke_ingress, phase6, phase6_demo]
+
+- name: Tier1 demo | HTTP test via Traefik (Host header)
+  ansible.builtin.command:
+    cmd: >-
+      curl -sf
+      -H 'Host: demo.{{ item }}.{{ domain }}'
+      http://127.0.0.1:{{ hostvars[item].spoke_ingress_http_nodeport | default(phase6_http_nodeport) }}/
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ groups['spokes'] }}"
+  register: spoke_demo_curl
+  changed_when: false
+  tags: [spoke_ingress, phase6, phase6_demo]
+
+- name: Tier1 demo | Results
+  ansible.builtin.debug:
+    msg:
+      cluster: "{{ item.item }}"
+      host: "demo.{{ item.item }}.{{ domain }}"
+      url: "http://127.0.0.1:{{ hostvars[item.item].spoke_ingress_http_nodeport | default(phase6_http_nodeport) }}/"
+      body: "{{ item.stdout }}"
+  loop: "{{ spoke_demo_curl.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  tags: [spoke_ingress, phase6, phase6_demo]
+
+- name: Tier1 demo | How to test from your laptop
+  ansible.builtin.debug:
+    msg:
+      - "virt01 (after provider router forwards 80→198.51.100.225:30080):"
+      - "  curl -H 'Host: demo.virt01.{{ domain }}' http://<provider-public-ip>/"
+      - "virt02 (OpenWrt forwards WAN 80→203.0.113.12:30080):"
+      - "  curl -H 'Host: demo.virt02.{{ domain }}' http://<openwrt-wan-ip>/"
+      - "Or add to /etc/hosts: <ip> demo.virt01.{{ domain }} demo.virt02.{{ domain }}"
+  run_once: true
+  tags: [spoke_ingress, phase6, phase6_demo]

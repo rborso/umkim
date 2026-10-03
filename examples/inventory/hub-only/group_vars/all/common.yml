@@ -1,0 +1,120 @@
+---
+# Greenfield hub inventory — copy to inventory/group_vars/all/common.yml
+# Merge with maintainer lab common.yml only when you know which keys to override.
+
+domain: example.local
+
+umkim_version: "0.2"
+harbor_fleet_image_tag: "{{ umkim_version }}"
+fleet_site_rocky_major: "10"
+
+fleet_hub_wireguard_ip: "10.10.0.1"
+
+# WireGuard overlay (endpoint DNS: fleet_dns.wireguard_hub in group_vars/all/site.yml)
+wireguard_subnet: 10.10.0.0/16
+wireguard_interface: wg0
+wireguard_port: 51820
+wireguard_endpoint_host: "{{ fleet_dns.wireguard_hub }}"
+wireguard_endpoint_port: "{{ wireguard_port }}"
+wireguard_persistent_keepalive: 25
+wireguard_config_path: "/etc/wireguard/{{ wireguard_interface }}.conf"
+wireguard_private_key_path: /etc/wireguard/privatekey
+wireguard_public_key_path: /etc/wireguard/publickey
+wireguard_allowed_ips: "{{ wireguard_subnet }}"
+
+# Harbor (NodePorts + fleet project)
+harbor_host: "{{ fleet_hub_wireguard_ip }}"
+harbor_nodeport_http: 30080
+harbor_nodeport_https: 30443
+harbor_proxy_project_quay: quay-proxy
+harbor_proxy_project_ghcr: ghcr-proxy
+harbor_fleet_project: fleet
+harbor_fleet_registry: "{{ harbor_host }}:{{ harbor_nodeport_https }}"
+harbor_fleet_image_prefix: "{{ harbor_fleet_registry }}/{{ harbor_fleet_project }}"
+fleet_llama_cpp_image_repository: "{{ harbor_fleet_registry }}/{{ harbor_proxy_project_ghcr }}/ggml-org/llama.cpp"
+
+# Helm OCI allowlist (comma-separated). Harbor charts + public external registries.
+# Private charts: mirror into Harbor, then use Harbor prefix. Override with "*" for any oci://.
+helm_chart_oci_prefixes: >-
+  {{ harbor_charts_oci_prefix | default('oci://' ~ harbor_host ~ ':' ~ harbor_nodeport_https ~ '/charts') }},oci://registry-1.docker.io,oci://docker.io,oci://quay.io,oci://ghcr.io
+
+# Overlay IP alias used by some roles.
+phase5_hub_wireguard_ip: "{{ fleet_hub_wireguard_ip }}"
+
+# Hub + spoke Traefik ACME (hub.yml also sets these; runner Jobs only embed common.yml).
+fleet_edge_acme_enabled: true
+fleet_edge_acme_email: "fleet@{{ fleet_edge_domain | default('example.local') }}"
+
+# After FCJ Ready, auto-enable cluster ACME / ingress auth when hub flags are on.
+fleet_fcj_default_acme_enabled: "{{ fleet_edge_acme_enabled | default(false) }}"
+# Keep false when clusters need distinct LLDAP passwords (use POST …/ingress-auth/enable per cluster).
+fleet_fcj_default_ingress_auth_enabled: false
+
+# host_prepare — OS baseline before WireGuard / K3s (tag: host_prepare)
+host_prepare:
+  disable_swap: true
+  disable_firewalld: true
+  disable_ipv6: true
+  enable_ip_forward: true
+  enable_br_netfilter: true
+  configure_nm_routing: true
+
+host_prepare_sysctl:
+  net.ipv4.ip_forward: 1
+  net.ipv4.conf.all.forwarding: 1
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 0
+  net.ipv6.conf.all.disable_ipv6: 1
+  net.ipv6.conf.default.disable_ipv6: 1
+
+host_prepare_packages:
+  - python3-libselinux
+  - kernel-modules-extra
+  - iproute
+  - NetworkManager
+
+host_prepare_nm_ipv6_method: disabled
+host_prepare_nm_ipv6_connection_types:
+  - bridge
+  - ethernet
+
+# Phase 4 — OLM + cert-manager (ManifestWork bootstrap on spokes; pins in VERSIONS.md).
+phase4_olm_version: "0.45.0"
+phase4_olm_crds_url: "https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v{{ phase4_olm_version }}/crds.yaml"
+phase4_olm_deploy_url: "https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v{{ phase4_olm_version }}/olm.yaml"
+phase4_cert_manager_version: "1.20.4"
+phase4_cert_manager_manifest_url: "https://github.com/cert-manager/cert-manager/releases/download/v{{ phase4_cert_manager_version }}/cert-manager.yaml"
+phase4_operatorhub_catalog_image: quay.io/operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
+phase4_bootstrap_namespace: fleet-bootstrap
+phase4_manifestwork_name: phase4-platform-bootstrap
+phase4_bootstrap_image: registry.k8s.io/kubectl:v1.36.4@sha256:b8d523e7b8cdc5e3caa0f8891ee9f504abf137dec786e6e0ddd33e4f272c2f13
+# Warm Harbor quay-proxy cache before spokes pull OLM/cert-manager (digest mismatch if skipped).
+phase4_harbor_warm_images:
+  - operator-framework/olm@sha256:f228c7a6b8c53e32f21a7cb855d9bc1c8f355fa5124cfc6c82552502e0a8481e
+  - operatorhubio/catalog@sha256:43bc6f89bee87fee75ef295b13d2f2dead7a52ec0c2754e190df703181d5d24f
+  - jetstack/cert-manager-controller:v1.20.4
+  - jetstack/cert-manager-webhook:v1.20.4
+  - jetstack/cert-manager-cainjector:v1.20.4
+
+# Fleet controllers — image tags follow umkim_version (harbor_fleet_image_tag).
+fleet_edge_controller_enabled: true
+fleet_edge_controller_tag: "{{ harbor_fleet_image_tag }}"
+fleet_edge_controller_image: "{{ harbor_fleet_image_prefix }}/fleet-edge-controller:{{ fleet_edge_controller_tag }}"
+# Hub route health + periodic reconcile (Ansible → fleet-edge-controller env).
+fleet_edge_route_health_interval_sec: 60
+fleet_edge_route_requeue_interval_sec: 60
+fleet_console_auth_enabled: true
+fleet_console_auth_tag: "{{ harbor_fleet_image_tag }}"
+fleet_console_auth_image: "{{ harbor_fleet_image_prefix }}/fleet-console-auth:{{ fleet_console_auth_tag }}"
+
+# Phase 6 — spoke Traefik ingress (ManifestWork on joined clusters).
+phase6_spoke_ingress_namespace: fleet-ingress
+phase6_manifestwork_name: phase6-spoke-ingress
+phase6_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
+phase6_http_nodeport: 30080
+phase6_https_nodeport: 30443
+phase6_traefik_acme_storage_class: local-path
+phase6_deploy_whoami_demo: true
+phase6_whoami_image: docker.io/traefik/whoami:v1.10@sha256:1699d99cb4b9acc17f74ca670b3d8d0b7ba27c948b3445f0593b58ebece92f04
+phase6_demo_manifestwork_name: phase6-spoke-demo
+phase6_demo_image: hashicorp/http-echo:0.2.3@sha256:ba27d460cd1f22a1a4331bdf74f4fccbc025552357e8a3249c40ae216275de96

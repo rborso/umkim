@@ -1,0 +1,16 @@
+---
+# Console-driven ingress auth reconcile (ansible-runner Job on hub).
+#
+# Extra-vars (from fleet-site inventory CM):
+#   fleet_ingress_auth_hub_enabled, fleet_ingress_auth_spoke_clusters,
+#   fleet_ingress_auth_teardown_spoke_clusters, fleet_ingress_auth_enabled,
+#   fleet_ingress_auth_* secrets, fleet_edge_* hub vars
+
+- name: Fleet ingress auth | Reconcile desired state
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_ingress_auth
+        tasks_from: reconcile.yml

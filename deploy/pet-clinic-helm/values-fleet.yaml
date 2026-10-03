@@ -1,0 +1,29 @@
+# Fleet defaults for pet-clinic-helm catalog instances.
+# Merged into the catalog item advanced values field at seed time.
+
+replicaCount: 1
+
+database:
+  engine: postgres
+  version: "18"
+  storageClass: ""
+  storageSize: 2Gi
+
+app:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+postgres:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+service:
+  type: ClusterIP
+  port: 80

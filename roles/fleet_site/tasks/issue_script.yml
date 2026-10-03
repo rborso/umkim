@@ -1,0 +1,179 @@
+---
+# Generate WG keys, bootstrap script, and register hub peer for one site.
+# Vars: fleet_site_name (required), optional fleet_site_wg_address
+
+- name: Fleet site | Require site name
+  ansible.builtin.assert:
+    that: fleet_site_name | length > 0
+    fail_msg: Set fleet_site_name (e.g. -e fleet_site_name=lab-site1)
+  run_once: true
+
+- name: Fleet site | Set hub public key from playbook fact
+  ansible.builtin.set_fact:
+    fleet_site_hub_public_key: >-
+      {{
+        wireguard_hub_public_key
+        if (wireguard_hub_public_key is defined and wireguard_hub_public_key | length > 0)
+        else fleet_site_hub_public_key
+      }}
+  when: >-
+    (wireguard_hub_public_key is defined and wireguard_hub_public_key | length > 0)
+    or (fleet_site_hub_public_key is defined and fleet_site_hub_public_key | length > 0)
+  run_once: true
+
+- name: Fleet site | Load hub public key
+  ansible.builtin.slurp:
+    src: "{{ fleet_site_hub_public_key_path | default(hostvars[groups['hub'] | first].wireguard_public_key_path | default('/etc/wireguard/publickey')) }}"
+  delegate_to: "{{ groups['hub'] | first }}"
+  become: true
+  register: fleet_site_hub_pubkey_slurp
+  when: fleet_site_hub_public_key is not defined or fleet_site_hub_public_key | length == 0
+  run_once: true
+
+- name: Fleet site | Set hub public key fact from slurp
+  ansible.builtin.set_fact:
+    fleet_site_hub_public_key: "{{ fleet_site_hub_pubkey_slurp.content | b64decode | trim }}"
+  when: fleet_site_hub_pubkey_slurp is changed or fleet_site_hub_pubkey_slurp.content is defined
+  run_once: true
+
+- name: Fleet site | List existing site overlay allocations
+  ansible.builtin.set_fact:
+    fleet_site_used_octets: >-
+      {{ fleet_site_existing_octets | default([]) }}
+  run_once: true
+
+- name: Fleet site | Allocate overlay address
+  ansible.builtin.set_fact:
+    fleet_site_wg_address: >-
+      {{
+        fleet_site_wg_address
+        if (fleet_site_wg_address is defined and fleet_site_wg_address | length > 0)
+        else (
+          '10.10.0.' ~ (
+            range(fleet_site_wireguard_pool_start | int, fleet_site_wireguard_pool_end | int + 1)
+            | reject('in', fleet_site_used_octets)
+            | first
+          ) ~ '/32'
+        )
+      }}
+  run_once: true
+
+- name: Fleet site | Ensure secrets directory
+  ansible.builtin.file:
+    path: "{{ fleet_site_secrets_dir }}/{{ fleet_site_name }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Check existing private key
+  ansible.builtin.stat:
+    path: "{{ fleet_site_secrets_dir }}/{{ fleet_site_name }}/privatekey"
+  register: fleet_site_key_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Generate WireGuard private key
+  ansible.builtin.command:
+    cmd: wg genkey
+  register: fleet_site_genkey
+  when: not fleet_site_key_stat.stat.exists
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: true
+
+- name: Fleet site | Save private key
+  ansible.builtin.copy:
+    dest: "{{ fleet_site_secrets_dir }}/{{ fleet_site_name }}/privatekey"
+    content: "{{ fleet_site_genkey.stdout | trim }}\n"
+    mode: "0600"
+  when: fleet_site_genkey.stdout is defined
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Read private key
+  ansible.builtin.slurp:
+    src: "{{ fleet_site_secrets_dir }}/{{ fleet_site_name }}/privatekey"
+  register: fleet_site_priv_slurp
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Derive public key
+  ansible.builtin.shell:
+    cmd: set -euo pipefail; printf '%s\n' "{{ fleet_site_priv_slurp.content | b64decode | trim }}" | wg pubkey
+  register: fleet_site_pubkey_cmd
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Set WG key facts
+  ansible.builtin.set_fact:
+    fleet_site_wg_private_key: "{{ fleet_site_priv_slurp.content | b64decode | trim }}"
+    fleet_site_wg_public_key: "{{ fleet_site_pubkey_cmd.stdout | trim }}"
+  run_once: true
+
+- name: Fleet site | Generate enrollment token
+  ansible.builtin.set_fact:
+    fleet_site_enrollment_token: >-
+      {{
+        fleet_site_enrollment_token
+        if (fleet_site_enrollment_token is defined and fleet_site_enrollment_token | length > 32)
+        else lookup('password', fleet_site_secrets_dir + '/' + fleet_site_name + '/enrollment-token chars=ascii_letters,digits length=48')
+      }}
+  run_once: true
+
+- name: Fleet site | Build WG config block for bootstrap script
+  ansible.builtin.set_fact:
+    fleet_site_wg_config_block: "{{ lookup('ansible.builtin.template', role_path + '/templates/wg-site-client.conf.j2') }}"
+  run_once: true
+
+- name: Fleet site | Ensure output directory
+  ansible.builtin.file:
+    path: "{{ fleet_site_output_dir }}/{{ fleet_site_name }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Write bootstrap script
+  ansible.builtin.template:
+    src: bootstrap.sh.j2
+    dest: "{{ fleet_site_output_dir }}/{{ fleet_site_name }}/{{ fleet_site_bootstrap_script_filename }}"
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fleet site | Build dynamic peer for hub
+  ansible.builtin.set_fact:
+    fleet_site_dynamic_peer:
+      name: "site-{{ fleet_site_name }}"
+      public_key: "{{ fleet_site_wg_public_key }}"
+      allowed_ips: "{{ fleet_site_wg_address | ansible.utils.ipaddr('host') }}"
+  run_once: true
+
+- name: Fleet site | Merge site peer into hub dynamic peers
+  ansible.builtin.set_fact:
+    wireguard_site_dynamic_peers: "{{ [fleet_site_dynamic_peer] }}"
+  run_once: true
+
+- name: Fleet site | Register peer on hub
+  ansible.builtin.import_role:
+    name: fleet_site
+    tasks_from: hub_wg_peer.yml
+  when: not (fleet_site_skip_hub_peer | default(false) | bool)
+  tags: [wireguard_server]
+
+- name: Fleet site | Summary
+  ansible.builtin.debug:
+    msg: >-
+      Site {{ fleet_site_name }}: overlay {{ fleet_site_wg_address }}
+      script {{ fleet_site_output_dir }}/{{ fleet_site_name }}/{{ fleet_site_bootstrap_script_filename }}
+  run_once: true

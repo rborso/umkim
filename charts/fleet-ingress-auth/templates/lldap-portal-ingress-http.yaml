@@ -1,0 +1,23 @@
+{{- if and .Values.enabled .Values.traefik.deploySpokeMiddleware .Values.lldap.exposeWebUI .Values.lldap.webUIHost }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lldap-portal-http
+  namespace: {{ include "fleet-ingress-auth.namespace" . }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s@file" (.Values.traefik.redirectMiddlewareName | default "homelab-redirect-https") | quote }}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.lldap.webUIHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lldap
+                port:
+                  number: {{ .Values.lldap.httpPort }}
+{{- end }}

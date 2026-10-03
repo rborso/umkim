@@ -1,0 +1,55 @@
+---
+- name: Fleet edge | Check domain registry console-managed
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get configmap {{ fleet_edge_domains_configmap_name | default('fleet-edge-domains') }}
+      -n {{ fleet_edge_controller_namespace | default('fleet-system') }}
+      -o jsonpath={.metadata.annotations.fleet\.umkim\.com/console-managed}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_domains_cm_managed
+  failed_when: false
+  changed_when: false
+  run_once: true
+  tags: [fleet_edge, fleet_edge_registry, fleet_edge_domains]
+
+- name: Fleet edge | Check domain registry ConfigMap exists
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get configmap {{ fleet_edge_domains_configmap_name | default('fleet-edge-domains') }}
+      -n {{ fleet_edge_controller_namespace | default('fleet-system') }}
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_edge_domains_cm_exists
+  failed_when: false
+  changed_when: false
+  run_once: true
+  tags: [fleet_edge, fleet_edge_registry, fleet_edge_domains]
+
+- name: Fleet edge | Apply domain registry ConfigMap
+  when:
+    - fleet_edge_domains_cm_managed.stdout | default('') != 'true'
+    - fleet_edge_domains_cm_exists.rc != 0
+  block:
+    - name: Fleet edge | Render domain registry
+      ansible.builtin.template:
+        src: fleet-edge-domains-configmap.yml.j2
+        dest: /tmp/fleet-edge-domains-cm.yaml
+        mode: "0644"
+      delegate_to: "{{ groups['hub'][0] }}"
+      run_once: true
+
+    - name: Fleet edge | kubectl apply domain registry
+      ansible.builtin.command:
+        cmd: kubectl apply -f /tmp/fleet-edge-domains-cm.yaml
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path }}"
+      delegate_to: "{{ groups['hub'][0] }}"
+      run_once: true
+      register: fleet_edge_domains_cm_apply
+      changed_when: >-
+        'created' in fleet_edge_domains_cm_apply.stdout
+        or 'configured' in fleet_edge_domains_cm_apply.stdout

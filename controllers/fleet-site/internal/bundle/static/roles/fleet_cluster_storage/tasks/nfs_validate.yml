@@ -1,0 +1,398 @@
+---
+- name: Fleet cluster storage | Skip validate when not nfs_external
+  ansible.builtin.meta: end_host
+  when: not ((fleet_cluster_nfs_enabled | default(false) | bool) or (fleet_cluster_storage_backend | default('local_path') == 'nfs_external'))
+
+- name: Fleet cluster storage | Initialize NFS validate checks
+  ansible.builtin.set_fact:
+    nfs_validate_checks: []
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Check nfs-utils package
+  ansible.builtin.command:
+    cmd: rpm -q nfs-utils
+  register: fleet_nfs_validate_nfs_utils
+  failed_when: false
+  changed_when: false
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record nfs-utils check
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'nfs_utils',
+        'ok': fleet_nfs_validate_nfs_utils.rc == 0,
+        'message': (
+          'nfs-utils installed on bootstrap node'
+          if fleet_nfs_validate_nfs_utils.rc == 0
+          else 'nfs-utils not installed (installed automatically when enabling NFS storage)'
+        )
+      }] }}
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Probe NFS RPC port
+  ansible.builtin.shell: |
+    set -euo pipefail
+    timeout 8 bash -c "</dev/tcp/{{ fleet_cluster_nfs_server }}/2049"
+  args:
+    executable: /bin/bash
+  register: fleet_nfs_validate_rpc
+  failed_when: false
+  changed_when: false
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record NFS reachability check
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'nfs_reachable',
+        'ok': fleet_nfs_validate_rpc.rc == 0,
+        'message': (
+          'TCP port 2049 reachable on ' ~ fleet_cluster_nfs_server
+          if fleet_nfs_validate_rpc.rc == 0
+          else 'NFS server ' ~ fleet_cluster_nfs_server ~ ' unreachable on TCP 2049 (routing, firewall, or NFS not running)'
+        )
+      }] }}
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | List NFS exports
+  ansible.builtin.command:
+    cmd: showmount -e {{ fleet_cluster_nfs_server }}
+  register: fleet_nfs_validate_showmount
+  failed_when: false
+  changed_when: false
+  when: fleet_nfs_validate_nfs_utils.rc == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record export visibility check
+  ansible.builtin.set_fact:
+    nfs_export_visible: >-
+      {{
+        fleet_cluster_nfs_export_base in (fleet_nfs_validate_showmount.stdout | default(''))
+        or fleet_cluster_nfs_export_base ~ ' ' in (fleet_nfs_validate_showmount.stdout | default(''))
+      }}
+  when: fleet_nfs_validate_nfs_utils.rc == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record export visibility (skip when showmount unavailable)
+  ansible.builtin.set_fact:
+    nfs_export_visible: true
+  when: fleet_nfs_validate_nfs_utils.rc != 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Append export visibility check
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'export_visible',
+        'ok': nfs_export_visible | bool,
+        'message': (
+          'Export base ' ~ fleet_cluster_nfs_export_base ~ ' listed by showmount -e'
+          if nfs_export_visible | bool
+          else (
+            'Export base ' ~ fleet_cluster_nfs_export_base ~ ' not listed by showmount -e '
+            ~ fleet_cluster_nfs_server ~ ' (wrong path or client not allowed to list exports)'
+          )
+        )
+      }] }}
+  when: fleet_nfs_validate_nfs_utils.rc == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Normalize delegate host for validate
+  ansible.builtin.set_fact:
+    fleet_nfs_validate_delegate: >-
+      {{
+        (
+          fleet_cluster_nfs_delegate_host
+          | default(cluster_storage_nfs_delegate_host | default(''))
+          | trim
+        )
+        if (
+          fleet_cluster_nfs_delegate_host
+          | default(cluster_storage_nfs_delegate_host | default(''))
+          | trim
+        ) not in ['', 'fleet_nfs_delegate']
+        else ''
+      }}
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Check cluster path on delegate host via SSH
+  ansible.builtin.command:
+    argv:
+      - ssh
+      - -o
+      - BatchMode=yes
+      - -o
+      - StrictHostKeyChecking=no
+      - -o
+      - UserKnownHostsFile=/dev/null
+      - -i
+      - "{{ ansible_ssh_private_key_file | default('/root/.ssh/id_rsa') }}"
+      - "{{ (fleet_cluster_nfs_delegate_user | default(ansible_user | default('linux'))) }}@{{ fleet_nfs_validate_delegate }}"
+      - "test -d {{ fleet_cluster_nfs_path }}"
+  register: fleet_nfs_validate_delegate_ssh
+  failed_when: false
+  changed_when: false
+  when: fleet_nfs_validate_delegate | length > 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record delegate path check
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'cluster_path',
+        'ok': fleet_nfs_validate_delegate_ssh.rc == 0,
+        'message': (
+          'Cluster path ' ~ fleet_cluster_nfs_path ~ ' exists on delegate host ' ~ fleet_nfs_validate_delegate
+          if fleet_nfs_validate_delegate_ssh.rc == 0
+          else 'Cluster path ' ~ fleet_cluster_nfs_path ~ ' missing or not SSH-reachable on '
+               ~ fleet_nfs_validate_delegate ~ ' (create directory or fix delegate SSH)'
+        )
+      }] }}
+  when: fleet_nfs_validate_delegate | length > 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Append mount skipped when nfs-utils missing
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'mount_write',
+        'ok': false,
+        'message': 'Skipped mount probe (install nfs-utils to test mount and write)'
+      }] }}
+  when: fleet_nfs_validate_nfs_utils.rc != 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Prepare mount probe directory
+  ansible.builtin.file:
+    path: /tmp/umkim-nfs-validate
+    state: absent
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Create mount probe directory
+  ansible.builtin.file:
+    path: /tmp/umkim-nfs-validate
+    state: directory
+    mode: "0755"
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Resolve NFS client mount path for probe
+  ansible.builtin.include_tasks: nfs_resolve_mount_path.yml
+  when: fleet_nfs_validate_nfs_utils.rc == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Mount NFS export for probe
+  ansible.builtin.command:
+    cmd: >-
+      mount -t nfs -o {{ fleet_cluster_nfs_mount_options | join(',') }}
+      {{ fleet_cluster_nfs_server }}:{{ fleet_cluster_nfs_client_path }} /tmp/umkim-nfs-validate
+  register: fleet_nfs_validate_mount
+  failed_when: false
+  changed_when: false
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - fleet_cluster_nfs_client_path | default('') | length > 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record mount check
+  ansible.builtin.set_fact:
+    nfs_validate_mount_ok: "{{ fleet_nfs_validate_mount.rc == 0 }}"
+    nfs_validate_mount_msg: >-
+      {{
+        'Mounted ' ~ fleet_cluster_nfs_server ~ ':' ~ fleet_cluster_nfs_client_path ~ ' from bootstrap node'
+        ~ (
+          ' (NFSv4 client path; export base ' ~ fleet_cluster_nfs_export_base ~ ' is not the mount path)'
+          if fleet_cluster_nfs_client_path != fleet_cluster_nfs_path else ''
+        )
+        if fleet_nfs_validate_mount.rc == 0
+        else (
+          'Mount failed for ' ~ fleet_cluster_nfs_server ~ ':' ~ (fleet_cluster_nfs_client_path | default(fleet_cluster_nfs_path)) ~ ': '
+          ~ (fleet_nfs_validate_mount.stderr | default(fleet_nfs_validate_mount.stdout) | trim)
+          ~ (
+            '; tried client paths including ' ~ fleet_cluster_nfs_path ~ ' and /' ~ fleet_cluster_nfs_cluster_path
+            if fleet_nfs_resolve_mount.rc | default(1) != 0 else ''
+          )
+        )
+      }}
+  when: fleet_nfs_validate_nfs_utils.rc == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Stat mount root is a directory
+  ansible.builtin.stat:
+    path: /tmp/umkim-nfs-validate
+  register: fleet_nfs_validate_stat
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record mount root type check
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'mount_write',
+        'ok': fleet_nfs_validate_stat.stat.isdir | default(false),
+        'message': (
+          'NFS mount is a writable directory at ' ~ fleet_cluster_nfs_server ~ ':' ~ fleet_cluster_nfs_client_path
+          if fleet_nfs_validate_stat.stat.isdir | default(false)
+          else (
+            'NFS mount root is not a directory (provisioner cannot create PVC subdirs). '
+            ~ 'Set client mount path to the filesystem export, e.g. '
+            ~ fleet_cluster_nfs_path ~ ', not an NFSv4 pseudo-path unless fsid=0 is configured.'
+          )
+        )
+      }] }}
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Create provisioner-style subdirectory on mount
+  ansible.builtin.file:
+    path: "/tmp/umkim-nfs-validate/{{ fleet_cluster_storage_cluster_name }}-provisioner-probe"
+    state: directory
+    mode: "0777"
+  register: fleet_nfs_validate_subdir
+  failed_when: false
+  changed_when: false
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+    - fleet_nfs_validate_stat.stat.isdir | default(false)
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Write probe file inside provisioner subdirectory
+  ansible.builtin.copy:
+    content: "umkim-nfs-probe\n"
+    dest: "/tmp/umkim-nfs-validate/{{ fleet_cluster_storage_cluster_name }}-provisioner-probe/.umkim-probe"
+    mode: "0644"
+  register: fleet_nfs_validate_subdir_write
+  failed_when: false
+  changed_when: false
+  when:
+    - fleet_nfs_validate_subdir is defined
+    - not (fleet_nfs_validate_subdir.failed | default(true))
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record provisioner subdirectory check
+  ansible.builtin.set_fact:
+    nfs_validate_subdir_probe_ok: >-
+      {{
+        not (fleet_nfs_validate_subdir_write.failed | default(true))
+        if fleet_nfs_validate_subdir_write is defined
+        else not (fleet_nfs_validate_subdir.failed | default(true))
+      }}
+    nfs_validate_subdir_probe_msg: >-
+      {{
+        fleet_nfs_validate_subdir.msg
+        if (fleet_nfs_validate_subdir.failed | default(false))
+        else fleet_nfs_validate_subdir_write.msg | default('write probe failed')
+      }}
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+    - fleet_nfs_validate_stat.stat.isdir | default(false)
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Append provisioner subdirectory check
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'provisioner_subdir',
+        'ok': nfs_validate_subdir_probe_ok | bool,
+        'message': (
+          'Created subdirectory on NFS mount (nfs-subdir-external-provisioner compatible)'
+          if nfs_validate_subdir_probe_ok | bool
+          else (
+            'Could not create PVC subdirectory on mount: '
+            ~ nfs_validate_subdir_probe_msg
+            ~ '. Use client mount path '
+            ~ fleet_cluster_nfs_path
+            ~ ' (export base + cluster path) instead of NFSv4 /'
+            ~ fleet_cluster_nfs_cluster_path
+            ~ ' unless the server exports an NFSv4 root.'
+          )
+        )
+      }] }}
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+    - fleet_nfs_validate_stat.stat.isdir | default(false)
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Record NFSv4 client path advisory
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'nfs_client_path',
+        'ok': nfs_validate_subdir_probe_ok | bool,
+        'message': (
+          'Client mount path ' ~ fleet_cluster_nfs_client_path
+          ~ ' differs from export directory ' ~ fleet_cluster_nfs_path
+          ~ ' (NFSv4 pseudo-path). Subdirectory probe passed.'
+          if nfs_validate_subdir_probe_ok | bool
+          else (
+            'Auto-resolved client path ' ~ fleet_cluster_nfs_client_path
+            ~ ' differs from export ' ~ fleet_cluster_nfs_path
+            ~ '. Set mount path explicitly to ' ~ fleet_cluster_nfs_path
+            ~ ' unless NFSv4 fsid=0 root is configured on the server.'
+          )
+        )
+      }] }}
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+    - fleet_cluster_nfs_client_path | default('') != fleet_cluster_nfs_path
+    - fleet_cluster_nfs_mount_path | default('') | trim | length == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Append mount check when write skipped
+  ansible.builtin.set_fact:
+    nfs_validate_checks: >-
+      {{ nfs_validate_checks + [{
+        'name': 'mount_write',
+        'ok': nfs_validate_mount_ok | default(false),
+        'message': nfs_validate_mount_msg | default('Mount probe skipped')
+      }] }}
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - not (nfs_validate_mount_ok | default(false))
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Unmount NFS probe
+  ansible.builtin.command:
+    cmd: umount /tmp/umkim-nfs-validate
+  register: fleet_nfs_validate_umount
+  failed_when: false
+  changed_when: false
+  when:
+    - fleet_nfs_validate_nfs_utils.rc == 0
+    - nfs_validate_mount_ok | default(false)
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Remove mount probe directory
+  ansible.builtin.file:
+    path: /tmp/umkim-nfs-validate
+    state: absent
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Build validate result
+  ansible.builtin.set_fact:
+    nfs_validate_result:
+      ok: "{{ (nfs_validate_checks | rejectattr('ok') | list | length) == 0 }}"
+      checks: "{{ nfs_validate_checks }}"
+      nfsPath: "{{ fleet_cluster_nfs_path }}"
+      mountPath: "{{ fleet_cluster_nfs_client_path | default('') }}"
+      node: "{{ inventory_hostname }}"
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Emit validate JSON marker
+  ansible.builtin.debug:
+    msg: "UMKIM_NFS_VALIDATE_JSON:{{ nfs_validate_result | to_json }}"
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Fail when NFS validation checks failed
+  ansible.builtin.fail:
+    msg: "NFS storage validation failed"
+  when: not (nfs_validate_result.ok | bool)
+  tags: [fleet_cluster_storage]

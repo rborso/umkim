@@ -1,0 +1,42 @@
+---
+- name: Fleet backup | Render MinIO manifests
+  ansible.builtin.template:
+    src: minio.yaml.j2
+    dest: "/tmp/fleet-velero-minio.yaml"
+    mode: "0600"
+  tags: [fleet_backup, fleet_backup_hub]
+
+- name: Fleet backup | Apply MinIO on hub
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-velero-minio.yaml
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_backup_minio_apply
+  changed_when: "'created' in fleet_backup_minio_apply.stdout or 'configured' in fleet_backup_minio_apply.stdout"
+  tags: [fleet_backup, fleet_backup_hub]
+
+- name: Fleet backup | Wait for MinIO deployment
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_velero_minio_namespace }}
+      rollout status deployment/{{ fleet_velero_minio_service_name }} --timeout=180s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  changed_when: false
+  tags: [fleet_backup, fleet_backup_hub]
+
+- name: Fleet backup | Ensure Velero bucket exists
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n {{ fleet_velero_minio_namespace }} exec deploy/{{ fleet_velero_minio_service_name }} --
+      sh -c 'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null || true;
+      mc mb --ignore-existing local/{{ fleet_velero_minio_bucket }}'
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_backup_minio_bucket
+  changed_when: "'Bucket created' in fleet_backup_minio_bucket.stdout"
+  failed_when: false
+  tags: [fleet_backup, fleet_backup_hub]

@@ -1,0 +1,46 @@
+---
+# Manual / debug: issue bootstrap script + hub WG peer for a new site (no controller).
+#
+#   ansible-playbook site-issue-script.yml -e fleet_site_name=lab-site1
+#   ansible-playbook site-issue-script.yml -e fleet_site_name=lab-site1 -e fleet_site_wg_address=10.10.0.15/32
+#
+# Output: output/fleet-sites/<name>/bootstrap.sh
+
+- name: Fleet site | Load hub public key
+  hosts: hub
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.slurp:
+        src: "{{ wireguard_public_key_path | default('/etc/wireguard/publickey') }}"
+      register: wireguard_hub_pubkey_slurp
+      tags: [fleet_site, fleet_site_issue]
+
+    - ansible.builtin.set_fact:
+        wireguard_hub_public_key: "{{ wireguard_hub_pubkey_slurp.content | b64decode | trim }}"
+      tags: [fleet_site, fleet_site_issue]
+
+- name: Fleet site | Issue bootstrap script
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    wireguard_hub_public_key: "{{ hostvars[groups['hub'] | first]['wireguard_hub_public_key'] }}"
+    fleet_site_skip_hub_peer: true
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: issue_script.yml
+
+- name: Fleet site | Register overlay peer on hub
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_site_wg_public_key: "{{ hostvars['localhost']['fleet_site_wg_public_key'] }}"
+    fleet_site_wg_address: "{{ hostvars['localhost']['fleet_site_wg_address'] }}"
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_site
+        tasks_from: hub_wg_peer.yml

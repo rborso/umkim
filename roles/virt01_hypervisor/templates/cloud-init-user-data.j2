@@ -1,0 +1,58 @@
+#cloud-config
+hostname: {{ vm_name }}
+fqdn: {{ vm_name }}.{{ domain }}
+manage_etc_hosts: true
+ssh_pwauth: false
+system_info:
+  default_user:
+    name: linux
+    lock_passwd: true
+users:
+  - name: rocky
+    lock_passwd: true
+    groups: [wheel]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+    ssh_authorized_keys:
+{% for key in virt01_k3s_ssh_authorized_keys %}
+      - {{ key }}
+{% endfor %}
+  - name: linux
+    groups: [wheel]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+    ssh_authorized_keys:
+{% for key in virt01_k3s_ssh_authorized_keys %}
+      - {{ key }}
+{% endfor %}
+write_files:
+  - path: /etc/NetworkManager/system-connections/eth0-static.nmconnection
+    permissions: "0600"
+    content: |
+      [connection]
+      id=eth0-static
+      type=ethernet
+      interface-name=eth0
+      autoconnect=true
+
+      [ethernet]
+
+      [ipv4]
+      method=manual
+      address1={{ vm_ip }}/{{ virt01_k3s_vm_network.prefix }},{{ virt01_k3s_vm_network.gateway }}
+      dns={{ virt01_k3s_vm_network.dns | join(';') }};;
+
+      [ipv6]
+      method=disabled
+package_update: false
+packages:
+  - openssh-server
+  - curl
+  - tar
+  - policycoreutils-python-utils
+runcmd:
+  - nmcli con delete "Wired connection 1" 2>/dev/null || true
+  - nmcli con load /etc/NetworkManager/system-connections/eth0-static.nmconnection
+  - nmcli con up eth0-static
+  - systemctl enable --now sshd
+  - systemctl disable --now firewalld || true

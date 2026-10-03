@@ -1,0 +1,25 @@
+FROM docker.io/library/golang:1.26.0-bookworm@sha256:2a0ba12e116687098780d3ce700f9ce3cb340783779646aafbabed748fa6677c AS build
+ENV GOTOOLCHAIN=local
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download 2>/dev/null || true
+COPY . .
+RUN go mod tidy && CGO_ENABLED=0 go build -o /fleet-edge-controller ./cmd/controller && \
+    CGO_ENABLED=0 go build -o /fleet-edge-route-sync ./cmd/route-sync
+
+FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/rborso/umkim"
+LABEL org.opencontainers.image.vendor="Robert Borso"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates=20230311+deb12u1 \
+    curl=7.88.1-10+deb12u15 \
+    && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.1/bin/linux/amd64/kubectl" \
+    && echo "5b86f0b06e1a5ba6f8f00e2b01e8ed39407729c4990aeda961f83a586f975e8a  /usr/local/bin/kubectl" | sha256sum -c - \
+    && chmod +x /usr/local/bin/kubectl \
+    && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+COPY LICENSE NOTICE /licenses/
+COPY --from=build /fleet-edge-controller /usr/local/bin/fleet-edge-controller
+COPY --from=build /fleet-edge-route-sync /usr/local/bin/fleet-edge-route-sync
+EXPOSE 8081
+ENTRYPOINT ["/usr/local/bin/fleet-edge-controller"]

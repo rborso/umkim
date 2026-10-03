@@ -1,0 +1,22 @@
+---
+- name: WireGuard | Install packages
+  ansible.builtin.import_tasks: install.yml
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Generate or load keys
+  ansible.builtin.import_tasks: keys.yml
+  tags: [wireguard, wireguard_install]
+
+- name: WireGuard | Configure hub server
+  ansible.builtin.import_tasks: server.yml
+  when: wireguard_role == 'server'
+  tags: [wireguard, wireguard_server]
+
+- name: WireGuard | Configure spoke clients
+  ansible.builtin.import_tasks: client.yml
+  when: wireguard_role == 'client'
+  tags: [wireguard, wireguard_client]
+
+- name: WireGuard | Verify overlay connectivity
+  ansible.builtin.import_tasks: verify.yml
+  tags: [wireguard, wireguard_verify]

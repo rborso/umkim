@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fleet-console-auth
+  namespace: fleet-console
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fleet-console-auth
+rules:
+  - apiGroups: ["console.umkim.com"]
+    resources:
+      - fleetroles
+      - fleetrolebindings
+      - fleetusers
+      - fleetgroups
+      - fleetserviceaccounts
+      - fleetcatalogaccesses
+      - fleetauditevents
+      - fleetllmapikeys
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["console.umkim.com"]
+    resources: ["fleetllmapikeys/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["fleet.umkim.com"]
+    resources: ["fleetsites", "fleetllms"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["managedclusters"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fleet-console-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fleet-console-auth
+subjects:
+  - kind: ServiceAccount
+    name: fleet-console-auth
+    namespace: fleet-console

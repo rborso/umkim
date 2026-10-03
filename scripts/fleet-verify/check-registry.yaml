@@ -1,0 +1,655 @@
+# Fleet-verify master check catalog. Scripts live under scripts/; thin handlers under checks/.
+---
+- id: preflight.hub-inventory
+  layer: [1]
+  suite: [hub, core]
+  module: S1
+  mode: readonly
+  requires: [hub]
+  profiles: [hub-only, homelab]
+  script: scripts/preflight-hub-inventory.sh
+  timeout_s: 120
+  blocking: true
+
+- id: preflight.secrets
+  layer: [1]
+  suite: [hub, core]
+  module: S1
+  mode: readonly
+  requires: [hub, vault]
+  profiles: [hub-only, homelab]
+  script: scripts/preflight-secrets.sh
+  timeout_s: 120
+  blocking: true
+
+- id: preflight.v1
+  layer: [1]
+  suite: [hub, core]
+  module: S1
+  mode: readonly
+  requires: [hub]
+  profiles: [hub-only, homelab]
+  script: scripts/preflight-v1.sh
+  timeout_s: 180
+  blocking: true
+
+- id: docs.tiers
+  layer: [1]
+  suite: [hub, core]
+  module: S1
+  mode: readonly
+  requires: [hub]
+  profiles: [hub-only, homelab]
+  script: scripts/check-doc-tiers.sh
+  timeout_s: 60
+  blocking: true
+
+- id: core.cluster-labels
+  layer: [1]
+  suite: [core, hub]
+  module: S2
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-cluster-labels.sh
+  timeout_s: 180
+  blocking: true
+
+- id: hub.install
+  layer: [1]
+  suite: [hub, core]
+  module: S3
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-hub-install.sh
+  timeout_s: 300
+  blocking: true
+
+- id: hub.charts
+  layer: [1]
+  suite: [hub, apps]
+  module: S3
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-fleet-chart.sh
+  timeout_s: 120
+  blocking: true
+
+- id: llm.fleet
+  layer: [1]
+  suite: [llm]
+  module: S3
+  mode: readonly
+  requires: [hub, fleet_api, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-fleet-llm.sh
+  timeout_s: 180
+  blocking: true
+
+- id: llm.gpu-discovery
+  layer: [1]
+  suite: [llm, core]
+  module: S3
+  mode: readonly
+  requires: [hub, kubectl, gpu]
+  profiles: [homelab]
+  script: scripts/verify-gpu-discovery.sh
+  timeout_s: 120
+  blocking: false
+
+- id: edge.ingress-auth
+  layer: [1]
+  suite: [edge, hub]
+  module: S5
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-fleet-ingress-auth.sh
+  timeout_s: 300
+  blocking: true
+
+- id: edge.route-hub-health
+  layer: [1]
+  suite: [edge, hub]
+  module: S5
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-route-hub-health.sh
+  timeout_s: 180
+  blocking: true
+
+- id: edge.gateway-ha
+  layer: [1]
+  suite: [edge, hub]
+  module: S5
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-gateway-ha.sh
+  timeout_s: 300
+  blocking: true
+
+- id: edge.acme-production
+  layer: [1]
+  suite: [edge]
+  module: S5
+  mode: readonly
+  requires: [hub, dns, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-acme-production.sh
+  timeout_s: 300
+  blocking: true
+
+- id: edge.acme-ingress
+  layer: [1]
+  suite: [edge]
+  module: S5
+  mode: readonly
+  requires: [hub, dns, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-acme-ingress.sh
+  timeout_s: 300
+  blocking: true
+
+- id: edge.acme-queue-backoff
+  layer: [1]
+  suite: [edge]
+  module: S5
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-acme-queue-backoff.sh
+  timeout_s: 300
+  blocking: true
+
+- id: edge.site-acme
+  layer: [1]
+  suite: [edge]
+  module: S5
+  mode: readonly
+  requires: [hub, fleet_api, dns]
+  profiles: [homelab]
+  script: scripts/verify-fleet-edge-site-acme.sh
+  timeout_s: 300
+  blocking: true
+
+- id: ops.fleet-backup
+  layer: [1]
+  suite: [backup, hub]
+  module: S8
+  mode: readonly
+  requires: [hub, fleet_api, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-fleet-backup.sh
+  timeout_s: 300
+  blocking: true
+
+- id: ops.site-cluster-model
+  layer: [1]
+  suite: [core, hub]
+  module: S8
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [homelab]
+  script: scripts/verify-site-cluster-model.sh
+  timeout_s: 180
+  blocking: true
+
+- id: ops.umkim-management-site
+  layer: [1]
+  suite: [hub, core]
+  module: S8
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [homelab]
+  script: scripts/verify-umkim-management-site.sh
+  timeout_s: 180
+  blocking: true
+
+- id: fleet.cluster-nodes
+  layer: [1]
+  suite: [core, hub]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-fleet-cluster-nodes.sh
+  timeout_s: 180
+  blocking: true
+
+- id: fleet.healthz
+  layer: [1]
+  suite: [hub, core]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-healthz.sh
+  timeout_s: 30
+  blocking: true
+
+- id: fleet.sites.list
+  layer: [1]
+  suite: [hub, core]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-sites-list.sh
+  timeout_s: 60
+  blocking: true
+
+- id: fleet.clusters.list
+  layer: [1]
+  suite: [hub, core]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-clusters-list.sh
+  timeout_s: 60
+  blocking: true
+
+- id: fleet.infra.hub
+  layer: [1]
+  suite: [hub, core]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-infra-hub.sh
+  timeout_s: 60
+  blocking: true
+
+- id: fleet.edge.domains
+  layer: [1]
+  suite: [edge, hub]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api, dns]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-edge-domains.sh
+  timeout_s: 60
+  blocking: true
+
+- id: fleet.infra.singletons
+  layer: [1]
+  suite: [hub, core]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-infra-singletons.sh
+  timeout_s: 120
+  blocking: true
+
+- id: fleet.backup.infra
+  layer: [1]
+  suite: [backup, hub]
+  module: S6
+  mode: readonly
+  requires: [hub, fleet_api]
+  profiles: [hub-only, homelab]
+  handler: checks/fleet-backup-infra.sh
+  timeout_s: 60
+  blocking: false
+
+- id: auth.gate
+  layer: [1]
+  suite: [hub, tenancy]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/auth-gate.sh
+  timeout_s: 60
+  blocking: true
+
+- id: auth.me
+  layer: [1]
+  suite: [hub, tenancy]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/auth-me.sh
+  timeout_s: 60
+  blocking: true
+
+- id: auth.admin.lists
+  layer: [1]
+  suite: [tenancy, hub]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/auth-admin-lists.sh
+  timeout_s: 120
+  blocking: true
+
+- id: auth.readonly
+  layer: [1]
+  suite: [hub, tenancy]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/auth-readonly.sh
+  timeout_s: 180
+  blocking: true
+
+- id: console.playwright.smoke
+  layer: [1]
+  suite: [hub, core]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/playwright-smoke.sh
+  timeout_s: 600
+  blocking: true
+
+- id: console.playwright.infrastructure
+  layer: [1]
+  suite: [hub, core]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/playwright-infrastructure.sh
+  timeout_s: 600
+  blocking: true
+
+- id: console.playwright.clusters
+  layer: [1]
+  suite: [core, hub]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [hub-only, homelab]
+  handler: checks/playwright-clusters.sh
+  timeout_s: 600
+  blocking: true
+
+- id: console.playwright.cluster-detail
+  layer: [1]
+  suite: [core, hub]
+  module: S7
+  mode: readonly
+  requires: [hub, console, fleet_api]
+  profiles: [homelab]
+  handler: checks/playwright-cluster-detail.sh
+  timeout_s: 600
+  blocking: false
+
+- id: console.playwright.admin-viewer
+  layer: [1]
+  suite: [core, hub]
+  module: S7
+  mode: readonly
+  requires: [hub, console]
+  profiles: [homelab]
+  handler: checks/playwright-admin-viewer.sh
+  timeout_s: 600
+  blocking: false
+
+- id: ansible.wireguard
+  layer: [1]
+  suite: [core, hub]
+  module: S2
+  mode: readonly
+  requires: [hub]
+  profiles: [hub-only, homelab]
+  handler: checks/ansible-verify.sh
+  env:
+    FV_ANSIBLE_PLAYBOOK: wireguard.yml
+    FV_ANSIBLE_TAGS: wireguard_verify
+  timeout_s: 600
+  blocking: true
+
+- id: ansible.platform
+  layer: [1]
+  suite: [hub, core]
+  module: S3
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [hub-only, homelab]
+  handler: checks/ansible-verify.sh
+  env:
+    FV_ANSIBLE_PLAYBOOK: fleet-platform.yml
+    FV_ANSIBLE_TAGS: phase4_verify
+  timeout_s: 600
+  blocking: true
+
+- id: ansible.spoke-ingress
+  layer: [1]
+  suite: [edge, core]
+  module: S5
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [homelab]
+  handler: checks/ansible-verify.sh
+  env:
+    FV_ANSIBLE_PLAYBOOK: fleet-spoke-ingress.yml
+    FV_ANSIBLE_TAGS: spoke_ingress_verify
+  timeout_s: 600
+  blocking: true
+
+- id: ansible.fleet-edge
+  layer: [1]
+  suite: [edge, hub]
+  module: S5
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [hub-only, homelab]
+  handler: checks/ansible-verify.sh
+  env:
+    FV_ANSIBLE_PLAYBOOK: fleet-edge.yml
+    FV_ANSIBLE_TAGS: fleet_edge_verify
+  timeout_s: 600
+  blocking: true
+
+- id: cluster.reinstall.preset
+  layer: [2]
+  suite: [core, regression]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api, jumphost, kubectl]
+  profiles: [homelab]
+  handler: checks/cluster-reinstall.sh
+  timeout_s: 7200
+  blocking: true
+
+- id: parity.site.create
+  layer: [2]
+  suite: [core]
+  module: S7
+  mode: mutating
+  requires: [hub, fleet_api, console]
+  profiles: [homelab]
+  handler: parity/run-parity.sh
+  timeout_s: 600
+  blocking: true
+  parity: true
+
+- id: parity.deploy.submit
+  layer: [2]
+  suite: [core, apps]
+  module: S7
+  mode: mutating
+  requires: [hub, console]
+  profiles: [homelab]
+  handler: parity/run-parity.sh
+  timeout_s: 900
+  blocking: true
+  parity: true
+
+- id: fleet.cluster-join
+  layer: [2]
+  suite: [core, regression]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api, jumphost]
+  profiles: [homelab]
+  script: scripts/verify-fleet-cluster-join.sh
+  timeout_s: 1800
+  blocking: true
+
+- id: fleet.sites-api
+  layer: [2]
+  suite: [core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api]
+  profiles: [homelab]
+  script: scripts/verify-fleet-sites-api.sh
+  timeout_s: 600
+  blocking: true
+
+- id: fleet.clusters-api
+  layer: [2]
+  suite: [core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api, jumphost]
+  profiles: [homelab]
+  script: scripts/verify-fleet-clusters-api.sh
+  timeout_s: 1800
+  blocking: true
+
+- id: edge.external-access
+  layer: [2]
+  suite: [edge, regression]
+  module: S5
+  mode: mutating
+  requires: [hub, fleet_api, dns, jumphost]
+  profiles: [homelab]
+  script: scripts/verify-fleet-external-access.sh
+  timeout_s: 600
+  blocking: true
+
+- id: edge.cluster-ingress-auth-enable
+  layer: [2]
+  suite: [edge]
+  module: S5
+  mode: mutating
+  requires: [hub, fleet_api, console, kubectl]
+  profiles: [homelab]
+  script: scripts/verify-cluster-ingress-auth-enable.sh
+  timeout_s: 900
+  blocking: true
+
+- id: storage.cluster-configure
+  layer: [2]
+  suite: [core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api, jumphost]
+  profiles: [homelab]
+  script: scripts/verify-fleet-cluster-storage-configure.sh
+  timeout_s: 1200
+  blocking: true
+
+- id: llm.inference-e2e
+  layer: [2]
+  suite: [llm, regression]
+  module: S3
+  mode: mutating
+  requires: [hub, fleet_api, console, gpu]
+  profiles: [homelab]
+  script: scripts/verify-llm-inference-e2e.sh
+  timeout_s: 1800
+  blocking: true
+  env:
+    # Optional GPU topology; not one of the three default cluster examples.
+    FLEET_LLM_CLUSTER: example-gpu
+    FLEET_GPU_CLUSTER: example-gpu
+    SKIP_LLM_DEPLOY: "0"
+    LLM_E2E_USE_MOCK_FALLBACK: "0"
+
+- id: llm.fleetapp-lifecycle
+  layer: [2]
+  suite: [llm, apps]
+  module: S3
+  mode: mutating
+  requires: [hub, fleet_api, gpu]
+  profiles: [homelab]
+  script: scripts/verify-fleet-llama-app-lifecycle.sh
+  timeout_s: 2400
+  blocking: false
+  env:
+    FLEET_LLM_CLUSTER: lab-gpu-0
+
+- id: llm.profile-verify
+  layer: [2]
+  suite: [llm, apps]
+  module: S3
+  mode: mutating
+  requires: [hub, fleet_api, gpu]
+  profiles: [homelab]
+  script: scripts/verify-fleet-llama-profile.sh
+  timeout_s: 3600
+  blocking: false
+  env:
+    FLEET_LLM_CLUSTER: lab-gpu-0
+
+- id: llm.inference-e2e-hub
+  layer: [2]
+  suite: [llm, hub]
+  module: S3
+  mode: mutating
+  requires: [hub, fleet_api, console]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-llm-inference-e2e.sh
+  timeout_s: 1800
+  blocking: true
+  env:
+    LLM_E2E_USE_MOCK_FALLBACK: "1"
+    SKIP_LLM_DEPLOY: "1"
+
+- id: fleet.sites.patch
+  layer: [2]
+  suite: [core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api]
+  profiles: [homelab]
+  handler: checks/fleet-sites-patch.sh
+  timeout_s: 300
+  blocking: true
+
+- id: fleet.clusters.discover
+  layer: [2]
+  suite: [core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api, jumphost]
+  profiles: [homelab]
+  handler: checks/fleet-clusters-discover.sh
+  timeout_s: 600
+  blocking: true
+
+- id: fleet.clusters.storage
+  layer: [2]
+  suite: [core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api, jumphost]
+  profiles: [homelab]
+  handler: checks/fleet-clusters-storage.sh
+  timeout_s: 1200
+  blocking: true
+
+- id: fleet.infra.patch
+  layer: [2]
+  suite: [hub, core]
+  module: S6
+  mode: mutating
+  requires: [hub, fleet_api]
+  profiles: [homelab]
+  handler: checks/fleet-infra-patch.sh
+  timeout_s: 600
+  blocking: true

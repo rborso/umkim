@@ -1,0 +1,68 @@
+---
+# K3s 1.32+ installs a multus-shim default CNI (00-multus.conf) even with
+# --flannel-backend=none. The shim waits for Calico kube-controllers before
+# attaching pod networks, which deadlocks bootstrap. Break the cycle by running
+# controllers on the host network and using Calico as the primary CNI until the
+# fleet kubevirt/Multus stack is installed (see kubevirt_stack role).
+- name: Calico | Patch kube-controllers hostNetwork for k3s multus-shim deadlock
+  ansible.builtin.command:
+    cmd: >-
+      kubectl -n kube-system patch deployment calico-kube-controllers
+      --type=json -p='[{"op": "add", "path": "/spec/template/spec/hostNetwork", "value": true}]'
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_kc_hostnet
+  changed_when: calico_kc_hostnet.rc == 0
+  failed_when: false
+  when:
+    - (k3s_flannel_backend | default('none')) == 'none'
+    - calico_disable_k3s_multus_shim | default(true) | bool
+  tags: [calico, ocm]
+
+- name: Calico | Stat k3s multus-shim CNI config
+  ansible.builtin.stat:
+    path: /etc/cni/net.d/00-multus.conf
+  register: calico_k3s_multus_conf
+  when:
+    - (k3s_flannel_backend | default('none')) == 'none'
+    - calico_disable_k3s_multus_shim | default(true) | bool
+  tags: [calico, ocm]
+
+- name: Calico | Disable k3s multus-shim default CNI
+  ansible.builtin.command:
+    cmd: mv /etc/cni/net.d/00-multus.conf /etc/cni/net.d/00-multus.conf.disabled-by-calico
+  when:
+    - calico_k3s_multus_conf.stat.exists | default(false)
+    - (k3s_flannel_backend | default('none')) == 'none'
+    - calico_disable_k3s_multus_shim | default(true) | bool
+  register: calico_multus_disabled
+  changed_when: calico_multus_disabled.rc == 0
+  failed_when: false
+  tags: [calico, ocm]
+
+- name: Calico | Restart k3s after disabling multus-shim
+  ansible.builtin.systemd:
+    name: k3s
+    state: restarted
+    daemon_reload: true
+  when:
+    - calico_multus_disabled is changed
+    - (k3s_flannel_backend | default('none')) == 'none'
+    - calico_disable_k3s_multus_shim | default(true) | bool
+  tags: [calico, ocm]
+
+- name: Calico | Wait for k3s API after multus-shim restart
+  ansible.builtin.command:
+    cmd: kubectl get nodes
+  environment:
+    KUBECONFIG: "{{ calico_kubeconfig }}"
+  register: calico_k3s_api
+  until: calico_k3s_api.rc == 0
+  retries: 36
+  delay: 10
+  changed_when: false
+  when:
+    - calico_multus_disabled is changed
+    - (k3s_flannel_backend | default('none')) == 'none'
+    - calico_disable_k3s_multus_shim | default(true) | bool
+  tags: [calico, ocm]

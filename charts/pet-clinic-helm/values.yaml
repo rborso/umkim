@@ -1,0 +1,57 @@
+# Default values for pet-clinic-helm.
+# Fleet catalog merges deploy/pet-clinic-helm/values-fleet.yaml into the advanced values field.
+
+replicaCount: 1
+
+database:
+  engine: postgres
+  version: "18"
+  storageClass: ""
+  storageSize: 2Gi
+  auth:
+    database: petclinic
+    username: petclinic
+    password: CHANGE_ME
+
+app:
+  image:
+    repository: docker.io/springcommunity/spring-framework-petclinic
+    tag: "6.1.2"
+    pullPolicy: IfNotPresent
+  port: 8080
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+web:
+  image:
+    repository: docker.io/library/nginx
+    tag: "1.27-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+postgres:
+  image:
+    repository: docker.io/library/postgres
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+service:
+  type: ClusterIP
+  port: 80

@@ -1,0 +1,58 @@
+---
+# Spoke-side overlay recovery (restart wg-umkim when hub path was restored).
+
+- name: Fleet site overlay | Install umkim DNS-ready helper
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../fleet_cluster_wireguard/files/umkim-wg-wait-dns.sh"
+    dest: /usr/local/libexec/umkim-wg-wait-dns.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Fleet site overlay | Ensure wg-quick systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/wg-quick@.service.d
+    state: directory
+    mode: "0755"
+
+- name: Fleet site overlay | Install wg-quick DNS-ready drop-in
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../fleet_cluster_wireguard/files/wg-quick-umkim-dns-ready.conf"
+    dest: /etc/systemd/system/wg-quick@.service.d/umkim-dns-ready.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: fleet_overlay_dns_dropin
+
+- name: Fleet site overlay | Reload systemd after DNS-ready drop-in
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: fleet_overlay_dns_dropin is changed
+
+- name: Fleet site overlay | Restore pod forwarding through firewalld
+  ansible.builtin.import_role:
+    name: k3s
+    tasks_from: spoke_overlay_nat.yml
+
+- name: Fleet site overlay | Probe hub before restarting WireGuard
+  ansible.builtin.command:
+    cmd: ping -c1 -W2 {{ fleet_hub_wireguard_ip | default('10.10.0.1') }}
+  register: fleet_overlay_hub_ping
+  changed_when: false
+  failed_when: false
+
+- name: Fleet site overlay | Restart spoke WireGuard
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ fleet_cluster_wireguard_interface | default('wg-umkim') }}"
+    state: restarted
+  register: fleet_overlay_spoke_wg_restart
+  when: fleet_overlay_hub_ping.rc != 0
+
+- name: Fleet site overlay | Wait for hub handshake
+  ansible.builtin.pause:
+    seconds: 3
+
+- name: Fleet site overlay | Verify hub reachability from spoke
+  ansible.builtin.command:
+    cmd: ping -c2 -W3 {{ fleet_hub_wireguard_ip | default('10.10.0.1') }}
+  changed_when: false

@@ -1,0 +1,64 @@
+---
+# Klusterlet registration agent needs hostNetwork to reach the hub API on the WireGuard overlay.
+# Work agent stays on pod network (registration-agent already binds :8443 on the host).
+- name: OCM | Wait for klusterlet registration agent deployment
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management-agent get deploy klusterlet-registration-agent
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  register: ocm_reg_agent_deploy
+  until: ocm_reg_agent_deploy.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+  when:
+    - ocm_hub_apiserver | default('') | length > 0
+    - not (ocm_hub | default(false) | bool)
+    - ocm_klusterlet_overlay_hostnetwork | default(true) | bool
+  tags: [ocm, ocm_post_join, ocm_spoke, ocm_klusterlet_hostnetwork]
+
+- name: OCM | Pause klusterlet operator reconciliation
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management scale deploy/klusterlet --replicas=0
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  when:
+    - ocm_hub_apiserver | default('') | length > 0
+    - not (ocm_hub | default(false) | bool)
+    - ocm_klusterlet_overlay_hostnetwork | default(true) | bool
+  changed_when: true
+  tags: [ocm, ocm_post_join, ocm_spoke, ocm_klusterlet_hostnetwork]
+
+- name: OCM | Wait for klusterlet operator pods to terminate
+  ansible.builtin.command:
+    cmd: kubectl -n open-cluster-management wait --for=delete pod -l app=klusterlet --timeout=120s
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  when:
+    - ocm_hub_apiserver | default('') | length > 0
+    - not (ocm_hub | default(false) | bool)
+    - ocm_klusterlet_overlay_hostnetwork | default(true) | bool
+  failed_when: false
+  changed_when: false
+  tags: [ocm, ocm_post_join, ocm_spoke, ocm_klusterlet_hostnetwork]
+
+- name: OCM | Enable hostNetwork on klusterlet registration agent
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl -n open-cluster-management-agent patch deploy klusterlet-registration-agent --type=merge \
+      -p '{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet"}}}}'
+    kubectl -n open-cluster-management-agent rollout status deploy/klusterlet-registration-agent --timeout=300s
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig | default('/etc/rancher/k3s/k3s.yaml') }}"
+    PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+  when:
+    - ocm_hub_apiserver | default('') | length > 0
+    - not (ocm_hub | default(false) | bool)
+    - ocm_klusterlet_overlay_hostnetwork | default(true) | bool
+  changed_when: true
+  tags: [ocm, ocm_post_join, ocm_spoke, ocm_klusterlet_hostnetwork]

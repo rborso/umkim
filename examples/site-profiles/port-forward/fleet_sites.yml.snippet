@@ -1,0 +1,18 @@
+# Merge under fleet_sites: in inventory/group_vars/all/fleet_sites.yml
+# Port-forward — maps to homelab site pattern (WAN DNAT to NodePorts).
+homelab_example:
+  display_name: Example homelab
+  region: homelab
+  ingress:
+    - id: site-pf
+      method: port_forward
+      address: "203.0.113.50"   # RFC5737 — static router public IP
+      wan_address_mode: fixed
+      zone: site.example.com
+      wildcard: "*.site.example.com"
+      description: "Router WAN — port-forward :80/:443 to cluster NodePorts"
+  dns_target_note: "A/AAAA *.site.example.com → 203.0.113.50 (router-wan) → node 203.0.113.100:30080/30443"
+  wan_egress:
+    enabled: true
+    expected_wan_ip: "203.0.113.50"
+  wireguard_pool: null

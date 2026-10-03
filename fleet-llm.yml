@@ -1,0 +1,18 @@
+---
+# Deploy optional hub LiteLLM proxy (OpenAI-compatible API).
+#
+# Usage:
+#   ansible-playbook fleet-llm.yml -l hub --tags fleet_llm_hub
+#   ansible-playbook fleet-llm.yml -l hub -e fleet_llm_enabled=true
+
+- name: Fleet LLM | Hub LiteLLM proxy
+  hosts: hub
+  become: true
+  gather_facts: false
+  vars:
+    fleet_llm_hub_enabled: "{{ fleet_llm_enabled | default(true) | bool }}"
+  tags: [fleet_llm, fleet_llm_hub]
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_llm
+        tasks_from: reconcile.yml

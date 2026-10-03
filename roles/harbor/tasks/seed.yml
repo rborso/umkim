@@ -1,0 +1,111 @@
+---
+# Warm Harbor proxy cache. Proxy projects reject push; each image is pulled once
+# through Harbor (Harbor fetches from quay.io on miss) and then cached for the fleet.
+- name: Harbor | Ensure warm scratch directory
+  ansible.builtin.file:
+    path: /tmp/harbor-warm
+    state: directory
+    mode: "0755"
+  when: harbor_seed_local_images | bool
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | List tagged quay.io images in k3s containerd
+  ansible.builtin.shell: |
+    set -euo pipefail
+    /usr/local/bin/k3s ctr -n k8s.io images ls -q | grep '^quay.io/' | grep -v '@sha256' || true
+  args:
+    executable: /bin/bash
+  register: harbor_quay_images
+  changed_when: false
+  when: harbor_seed_local_images | bool
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | List tagged ghcr.io images in k3s containerd
+  ansible.builtin.shell: |
+    set -euo pipefail
+    /usr/local/bin/k3s ctr -n k8s.io images ls -q | grep '^ghcr.io/' | grep -v '@sha256' || true
+  args:
+    executable: /bin/bash
+  register: harbor_ghcr_images
+  changed_when: false
+  when: harbor_seed_local_images | bool
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | Warm quay.io proxy cache (pull through Harbor)
+  ansible.builtin.command:
+    cmd: >-
+      skopeo copy
+      docker://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_quay }}/{{ item | regex_replace('^quay.io/', '') }}
+      dir:/tmp/harbor-warm/{{ item | regex_replace('[^a-zA-Z0-9._-]', '_') }}
+      --src-tls-verify=false
+  loop: "{{ harbor_quay_images.stdout_lines | default([]) }}"
+  register: harbor_seed_quay
+  changed_when: false
+  failed_when: false
+  async: 600
+  poll: 0
+  when:
+    - harbor_seed_local_images | bool
+    - harbor_quay_images.stdout_lines | length > 0
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | Warm ghcr.io proxy cache (pull through Harbor)
+  ansible.builtin.command:
+    cmd: >-
+      skopeo copy
+      docker://{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/{{ item | regex_replace('^ghcr.io/', '') }}
+      dir:/tmp/harbor-warm/{{ item | regex_replace('[^a-zA-Z0-9._-]', '_') }}
+      --src-tls-verify=false
+  loop: "{{ harbor_ghcr_images.stdout_lines | default([]) }}"
+  register: harbor_seed_ghcr
+  changed_when: false
+  failed_when: false
+  async: 600
+  poll: 0
+  when:
+    - harbor_seed_local_images | bool
+    - harbor_ghcr_images.stdout_lines | length > 0
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | Wait for quay cache warm jobs
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+  loop: "{{ harbor_seed_quay.results | default([]) }}"
+  register: harbor_seed_quay_jobs
+  until: harbor_seed_quay_jobs.finished
+  retries: 120
+  delay: 10
+  failed_when: false
+  when:
+    - harbor_seed_local_images | bool
+    - harbor_seed_quay.results is defined
+    - harbor_seed_quay.results | length > 0
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | Wait for ghcr cache warm jobs
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+  register: harbor_seed_ghcr_jobs
+  loop: "{{ harbor_seed_ghcr.results | default([]) }}"
+  until: harbor_seed_ghcr_jobs.finished
+  retries: 60
+  delay: 10
+  failed_when: false
+  when:
+    - harbor_seed_local_images | bool
+    - harbor_seed_ghcr.results is defined
+    - harbor_seed_ghcr.results | length > 0
+  tags: [harbor, harbor_seed]
+
+- name: Harbor | Report seed summary
+  ansible.builtin.debug:
+    msg:
+      - >-
+        Quay images warmed via Harbor pull-through:
+        {{ harbor_seed_quay_jobs.results | default([]) | selectattr('rc', 'equalto', 0) | list | length }}/{{ harbor_seed_quay_jobs.results | default([]) | length }}
+      - >-
+        GHCR images warmed:
+        {{ harbor_seed_ghcr_jobs.results | default([]) | selectattr('rc', 'equalto', 0) | list | length }}/{{ harbor_seed_ghcr_jobs.results | default([]) | length }}
+      - "Proxy cache cannot accept direct push; Harbor fetched from upstream on first pull."
+  when: harbor_seed_local_images | bool
+  tags: [harbor, harbor_seed]

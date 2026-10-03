@@ -1,0 +1,55 @@
+---
+- name: GPU host | Apply K3s runtime handler before device plugin
+  ansible.builtin.meta: flush_handlers
+  tags: [gpu_host, gpu_host_device_plugin]
+
+- name: GPU host | Require K3s kubeconfig for device plugin
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: gpu_host_k3s_kubeconfig
+  tags: [gpu_host, gpu_host_device_plugin]
+
+- name: GPU host | Assert K3s is installed
+  ansible.builtin.assert:
+    that:
+      - gpu_host_k3s_kubeconfig.stat.exists
+    fail_msg: K3s must be installed before deploying the NVIDIA device plugin.
+  tags: [gpu_host, gpu_host_device_plugin]
+
+- name: GPU host | Deploy NVIDIA device plugin (fleet manifest)
+  ansible.builtin.template:
+    src: nvidia-device-plugin.yml.j2
+    dest: /tmp/fleet-nvidia-device-plugin.yml
+    mode: "0644"
+  register: gpu_host_device_plugin_manifest
+  tags: [gpu_host, gpu_host_device_plugin]
+
+- name: GPU host | Apply NVIDIA device plugin
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/fleet-nvidia-device-plugin.yml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: gpu_host_device_plugin_apply
+  changed_when: gpu_host_device_plugin_apply.rc == 0
+  tags: [gpu_host, gpu_host_device_plugin]
+
+- name: GPU host | Rollout NVIDIA device plugin
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system rollout status daemonset/nvidia-device-plugin-daemonset --timeout=300s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  tags: [gpu_host, gpu_host_device_plugin]
+
+- name: GPU host | Wait for nvidia.com/gpu on nodes
+  ansible.builtin.command:
+    cmd: >-
+      kubectl get nodes -o jsonpath='{range .items[*]}{.status.capacity.nvidia\.com/gpu}{"\n"}{end}'
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: gpu_host_node_gpu_capacity
+  until: gpu_host_node_gpu_capacity.stdout | trim | length > 0
+  retries: "{{ gpu_host_device_plugin_wait_retries | default(30) }}"
+  delay: "{{ gpu_host_device_plugin_wait_delay | default(10) }}"
+  changed_when: false
+  tags: [gpu_host, gpu_host_device_plugin]

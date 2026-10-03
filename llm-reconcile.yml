@@ -1,0 +1,10 @@
+---
+# Console-driven LLM platform reconcile (ansible-runner Job on hub).
+- name: Fleet LLM | Reconcile desired state
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_role:
+        name: fleet_llm
+        tasks_from: reconcile.yml

@@ -1,0 +1,91 @@
+---
+# Opt-in (configure_firewalld=true). Default host_prepare still masks firewalld.
+# Mirrors YAIDAP firewalld_cluster_profile trusted sources and ingress ports.
+# Also opens the management-LAN ports HA k3s needs: etcd peers, API, and kubelet
+# are node IPs, not the overlay/pod/service CIDRs, so trusting only those CIDRs
+# drops cluster-init join and kubelet. SSH stays allowed; the zone target is
+# not changed to DROP.
+- name: Host prepare | Ensure firewalld package
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+  tags: [host_prepare]
+
+- name: Host prepare | Unmask and start firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    masked: false
+    enabled: true
+    state: started
+  # firewalld start reloads nftables and can drop the Ansible SSH session.
+  # Keep the host in the play and reconnect before opening ports.
+  ignore_unreachable: true
+  tags: [host_prepare]
+
+- name: Host prepare | Reconnect SSH after firewalld start
+  ansible.builtin.wait_for_connection:
+    delay: 2
+    sleep: 3
+    timeout: 90
+  tags: [host_prepare]
+
+- name: Host prepare | Keep SSH allowed
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    immediate: true
+    state: enabled
+  register: host_prepare_firewalld_ssh
+  retries: 6
+  delay: 5
+  until: host_prepare_firewalld_ssh is succeeded
+  tags: [host_prepare]
+
+- name: Host prepare | Trust overlay, pod, and service sources
+  ansible.posix.firewalld:
+    source: "{{ item }}"
+    zone: trusted
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ host_prepare_firewalld_trusted_sources }}"
+  tags: [host_prepare]
+
+- name: Host prepare | Trust WireGuard interfaces that already exist
+  ansible.builtin.command:
+    cmd: ip -o link show {{ item }}
+  loop: "{{ host_prepare_firewalld_trusted_interfaces }}"
+  register: host_prepare_firewalld_ifaces
+  changed_when: false
+  failed_when: false
+  tags: [host_prepare]
+
+- name: Host prepare | Move existing WireGuard interfaces to trusted
+  ansible.posix.firewalld:
+    interface: "{{ item.item }}"
+    zone: trusted
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ host_prepare_firewalld_ifaces.results | default([]) }}"
+  when:
+    - not (item.skipped | default(false))
+    - item.rc | default(1) == 0
+  tags: [host_prepare]
+
+- name: Host prepare | Open ingress and HA control-plane ports
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ host_prepare_firewalld_tcp_ports }}"
+  tags: [host_prepare]
+
+- name: Host prepare | Allow Calico IPIP between nodes
+  ansible.posix.firewalld:
+    rich_rule: rule family=ipv4 protocol value=ipip accept
+    permanent: true
+    immediate: true
+    state: enabled
+  tags: [host_prepare]

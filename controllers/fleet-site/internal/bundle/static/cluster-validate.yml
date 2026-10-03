@@ -1,0 +1,16 @@
+---
+# Validate 3-node HA cluster nodes before provision (fleet-site-controller Job).
+#
+#   ansible-playbook cluster-validate.yml -e fleet_cluster_name=virt01-k3s \
+#     -i inventory/from-controller.ini
+
+- name: Fleet cluster validate | All nodes
+  hosts: fleet_cluster_nodes
+  become: true
+  gather_facts: true
+  vars:
+    fleet_site_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+    fleet_site_id: "{{ fleet_site_id | default(fleet_site_name) }}"
+  roles:
+    - role: fleet_site_validate
+      tags: [fleet_site_validate, fleet_cluster_validate]

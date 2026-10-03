@@ -1,0 +1,3 @@
+---
+# Fleet overlay on greenfield cluster nodes (distinct from inventory hub/spoke wg0).
+fleet_cluster_wireguard_interface: wg-umkim

@@ -1,0 +1,55 @@
+# Helm values for OCM Lab Dashboard (homelab hub)
+api:
+  replicaCount: {{ ocm_lab_api_replicas }}
+  image:
+{% if harbor_host is defined %}
+    registry: {{ harbor_host }}:{{ harbor_nodeport_https }}
+    repository: {{ harbor_proxy_project_quay }}/open-cluster-management/dashboard-api
+{% else %}
+    registry: quay.io
+    repository: open-cluster-management/dashboard-api
+{% endif %}
+    tag: "{{ ocm_lab_api_image_tag | default(ocm_lab_image_tag) }}"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 192Mi
+  env:
+    GIN_MODE: "release"
+    DASHBOARD_DEBUG: "false"
+    DASHBOARD_USE_MOCK: "false"
+    DASHBOARD_BYPASS_AUTH: "{{ 'true' if ocm_lab_bypass_auth | bool else 'false' }}"
+    PORT: "8080"
+
+ui:
+  replicaCount: {{ ocm_lab_ui_replicas }}
+  image:
+{% if harbor_host is defined %}
+    registry: {{ harbor_host }}:{{ harbor_nodeport_https }}
+    repository: {{ harbor_proxy_project_quay }}/open-cluster-management/dashboard-ui
+{% else %}
+    registry: quay.io
+    repository: open-cluster-management/dashboard-ui
+{% endif %}
+    tag: "{{ ocm_lab_ui_image_tag | default(ocm_lab_image_tag) }}"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 300m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+ingress:
+  enabled: false
+
+# k3s homelab: avoid strict pod security blocking pulls
+podSecurityContext: {}
+securityContext: {}
+
+affinity: {}

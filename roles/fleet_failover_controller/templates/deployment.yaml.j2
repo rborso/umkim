@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-failover-controller
+  namespace: {{ fleet_failover_controller_namespace }}
+  labels:
+    app: fleet-failover-controller
+spec:
+  replicas: {{ fleet_failover_controller_replicas }}
+  selector:
+    matchLabels:
+      app: fleet-failover-controller
+  template:
+    metadata:
+      labels:
+        app: fleet-failover-controller
+    spec:
+      serviceAccountName: fleet-failover-controller
+      containers:
+        - name: controller
+          image: {{ fleet_failover_controller_image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FLEET_ROUTE_NAMESPACE
+              value: "{{ fleet_failover_route_namespace | default(fleet_failover_controller_namespace) }}"
+            - name: FLEET_FAILOVER_CM_NS
+              value: "{{ fleet_failover_controller_namespace }}"
+            - name: FLEET_FAILOVER_CM_NAME
+              value: fleet-failover-degraded-clusters
+            - name: PLACEMENT_MANAGER_URL
+              value: "{{ placement_manager_api_url }}"
+            - name: FAILOVER_COOLDOWN_SECONDS
+              value: "{{ fleet_failover_cooldown_seconds | string }}"
+          ports:
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10

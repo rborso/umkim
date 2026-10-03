@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ fleet_llm_release_name }}
+  namespace: {{ fleet_llm_namespace }}
+  labels:
+    app: fleet-llm
+spec:
+  replicas: 1
+  # hostNetwork binds :4000 on the node; RollingUpdate cannot schedule the new pod.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fleet-llm
+  template:
+    metadata:
+      labels:
+        app: fleet-llm
+    spec:
+{% if fleet_llm_host_network | default(false) | bool %}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{% endif %}
+      containers:
+        - name: litellm
+          image: {{ fleet_llm_image }}
+          imagePullPolicy: IfNotPresent
+          command: ["litellm"]
+          args:
+            - --config
+            - /app/config.yaml
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "{{ fleet_llm_service_port | string }}"
+          ports:
+            - name: http
+              containerPort: {{ fleet_llm_service_port }}
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ fleet_llm_master_key_secret }}
+                  key: master_key
+          resources:
+            requests:
+              cpu: "{{ fleet_llm_cpu_request }}"
+              memory: "{{ fleet_llm_memory_request }}"
+            limits:
+              cpu: "{{ fleet_llm_cpu_limit }}"
+              memory: "{{ fleet_llm_memory_limit }}"
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            initialDelaySeconds: {{ fleet_llm_readiness_initial_delay_seconds | default(45) }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: {{ fleet_llm_readiness_failure_threshold | default(18) }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ fleet_llm_configmap }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ fleet_llm_release_name }}
+  namespace: {{ fleet_llm_namespace }}
+  labels:
+    app: fleet-llm
+spec:
+  type: NodePort
+  selector:
+    app: fleet-llm
+  ports:
+    - name: http
+      port: {{ fleet_llm_service_port }}
+      targetPort: http
+      nodePort: {{ fleet_llm_nodeport }}

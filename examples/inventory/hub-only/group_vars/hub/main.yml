@@ -1,0 +1,86 @@
+---
+# Greenfield management hub — copy to inventory/group_vars/hub/main.yml
+# (replaces maintainer lab inventory/group_vars/hub.yml for VPS / bare-metal hub-only).
+#
+# Pair with:
+#   inventory/group_vars/all/site.yml   — domain, LDAP base DN, fleet_hub_inventory_hostname
+#   inventory/group_vars/all/fleet_sites.yml
+#
+# Secrets: inventory/group_vars/all/vault.yml (encrypted); wired below via *_vault keys.
+
+fleet_role: hub
+fleet_node: true
+fleet_lab_webui_extras: false
+harbor_enable_quay_mirror: false
+ocm_clusteradm_path: /usr/local/bin/clusteradm
+k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+phase4_bootstrap_namespace: fleet-bootstrap
+phase4_manifestwork_name: phase4-platform-bootstrap
+phase4_bootstrap_image: registry.k8s.io/kubectl:v1.36.4@sha256:b8d523e7b8cdc5e3caa0f8891ee9f504abf137dec786e6e0ddd33e4f272c2f13
+fleet_cleanup_delete_harbor: false
+k3s_role: server
+ocm_hub: true
+
+# Whoami smoke-test chart (Harbor charts/whoami); install with FleetApp onto a selected Ready cluster.
+# Optional hub LiteLLM proxy — enable only when GPU clusters exist (not in install-hub.sh).
+# fleet_llm_enabled: false
+wireguard_address: 10.10.0.1/24
+wireguard_role: server
+
+# VPS has no KVM — skip kubevirt_stack on hub (phase4 --skip-tags kubevirt).
+hardware_kvm_capable: false
+harbor_host: "10.10.0.1"
+harbor_registry_pvc_size: 80Gi
+
+# Hub K3s must not use 127.0.0.1 when Ansible runs locally (hosts-from-hub.yml).
+k3s_node_ip: "{{ wireguard_address | ansible.utils.ipaddr('address') }}"
+k3s_bind_address: "{{ wireguard_address | ansible.utils.ipaddr('address') }}"
+k3s_advertise_address: "{{ wireguard_address | ansible.utils.ipaddr('address') }}"
+calico_ip_autodetection_method: interface=wg0
+
+# Fleet edge + Let's Encrypt on hub gateway (hostNetwork :80/:443).
+fleet_edge_acme_enabled: true
+fleet_edge_hub_gateway_url: "{{ 'https://127.0.0.1' if (fleet_ingress_auth_enabled | default(false) | bool) else 'https://127.0.0.1' if (fleet_edge_acme_enabled | default(false) | bool) else 'http://127.0.0.1:80' }}"
+
+# Fleet ingress auth (Authelia). Set true to enable on hub at install (requires vault LLDAP password).
+# Reconcile: fleet-site-controller Job (seed_infrastructure.yml) or POST /ingress-auth/reconcile.
+fleet_ingress_auth_enabled: false
+fleet_ingress_auth_bootstrap_password: "{{ fleet_lldap_admin_password_vault | default(fleet_ingress_auth_bootstrap_password_vault | default('CHANGE_ME')) }}"
+fleet_ingress_auth_portal_host: "auth.{{ fleet_edge_domain }}"
+fleet_ingress_auth_forward_auth_url: "http://authelia.fleet-ingress-auth.svc.cluster.local:9091/api/authz/forward-auth"
+# Hub-only: no Ansible-managed spokes. Add cluster names when you run spokes.yml / phase6.
+fleet_ingress_auth_spoke_clusters: []
+
+# Shared LLDAP secrets (vault); console chart + optional hub ingress-auth LDAP.
+fleet_auth_lldap_jwt_secret: "{{ fleet_lldap_jwt_secret_vault | default(fleet_ingress_auth_lldap_jwt_secret_vault | default('CHANGE_ME')) }}"
+fleet_auth_lldap_admin_password: "{{ fleet_lldap_admin_password_vault | default(fleet_ingress_auth_bootstrap_password_vault | default('CHANGE_ME')) }}"
+fleet_ingress_auth_lldap_deploy: "{{ not (fleet_auth_lldap_enabled | default(fleet_auth_lldap_enabled_profile | default(false)) | bool) }}"
+fleet_ingress_auth_lldap_external_url: >-
+  {{ ('ldap://lldap.' + (fleet_console_namespace | default('fleet-console')) + '.svc.cluster.local:' + (fleet_auth_lldap_ldap_port | default(3890) | string))
+     if (fleet_auth_lldap_enabled | default(fleet_auth_lldap_enabled_profile | default(false)) | bool) else '' }}
+
+# Console auth — LLDAP (default hub install). Break-glass localadmin stays in vault.
+# fleet_auth_ldap_base_dn: set in group_vars/all/site.yml (applies to hub via all/ group).
+fleet_auth_lldap_enabled: "{{ fleet_auth_lldap_enabled_profile | default(false) }}"
+fleet_auth_lldap_image: ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
+fleet_auth_lldap_ldap_port: 3890
+fleet_auth_ldap_url: "ldap://lldap.{{ fleet_console_namespace | default('fleet-console') }}.svc.cluster.local:{{ fleet_auth_lldap_ldap_port }}"
+# LDAP service bind: fleet_console_helm defaults use uid=admin,ou=people,<baseDN> +
+# fleet_auth_lldap_admin_password (vault). Optional override: fleet_auth_ldap_bind_password_vault.
+fleet_console_auth_bootstrap_ldap_admin_group: fleet-admins
+
+calico_version: v3.31.3
+ocm_hub_apiserver: "https://{{ wireguard_address | ansible.utils.ipaddr('address') }}:6443"
+ocm_bundle_version: "1.3.1"
+ocm_clusteradm_version: "v1.3.1"
+ocm_wait: true
+ocm_create_namespace: true
+ocm_kubeconfig: /etc/rancher/k3s/k3s.yaml
+ocm_join_command_path: /etc/ocm/hub-join-command.sh
+
+# Vault secrets (inventory/group_vars/all/vault.yml, encrypted)
+harbor_admin_password: "{{ harbor_admin_password_vault | default('CHANGE_ME') }}"
+fleet_console_auth_session_secret: "{{ fleet_console_auth_session_secret_vault | default('CHANGE_ME') }}"
+# Overlay HTTP console NodePort (30912); Secure cookies break login in the browser.
+fleet_console_auth_session_secure: false

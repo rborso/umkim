@@ -1,0 +1,94 @@
+---
+# Install an OCI Helm chart on a selected Ready cluster (no placement engine).
+#
+#   ansible-playbook $INV playbooks/flows/app-install.yml \
+#     -e fleet_flow_cluster_name=lab-single-0 \
+#     -e fleet_flow_chart=whoami \
+#     -e fleet_flow_version=0.1.0 \
+#     -e fleet_flow_release_name=whoami
+#
+# fleet_flow_chart may be a short Harbor name (whoami) or a full oci:// URL.
+
+- name: Fleet flow | Install Helm chart on a selected cluster
+  hosts: hub
+  gather_facts: false
+  vars:
+    _flow_api_default: http://127.0.0.1:18080/api/v1alpha1
+    _flow_poll_interval_default: 10
+    _flow_poll_retries_default: 36
+  tasks:
+    - name: Require cluster and chart
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_cluster_name | default('') | length > 0
+          - fleet_flow_chart | default('') | length > 0
+        fail_msg: Set fleet_flow_cluster_name and fleet_flow_chart. The cluster is required; there is no placement engine.
+
+    - name: Initialize flow defaults
+      ansible.builtin.set_fact:
+        fleet_flow_identity_headers:
+          X-Fleet-Subject-Kind: User
+          X-Fleet-Subject-Name: fleet-flow
+          X-Fleet-DC-Admin: "true"
+        fleet_flow_release_name: "{{ fleet_flow_release_name | default(fleet_flow_app_name | default('')) }}"
+        fleet_flow_namespace: "{{ fleet_flow_namespace | default('default') }}"
+        fleet_flow_route_mode: "{{ fleet_flow_route_mode | default('none') }}"
+        fleet_flow_app_name: "{{ fleet_flow_app_name | default(fleet_flow_release_name | default('')) }}"
+
+    - name: Build FleetApp body
+      ansible.builtin.set_fact:
+        fleet_flow_app_body:
+          name: "{{ fleet_flow_app_name }}"
+          clusterName: "{{ fleet_flow_cluster_name }}"
+          chart: "{{ fleet_flow_chart }}"
+          version: "{{ fleet_flow_version | default('') }}"
+          releaseName: "{{ fleet_flow_release_name }}"
+          namespace: "{{ fleet_flow_namespace }}"
+          valuesYaml: "{{ fleet_flow_values_yaml | default('') }}"
+          route:
+            mode: "{{ fleet_flow_route_mode }}"
+            hubHost: "{{ fleet_flow_hub_host | default('') }}"
+            siteHost: "{{ fleet_flow_site_host | default('') }}"
+            requireAuth: "{{ fleet_flow_require_auth | default(false) | bool }}"
+
+    - name: POST /apps
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/apps"
+        method: POST
+        body_format: json
+        headers: "{{ fleet_flow_identity_headers }}"
+        body: "{{ fleet_flow_app_body }}"
+        status_code: [201, 409]
+      register: fleet_flow_app_create
+
+    - name: Resolve app name
+      ansible.builtin.set_fact:
+        fleet_flow_app_name: "{{ fleet_flow_app_create.json.name | default(fleet_flow_app_name) }}"
+
+    - name: Wait for FleetApp Ready
+      ansible.builtin.uri:
+        url: "{{ fleet_flow_api_url | default(_flow_api_default) }}/apps/{{ fleet_flow_app_name }}"
+        method: GET
+        headers: "{{ fleet_flow_identity_headers }}"
+        status_code: 200
+      register: fleet_flow_app_status
+      until: >-
+        fleet_flow_app_status.json.phase | default('') in ['Ready', 'Failed']
+      retries: "{{ fleet_flow_poll_retries | default(_flow_poll_retries_default) }}"
+      delay: "{{ fleet_flow_poll_interval | default(_flow_poll_interval_default) }}"
+
+    - name: Fail if install did not become Ready
+      ansible.builtin.assert:
+        that:
+          - fleet_flow_app_status.json.phase == 'Ready'
+        fail_msg: >-
+          FleetApp {{ fleet_flow_app_name }} phase={{ fleet_flow_app_status.json.phase | default('?') }}
+          message={{ fleet_flow_app_status.json.message | default('') }}
+
+    - name: Install result
+      ansible.builtin.debug:
+        msg: >-
+          {{ fleet_flow_app_name }} chart={{ fleet_flow_chart }}
+          cluster={{ fleet_flow_cluster_name }}
+          release={{ fleet_flow_release_name }}
+          phase={{ fleet_flow_app_status.json.phase }}
