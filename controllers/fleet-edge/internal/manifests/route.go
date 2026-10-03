@@ -7,11 +7,12 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 )
 
-	const (
+const (
 	traefikMiddlewareAnnotation      = "traefik.ingress.kubernetes.io/router.middlewares"
 	traefikTLSAnnotation             = "traefik.ingress.kubernetes.io/router.tls"
 	traefikTLSCertResolverAnnotation = "traefik.ingress.kubernetes.io/router.tls.certresolver"
 	traefikEntrypointsAnnotation     = "traefik.ingress.kubernetes.io/router.entrypoints"
+	annotationACMERetry              = "fleet.umkim.com/acme-retry"
 	// Site routes with require_auth use spoke Traefik file-provider middleware from fleet-ingress-auth chart.
 	siteAuthMiddleware = "fleet-ingress-authelia@file"
 )
@@ -23,6 +24,9 @@ type SpokeIngressOptions struct {
 	CertResolver     string
 	RedirectHTTPS    bool
 	UseHubEntrypoint bool
+	// ACMERetry, when set, is copied onto the TLS ingress so Traefik reloads
+	// the router and retries ACME without recreating the pod.
+	ACMERetry string
 }
 
 func RenderManifestWork(route fleetv1alpha1.FleetAppRoute, hosts []string, clusterName string, svc fleetv1alpha1.ServiceRef, opts SpokeIngressOptions) (string, error) {
@@ -57,6 +61,7 @@ func RenderManifestWork(route fleetv1alpha1.FleetAppRoute, hosts []string, clust
 			tls:          true,
 			certResolver: spokeCertResolver(opts),
 			middlewares:  httpsMids,
+			acmeRetry:    opts.ACMERetry,
 		})
 		tlsBlock := ingressTLSBlock(hosts)
 		manifestDocs.WriteString(renderIngressManifest(
@@ -111,6 +116,7 @@ type ingressAnnotationOpts struct {
 	tls          bool
 	certResolver string
 	middlewares  []string
+	acmeRetry    string
 }
 
 func ingressAnnotations(opts ingressAnnotationOpts) string {
@@ -126,6 +132,9 @@ func ingressAnnotations(opts ingressAnnotationOpts) string {
 	}
 	if opts.certResolver != "" {
 		lines = append(lines, fmt.Sprintf(`            %s: %q`, traefikTLSCertResolverAnnotation, opts.certResolver))
+	}
+	if opts.acmeRetry != "" {
+		lines = append(lines, fmt.Sprintf(`            %s: %q`, annotationACMERetry, opts.acmeRetry))
 	}
 	if len(lines) == 0 {
 		return ""

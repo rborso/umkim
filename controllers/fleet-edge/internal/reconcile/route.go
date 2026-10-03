@@ -223,6 +223,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			if spokeState.ApplyACME {
 				targetOpts.SpokeACME = true
 				targetOpts.CertResolver = spokeState.CertResolver
+				targetOpts.ACMERetry = spokeState.ACMERetry
 				if spokeState.SkipApply {
 					held = true
 					if spokeState.TLSMessage != "" {

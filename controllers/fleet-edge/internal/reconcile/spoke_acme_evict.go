@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-edge/internal/clusters"
@@ -42,6 +43,51 @@ func stagingPromotionAction(evictedHost, siteHost string, stagingCertServed, ini
 // resolver can issue. An empty return means the caller should keep the
 // standard issuing message. A non-empty return is a status message for a
 // restart that could not be completed yet.
+
+// ensureSpokeProdACMERetry records a one-shot ingress reload token after the
+// staging certificate is gone and Traefik is Ready. Issuance during pod start
+// races NodePort programming and Let's Encrypt often sees connection refused;
+// the token changes the TLS ingress so Traefik retries without another restart.
+func (r *RouteReconciler) ensureSpokeProdACMERetry(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, clusterName string, regCluster clusters.Cluster, siteHost string) string {
+	if route != nil && route.Annotations != nil {
+		if token := strings.TrimSpace(route.Annotations[annotationSpokeACMEProdRetry]); token != "" {
+			return token
+		}
+	}
+	initDrops, stagingServed, err := r.spokeStagingEvictInputs(ctx, clusterName, regCluster, siteHost)
+	if err != nil || !initDrops || stagingServed {
+		return ""
+	}
+	token := fmt.Sprintf("%d", time.Now().Unix())
+	if route.Annotations == nil {
+		route.Annotations = map[string]string{}
+	}
+	route.Annotations[annotationSpokeACMEProdRetry] = token
+	_ = r.annotateSpokeProdRetry(ctx, route, token)
+	return token
+}
+
+func (r *RouteReconciler) annotateSpokeProdRetry(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, token string) error {
+	if route == nil || token == "" {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var latest fleetv1alpha1.FleetAppRoute
+		if err := r.Get(ctx, client.ObjectKeyFromObject(route), &latest); err != nil {
+			return err
+		}
+		if latest.Annotations != nil && latest.Annotations[annotationSpokeACMEProdRetry] == token {
+			return nil
+		}
+		base := latest.DeepCopy()
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[annotationSpokeACMEProdRetry] = token
+		return r.Patch(ctx, &latest, client.MergeFrom(base))
+	})
+}
+
 func (r *RouteReconciler) promoteSpokeStagingCert(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, clusterName string, regCluster clusters.Cluster, siteHost string) string {
 	evicted := ""
 	if route != nil && route.Annotations != nil {

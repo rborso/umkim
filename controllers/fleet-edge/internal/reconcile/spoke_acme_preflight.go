@@ -17,6 +17,7 @@ const (
 	certResolverStaging               = "letsencrypt-staging"
 	annotationSpokeACMEStagingOK      = "edge.umkim.com/spoke-acme-staging-ok"
 	annotationSpokeACMEStagingEvicted = "edge.umkim.com/spoke-acme-staging-evicted"
+	annotationSpokeACMEProdRetry      = "edge.umkim.com/spoke-acme-prod-retry"
 	spokeTraefikDeploymentName        = "traefik"
 	spokeDropStagingInitContainerName = "drop-staging-acme-certs"
 	acmeChallengePreflightPath        = "/.well-known/acme-challenge/preflight"
@@ -26,6 +27,7 @@ const (
 type spokeACMEState struct {
 	ApplyACME    bool
 	CertResolver string
+	ACMERetry    string
 	SkipApply    bool
 	TLSPhase     string
 	TLSMessage   string

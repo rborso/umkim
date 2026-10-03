@@ -100,15 +100,23 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 	}
 
 	msg = "requesting production Let's Encrypt certificate"
+	var retryToken string
+	if route.Annotations != nil {
+		retryToken = route.Annotations[annotationSpokeACMEProdRetry]
+	}
 	if r.Config.SpokeACMEPreflightEnabled {
 		if evictMsg := r.promoteSpokeStagingCert(ctx, route, clusterName, regCluster, siteHost); evictMsg != "" {
 			msg = evictMsg
+		}
+		if token := r.ensureSpokeProdACMERetry(ctx, route, clusterName, regCluster, siteHost); token != "" {
+			retryToken = token
 		}
 	}
 	_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseIssuing, msg)
 	return spokeACMEState{
 		ApplyACME:    true,
 		CertResolver: certResolverProduction,
+		ACMERetry:    retryToken,
 		TLSPhase:     fleetv1alpha1.TLSPhaseIssuing,
 		TLSMessage:   msg,
 	}
