@@ -28,21 +28,21 @@ import (
 )
 
 const (
-	maxProvisionHistory     = 20
-	siteProvisionInvCMFmt   = "fleet-site-%s-provision-inventory"
-	siteProvisionJobPrefix  = "fleet-site-prov-"
+	maxProvisionHistory    = 20
+	siteProvisionInvCMFmt  = "fleet-site-%s-provision-inventory"
+	siteProvisionJobPrefix = "fleet-site-prov-"
 )
 
 type siteProvisionBindingView struct {
-	Provider           string            `json:"provider"`
-	Jumphost           string            `json:"jumphost,omitempty"`
-	SSHSecretRef       string            `json:"sshSecretRef,omitempty"`
-	InventoryPath      string            `json:"inventoryPath,omitempty"`
-	YaidaPRoot         string            `json:"yaidapRoot,omitempty"`
-	YaidapRepo         string            `json:"yaidapRepo,omitempty"`
-	YaidapRef          string            `json:"yaidapRef,omitempty"`
-	YaidapGitSecretRef string            `json:"yaidapGitSecretRef,omitempty"`
-	DefaultExtraVars   map[string]string `json:"defaultExtraVars,omitempty"`
+	Provider           string                             `json:"provider"`
+	Jumphost           string                             `json:"jumphost,omitempty"`
+	SSHSecretRef       string                             `json:"sshSecretRef,omitempty"`
+	InventoryPath      string                             `json:"inventoryPath,omitempty"`
+	YaidaPRoot         string                             `json:"yaidapRoot,omitempty"`
+	YaidapRepo         string                             `json:"yaidapRepo,omitempty"`
+	YaidapRef          string                             `json:"yaidapRef,omitempty"`
+	YaidapGitSecretRef string                             `json:"yaidapGitSecretRef,omitempty"`
+	DefaultExtraVars   map[string]string                  `json:"defaultExtraVars,omitempty"`
 	Status             *fleetv1alpha1.SiteProvisionStatus `json:"status,omitempty"`
 }
 
@@ -357,10 +357,10 @@ func (s *Server) runSiteProvisionAction(ctx context.Context, w http.ResponseWrit
 		if addr := strings.TrimSpace(invHost.AnsibleHost); addr != "" {
 			req.Host = &fleetv1alpha1.ProvisionHandoffHost{
 				Hostname:    subject,
-				AnsibleHost:   addr,
-				AnsibleUser:   "linux",
-				OSFamily:      "rocky",
-				SiteID:        siteName,
+				AnsibleHost: addr,
+				AnsibleUser: "linux",
+				OSFamily:    "rocky",
+				SiteID:      siteName,
 			}
 		}
 	}
@@ -590,7 +590,7 @@ func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.
 	}
 	if rec.Action == fleetv1alpha1.ProvisionActionCreateVM {
 		if pub := s.hubFleetSSHPublicKey(ctx); pub != "" {
-			extra = append(extra, "-e", "fleet_provision_fleet_ansible_ssh_pubkey="+pub)
+			extra = append(extra, "-e", fmt.Sprintf("fleet_provision_fleet_ansible_ssh_pubkey=%q", pub))
 		}
 	}
 	for k, v := range spec.DefaultExtraVars {
