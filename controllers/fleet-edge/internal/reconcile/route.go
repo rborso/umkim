@@ -78,12 +78,14 @@ func annotationValue(ann map[string]string, key string) string {
 
 type RouteReconciler struct {
 	client.Client
-	APIReader     client.Reader
-	Config        config.Config
-	RestConfig    rest.Config
-	acme          *acmeCoordinator
-	spokeACME     *spokeACMEQueue
-	fleetRoutesMu sync.Mutex
+	APIReader      client.Reader
+	Config         config.Config
+	RestConfig     rest.Config
+	acme           *acmeCoordinator
+	spokeACME      *spokeACMEQueue
+	fleetRoutesMu  sync.Mutex
+	stagingEvictMu sync.Mutex
+	stagingEvict   map[string]struct{}
 }
 
 func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -418,7 +420,6 @@ func (r *RouteReconciler) markFleetRoutesRebuilt(ctx context.Context, route *fle
 		return r.Patch(ctx, &latest, client.MergeFrom(base))
 	})
 }
-
 
 func (r *RouteReconciler) renderFleetRoutesYAML(ctx context.Context) ([]byte, error) {
 	var list fleetv1alpha1.FleetAppRouteList

@@ -56,9 +56,9 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 	if !r.spokeACME.allow(clusterName, siteHost) {
 		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseQueued, "waiting for spoke ACME queue")
 		return spokeACMEState{
-			ApplyACME: true,
-			SkipApply: true,
-			TLSPhase:  fleetv1alpha1.TLSPhaseQueued,
+			ApplyACME:  true,
+			SkipApply:  true,
+			TLSPhase:   fleetv1alpha1.TLSPhaseQueued,
 			TLSMessage: "waiting for spoke ACME queue",
 		}
 	}
@@ -99,11 +99,17 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 		}
 	}
 
-	_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseIssuing, "requesting production Let's Encrypt certificate")
+	msg = "requesting production Let's Encrypt certificate"
+	if r.Config.SpokeACMEPreflightEnabled {
+		if evictMsg := r.promoteSpokeStagingCert(ctx, route, clusterName, regCluster, siteHost); evictMsg != "" {
+			msg = evictMsg
+		}
+	}
+	_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseIssuing, msg)
 	return spokeACMEState{
 		ApplyACME:    true,
 		CertResolver: certResolverProduction,
 		TLSPhase:     fleetv1alpha1.TLSPhaseIssuing,
-		TLSMessage:   "requesting production Let's Encrypt certificate",
+		TLSMessage:   msg,
 	}
 }

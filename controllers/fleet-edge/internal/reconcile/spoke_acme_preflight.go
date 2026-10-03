@@ -13,10 +13,13 @@ import (
 )
 
 const (
-	certResolverProduction       = "letsencrypt"
-	certResolverStaging          = "letsencrypt-staging"
-	annotationSpokeACMEStagingOK = "edge.umkim.com/spoke-acme-staging-ok"
-	acmeChallengePreflightPath   = "/.well-known/acme-challenge/preflight"
+	certResolverProduction            = "letsencrypt"
+	certResolverStaging               = "letsencrypt-staging"
+	annotationSpokeACMEStagingOK      = "edge.umkim.com/spoke-acme-staging-ok"
+	annotationSpokeACMEStagingEvicted = "edge.umkim.com/spoke-acme-staging-evicted"
+	spokeTraefikDeploymentName        = "traefik"
+	spokeDropStagingInitContainerName = "drop-staging-acme-certs"
+	acmeChallengePreflightPath        = "/.well-known/acme-challenge/preflight"
 )
 
 // spokeACMEState is the spoke/site ACME gate outcome for one route reconcile.

@@ -77,9 +77,15 @@ spec:
           name: traefik
           namespace: {{ phase6_spoke_ingress_namespace }}
           annotations:
-            fleet.umkim.com/acme-reconcile: "4"
+            fleet.umkim.com/acme-reconcile: "5"
         spec:
           replicas: 1
+{% if phase6_spoke_acme %}
+          # acme.json is a ReadWriteOnce volume. Recreate so a second Traefik
+          # does not write it, and so the staging-cert wipe runs before listen.
+          strategy:
+            type: Recreate
+{% endif %}
           selector:
             matchLabels:
               app: traefik
@@ -88,9 +94,24 @@ spec:
               labels:
                 app: traefik
               annotations:
-                fleet.umkim.com/acme-reconcile: "4"
+                fleet.umkim.com/acme-reconcile: "5"
             spec:
               serviceAccountName: traefik
+{% if phase6_spoke_acme %}
+              # Staging certs are published into Traefik's default TLS store. The
+              # production resolver then treats that hostname as already issued
+              # ("No ACME certificate generation required") and never calls Let's
+              # Encrypt. Drop staging storage before each start so the one restart
+              # the controller performs after preflight can issue the real cert.
+              # Account material is staging-only; production certs live in acme.json.
+              initContainers:
+                - name: drop-staging-acme-certs
+                  image: docker.io/library/busybox:1.36.1@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+                  command: ["sh", "-c", "rm -f /data/acme-staging.json"]
+                  volumeMounts:
+                    - name: acme
+                      mountPath: /data
+{% endif %}
               containers:
                 - name: traefik
                   image: {{ phase6_traefik_image }}
