@@ -54,6 +54,17 @@ describe('inventoryVmTemplates', () => {
       ip: '172.16.10.99',
     });
     expect(body).toContain('ip: "172.16.10.99"');
+    expect(body).toContain('ansible_host: 172.16.10.99');
+    expect(body.indexOf('ansible_host:')).toBeLessThan(body.indexOf('memory:'));
+  });
+
+  it('omits top-level ansible_host when guest IP is empty', () => {
+    const body = guestHostVarsTemplate({
+      guestName: 'g1',
+      ip: '',
+    });
+    expect(body).not.toContain('ansible_host:');
+    expect(body).toContain('ip: ""');
   });
 
   it('templates GPU passthrough guest host_vars', () => {

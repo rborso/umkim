@@ -144,9 +144,10 @@ export function guestHostVarsTemplate(opts: VmGuestTemplateOptions): string {
   const os = opts.os?.trim() || 'rocky-10';
   const ip = opts.ip?.trim() ?? '';
   const mac = opts.macaddress?.trim() || '52:54:00:00:00:01';
+  const ansibleHostLine = ip ? `ansible_host: ${ip}\n` : '';
   return `---
 # YAIDAP guest profile for ${opts.guestName}. Edit network IP/MAC before provision.
-memory: ${memory}
+${ansibleHostLine}memory: ${memory}
 cores: ${cores}
 os: ${os}
 provisioning_provider: libvirt
