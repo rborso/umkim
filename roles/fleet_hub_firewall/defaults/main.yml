@@ -28,6 +28,10 @@ fleet_hub_firewall_block_public_http: "{{ not fleet_hub_firewall_public_ingress_
 fleet_hub_firewall_gateway_http_nodeport: 80
 fleet_hub_firewall_gateway_https_nodeport: 443
 
+# Hub gateway Traefik binds 80/443 on the host only when ACME is enabled
+# (hub_ingress traefik.yml.j2). Those ports are fleet_hub_firewall_public_tcp_allow.
+# 30080/30443 stay blocked on the public NIC: they are Harbor/management NodePorts,
+# not the gateway. Spoke Traefik opens 30080/30443/30081 on the spoke.
 fleet_hub_firewall_public_tcp_allow: >-
   {{
     ['22']

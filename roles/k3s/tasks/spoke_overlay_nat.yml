@@ -98,3 +98,41 @@
   register: k3s_overlay_firewalld
   changed_when: k3s_overlay_firewalld.stdout | default('') | length > 0
   failed_when: false
+
+- name: K3s | Open Traefik node ports in firewalld when spoke ingress is enabled
+  when: fleet_cluster_spoke_ingress_enabled | default(true) | bool
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v firewall-cmd >/dev/null 2>&1; then
+      exit 0
+    fi
+    if ! firewall-cmd --state >/dev/null 2>&1; then
+      exit 0
+    fi
+    # NodePorts published by roles/spoke_ingress (web, websecure, web-hub).
+    # Hub gateway Traefik binds 80/443 on the hub; spokes do not.
+    for PORT in {{ k3s_traefik_firewall_tcp_ports | join(' ') }}; do
+      if firewall-cmd --query-port="${PORT}/tcp" >/dev/null 2>&1; then
+        continue
+      fi
+      firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null
+      firewall-cmd --add-port="${PORT}/tcp" >/dev/null
+      echo "opened ${PORT}/tcp"
+    done
+    # Service CIDR is not a pod CIDR, so the discovery loop above misses it.
+    # ClusterIP is usually DNAT; trusting the source matches pod-CIDR handling
+    # for the non-DNAT forwards firewalld otherwise rejects.
+    SVC="{{ k3s_service_cidr | default('10.43.0.0/16') }}"
+    if [ -n "$SVC" ]; then
+      if ! firewall-cmd --zone=trusted --query-source="$SVC" >/dev/null 2>&1; then
+        firewall-cmd --permanent --zone=trusted --add-source="$SVC" >/dev/null
+        firewall-cmd --zone=trusted --add-source="$SVC" >/dev/null
+        echo "trusted-source $SVC"
+      fi
+    fi
+  args:
+    executable: /bin/bash
+  register: k3s_traefik_firewalld
+  changed_when: k3s_traefik_firewalld.stdout | default('') | length > 0
+  failed_when: false
+

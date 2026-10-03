@@ -55,6 +55,29 @@
     state: enabled
   notify: Fleet spoke firewall | Reload firewalld
 
+
+- name: Fleet spoke firewall | Open Traefik node ports
+  when:
+    - fleet_spoke_firewall_enabled | default(false) | bool
+    - fleet_spoke_firewall_traefik_enabled | bool
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ fleet_spoke_firewall_traefik_tcp_ports }}"
+  notify: Fleet spoke firewall | Reload firewalld
+
+- name: Fleet spoke firewall | Trust k3s service CIDR
+  when: fleet_spoke_firewall_enabled | default(false) | bool
+  ansible.posix.firewalld:
+    source: "{{ fleet_spoke_firewall_service_cidr }}"
+    zone: trusted
+    permanent: true
+    state: enabled
+    immediate: true
+  notify: Fleet spoke firewall | Reload firewalld
+
 - name: Fleet spoke firewall | Unmask and start firewalld
   when: fleet_spoke_firewall_enabled | default(false) | bool
   ansible.builtin.systemd:

@@ -9,3 +9,12 @@ fleet_spoke_firewall_k3s_tcp_ports:
   - 10250
 # Calico IPIP (tunl0) between overlay nodes when firewalld filters forward/input.
 fleet_spoke_firewall_allow_calico_ipip: true
+# Spoke Traefik NodePorts (roles/spoke_ingress/defaults/main.yml).
+fleet_spoke_firewall_traefik_enabled: "{{ fleet_cluster_spoke_ingress_enabled | default(true) | bool }}"
+fleet_spoke_firewall_traefik_tcp_ports:
+  - 30080
+  - 30443
+  - 30081
+# k3s default service CIDR (roles/k3s/defaults/main.yml).
+fleet_spoke_firewall_service_cidr: "{{ k3s_service_cidr | default('10.43.0.0/16') }}"
+
