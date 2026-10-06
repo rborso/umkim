@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRocky10VmChart, rockyVmValuesYaml } from './rockyVm';
+import { isRocky10VmChart, parseRockyDns, rockyVmValuesYaml } from './rockyVm';
 
 describe('isRocky10VmChart', () => {
   it('matches short and oci chart names', () => {
@@ -11,7 +11,7 @@ describe('isRocky10VmChart', () => {
 });
 
 describe('rockyVmValuesYaml', () => {
-  it('renders sizing only when no keys are given', () => {
+  it('renders sizing only when no keys or network are given', () => {
     expect(rockyVmValuesYaml('2', '2Gi', '20Gi')).toBe(
       ['cpu: 2', 'memory: 2Gi', 'disk:', '  size: 20Gi'].join('\n'),
     );
@@ -44,5 +44,59 @@ describe('rockyVmValuesYaml', () => {
   it('escapes quotes in key comments', () => {
     const yaml = rockyVmValuesYaml('2', '2Gi', '20Gi', 'ssh-ed25519 AAAA "weird"');
     expect(yaml).toContain('\\"weird\\"');
+  });
+
+  it('emits a lan network block with multus for DHCP (no staticIP)', () => {
+    const yaml = rockyVmValuesYaml('2', '2Gi', '20Gi', '', {
+      mode: 'lan',
+      multusNetwork: 'default/mgmt-l2',
+    });
+    expect(yaml).toContain('network:');
+    expect(yaml).toContain('  mode: lan');
+    expect(yaml).toContain('  multusNetwork: "default/mgmt-l2"');
+    expect(yaml).not.toContain('staticIP');
+    expect(yaml).not.toContain('network: pod');
+  });
+
+  it('emits static lan addressing (interface, staticIP, gateway, dns)', () => {
+    const yaml = rockyVmValuesYaml('2', '2Gi', '20Gi', '', {
+      mode: 'lan',
+      multusNetwork: 'default/mgmt-l2',
+      interface: 'enp1s0',
+      staticIP: '172.16.10.150/24',
+      gateway: '172.16.10.1',
+      dns: ['172.16.10.1', '1.1.1.1'],
+    });
+    expect(yaml).toContain('  interface: "enp1s0"');
+    expect(yaml).toContain('  staticIP: "172.16.10.150/24"');
+    expect(yaml).toContain('  gateway: "172.16.10.1"');
+    expect(yaml).toContain('  dns:');
+    expect(yaml).toContain('    - "172.16.10.1"');
+    expect(yaml).toContain('    - "1.1.1.1"');
+  });
+
+  it('omits interface when staticIP is set but interface is blank', () => {
+    const yaml = rockyVmValuesYaml('2', '2Gi', '20Gi', '', {
+      mode: 'lan',
+      staticIP: '172.16.10.150/24',
+    });
+    expect(yaml).toContain('  staticIP: "172.16.10.150/24"');
+    expect(yaml).not.toContain('interface:');
+  });
+
+  it('omits the network block for pod mode or no network', () => {
+    expect(rockyVmValuesYaml('2', '2Gi', '20Gi', '', { mode: 'pod' })).not.toContain('network:');
+    expect(rockyVmValuesYaml('2', '2Gi', '20Gi')).not.toContain('network:');
+  });
+});
+
+describe('parseRockyDns', () => {
+  it('splits on commas and whitespace and drops blanks', () => {
+    expect(parseRockyDns('172.16.10.1, 1.1.1.1  8.8.8.8')).toEqual([
+      '172.16.10.1',
+      '1.1.1.1',
+      '8.8.8.8',
+    ]);
+    expect(parseRockyDns('  ')).toEqual([]);
   });
 });

@@ -83,8 +83,8 @@ uses `llmBackend` on `POST /apps` / `PATCH /apps/{name}` (console checkbox or
 
 Install a KubeVirt VM from **Apps → Install chart** (chart `rocky-10-vm`) onto a
 cluster that already has the KubeVirt platform. The console exposes **vCPU**,
-**memory**, **disk**, and **SSH public key(s)** fields; they write Helm values.
-Use `route.mode: none`.
+**memory**, **disk**, **SSH public key(s)**, and **Network** (pod vs lan + static
+IP) fields; they write Helm values. Use `route.mode: none`.
 
 ```yaml
 cpu: 2
@@ -101,8 +101,9 @@ cloudInit:
 The chart imports Rocky 10 GenericCloud via CDI (`volumeMode: Filesystem` is
 required for Longhorn in this lab) and applies cloud-init (default serial
 login `rocky` / `rocky`; add keys in **SSH public key(s)** or
-`cloudInit.sshAuthorizedKeys`). For LAN guests, set `network.staticIP`, `gateway`,
-and `dns` — Rocky GenericCloud ignores cloud-init `network:` v2, so the chart
+`cloudInit.sshAuthorizedKeys`). For LAN guests, choose **Network = lan** (Multus
+NAD, default `default/mgmt-l2`) and optionally set **Static IPv4**, **Gateway**,
+and **DNS** — Rocky GenericCloud ignores cloud-init `network:` v2, so the chart
 writes a NetworkManager keyfile instead. See [fleet-kubevirt.md](fleet-kubevirt.md)
 and [charts/rocky-10-vm/README.md](../../charts/rocky-10-vm/README.md).
 

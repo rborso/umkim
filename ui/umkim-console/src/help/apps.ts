@@ -82,6 +82,34 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
       'Expecting keys added to an already-booted VM to apply without a reboot / cloud-init re-run',
     ],
   },
+  'apps.rockyNetMode': {
+    description:
+      'pod uses the cluster pod network with masquerade/NAT (guest IP is not routable from the LAN). lan attaches a second NIC through Multus to a NetworkAttachmentDefinition, giving the guest an address on the site L2 (DHCP or static).',
+    examples: ['pod', 'lan'],
+  },
+  'apps.rockyMultusNetwork': {
+    description:
+      'Multus NetworkAttachmentDefinition as namespace/name. The default default/mgmt-l2 is created by Enable LAN Multus on the KubeVirt platform. Its bridge CNI has no IPAM, so the guest does DHCP or static addressing.',
+    example: 'default/mgmt-l2',
+  },
+  'apps.rockyStaticIP': {
+    description:
+      'Static IPv4 in CIDR form, written into the guest as a NetworkManager keyfile (Rocky GenericCloud ignores cloud-init network v2). Leave empty to use DHCP on the L2. Requires Network = lan.',
+    example: '172.16.10.150/24',
+  },
+  'apps.rockyGateway': {
+    description: 'Default gateway for the static LAN address (usually the L2 router).',
+    example: '172.16.10.1',
+  },
+  'apps.rockyDns': {
+    description: 'DNS servers for the static LAN address (comma or space separated).',
+    example: '172.16.10.1, 1.1.1.1',
+  },
+  'apps.rockyInterface': {
+    description:
+      'Guest NIC name that receives the static address. Must match the VM interface (enp1s0 on q35 virtio).',
+    example: 'enp1s0',
+  },
   'apps.libraryChart': {
     description:
       'Ready library chart on the hub. Short names still work; they expand to Harbor charts.',

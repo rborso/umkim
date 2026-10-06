@@ -164,6 +164,9 @@ and `disk.size` in the install dialog / values, and add guest SSH public keys in
 the **SSH public key(s)** field (one per line; chart value
 `cloudInit.sshAuthorizedKeys`). Leave it empty to keep the default password
 login (`cloudInit.user` / `cloudInit.password`, default `rocky` / `rocky`).
+For a LAN address, set **Network = lan** (Multus NAD `network.multusNetwork`,
+default `default/mgmt-l2`) and optionally a **Static IPv4** (chart
+`network.staticIP`/`gateway`/`dns`); empty static IP uses DHCP on the L2.
 Requires KubeVirt + CDI and a storage class suitable for CDI imports (default
 `longhorn`). Guest management after Ready uses the cluster **Virtual machines**
 page / `umkim vm`.

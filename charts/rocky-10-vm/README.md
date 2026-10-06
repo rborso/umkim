@@ -2,7 +2,9 @@
 
 Install a **Rocky Linux 10** guest on a Ready cluster that already has the
 KubeVirt platform (Multus + CDI + KubeVirt). Use **Apps → Install chart** or
-`FleetApp` with short chart name `rocky-10-vm`.
+`FleetApp` with short chart name `rocky-10-vm`. The console install dialog
+exposes CPU, memory, disk, SSH public keys, and network mode (pod or lan with an
+optional static IP); everything below is also settable through Helm values.
 
 ## Values
 

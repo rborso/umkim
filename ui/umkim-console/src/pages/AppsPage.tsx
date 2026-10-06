@@ -35,7 +35,8 @@ import {
   uploadFleetChart,
 } from '../api/client';
 import { isLlamaCppChart } from '../apps/llamaCpp';
-import { isRocky10VmChart, rockyVmValuesYaml } from '../apps/rockyVm';
+import { isRocky10VmChart, parseRockyDns, rockyVmValuesYaml } from '../apps/rockyVm';
+import type { RockyVmNetwork, RockyVmNetworkMode } from '../apps/rockyVm';
 import type {
   FleetApp,
   FleetAppCreate,
@@ -69,6 +70,50 @@ const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
   valuesYaml: '',
   route: { mode: 'none' },
 });
+
+type RockyForm = {
+  cpu: string;
+  memory: string;
+  disk: string;
+  sshKeys: string;
+  netMode: RockyVmNetworkMode;
+  multusNetwork: string;
+  iface: string;
+  staticIP: string;
+  gateway: string;
+  dns: string;
+};
+
+const newRockyForm = (): RockyForm => ({
+  cpu: '2',
+  memory: '2Gi',
+  disk: '20Gi',
+  sshKeys: '',
+  netMode: 'pod',
+  multusNetwork: 'default/mgmt-l2',
+  iface: 'enp1s0',
+  staticIP: '',
+  gateway: '',
+  dns: '',
+});
+
+function rockyNetworkFromForm(f: RockyForm): RockyVmNetwork | undefined {
+  if (f.netMode !== 'lan') {
+    return undefined;
+  }
+  return {
+    mode: 'lan',
+    multusNetwork: f.multusNetwork,
+    interface: f.iface,
+    staticIP: f.staticIP,
+    gateway: f.gateway,
+    dns: parseRockyDns(f.dns),
+  };
+}
+
+function rockyValuesFromForm(f: RockyForm): string {
+  return rockyVmValuesYaml(f.cpu, f.memory, f.disk, f.sshKeys, rockyNetworkFromForm(f));
+}
 
 function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
   if (!cluster?.site || isReverseProxyMethod(cluster.method)) return '';
@@ -157,10 +202,7 @@ export function AppsPage() {
   const [deleteTarget, setDeleteTarget] = useState<FleetApp | null>(null);
   const [deleteChartTarget, setDeleteChartTarget] = useState<FleetChart | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [rockyCpu, setRockyCpu] = useState('2');
-  const [rockyMemory, setRockyMemory] = useState('2Gi');
-  const [rockyDisk, setRockyDisk] = useState('20Gi');
-  const [rockySshKeys, setRockySshKeys] = useState('');
+  const [rocky, setRocky] = useState<RockyForm>(newRockyForm());
   const [llamaProfiles, setLlamaProfiles] = useState<{ id: string; description?: string }[]>([]);
   const [llamaProfileId, setLlamaProfileId] = useState('');
   const [editOpen, setEditOpen] = useState(false);
@@ -238,16 +280,14 @@ export function AppsPage() {
     setActionError(null);
     void loadLlamaProfiles();
     const first = readyCharts[0]?.name || 'whoami';
-    const rocky = isRocky10VmChart(first);
-    setRockyCpu('2');
-    setRockyMemory('2Gi');
-    setRockyDisk('20Gi');
-    setRockySshKeys('');
+    const isRocky = isRocky10VmChart(first);
+    const rockyDefaults = newRockyForm();
+    setRocky(rockyDefaults);
     setRegisterLiteLLM(false);
     setForm({
       ...emptyForm(readyClusters[0]?.name || '', first),
       version: readyCharts[0]?.version || '0.1.0',
-      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : '',
+      valuesYaml: isRocky ? rockyValuesFromForm(rockyDefaults) : '',
       route: { mode: 'none' },
     });
     setModalOpen(true);
@@ -368,13 +408,11 @@ export function AppsPage() {
 
   const onLibrarySelect = (name: string) => {
     const c = readyCharts.find((x) => x.name === name);
-    const rocky = isRocky10VmChart(name);
+    const isRocky = isRocky10VmChart(name);
     const llama = isLlamaCppChart(name);
-    if (rocky) {
-      setRockyCpu('2');
-      setRockyMemory('2Gi');
-      setRockyDisk('20Gi');
-      setRockySshKeys('');
+    const rockyDefaults = isRocky ? newRockyForm() : null;
+    if (rockyDefaults) {
+      setRocky(rockyDefaults);
     }
     setForm((f) => ({
       ...f,
@@ -382,8 +420,8 @@ export function AppsPage() {
       version: c?.version || f.version,
       releaseName: f.releaseName && f.releaseName !== f.chart ? f.releaseName : name,
       namespace: llama ? 'llm' : f.namespace,
-      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : llama ? f.valuesYaml : f.valuesYaml,
-      route: rocky ? { mode: 'none' } : f.route,
+      valuesYaml: rockyDefaults ? rockyValuesFromForm(rockyDefaults) : f.valuesYaml,
+      route: isRocky ? { mode: 'none' } : f.route,
     }));
     if (llama && llamaProfileId) {
       void applyLlamaProfile(llamaProfileId).catch((e) => setActionError(e));
@@ -430,12 +468,10 @@ export function AppsPage() {
     }
   };
 
-  const applyRockySizing = (cpu: string, memory: string, disk: string, ssh: string) => {
-    setRockyCpu(cpu);
-    setRockyMemory(memory);
-    setRockyDisk(disk);
-    setRockySshKeys(ssh);
-    setForm((f) => ({ ...f, valuesYaml: rockyVmValuesYaml(cpu, memory, disk, ssh) }));
+  const updateRocky = (patch: Partial<RockyForm>) => {
+    const next = { ...rocky, ...patch };
+    setRocky(next);
+    setForm((f) => ({ ...f, valuesYaml: rockyValuesFromForm(next) }));
   };
 
   return (
@@ -636,12 +672,12 @@ export function AppsPage() {
               id="app-chart-custom"
               value={form.chart}
               onChange={(_e, v) => {
-                const rocky = isRocky10VmChart(v);
+                const isRocky = isRocky10VmChart(v);
                 setForm((f) => ({
                   ...f,
                   chart: v,
-                  valuesYaml: rocky ? rockyVmValuesYaml(rockyCpu, rockyMemory, rockyDisk, rockySshKeys) : f.valuesYaml,
-                  route: rocky ? { mode: 'none' } : f.route,
+                  valuesYaml: isRocky ? rockyValuesFromForm(rocky) : f.valuesYaml,
+                  route: isRocky ? { mode: 'none' } : f.route,
                 }));
               }}
             />
@@ -653,22 +689,22 @@ export function AppsPage() {
                   id="app-rocky-cpu"
                   type="number"
                   min={1}
-                  value={rockyCpu}
-                  onChange={(_e, v) => applyRockySizing(v, rockyMemory, rockyDisk, rockySshKeys)}
+                  value={rocky.cpu}
+                  onChange={(_e, v) => updateRocky({ cpu: v })}
                 />
               </LabeledField>
               <LabeledField label="Memory" fieldId="app-rocky-memory" help={getFieldHelp('apps.rockyMemory')}>
                 <TextInput
                   id="app-rocky-memory"
-                  value={rockyMemory}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, v, rockyDisk, rockySshKeys)}
+                  value={rocky.memory}
+                  onChange={(_e, v) => updateRocky({ memory: v })}
                 />
               </LabeledField>
               <LabeledField label="Disk size" fieldId="app-rocky-disk" help={getFieldHelp('apps.rockyDisk')}>
                 <TextInput
                   id="app-rocky-disk"
-                  value={rockyDisk}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, v, rockySshKeys)}
+                  value={rocky.disk}
+                  onChange={(_e, v) => updateRocky({ disk: v })}
                 />
               </LabeledField>
               <LabeledField
@@ -678,12 +714,85 @@ export function AppsPage() {
               >
                 <TextArea
                   id="app-rocky-ssh"
-                  value={rockySshKeys}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, rockyDisk, v)}
+                  value={rocky.sshKeys}
+                  onChange={(_e, v) => updateRocky({ sshKeys: v })}
                   rows={3}
                   placeholder="ssh-ed25519 AAAA... user@host (one per line)"
                 />
               </LabeledField>
+              <LabeledField label="Network" fieldId="app-rocky-net-mode" help={getFieldHelp('apps.rockyNetMode')}>
+                <FleetModalSelect
+                  id="app-rocky-net-mode"
+                  value={rocky.netMode}
+                  onChange={(v) => updateRocky({ netMode: v as RockyVmNetworkMode })}
+                  options={[
+                    { value: 'pod', label: 'pod — NAT on the cluster network' },
+                    { value: 'lan', label: 'lan — Multus L2 (DHCP or static IP)' },
+                  ]}
+                />
+              </LabeledField>
+              {rocky.netMode === 'lan' ? (
+                <LabeledField
+                  label="Multus network"
+                  fieldId="app-rocky-multus"
+                  help={getFieldHelp('apps.rockyMultusNetwork')}
+                >
+                  <TextInput
+                    id="app-rocky-multus"
+                    value={rocky.multusNetwork}
+                    onChange={(_e, v) => updateRocky({ multusNetwork: v })}
+                    placeholder="default/mgmt-l2"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' ? (
+                <LabeledField
+                  label="Static IPv4 (CIDR)"
+                  fieldId="app-rocky-static-ip"
+                  help={getFieldHelp('apps.rockyStaticIP')}
+                >
+                  <TextInput
+                    id="app-rocky-static-ip"
+                    value={rocky.staticIP}
+                    onChange={(_e, v) => updateRocky({ staticIP: v })}
+                    placeholder="172.16.10.150/24 (empty = DHCP)"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' && rocky.staticIP.trim() ? (
+                <LabeledField label="Gateway" fieldId="app-rocky-gateway" help={getFieldHelp('apps.rockyGateway')}>
+                  <TextInput
+                    id="app-rocky-gateway"
+                    value={rocky.gateway}
+                    onChange={(_e, v) => updateRocky({ gateway: v })}
+                    placeholder="172.16.10.1"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' && rocky.staticIP.trim() ? (
+                <LabeledField label="DNS servers" fieldId="app-rocky-dns" help={getFieldHelp('apps.rockyDns')}>
+                  <TextInput
+                    id="app-rocky-dns"
+                    value={rocky.dns}
+                    onChange={(_e, v) => updateRocky({ dns: v })}
+                    placeholder="172.16.10.1, 1.1.1.1"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' && rocky.staticIP.trim() ? (
+                <LabeledField
+                  label="Guest interface"
+                  fieldId="app-rocky-iface"
+                  help={getFieldHelp('apps.rockyInterface')}
+                >
+                  <TextInput
+                    id="app-rocky-iface"
+                    value={rocky.iface}
+                    onChange={(_e, v) => updateRocky({ iface: v })}
+                    placeholder="enp1s0"
+                  />
+                </LabeledField>
+              ) : null}
             </>
           ) : null}
           {isLlamaCppChart(form.chart) ? (
