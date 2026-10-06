@@ -1,8 +1,7 @@
 # Versions and release pins
 
-This tree is UMKIM v0.2. Fleet-built images use `harbor_fleet_image_tag`,
-which normally follows `umkim_version` (currently `0.2`). The previous
-public tag was `v0.1.0`.
+This tree is UMKIM v0.2.1. Fleet-built images use `harbor_fleet_image_tag`,
+which normally follows `umkim_version`. The previous public tag was `v0.2.0`.
 
 ## Greenfield platform pins (0.2.1)
 
