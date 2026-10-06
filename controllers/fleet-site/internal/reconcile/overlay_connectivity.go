@@ -32,6 +32,9 @@ const (
 	labelOverlayReachable   = "fleet.health/overlay_reachable"
 	overlayCheckInterval    = 60 * time.Second
 	overlayRecoverFailCount = 3
+	// overlayAPIPort is the spoke kube-apiserver port reachable over WireGuard
+	// (the same endpoint the synced spoke kubeconfig uses).
+	overlayAPIPort = 6443
 )
 
 func (r *ClusterJoinReconciler) reconcileOverlayConnectivity(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) (ctrl.Result, error) {
@@ -106,10 +109,11 @@ func (r *ClusterJoinReconciler) reconcileOverlayConnectivity(ctx context.Context
 	}
 
 	hostIP := wg.HostIP(fcj.Status.WireguardAddress)
-	tcpPort := fcj.Spec.Providers.K8sNodePort
-	if tcpPort <= 0 {
-		tcpPort = 30190
-	}
+	// Probe the endpoint the hub actually uses to reach the spoke: the
+	// kube-apiserver on 6443 over WireGuard. spec.providers.k8sNodePort is
+	// allocated for bookkeeping but nothing listens on it, so probing it caused
+	// false "Hub overlay unreachable" alarms and repeated recover jobs.
+	tcpPort := overlayAPIPort
 	jobName := fmt.Sprintf("fleet-overlay-check-%s-%d", clusterName, time.Now().Unix())
 	if err := r.pruneOverlayCheckJobs(ctx, fcj.Namespace, clusterName); err != nil {
 		return ctrl.Result{}, err
