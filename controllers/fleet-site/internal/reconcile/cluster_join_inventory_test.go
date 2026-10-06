@@ -143,7 +143,7 @@ func TestBuildClusterInventoryINI_haKubevirtBridgeUsesCalicoBridgeAutodetection(
 				Install: fleetv1alpha1.ProviderInstallSpec{Kubevirt: true},
 				KubevirtBridge: fleetv1alpha1.KubevirtBridgeSpec{
 					Enabled:    true,
-					BridgeName: "n0p0_mgmt_nw",
+					BridgeName: "mgmt-l2-br",
 				},
 			},
 		},
@@ -152,7 +152,7 @@ func TestBuildClusterInventoryINI_haKubevirtBridgeUsesCalicoBridgeAutodetection(
 		{Hostname: "lab-ha-0-cp1", Address: "172.16.10.101", WGAddress: "10.10.0.12/32", Role: fleetv1alpha1.NodeRoleControl},
 	}
 	ini := r.buildClusterInventoryINI(context.Background(), fcj, "lab-ha-0", nodes, false)
-	if !strings.Contains(ini, "calico_ip_autodetection_method=interface=n0p0_mgmt_nw") {
+	if !strings.Contains(ini, "calico_ip_autodetection_method=interface=mgmt-l2-br") {
 		t.Fatalf("kubevirt bridge inventory must pin Calico to bridge interface, got:\n%s", ini)
 	}
 }

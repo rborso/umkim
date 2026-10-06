@@ -37,12 +37,12 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'clusterJoin.kubevirtBridgeName': {
     description:
-      'Linux bridge device name on each node for Multus L2 KubeVirt VMs. Created during bootstrap when Configure host bridge is enabled.',
-    example: 'n0p0_mgmt_nw',
+      'Linux bridge device name on each node for Multus L2 KubeVirt VMs. Default mgmt-l2-br. If the node management IP already sits on a bridge, that bridge is adopted instead of creating a new one.',
+    example: 'mgmt-l2-br',
   },
   'clusterJoin.kubevirtBridgeSlaveNic': {
     description:
-      'Optional NIC override to enslave under the bridge. Leave empty to discover the interface that holds the node management IP (inventory address). Bootstrap fails if that IP is already on a bridge.',
+      'Optional NIC override to enslave under the bridge. Leave empty to discover the interface that holds the node management IP (inventory address). If that IP already sits on a bridge, the bridge is adopted.',
     example: 'enp0s31f6',
   },
   'clusterJoin.kubevirtBridgeKeepIp': {

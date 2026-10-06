@@ -32,7 +32,7 @@
           X-Fleet-DC-Admin: "true"
         fleet_flow_lan_bridge: "{{ fleet_flow_lan_bridge | default(true) | bool }}"
         fleet_flow_force: "{{ fleet_flow_force | default(false) | bool }}"
-        fleet_flow_bridge_name: "{{ fleet_flow_bridge_name | default('n0p0_mgmt_nw') }}"
+        fleet_flow_bridge_name: "{{ fleet_flow_bridge_name | default('mgmt-l2-br') }}"
         fleet_flow_keep_ip: "{{ fleet_flow_keep_ip | default(true) | bool }}"
         fleet_flow_wait: "{{ fleet_flow_wait | default(true) | bool }}"
 

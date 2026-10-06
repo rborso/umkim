@@ -76,7 +76,7 @@ const emptyClusterForm = (siteId = ''): FleetClusterCreate => ({
     kubevirt: false,
     kubevirtBridge: {
       enabled: false,
-      bridgeName: 'n0p0_mgmt_nw',
+      bridgeName: 'mgmt-l2-br',
       keepIp: true,
     },
   },
@@ -977,7 +977,7 @@ export function ClustersPage() {
                     kubevirtBridge: {
                       ...(form.providers?.kubevirtBridge || {
                         enabled: false,
-                        bridgeName: 'n0p0_mgmt_nw',
+                        bridgeName: 'mgmt-l2-br',
                         keepIp: true,
                       }),
                       enabled: checked ? !!form.providers?.kubevirtBridge?.enabled : false,
@@ -1005,7 +1005,7 @@ export function ClustersPage() {
                       kubevirt: true,
                       kubevirtBridge: {
                         enabled: checked,
-                        bridgeName: form.providers?.kubevirtBridge?.bridgeName || 'n0p0_mgmt_nw',
+                        bridgeName: form.providers?.kubevirtBridge?.bridgeName || 'mgmt-l2-br',
                         slaveNic: form.providers?.kubevirtBridge?.slaveNic,
                         keepIp: form.providers?.kubevirtBridge?.keepIp !== false,
                       },

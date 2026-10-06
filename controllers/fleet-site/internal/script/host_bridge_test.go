@@ -18,7 +18,7 @@ func TestRenderHostBridgeDisabled(t *testing.T) {
 func TestRenderHostBridgeEnabled(t *testing.T) {
 	out, err := RenderHostBridge(HostBridgeParams{
 		Enabled:    true,
-		BridgeName: "n0p0_mgmt_nw",
+		BridgeName: "mgmt-l2-br",
 		SlaveNic:   "enp0s31f6",
 		KeepIP:     true,
 	})
@@ -27,7 +27,7 @@ func TestRenderHostBridgeEnabled(t *testing.T) {
 	}
 	for _, want := range []string{
 		"#!/usr/bin/env bash",
-		`BRIDGE_NAME="n0p0_mgmt_nw"`,
+		`BRIDGE_NAME="mgmt-l2-br"`,
 		`SLAVE_NIC_OVERRIDE="enp0s31f6"`,
 		`KEEP_IP="true"`,
 		"MGMT_IP=",

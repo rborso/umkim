@@ -5,8 +5,36 @@
   ansible.builtin.set_fact:
     kubevirt_bridge_nad_name: "{{ kubevirt_bridge_nad_name | default('mgmt-l2') }}"
     kubevirt_bridge_nad_namespace: "{{ kubevirt_bridge_nad_namespace | default('default') }}"
-    kubevirt_bridge_host_bridge: "{{ kubevirt_bridge_host_bridge | default('n0p0_mgmt_nw') }}"
+    kubevirt_bridge_host_bridge: "{{ kubevirt_bridge_host_bridge | default('mgmt-l2-br') }}"
     kubevirt_bridge_cni_bin_dir: "{{ kubevirt_bridge_cni_bin_dir | default('/opt/cni/bin') }}"
+  tags: [kubevirt, kubevirt_bridge_nad]
+
+# Match the bridge that actually carries the management IP (it may have been
+# adopted rather than created under the default name).
+- name: KubeVirt bridge NAD | Resolve effective bridge name
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ip_addr="{{ kubevirt_bridge_mgmt_ip }}"
+    iface="$(ip -4 -o addr show | awk -v ip="${ip_addr}" '$4 ~ ("^" ip "/") {print $2; exit}')"
+    iface="${iface%%@*}"
+    if [[ -n "${iface}" && -d "/sys/class/net/${iface}/bridge" ]]; then
+      echo "${iface}"
+    else
+      echo "{{ kubevirt_bridge_host_bridge }}"
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  register: kubevirt_bridge_nad_resolved
+  changed_when: false
+  when: kubevirt_bridge_mgmt_ip | default('') | length > 0
+  tags: [kubevirt, kubevirt_bridge_nad]
+
+- name: KubeVirt bridge NAD | Set effective bridge name
+  ansible.builtin.set_fact:
+    kubevirt_bridge_host_bridge: >-
+      {{ (kubevirt_bridge_nad_resolved.stdout | default('') | trim)
+         or kubevirt_bridge_host_bridge }}
   tags: [kubevirt, kubevirt_bridge_nad]
 
 - name: KubeVirt bridge NAD | Ensure bridge CNI plugin present

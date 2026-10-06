@@ -16,7 +16,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     want="{{ calico_node_ipv4 }}"
-    bridge="{{ kubevirt_bridge_host_bridge | default('n0p0_mgmt_nw') }}"
+    bridge="{{ kubevirt_bridge_host_bridge | default('mgmt-l2-br') }}"
     ip_on_iface() {
       ip -4 -o addr show dev "$1" 2>/dev/null | awk -v want="$want" '
         { split($4, p, "/"); if (p[1] == want) { found=1 } } END { exit(found ? 0 : 1) }'

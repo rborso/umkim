@@ -124,7 +124,7 @@ func (p *ProviderInstallSpec) SetIntent(kind string, install bool) {
 type KubevirtBridgeSpec struct {
 	// Enabled creates/ensures the host bridge during bootstrap (requires install.kubevirt).
 	Enabled bool `json:"enabled,omitempty"`
-	// BridgeName is the Linux bridge device name (default n0p0_mgmt_nw).
+	// BridgeName is the Linux bridge device name (default mgmt-l2-br).
 	BridgeName string `json:"bridgeName,omitempty"`
 	// SlaveNic is the physical NIC to enslave; empty = default-route interface.
 	SlaveNic string `json:"slaveNic,omitempty"`
@@ -136,7 +136,7 @@ func (k KubevirtBridgeSpec) EffectiveBridgeName() string {
 	if strings.TrimSpace(k.BridgeName) != "" {
 		return strings.TrimSpace(k.BridgeName)
 	}
-	return "n0p0_mgmt_nw"
+	return "mgmt-l2-br"
 }
 
 func (k KubevirtBridgeSpec) EffectiveKeepIP() bool {

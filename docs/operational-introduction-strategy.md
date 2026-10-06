@@ -1,8 +1,8 @@
 # Operational introduction strategy
 
-> **Public tree:** Maintainer lab inventory is not in this snapshot. Start from
-> [examples/inventory/hub-only/](../examples/inventory/hub-only/) and replace
-> every `CHANGE_ME` before install. See [install.md](install.md).
+> **Demo bundle:** A copy of this plan with the TLDR intro and
+> [yaidap-inventory-reference/](../demo_materials/yaidap-inventory-reference/) lives under
+> [demo_materials/](../demo_materials/).
 
 > **Purpose:** End-to-end learning path from greenfield hub install through YAIDAP
 > metal/VM provisioning, multi-cluster operations, GPU inference, and teardown.
@@ -14,9 +14,9 @@
 > as you go—not only “what to run,” but **evidence that it worked** (see
 > [Documenting each stage](#documenting-each-stage-procedure--evidence)).
 >
-> **Audience:** Operators who installed a hub from the hub-only template.
-> Later phases use illustrative homelab names. Replace hostnames, IPs, DNS
-> zones, and the jumphost with your deployment values.
+> **Audience:** Operators with a lab like [`examples/homelab/`](../examples/homelab/)
+> (jumphost, `172.16.10.0/24`, virt01–04, virt03 BM, and so on). Replace hostnames,
+> IPs, DNS zones, and jumphost with your deployment values.
 >
 > **Conventions**
 >
@@ -29,7 +29,14 @@
 >
 > Canonical references: [install.md](install.md), [umkim-cli.md](components/umkim-cli.md),
 > [yaidap-integration.md](components/yaidap-integration.md),
-> [examples/inventory/hub-only/README.md](../examples/inventory/hub-only/README.md).
+> [rebuild-homelab-cli.md](../examples/homelab/rebuild-homelab-cli.md).
+
+
+> **Run 2 plan (next introducible demo):**  
+> [`demo_materials/introduction-walkthrough-run2/PLAN.md`](../demo_materials/introduction-walkthrough-run2/PLAN.md)  
+> — Archive run 1; hub-only evidence at `/home/linux/umkim-demo-materials/introduction-run2/`;  
+> bug workflow document→fix→rebuild/deploy→re-test; **do not start** Phase A/B until remaining
+> issues (ACME/redirect, YAIDAP pubkey push, …) are fixed and go-ahead is given.
 
 ---
 
@@ -128,7 +135,7 @@ Each report must include:
 | **Follow-up** | GitHub issue URL or “fixed in commit …” when resolved |
 
 
-**Requirement:** Do not leave the stage on a workaround. After filing the bug, **fix it, rebuild/deploy the fix, and re-test** until Verify passes.
+**Run 2 requirement:** Do not leave the stage on a workaround. After filing the bug, **fix it, rebuild/deploy the fix, and re-test** until Verify passes. Goal is an introducible demo, not a terminal buglist. See [`demo_materials/introduction-walkthrough-run2/PLAN.md`](../demo_materials/introduction-walkthrough-run2/PLAN.md).
 
 Re-run the stage after a fix and add a **pass** artifact (`A6-whoami-curl.txt`) so the
 introduction shows both failure (optional) and success.
@@ -399,19 +406,15 @@ Order: **apps → clusters → site**.
 
 From here, default to **CLI** unless a step says **Console**.
 
-Names below are illustrative: site **`homelab`**, jumphost, BM **virt03** (`172.16.10.4`),
-hypervisors **virt01/02/04**, HA VIP **`172.16.10.100`**. Maintainer inventory
-files are not published. Write your own site and cluster JSON. Hub Ansible
-inventory comes from [examples/inventory/hub-only/](../examples/inventory/hub-only/)
-(replace `CHANGE_ME`).
+Lab names below match [`examples/homelab/`](../examples/homelab/): site **`homelab`**, jumphost on **bck**,
+BM **virt03** (`172.16.10.4`), hypervisors **virt01/02/04**, HA VIP **`172.16.10.100`**.
 
 ---
 
 ### B1 — Create site via CLI: port-forward ingress + jumphost
 
 ```bash
-# site-homelab.json is operator-local; it is not shipped in this tree.
-umkim site create -f site-homelab.json
+umkim site create -f examples/homelab/site-homelab.json
 # Patch jumphost if needed:
 umkim site patch homelab --jumphost linux@JUMPHOST:PORT
 ```
@@ -443,8 +446,8 @@ Configure WAN router: TCP 80/443 → `172.16.10.100:30080` / `:30443` (Traefik N
 umkim site provision set homelab --provider yaidap \
   --jumphost linux@JUMPHOST:PORT \
   --ssh-secret fleet-site-homelab-provision-ssh \
-  --inventory /path/on/jumphost/inventory \
-  --yaidap-root /path/on/jumphost/yaidap \
+  --inventory /home/linux/yaidap/inventory/homelab \
+  --yaidap-root /home/linux/yaidap \
   --yaidap-repo https://github.com/rborso/yaidap.git \
   --yaidap-ref main
 
@@ -456,9 +459,8 @@ umkim site provision yaidap-sync homelab --wait
 ```bash
 umkim site inventory migrate homelab
 umkim site inventory files put homelab --path group_vars/all/all.yml \
-  --file /path/to/your/group_vars/all/all.yml
-# Put hypervisors.yml, bare_metals.yml, guests.yml, host_vars/*, cluster group files.
-# Use CHANGE_ME for example passwords. Do not commit filled-in site inventory.
+  --file examples/homelab/inventory/group_vars/all/all.yml
+# Put hypervisors.yml, bare_metals.yml, guests.yml, host_vars/*, cluster group files — see rebuild runbook
 umkim site inventory sync homelab --wait
 ```
 
@@ -531,8 +533,7 @@ umkim site host prepare homelab virt02 --wait
 **CLI mirror (same cluster):**
 
 ```bash
-# cluster-lab-single-0.json is operator-local; it is not shipped in this tree.
-umkim cluster create -f cluster-lab-single-0.json
+umkim cluster create -f examples/homelab/cluster-lab-single-0.json
 umkim cluster bootstrap lab-single-0 --bootstrap-host 172.16.10.4 --ssh-user linux \
   --jumphost linux@JUMPHOST:PORT
 umkim cluster wait lab-single-0 --phase Validated --timeout 45m
@@ -546,8 +547,8 @@ umkim cluster wait lab-single-0 --phase Ready --timeout 45m
 
 ### B6 — HA cluster via CLI (`least-utilized`, VIP 172.16.10.100)
 
-Ensure guest definitions use `vm_location: least-utilized` in your site
-`guests.yml` (not published in this tree).
+Ensure guest definitions use `vm_location: least-utilized` in `guests.yml` (see
+[`examples/homelab/inventory/guests.yml`](../examples/homelab/inventory/guests.yml)).
 
 **Create VMs and apply cluster inventory:**
 
@@ -561,8 +562,7 @@ done
 **Create cluster** (VIP must match port-forward target):
 
 ```bash
-# cluster-lab-ha-0.json is operator-local; it is not shipped in this tree.
-umkim cluster create -f cluster-lab-ha-0.json
+umkim cluster create -f examples/homelab/cluster-lab-ha-0.json
 # controlPlaneVip: 172.16.10.100 in JSON; patch ingress:
 umkim cluster patch lab-ha-0 --ingress-id homelab-ha-pf
 umkim cluster bootstrap lab-ha-0 --bootstrap-host 172.16.10.101 --ssh-user linux \
@@ -725,7 +725,7 @@ with expected vs actual and reproduction ([When something fails](#when-something
 
 Validate the optional spoke **platform** (Multus + CDI + KubeVirt) and a **LAN L2**
 guest on the same bridge/NAD as node management (`default/mgmt-l2`, host bridge
-default `n0p0_mgmt_nw`). Use cluster **`lab-ha-0`** (Longhorn from B6) unless noted.
+default `mgmt-l2-br`). Use cluster **`lab-ha-0`** (Longhorn from B6) unless noted.
 
 Reference: [fleet-kubevirt.md](components/fleet-kubevirt.md),
 [fleet-apps.md](components/fleet-apps.md) (`rocky-10-vm`),
@@ -744,7 +744,7 @@ Prefer **day-0** bridge when creating HA clusters (optional patch before bootstr
   },
   "kubevirtBridge": {
     "enabled": true,
-    "bridgeName": "n0p0_mgmt_nw"
+    "bridgeName": "mgmt-l2-br"
   }
 }
 ```
@@ -757,7 +757,7 @@ Prefer **day-0** bridge when creating HA clusters (optional patch before bootstr
 **CLI:**
 
 ```bash
-umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --bridge n0p0_mgmt_nw --wait 45m
+umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --bridge mgmt-l2-br --wait 45m
 umkim cluster platform status lab-ha-0
 umkim cluster candidates --require kubevirt,network.multus_l2 --site homelab
 ```
@@ -766,7 +766,7 @@ umkim cluster candidates --require kubevirt,network.multus_l2 --site homelab
 
 - `umkim cluster get lab-ha-0` — KubeVirt provider phase installed.
 - Labels/capabilities: `fleet.capability/kubevirt`, `fleet.capability/network.multus_l2`.
-- On a spoke node: NAD `default/mgmt-l2` exists; bridge `n0p0_mgmt_nw` carries management L2.
+- On a spoke node: NAD `default/mgmt-l2` exists; bridge `mgmt-l2-br` carries management L2.
 
 **Document:** `B9a-platform-status.json`, `B9a-multus-nad.txt` (redacted `kubectl get net-attach-def`).
 
@@ -858,7 +858,9 @@ the introduction keeps them as proof.
 
 ### B10 — virt04 as hypervisor + GPU passthrough VM `lab-gpu-pt-0`
 
-Maintainer GPU lab fixtures are not in this public tree. Summary:
+Follow [`examples/homelab/lab-gpu-passthrough-cli.md`](../examples/homelab/lab-gpu-passthrough-cli.md).
+
+Summary:
 
 ```bash
 # Promote virt04 (172.16.10.6), VFIO prepare, create guest lab-gpu-pt-0-cp1
@@ -876,17 +878,15 @@ umkim site host provision homelab lab-gpu-pt-0-cp1 --action create_vm --wait
 
 | Cluster | Node | Example JSON |
 |---------|------|----------------|
-| **lab-single-0** (virt03, GTX 1050 Ti) | `172.16.10.4` | operator-local JSON |
-| **lab-gpu-pt-0** (passthrough VM) | guest IP e.g. `172.16.10.141` | operator-local JSON |
+| **lab-single-0** (virt03, GTX 1050 Ti) | `172.16.10.4` | `cluster-lab-single-0.json` |
+| **lab-gpu-pt-0** (passthrough VM) | guest IP e.g. `172.16.10.141` | `cluster-lab-gpu-pt-0.json` |
 
 ```bash
 # virt03 cluster — if not already Ready from B5, (re)provision
-# cluster-lab-single-0.json is operator-local; it is not shipped in this tree.
-umkim cluster create -f cluster-lab-single-0.json
+umkim cluster create -f examples/homelab/cluster-lab-single-0.json
 # ... bootstrap / provision / wait Ready
 
-# cluster-lab-gpu-pt-0.json is operator-local; it is not shipped in this tree.
-umkim cluster create -f cluster-lab-gpu-pt-0.json
+umkim cluster create -f examples/homelab/cluster-lab-gpu-pt-0.json
 umkim cluster bootstrap lab-gpu-pt-0 --bootstrap-host 172.16.10.141 \
   --jumphost linux@JUMPHOST:PORT --ssh-user linux
 umkim cluster provision lab-gpu-pt-0
@@ -967,10 +967,13 @@ Optional scripts: `scripts/verify-llm-inference-e2e.sh`, [fleet-llm.md](componen
 
 ## Automation shortcut
 
-The maintainer homelab rebuild script is not in this public tree. Install the
-hub from [install.md](install.md) using
-[examples/inventory/hub-only/](../examples/inventory/hub-only/) and replace
-every `CHANGE_ME`. Site and cluster JSON stay in your local inventory.
+Maintainers can run the homelab rebuild script (overlaps B2–B6):
+
+```bash
+./scripts/lab/rebuild-homelab-cli.sh
+```
+
+See [`examples/homelab/rebuild-homelab-cli.md`](../examples/homelab/rebuild-homelab-cli.md) for phases, env vars, and logs.
 
 ---
 

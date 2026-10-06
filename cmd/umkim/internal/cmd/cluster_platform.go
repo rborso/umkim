@@ -46,7 +46,7 @@ Completed runs appear in umkim node-op history as configureKubevirt.`,
 			}
 			if lanBridge {
 				if strings.TrimSpace(bridgeName) == "" {
-					bridgeName = "n0p0_mgmt_nw"
+					bridgeName = "mgmt-l2-br"
 				}
 				body["bridgeName"] = bridgeName
 				body["keepIp"] = keepIP
@@ -102,7 +102,7 @@ Completed runs appear in umkim node-op history as configureKubevirt.`,
 		},
 	}
 	c.Flags().BoolVar(&lanBridge, "lan-bridge", false, "Configure host Linux bridge on all nodes + Multus NAD (LAN VMs)")
-	c.Flags().StringVar(&bridgeName, "bridge", "n0p0_mgmt_nw", "Host bridge device name when --lan-bridge")
+	c.Flags().StringVar(&bridgeName, "bridge", "mgmt-l2-br", "Host bridge device name when --lan-bridge")
 	c.Flags().StringVar(&slaveNic, "slave", "", "Optional physical NIC to enslave (default: NIC holding management IP)")
 	c.Flags().BoolVar(&keepIP, "keep-ip", true, "Move management IP onto the bridge (recommended)")
 	c.Flags().BoolVar(&force, "force", false, "Re-run install even if already Ready (LAN Multus upgrade does not need this)")
