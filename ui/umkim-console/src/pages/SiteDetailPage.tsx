@@ -58,6 +58,7 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { getFieldHelp } from '../help/fieldHelp';
 import { SiteHostsPanel } from '../components/sites/SiteHostsPanel';
+import { SiteKubeVirtPanel } from '../components/sites/SiteKubeVirtPanel';
 import { SiteProvisionerInventoryPanel } from '../components/sites/SiteProvisionerInventoryPanel';
 import { getSiteProvisionBinding } from '../api/client';
 import type { SiteProvisionBinding } from '../api/types';
@@ -877,6 +878,11 @@ export function SiteDetailPage() {
                     <SiteProvisionerInventoryPanel siteName={name} />
                   </Tab>
                 )}
+              {!isManagement && (site.clusters?.length ?? 0) > 0 && (
+                <Tab eventKey={4} title={<TabTitleText>KubeVirt machines</TabTitleText>}>
+                  <SiteKubeVirtPanel site={site} />
+                </Tab>
+              )}
               {!isRegistry && site.status?.validationErrors && site.status.validationErrors.length > 0 && (
                 <Tab eventKey={2} title={<TabTitleText>Validation</TabTitleText>}>
                   <List style={{ marginTop: '1rem' }}>

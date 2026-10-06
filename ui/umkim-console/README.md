@@ -74,6 +74,8 @@ jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equi
 on a managed cluster, with serial console by default and on-demand VNC. Power
 controls (start, soft/hard stop, soft/hard restart) match `umkim vm`
 ([fleet-kubevirt.md](../../docs/components/fleet-kubevirt.md)).
+**Sites → detail → KubeVirt machines** aggregates those VMs across every cluster
+in the site (read-only).
 
 Deploy through `fleet-console-auth.yml` and `roles/fleet_console_helm/`; build and image
 publication use the Harbor role (`Containerfile` in this directory). Example:

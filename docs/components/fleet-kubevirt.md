@@ -66,6 +66,7 @@ After KubeVirt is Ready on a cluster, operators manage guest VMs from the hub
 | Surface | Path |
 | --- | --- |
 | Console | **Clusters → cluster → Virtual machines** (`/clusters/{name}/vms`) |
+| Console (site view) | **Sites → site → KubeVirt machines** (read-only aggregate across the site's managed clusters) |
 | CLI | `umkim vm …` |
 | API | `/clusters/{name}/vms…` |
 
