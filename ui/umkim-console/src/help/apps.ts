@@ -73,6 +73,15 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'Root disk PVC size for the CDI import. Must cover the Rocky cloud image (~10Gi+).',
     example: '20Gi',
   },
+  'apps.rockySshKeys': {
+    description:
+      'One SSH public key per line, added to the guest via cloud-init ssh_authorized_keys for the cloudInit.user account. Leave empty to keep password-only access (default user/password rocky/rocky on the console).',
+    example: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... you@host',
+    commonMistakes: [
+      'Pasting a private key instead of the .pub public key',
+      'Expecting keys added to an already-booted VM to apply without a reboot / cloud-init re-run',
+    ],
+  },
   'apps.libraryChart': {
     description:
       'Ready library chart on the hub. Short names still work; they expand to Harbor charts.',

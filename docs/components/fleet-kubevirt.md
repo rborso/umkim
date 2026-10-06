@@ -160,9 +160,13 @@ spec:
 
 Prefer the seeded Helm chart **`rocky-10-vm`** from **Apps → Install chart**
 (or `FleetApp` with short chart name `rocky-10-vm`). Configure `cpu`, `memory`,
-and `disk.size` in the install dialog / values. Requires KubeVirt + CDI and a
-storage class suitable for CDI imports (default `longhorn`). Guest management
-after Ready uses the cluster **Virtual machines** page / `umkim vm`.
+and `disk.size` in the install dialog / values, and add guest SSH public keys in
+the **SSH public key(s)** field (one per line; chart value
+`cloudInit.sshAuthorizedKeys`). Leave it empty to keep the default password
+login (`cloudInit.user` / `cloudInit.password`, default `rocky` / `rocky`).
+Requires KubeVirt + CDI and a storage class suitable for CDI imports (default
+`longhorn`). Guest management after Ready uses the cluster **Virtual machines**
+page / `umkim vm`.
 ## Sample VM (LAN Multus)
 
 Requires `fleet.capability/network.multus_l2` (NAD `default/mgmt-l2`) and a

@@ -55,8 +55,8 @@ See [fleet-apps.md](../../docs/components/fleet-apps.md) and
 [examples/site-profiles/](../../examples/site-profiles/) for site exposure.
 
 **Rocky Linux 10 VMs:** install library chart `rocky-10-vm` from **Apps** with
-configurable vCPU, memory, and disk (KubeVirt platform required on the target
-cluster).
+configurable vCPU, memory, disk, and guest SSH public keys (KubeVirt platform
+required on the target cluster).
 
 **Site connectivity:** registry sites expose jumphost, region, and failure domain
 on **Sites → detail → Edge and DNS** (and on create). **Sites → detail → Hosts**

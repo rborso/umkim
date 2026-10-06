@@ -35,6 +35,7 @@ import {
   uploadFleetChart,
 } from '../api/client';
 import { isLlamaCppChart } from '../apps/llamaCpp';
+import { isRocky10VmChart, rockyVmValuesYaml } from '../apps/rockyVm';
 import type {
   FleetApp,
   FleetAppCreate,
@@ -68,27 +69,6 @@ const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
   valuesYaml: '',
   route: { mode: 'none' },
 });
-
-function chartBaseName(chart: string): string {
-  const trimmed = chart.trim().toLowerCase();
-  const noScheme = trimmed.replace(/^oci:\/\//, '');
-  const last = noScheme.includes('/') ? noScheme.slice(noScheme.lastIndexOf('/') + 1) : noScheme;
-  return last.replace(/:.*/, '');
-}
-
-function isRocky10VmChart(chart: string): boolean {
-  return chartBaseName(chart) === 'rocky-10-vm';
-}
-
-function rockyVmValuesYaml(cpu: string, memory: string, diskSize: string): string {
-  const cores = Number.parseInt(cpu, 10);
-  return [
-    `cpu: ${Number.isFinite(cores) && cores > 0 ? cores : 2}`,
-    `memory: ${memory.trim() || '2Gi'}`,
-    'disk:',
-    `  size: ${diskSize.trim() || '20Gi'}`,
-  ].join('\n');
-}
 
 function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
   if (!cluster?.site || isReverseProxyMethod(cluster.method)) return '';
@@ -180,6 +160,7 @@ export function AppsPage() {
   const [rockyCpu, setRockyCpu] = useState('2');
   const [rockyMemory, setRockyMemory] = useState('2Gi');
   const [rockyDisk, setRockyDisk] = useState('20Gi');
+  const [rockySshKeys, setRockySshKeys] = useState('');
   const [llamaProfiles, setLlamaProfiles] = useState<{ id: string; description?: string }[]>([]);
   const [llamaProfileId, setLlamaProfileId] = useState('');
   const [editOpen, setEditOpen] = useState(false);
@@ -261,6 +242,7 @@ export function AppsPage() {
     setRockyCpu('2');
     setRockyMemory('2Gi');
     setRockyDisk('20Gi');
+    setRockySshKeys('');
     setRegisterLiteLLM(false);
     setForm({
       ...emptyForm(readyClusters[0]?.name || '', first),
@@ -392,6 +374,7 @@ export function AppsPage() {
       setRockyCpu('2');
       setRockyMemory('2Gi');
       setRockyDisk('20Gi');
+      setRockySshKeys('');
     }
     setForm((f) => ({
       ...f,
@@ -447,11 +430,12 @@ export function AppsPage() {
     }
   };
 
-  const applyRockySizing = (cpu: string, memory: string, disk: string) => {
+  const applyRockySizing = (cpu: string, memory: string, disk: string, ssh: string) => {
     setRockyCpu(cpu);
     setRockyMemory(memory);
     setRockyDisk(disk);
-    setForm((f) => ({ ...f, valuesYaml: rockyVmValuesYaml(cpu, memory, disk) }));
+    setRockySshKeys(ssh);
+    setForm((f) => ({ ...f, valuesYaml: rockyVmValuesYaml(cpu, memory, disk, ssh) }));
   };
 
   return (
@@ -656,7 +640,7 @@ export function AppsPage() {
                 setForm((f) => ({
                   ...f,
                   chart: v,
-                  valuesYaml: rocky ? rockyVmValuesYaml(rockyCpu, rockyMemory, rockyDisk) : f.valuesYaml,
+                  valuesYaml: rocky ? rockyVmValuesYaml(rockyCpu, rockyMemory, rockyDisk, rockySshKeys) : f.valuesYaml,
                   route: rocky ? { mode: 'none' } : f.route,
                 }));
               }}
@@ -670,21 +654,34 @@ export function AppsPage() {
                   type="number"
                   min={1}
                   value={rockyCpu}
-                  onChange={(_e, v) => applyRockySizing(v, rockyMemory, rockyDisk)}
+                  onChange={(_e, v) => applyRockySizing(v, rockyMemory, rockyDisk, rockySshKeys)}
                 />
               </LabeledField>
               <LabeledField label="Memory" fieldId="app-rocky-memory" help={getFieldHelp('apps.rockyMemory')}>
                 <TextInput
                   id="app-rocky-memory"
                   value={rockyMemory}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, v, rockyDisk)}
+                  onChange={(_e, v) => applyRockySizing(rockyCpu, v, rockyDisk, rockySshKeys)}
                 />
               </LabeledField>
               <LabeledField label="Disk size" fieldId="app-rocky-disk" help={getFieldHelp('apps.rockyDisk')}>
                 <TextInput
                   id="app-rocky-disk"
                   value={rockyDisk}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, v)}
+                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, v, rockySshKeys)}
+                />
+              </LabeledField>
+              <LabeledField
+                label="SSH public key(s)"
+                fieldId="app-rocky-ssh"
+                help={getFieldHelp('apps.rockySshKeys')}
+              >
+                <TextArea
+                  id="app-rocky-ssh"
+                  value={rockySshKeys}
+                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, rockyDisk, v)}
+                  rows={3}
+                  placeholder="ssh-ed25519 AAAA... user@host (one per line)"
                 />
               </LabeledField>
             </>

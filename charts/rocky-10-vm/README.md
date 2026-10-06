@@ -20,6 +20,7 @@ KubeVirt platform (Multus + CDI + KubeVirt). Use **Apps → Install chart** or
 | `network.dns` | `[]` | DNS servers when `staticIP` is set |
 | `network.interface` | `enp1s0` | Guest NIC name (virtio bridge on q35) |
 | `cloudInit.user` / `password` | `rocky` / `rocky` | Local console login |
+| `cloudInit.sshAuthorizedKeys` | `[]` | List of SSH public keys added to `cloudInit.user` via cloud-init |
 
 Example values (pod network):
 
@@ -29,6 +30,9 @@ memory: 4Gi
 disk:
   size: 40Gi
   storageClass: longhorn
+cloudInit:
+  sshAuthorizedKeys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... you@host
 ```
 
 LAN (same L2 as the node — requires `network.multus_l2`):
