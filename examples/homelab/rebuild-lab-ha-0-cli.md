@@ -188,7 +188,7 @@ umkim cluster platform status lab-ha-0
 ```
 
 Expect: `phase=Ready install=true lanBridge=true`, NAD `default/mgmt-l2`,
-Calico `IP_AUTODETECTION_METHOD=interface=n0p0_mgmt_nw`.
+Calico `IP_AUTODETECTION_METHOD=interface=mgmt-l2-br`.
 
 ## Demo apps (fleet API)
 
@@ -240,7 +240,7 @@ ssh -J linux@jump.otthol.hu:30200 linux@172.16.10.100 \
 
 - 4 nodes Ready (3 CP + 1 worker)
 - Longhorn default SC
-- Calico `interface=n0p0_mgmt_nw` on all nodes
+- Calico `interface=mgmt-l2-br` on all nodes
 - NAD `default/mgmt-l2`
 - FleetApps: `whoami-ha`, `petclinic-ha`, `rocky-lan-ha` → `Ready`
 

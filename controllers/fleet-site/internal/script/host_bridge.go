@@ -278,6 +278,22 @@ main() {
 
   local ip_iface slave cidr gw
   ip_iface="$(require_iface_for_ip "${MGMT_IP}")"
+
+  # Auto-adopt a bridge that already carries the management IP (for example one
+  # created by the site provisioner). Use its name instead of creating a new
+  # bridge, so the NAD and Calico point at the right interface.
+  if iface_is_bridge "${ip_iface}"; then
+    BRIDGE_NAME="${ip_iface}"
+    log "Adopting existing bridge ${BRIDGE_NAME} carrying ${MGMT_IP}"
+  else
+    local master
+    master="$(iface_master_name "${ip_iface}" || true)"
+    if [[ -n "${master}" ]]; then
+      BRIDGE_NAME="${master}"
+      log "Adopting existing bridge ${BRIDGE_NAME} (port ${ip_iface}) carrying ${MGMT_IP}"
+    fi
+  fi
+
   slave="$(detect_slave "${ip_iface}")"
   log "mgmtIp=${MGMT_IP} ipIface=${ip_iface} bridge=${BRIDGE_NAME} slave=${slave:-none} keepIp=${KEEP_IP}"
 
@@ -349,7 +365,7 @@ func RenderHostBridge(p HostBridgeParams) (string, error) {
 		return "", nil
 	}
 	if p.BridgeName == "" {
-		p.BridgeName = "n0p0_mgmt_nw"
+		p.BridgeName = "mgmt-l2-br"
 	}
 	tmpl, err := template.New("host-bridge").Parse(hostBridgeTmpl)
 	if err != nil {

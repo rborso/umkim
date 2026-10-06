@@ -10,7 +10,7 @@ VMs to the node LAN with a Multus bridge NAD (`mgmt-l2`).
 | Mode | Behavior |
 | --- | --- |
 | Pod network (default) | Multus + CDI + KubeVirt; VMs use masquerade / pod network |
-| LAN L2 | Host Linux bridge on every node + NAD `mgmt-l2` (default bridge `n0p0_mgmt_nw`). Prefer creating the bridge at bootstrap (`spec.providers.kubevirtBridge.enabled`); day-2 enable is supported |
+| LAN L2 | Host Linux bridge on every node + NAD `mgmt-l2` (default bridge `mgmt-l2-br`). Prefer creating the bridge at bootstrap (`spec.providers.kubevirtBridge.enabled`); day-2 enable is supported |
 
 NAD IPAM is empty — LAN addresses come from site DHCP/static, not Kubernetes.
 
@@ -34,7 +34,7 @@ Console **Operations → Enable KubeVirt** / **Enable LAN Multus**, or:
 umkim cluster platform enable-kubevirt CLUSTER
 
 # Install KubeVirt with LAN Multus, or add LAN Multus when KubeVirt is already Ready
-umkim cluster platform enable-kubevirt CLUSTER --lan-bridge [--bridge n0p0_mgmt_nw]
+umkim cluster platform enable-kubevirt CLUSTER --lan-bridge [--bridge mgmt-l2-br]
 umkim cluster platform enable-kubevirt CLUSTER --lan-bridge --wait 45m
 
 # Ansible flow (same API)
@@ -114,7 +114,13 @@ Discovery sets:
   rejects traffic to guest IPs with `icmp-host-prohibited`. `kubevirt_host_bridge`
   moves the bridge interface into the `trusted` zone (set
   `kubevirt_bridge_trust_firewalld: false` to opt out).
-- Day-2 LAN bridge moves the node management IP onto `n0p0_mgmt_nw` (default).
+- Host bridge name defaults to `mgmt-l2-br` (a UMKIM-owned name aligned with the
+  NAD `mgmt-l2`). It no longer borrows YAIDAP's `<uplink>_<network>` convention,
+  which does not match real NICs/networks. If a node's management IP already sits
+  on a bridge (for example one created by the site provisioner), the role
+  **adopts** that bridge instead of creating a new one, and the NAD targets the
+  adopted interface.
+- Day-2 LAN bridge moves the node management IP onto `mgmt-l2-br` (default).
   Calico must use `IP_AUTODETECTION_METHOD=interface=<bridge>` afterward;
   stray DHCP `/32` addresses on the enslaved NIC are flushed by
   `configure-kubevirt-bridge.sh`. Bootstrap with LAN bridge runs the same script

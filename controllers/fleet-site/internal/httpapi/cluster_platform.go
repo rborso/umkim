@@ -136,7 +136,7 @@ func (s *Server) handleEnableKubevirt(ctx context.Context, w http.ResponseWriter
 		}
 		bridgeName := strings.TrimSpace(req.BridgeName)
 		if bridgeName == "" {
-			bridgeName = "n0p0_mgmt_nw"
+			bridgeName = "mgmt-l2-br"
 		}
 		fcj.Spec.Providers.KubevirtBridge = fleetv1alpha1.KubevirtBridgeSpec{
 			Enabled:    true,

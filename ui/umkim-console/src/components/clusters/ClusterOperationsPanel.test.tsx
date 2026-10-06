@@ -50,7 +50,7 @@ describe('ClusterOperationsPanel hooks', () => {
     );
 
     expect(screen.getByLabelText('Host bridge name')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('n0p0_mgmt_nw')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('mgmt-l2-br')).toBeInTheDocument();
   });
 
   it('shows GPU runtime enabled when runtime is Ready but host phase was not recorded', async () => {

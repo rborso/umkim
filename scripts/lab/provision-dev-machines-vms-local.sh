@@ -125,14 +125,14 @@ define_vm() {
 
 case "${HYPER}" in
   virt02)
-    define_vm virt02-ha-cp1 192.168.1.81 n0p0_mgmt_nw 8192 4 50 longhorn:50
-    define_vm virt02-ha-cp2 192.168.1.82 n0p0_mgmt_nw 8192 4 50 longhorn:50
-    define_vm virt02-ha-cp3 192.168.1.83 n0p0_mgmt_nw 8192 4 50 longhorn:50
+    define_vm virt02-ha-cp1 192.168.1.81 mgmt-l2-br 8192 4 50 longhorn:50
+    define_vm virt02-ha-cp2 192.168.1.82 mgmt-l2-br 8192 4 50 longhorn:50
+    define_vm virt02-ha-cp3 192.168.1.83 mgmt-l2-br 8192 4 50 longhorn:50
     ;;
   virt03)
-    define_vm virt03-gpu-01 192.168.1.91 n0p0_mgmt_nw 10240 6 50
-    define_vm virt03-single-01 192.168.1.92 n0p0_mgmt_nw 8192 4 50
-    define_vm virt03-single-02 192.168.1.93 n0p0_mgmt_nw 8192 4 50
+    define_vm virt03-gpu-01 192.168.1.91 mgmt-l2-br 10240 6 50
+    define_vm virt03-single-01 192.168.1.92 mgmt-l2-br 8192 4 50
+    define_vm virt03-single-02 192.168.1.93 mgmt-l2-br 8192 4 50
     ;;
   virt01)
     echo "virt01 has no inventory VBM guests (bare-metal spoke only)" >&2

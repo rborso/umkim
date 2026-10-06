@@ -725,7 +725,7 @@ with expected vs actual and reproduction ([When something fails](#when-something
 
 Validate the optional spoke **platform** (Multus + CDI + KubeVirt) and a **LAN L2**
 guest on the same bridge/NAD as node management (`default/mgmt-l2`, host bridge
-default `n0p0_mgmt_nw`). Use cluster **`lab-ha-0`** (Longhorn from B6) unless noted.
+default `mgmt-l2-br`). Use cluster **`lab-ha-0`** (Longhorn from B6) unless noted.
 
 Reference: [fleet-kubevirt.md](components/fleet-kubevirt.md),
 [fleet-apps.md](components/fleet-apps.md) (`rocky-10-vm`),
@@ -744,7 +744,7 @@ Prefer **day-0** bridge when creating HA clusters (optional patch before bootstr
   },
   "kubevirtBridge": {
     "enabled": true,
-    "bridgeName": "n0p0_mgmt_nw"
+    "bridgeName": "mgmt-l2-br"
   }
 }
 ```
@@ -757,7 +757,7 @@ Prefer **day-0** bridge when creating HA clusters (optional patch before bootstr
 **CLI:**
 
 ```bash
-umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --bridge n0p0_mgmt_nw --wait 45m
+umkim cluster platform enable-kubevirt lab-ha-0 --lan-bridge --bridge mgmt-l2-br --wait 45m
 umkim cluster platform status lab-ha-0
 umkim cluster candidates --require kubevirt,network.multus_l2 --site homelab
 ```
@@ -766,7 +766,7 @@ umkim cluster candidates --require kubevirt,network.multus_l2 --site homelab
 
 - `umkim cluster get lab-ha-0` — KubeVirt provider phase installed.
 - Labels/capabilities: `fleet.capability/kubevirt`, `fleet.capability/network.multus_l2`.
-- On a spoke node: NAD `default/mgmt-l2` exists; bridge `n0p0_mgmt_nw` carries management L2.
+- On a spoke node: NAD `default/mgmt-l2` exists; bridge `mgmt-l2-br` carries management L2.
 
 **Document:** `B9a-platform-status.json`, `B9a-multus-nad.txt` (redacted `kubectl get net-attach-def`).
 

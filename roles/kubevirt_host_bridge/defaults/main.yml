@@ -1,6 +1,6 @@
 ---
 # Day-0/day-2 host Linux bridge for Multus L2 KubeVirt VMs (all cluster nodes).
-kubevirt_bridge_host_bridge: n0p0_mgmt_nw
+kubevirt_bridge_host_bridge: mgmt-l2-br
 kubevirt_bridge_slave_nic: ""
 kubevirt_bridge_keep_ip: true
 kubevirt_bridge_cni_bin_dir: /opt/cni/bin

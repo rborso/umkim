@@ -2,7 +2,7 @@
 # Re-point Calico node IP autodetection after management IP moved to kubevirt host bridge.
 - name: Calico | Resolve post-bridge autodetection interface
   ansible.builtin.set_fact:
-    calico_ip_autodetection_method: "interface={{ kubevirt_bridge_host_bridge | default('n0p0_mgmt_nw') }}"
+    calico_ip_autodetection_method: "interface={{ kubevirt_bridge_host_bridge | default('mgmt-l2-br') }}"
 
 - name: Calico | Check calico-node daemonset exists
   ansible.builtin.command:

@@ -20,12 +20,12 @@ wireguard_peers: "{{ groups['spokes'] | default([]) }}"
 wireguard_hub_host: "{{ groups['hub'] | first | default('umkim-hub') }}"
 
 wireguard_dnf_via_mgmt: false
-wireguard_dnf_mgmt_device: n0p0_mgmt_nw
+wireguard_dnf_mgmt_device: mgmt-l2-br
 wireguard_dnf_mgmt_gateway: 198.51.100.1
 wireguard_dnf_temp_route_metric: 50
 
 wireguard_endpoint_route_via_mgmt: false
 wireguard_endpoint_route_gateway: 198.51.100.1
-wireguard_endpoint_route_device: n0p0_mgmt_nw
+wireguard_endpoint_route_device: mgmt-l2-br
 wireguard_endpoint_route_metric: 50
 wireguard_endpoint_route_script: /usr/local/sbin/wg-endpoint-route.sh

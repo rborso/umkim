@@ -620,7 +620,7 @@ export async function createFleetCluster(body: FleetClusterCreate): Promise<Flee
     prov?.kubevirt && prov.kubevirtBridge?.enabled
       ? {
           enabled: true,
-          bridgeName: prov.kubevirtBridge.bridgeName || 'n0p0_mgmt_nw',
+          bridgeName: prov.kubevirtBridge.bridgeName || 'mgmt-l2-br',
           slaveNic: prov.kubevirtBridge.slaveNic || undefined,
           keepIp: prov.kubevirtBridge.keepIp !== false,
         }

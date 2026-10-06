@@ -350,7 +350,7 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
   const [historyRefreshKey, setHistoryRefreshKey] = useState('');
   const lastHistoryPhase = useRef('');
   const [lanBridge, setLanBridge] = useState(false);
-  const [bridgeName, setBridgeName] = useState('n0p0_mgmt_nw');
+  const [bridgeName, setBridgeName] = useState('mgmt-l2-br');
 
   useEffect(() => {
     setNfsDir(cluster.storage?.nfs?.exportBase || '/srv/fleet-nfs');
@@ -613,7 +613,7 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
       const lanUpgrade = withLan && !multusL2;
       await enableFleetClusterKubevirt(clusterName, {
         lanBridge: withLan || undefined,
-        bridgeName: withLan ? bridgeName.trim() || 'n0p0_mgmt_nw' : undefined,
+        bridgeName: withLan ? bridgeName.trim() || 'mgmt-l2-br' : undefined,
         keepIp: withLan ? true : undefined,
         // Re-apply needs force; first-time LAN Multus on Ready KubeVirt does not.
         force: (!lanUpgrade && (kubevirtReady || kubevirtPhase === 'Failed')) || undefined,
