@@ -59,6 +59,17 @@ Required fields:
 Optional: `version`, `releaseName`, `namespace`, `values` / `valuesYaml`, and
 `route.mode` (`none`, `hub`, `site`).
 
+Console install fields adapt to the chart:
+
+- **Built-in charts** show only applicable fields. `rocky-10-vm` exposes sizing,
+  SSH keys, and network/static IP with no Route control; `llama-cpp-helm` exposes
+  the profile picker and LiteLLM registration; `whoami` / `pet-clinic-helm`
+  expose the fleet Route (`none`/`hub`/`site`) since they create a Service.
+- **Custom charts** get the generic fields (cluster, chart, version, release,
+  namespace, values) plus an optional Route. Selecting `hub`/`site` reveals the
+  wiring (`serviceName`, `servicePort`, `serviceNamespace`, `healthPath`,
+  `requireAuth`); the chart must create a matching Kubernetes Service.
+
 ### Update (patch)
 
 `PATCH /fleet/api/v1alpha1/apps/{name}` updates `version`, `valuesYaml`,

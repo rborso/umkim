@@ -25,7 +25,7 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'apps.routeMode': {
     description:
-      'none leaves ingress to the chart. hub publishes through the hub Traefik gateway to this cluster. site uses the cluster’s own ingress.',
+      'none leaves ingress to the chart. hub publishes through the hub Traefik gateway to this cluster. site uses the cluster’s own ingress. Only applies to charts that create a Service (web apps and custom charts); KubeVirt and LLM charts manage their own networking.',
     examples: ['none', 'hub', 'site'],
   },
   'apps.hubHost': {
@@ -37,6 +37,23 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description:
       'Public hostname on the cluster site ingress (port-forward or reverse proxy). Leave empty to use <release>.<site edge domain>.',
     example: 'whoami.homelab.example.com',
+  },
+  'apps.routeServiceName': {
+    description:
+      'Kubernetes Service the route targets in the release namespace. Defaults to the release name when empty. Custom charts must create this Service.',
+    example: 'my-app',
+  },
+  'apps.routeServicePort': {
+    description: 'Service port the route forwards to. Empty uses the controller default.',
+    example: '80',
+  },
+  'apps.routeServiceNamespace': {
+    description: 'Namespace of the routed Service. Defaults to the release namespace.',
+    example: 'default',
+  },
+  'apps.routeHealthPath': {
+    description: 'HTTP path probed to mark the route healthy. Defaults to /.',
+    example: '/healthz',
   },
   'apps.valuesYaml': {
     description: 'Optional Helm values YAML merged at install time.',
