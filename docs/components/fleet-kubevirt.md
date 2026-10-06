@@ -109,6 +109,11 @@ Discovery sets:
   the bridge interface on bootstrap, then
   `roles/fleet_site/tasks/push_site_kubevirt_platform.yml`
 - Roles: `kubevirt_host_bridge`, `kubevirt_stack`, `kubevirt_bridge_nad`
+- LAN guests are reached by forwarding through the host bridge. On nodes with
+  firewalld the bridge is normally in the `public` zone (`forward: no`), which
+  rejects traffic to guest IPs with `icmp-host-prohibited`. `kubevirt_host_bridge`
+  moves the bridge interface into the `trusted` zone (set
+  `kubevirt_bridge_trust_firewalld: false` to opt out).
 - Day-2 LAN bridge moves the node management IP onto `n0p0_mgmt_nw` (default).
   Calico must use `IP_AUTODETECTION_METHOD=interface=<bridge>` afterward;
   stray DHCP `/32` addresses on the enslaved NIC are flushed by

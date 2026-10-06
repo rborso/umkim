@@ -68,3 +68,31 @@
   become: true
   changed_when: false
   tags: [kubevirt, kubevirt_host_bridge]
+
+# Guests behind the host bridge are not the node itself: external traffic to them
+# is forwarded, which firewalld blocks when the bridge is in a normal zone. Move
+# it to trusted so cluster-external clients can reach guest IPs.
+- name: KubeVirt host bridge | Trust bridge in firewalld (allow guest forwarding)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    BR="{{ kubevirt_bridge_host_bridge }}"
+    if ! command -v firewall-cmd >/dev/null 2>&1; then
+      echo "firewalld not installed"; exit 0
+    fi
+    if ! firewall-cmd --state >/dev/null 2>&1; then
+      echo "firewalld not running"; exit 0
+    fi
+    zone="$(firewall-cmd --get-zone-of-interface="${BR}" 2>/dev/null || true)"
+    if [ "${zone}" = "trusted" ]; then
+      echo "bridge ${BR} already in trusted zone"; exit 0
+    fi
+    firewall-cmd --permanent --zone=trusted --add-interface="${BR}"
+    firewall-cmd --reload
+    echo "moved bridge ${BR} to trusted zone"
+  args:
+    executable: /bin/bash
+  become: true
+  register: kubevirt_host_bridge_fw
+  changed_when: "'moved bridge' in kubevirt_host_bridge_fw.stdout"
+  when: kubevirt_bridge_trust_firewalld | default(true) | bool
+  tags: [kubevirt, kubevirt_host_bridge, kubevirt_bridge_nad]
