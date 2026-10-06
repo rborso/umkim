@@ -32,3 +32,9 @@ controllers/fleet-edge/controller
 controllers/fleet-site/controller
 controllers/fleet-bootstrap/controller
 cmd/umkim/umkim
+
+# Local-only artifacts (never publish)
+*.bak
+*.bak-*
+logs/
+.cursor/plans/
