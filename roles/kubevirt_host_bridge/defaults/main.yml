@@ -10,3 +10,7 @@ kubevirt_bridge_mgmt_ip: "{{ fleet_node_mgmt_address | default(ansible_host) }}"
 kubevirt_bridge_reconcile_calico: true
 calico_kubeconfig: /etc/rancher/k3s/k3s.yaml
 calico_rollout_timeout: 600
+# Guests behind the host bridge need forwarded traffic allowed. When firewalld is
+# active, move the bridge interface into the trusted zone so external clients can
+# reach guest IPs (otherwise the public zone rejects forwarding with icmp-host-prohibited).
+kubevirt_bridge_trust_firewalld: true

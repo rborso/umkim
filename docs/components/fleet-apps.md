@@ -59,6 +59,17 @@ Required fields:
 Optional: `version`, `releaseName`, `namespace`, `values` / `valuesYaml`, and
 `route.mode` (`none`, `hub`, `site`).
 
+Console install fields adapt to the chart:
+
+- **Built-in charts** show only applicable fields. `rocky-10-vm` exposes sizing,
+  SSH keys, and network/static IP with no Route control; `llama-cpp-helm` exposes
+  the profile picker and LiteLLM registration; `whoami` / `pet-clinic-helm`
+  expose the fleet Route (`none`/`hub`/`site`) since they create a Service.
+- **Custom charts** get the generic fields (cluster, chart, version, release,
+  namespace, values) plus an optional Route. Selecting `hub`/`site` reveals the
+  wiring (`serviceName`, `servicePort`, `serviceNamespace`, `healthPath`,
+  `requireAuth`); the chart must create a matching Kubernetes Service.
+
 ### Update (patch)
 
 `PATCH /fleet/api/v1alpha1/apps/{name}` updates `version`, `valuesYaml`,
@@ -83,7 +94,8 @@ uses `llmBackend` on `POST /apps` / `PATCH /apps/{name}` (console checkbox or
 
 Install a KubeVirt VM from **Apps → Install chart** (chart `rocky-10-vm`) onto a
 cluster that already has the KubeVirt platform. The console exposes **vCPU**,
-**memory**, and **disk** fields; they write Helm values. Use `route.mode: none`.
+**memory**, **disk**, **SSH public key(s)**, and **Network** (pod vs lan + static
+IP) fields; they write Helm values. Use `route.mode: none`.
 
 ```yaml
 cpu: 2
@@ -92,12 +104,17 @@ disk:
   size: 20Gi
   storageClass: longhorn
   volumeMode: Filesystem
+cloudInit:
+  sshAuthorizedKeys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... you@host
 ```
 
 The chart imports Rocky 10 GenericCloud via CDI (`volumeMode: Filesystem` is
 required for Longhorn in this lab) and applies cloud-init (default serial
-login user `rocky`; set `cloudInit.password`, which defaults to `CHANGE_ME`). For LAN guests, set `network.staticIP`, `gateway`,
-and `dns` — Rocky GenericCloud ignores cloud-init `network:` v2, so the chart
+login `rocky` / `rocky`; add keys in **SSH public key(s)** or
+`cloudInit.sshAuthorizedKeys`). For LAN guests, choose **Network = lan** (Multus
+NAD, default `default/mgmt-l2`) and optionally set **Static IPv4**, **Gateway**,
+and **DNS** — Rocky GenericCloud ignores cloud-init `network:` v2, so the chart
 writes a NetworkManager keyfile instead. See [fleet-kubevirt.md](fleet-kubevirt.md)
 and [charts/rocky-10-vm/README.md](../../charts/rocky-10-vm/README.md).
 

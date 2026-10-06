@@ -25,7 +25,7 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'apps.routeMode': {
     description:
-      'none leaves ingress to the chart. hub publishes through the hub Traefik gateway to this cluster. site uses the cluster’s own ingress.',
+      'none leaves ingress to the chart. hub publishes through the hub Traefik gateway to this cluster. site uses the cluster’s own ingress. Only applies to charts that create a Service (web apps and custom charts); KubeVirt and LLM charts manage their own networking.',
     examples: ['none', 'hub', 'site'],
   },
   'apps.hubHost': {
@@ -37,6 +37,23 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description:
       'Public hostname on the cluster site ingress (port-forward or reverse proxy). Leave empty to use <release>.<site edge domain>.',
     example: 'whoami.homelab.example.com',
+  },
+  'apps.routeServiceName': {
+    description:
+      'Kubernetes Service the route targets in the release namespace. Defaults to the release name when empty. Custom charts must create this Service.',
+    example: 'my-app',
+  },
+  'apps.routeServicePort': {
+    description: 'Service port the route forwards to. Empty uses the controller default.',
+    example: '80',
+  },
+  'apps.routeServiceNamespace': {
+    description: 'Namespace of the routed Service. Defaults to the release namespace.',
+    example: 'default',
+  },
+  'apps.routeHealthPath': {
+    description: 'HTTP path probed to mark the route healthy. Defaults to /.',
+    example: '/healthz',
   },
   'apps.valuesYaml': {
     description: 'Optional Helm values YAML merged at install time.',
@@ -72,6 +89,43 @@ export const APPS_FIELD_HELP: Record<string, FieldHelpContent> = {
   'apps.rockyDisk': {
     description: 'Root disk PVC size for the CDI import. Must cover the Rocky cloud image (~10Gi+).',
     example: '20Gi',
+  },
+  'apps.rockySshKeys': {
+    description:
+      'One SSH public key per line, added to the guest via cloud-init ssh_authorized_keys for the cloudInit.user account. Leave empty to keep password-only access (default user/password rocky/rocky on the console).',
+    example: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... you@host',
+    commonMistakes: [
+      'Pasting a private key instead of the .pub public key',
+      'Expecting keys added to an already-booted VM to apply without a reboot / cloud-init re-run',
+    ],
+  },
+  'apps.rockyNetMode': {
+    description:
+      'pod uses the cluster pod network with masquerade/NAT (guest IP is not routable from the LAN). lan attaches a second NIC through Multus to a NetworkAttachmentDefinition, giving the guest an address on the site L2 (DHCP or static).',
+    examples: ['pod', 'lan'],
+  },
+  'apps.rockyMultusNetwork': {
+    description:
+      'Multus NetworkAttachmentDefinition as namespace/name. The default default/mgmt-l2 is created by Enable LAN Multus on the KubeVirt platform. Its bridge CNI has no IPAM, so the guest does DHCP or static addressing.',
+    example: 'default/mgmt-l2',
+  },
+  'apps.rockyStaticIP': {
+    description:
+      'Static IPv4 in CIDR form, written into the guest as a NetworkManager keyfile (Rocky GenericCloud ignores cloud-init network v2). Leave empty to use DHCP on the L2. Requires Network = lan.',
+    example: '172.16.10.150/24',
+  },
+  'apps.rockyGateway': {
+    description: 'Default gateway for the static LAN address (usually the L2 router).',
+    example: '172.16.10.1',
+  },
+  'apps.rockyDns': {
+    description: 'DNS servers for the static LAN address (comma or space separated).',
+    example: '172.16.10.1, 1.1.1.1',
+  },
+  'apps.rockyInterface': {
+    description:
+      'Guest NIC name that receives the static address. Must match the VM interface (enp1s0 on q35 virtio).',
+    example: 'enp1s0',
   },
   'apps.libraryChart': {
     description:

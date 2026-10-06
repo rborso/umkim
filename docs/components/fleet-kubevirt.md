@@ -66,6 +66,7 @@ After KubeVirt is Ready on a cluster, operators manage guest VMs from the hub
 | Surface | Path |
 | --- | --- |
 | Console | **Clusters → cluster → Virtual machines** (`/clusters/{name}/vms`) |
+| Console (site view) | **Sites → site → KubeVirt machines** (read-only aggregate across the site's managed clusters) |
 | CLI | `umkim vm …` |
 | API | `/clusters/{name}/vms…` |
 
@@ -108,6 +109,11 @@ Discovery sets:
   the bridge interface on bootstrap, then
   `roles/fleet_site/tasks/push_site_kubevirt_platform.yml`
 - Roles: `kubevirt_host_bridge`, `kubevirt_stack`, `kubevirt_bridge_nad`
+- LAN guests are reached by forwarding through the host bridge. On nodes with
+  firewalld the bridge is normally in the `public` zone (`forward: no`), which
+  rejects traffic to guest IPs with `icmp-host-prohibited`. `kubevirt_host_bridge`
+  moves the bridge interface into the `trusted` zone (set
+  `kubevirt_bridge_trust_firewalld: false` to opt out).
 - Day-2 LAN bridge moves the node management IP onto `n0p0_mgmt_nw` (default).
   Calico must use `IP_AUTODETECTION_METHOD=interface=<bridge>` afterward;
   stray DHCP `/32` addresses on the enslaved NIC are flushed by
@@ -160,9 +166,16 @@ spec:
 
 Prefer the seeded Helm chart **`rocky-10-vm`** from **Apps → Install chart**
 (or `FleetApp` with short chart name `rocky-10-vm`). Configure `cpu`, `memory`,
-and `disk.size` in the install dialog / values. Requires KubeVirt + CDI and a
-storage class suitable for CDI imports (default `longhorn`). Guest management
-after Ready uses the cluster **Virtual machines** page / `umkim vm`.
+and `disk.size` in the install dialog / values, and add guest SSH public keys in
+the **SSH public key(s)** field (one per line; chart value
+`cloudInit.sshAuthorizedKeys`). Leave it empty to keep the default password
+login (`cloudInit.user` / `cloudInit.password`, default `rocky` / `rocky`).
+For a LAN address, set **Network = lan** (Multus NAD `network.multusNetwork`,
+default `default/mgmt-l2`) and optionally a **Static IPv4** (chart
+`network.staticIP`/`gateway`/`dns`); empty static IP uses DHCP on the L2.
+Requires KubeVirt + CDI and a storage class suitable for CDI imports (default
+`longhorn`). Guest management after Ready uses the cluster **Virtual machines**
+page / `umkim vm`.
 ## Sample VM (LAN Multus)
 
 Requires `fleet.capability/network.multus_l2` (NAD `default/mgmt-l2`) and a

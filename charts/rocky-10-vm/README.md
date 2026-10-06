@@ -2,7 +2,9 @@
 
 Install a **Rocky Linux 10** guest on a Ready cluster that already has the
 KubeVirt platform (Multus + CDI + KubeVirt). Use **Apps → Install chart** or
-`FleetApp` with short chart name `rocky-10-vm`.
+`FleetApp` with short chart name `rocky-10-vm`. The console install dialog
+exposes CPU, memory, disk, SSH public keys, and network mode (pod or lan with an
+optional static IP); everything below is also settable through Helm values.
 
 ## Values
 
@@ -19,7 +21,8 @@ KubeVirt platform (Multus + CDI + KubeVirt). Use **Apps → Install chart** or
 | `network.gateway` | `""` | Default gateway when `staticIP` is set |
 | `network.dns` | `[]` | DNS servers when `staticIP` is set |
 | `network.interface` | `enp1s0` | Guest NIC name (virtio bridge on q35) |
-| `cloudInit.user` / `password` | `rocky` / `CHANGE_ME` | Local console login |
+| `cloudInit.user` / `password` | `rocky` / `rocky` | Local console login |
+| `cloudInit.sshAuthorizedKeys` | `[]` | List of SSH public keys added to `cloudInit.user` via cloud-init |
 
 Example values (pod network):
 
@@ -29,6 +32,9 @@ memory: 4Gi
 disk:
   size: 40Gi
   storageClass: longhorn
+cloudInit:
+  sshAuthorizedKeys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... you@host
 ```
 
 LAN (same L2 as the node — requires `network.multus_l2`):

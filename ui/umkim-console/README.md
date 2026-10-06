@@ -55,8 +55,9 @@ See [fleet-apps.md](../../docs/components/fleet-apps.md) and
 [examples/site-profiles/](../../examples/site-profiles/) for site exposure.
 
 **Rocky Linux 10 VMs:** install library chart `rocky-10-vm` from **Apps** with
-configurable vCPU, memory, and disk (KubeVirt platform required on the target
-cluster).
+configurable vCPU, memory, disk, guest SSH public keys, and network
+(pod/NAT or lan/Multus with optional static IP) (KubeVirt platform required on
+the target cluster).
 
 **Site connectivity:** registry sites expose jumphost, region, and failure domain
 on **Sites → detail → Edge and DNS** (and on create). **Sites → detail → Hosts**
@@ -73,6 +74,8 @@ jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equi
 on a managed cluster, with serial console by default and on-demand VNC. Power
 controls (start, soft/hard stop, soft/hard restart) match `umkim vm`
 ([fleet-kubevirt.md](../../docs/components/fleet-kubevirt.md)).
+**Sites → detail → KubeVirt machines** aggregates those VMs across every cluster
+in the site (read-only).
 
 Deploy through `fleet-console-auth.yml` and `roles/fleet_console_helm/`; build and image
 publication use the Harbor role (`Containerfile` in this directory). Example:

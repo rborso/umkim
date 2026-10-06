@@ -129,7 +129,8 @@ func WgSyncJob(ns, jobName, pubKey, allowedIP string, removePeers []WGPeer) *bat
 }
 
 // OverlayConnectivityJob probes hub→spoke overlay reachability from the host network,
-// re-applies the WireGuard peer + route when the handshake is stale, and verifies TCP to the SP NodePort.
+// re-applies the WireGuard peer + route when the handshake is stale, and verifies TCP to the
+// spoke kube-apiserver (6443) over WireGuard.
 func OverlayConnectivityJob(ns, jobName, pubKey, hostIP string, tcpPort int) *batchv1.Job {
 	const staleSec = 90
 	cmd := fmt.Sprintf(`set -e

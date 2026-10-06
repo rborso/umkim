@@ -35,9 +35,13 @@ import {
   uploadFleetChart,
 } from '../api/client';
 import { isLlamaCppChart } from '../apps/llamaCpp';
+import { chartInstallProfile } from '../apps/chartProfile';
+import { isRocky10VmChart, parseRockyDns, rockyVmValuesYaml } from '../apps/rockyVm';
+import type { RockyVmNetwork, RockyVmNetworkMode } from '../apps/rockyVm';
 import type {
   FleetApp,
   FleetAppCreate,
+  FleetAppRoute,
   FleetAppRouteMode,
   FleetChart,
   FleetChartImagePolicy,
@@ -69,25 +73,60 @@ const emptyForm = (clusterName = '', chart = 'whoami'): FleetAppCreate => ({
   route: { mode: 'none' },
 });
 
-function chartBaseName(chart: string): string {
-  const trimmed = chart.trim().toLowerCase();
-  const noScheme = trimmed.replace(/^oci:\/\//, '');
-  const last = noScheme.includes('/') ? noScheme.slice(noScheme.lastIndexOf('/') + 1) : noScheme;
-  return last.replace(/:.*/, '');
+type RockyForm = {
+  cpu: string;
+  memory: string;
+  disk: string;
+  sshKeys: string;
+  netMode: RockyVmNetworkMode;
+  multusNetwork: string;
+  iface: string;
+  staticIP: string;
+  gateway: string;
+  dns: string;
+};
+
+const newRockyForm = (): RockyForm => ({
+  cpu: '2',
+  memory: '2Gi',
+  disk: '20Gi',
+  sshKeys: '',
+  netMode: 'pod',
+  multusNetwork: 'default/mgmt-l2',
+  iface: 'enp1s0',
+  staticIP: '',
+  gateway: '',
+  dns: '',
+});
+
+function rockyNetworkFromForm(f: RockyForm): RockyVmNetwork | undefined {
+  if (f.netMode !== 'lan') {
+    return undefined;
+  }
+  return {
+    mode: 'lan',
+    multusNetwork: f.multusNetwork,
+    interface: f.iface,
+    staticIP: f.staticIP,
+    gateway: f.gateway,
+    dns: parseRockyDns(f.dns),
+  };
 }
 
-function isRocky10VmChart(chart: string): boolean {
-  return chartBaseName(chart) === 'rocky-10-vm';
+function rockyValuesFromForm(f: RockyForm): string {
+  return rockyVmValuesYaml(f.cpu, f.memory, f.disk, f.sshKeys, rockyNetworkFromForm(f));
 }
 
-function rockyVmValuesYaml(cpu: string, memory: string, diskSize: string): string {
-  const cores = Number.parseInt(cpu, 10);
-  return [
-    `cpu: ${Number.isFinite(cores) && cores > 0 ? cores : 2}`,
-    `memory: ${memory.trim() || '2Gi'}`,
-    'disk:',
-    `  size: ${diskSize.trim() || '20Gi'}`,
-  ].join('\n');
+/** Route target wiring for custom charts (carried through install and edit). */
+function routeWiringFromRoute(route?: FleetAppRoute): Partial<FleetAppRoute> {
+  if (!route) return {};
+  const wiring: Partial<FleetAppRoute> = {};
+  if (route.serviceName?.trim()) wiring.serviceName = route.serviceName.trim();
+  if (route.servicePort && route.servicePort > 0) wiring.servicePort = route.servicePort;
+  if (route.serviceNamespace?.trim()) wiring.serviceNamespace = route.serviceNamespace.trim();
+  if (route.healthPath?.trim()) wiring.healthPath = route.healthPath.trim();
+  if (route.requireAuth) wiring.requireAuth = true;
+  return wiring;
 }
 
 function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
@@ -177,9 +216,7 @@ export function AppsPage() {
   const [deleteTarget, setDeleteTarget] = useState<FleetApp | null>(null);
   const [deleteChartTarget, setDeleteChartTarget] = useState<FleetChart | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [rockyCpu, setRockyCpu] = useState('2');
-  const [rockyMemory, setRockyMemory] = useState('2Gi');
-  const [rockyDisk, setRockyDisk] = useState('20Gi');
+  const [rocky, setRocky] = useState<RockyForm>(newRockyForm());
   const [llamaProfiles, setLlamaProfiles] = useState<{ id: string; description?: string }[]>([]);
   const [llamaProfileId, setLlamaProfileId] = useState('');
   const [editOpen, setEditOpen] = useState(false);
@@ -204,6 +241,7 @@ export function AppsPage() {
   );
 
   const readyCharts = useMemo(() => charts.filter((c) => c.phase === 'Ready'), [charts]);
+  const chartProfile = useMemo(() => chartInstallProfile(form.chart), [form.chart]);
 
   const selectedCluster = useMemo(
     () => readyClusters.find((c) => c.name === form.clusterName),
@@ -257,15 +295,15 @@ export function AppsPage() {
     setActionError(null);
     void loadLlamaProfiles();
     const first = readyCharts[0]?.name || 'whoami';
-    const rocky = isRocky10VmChart(first);
-    setRockyCpu('2');
-    setRockyMemory('2Gi');
-    setRockyDisk('20Gi');
+    const firstProfile = chartInstallProfile(first);
+    const rockyDefaults = newRockyForm();
+    setRocky(rockyDefaults);
     setRegisterLiteLLM(false);
     setForm({
       ...emptyForm(readyClusters[0]?.name || '', first),
       version: readyCharts[0]?.version || '0.1.0',
-      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : '',
+      namespace: firstProfile.defaultNamespace || 'default',
+      valuesYaml: firstProfile.kind === 'kubevirt' ? rockyValuesFromForm(rockyDefaults) : '',
       route: { mode: 'none' },
     });
     setModalOpen(true);
@@ -294,6 +332,7 @@ export function AppsPage() {
         ...(mode === 'site' && form.route?.siteHost?.trim()
           ? { siteHost: form.route.siteHost.trim() }
           : {}),
+        ...(mode !== 'none' ? routeWiringFromRoute(form.route) : {}),
       };
       const llama = isLlamaCppChart(form.chart);
       const body: FleetAppCreate = {
@@ -386,21 +425,21 @@ export function AppsPage() {
 
   const onLibrarySelect = (name: string) => {
     const c = readyCharts.find((x) => x.name === name);
-    const rocky = isRocky10VmChart(name);
-    const llama = isLlamaCppChart(name);
-    if (rocky) {
-      setRockyCpu('2');
-      setRockyMemory('2Gi');
-      setRockyDisk('20Gi');
+    const profile = chartInstallProfile(name);
+    const isRocky = profile.kind === 'kubevirt';
+    const llama = profile.kind === 'llm';
+    const rockyDefaults = isRocky ? newRockyForm() : null;
+    if (rockyDefaults) {
+      setRocky(rockyDefaults);
     }
     setForm((f) => ({
       ...f,
       chart: name,
       version: c?.version || f.version,
       releaseName: f.releaseName && f.releaseName !== f.chart ? f.releaseName : name,
-      namespace: llama ? 'llm' : f.namespace,
-      valuesYaml: rocky ? rockyVmValuesYaml('2', '2Gi', '20Gi') : llama ? f.valuesYaml : f.valuesYaml,
-      route: rocky ? { mode: 'none' } : f.route,
+      namespace: profile.defaultNamespace || f.namespace,
+      valuesYaml: rockyDefaults ? rockyValuesFromForm(rockyDefaults) : f.valuesYaml,
+      route: profile.supportsRoute ? f.route : { mode: 'none' },
     }));
     if (llama && llamaProfileId) {
       void applyLlamaProfile(llamaProfileId).catch((e) => setActionError(e));
@@ -425,12 +464,14 @@ export function AppsPage() {
     setSaving(true);
     setActionError(null);
     try {
-      const route =
-        editForm.routeMode === 'hub'
-          ? { mode: 'hub' as FleetAppRouteMode, hubHost: editForm.routeHost.trim() || undefined }
-          : editForm.routeMode === 'site'
-            ? { mode: 'site' as FleetAppRouteMode, siteHost: editForm.routeHost.trim() || undefined }
-            : { mode: 'none' as FleetAppRouteMode };
+      const routeMode: FleetAppRouteMode =
+        editForm.routeMode === 'hub' ? 'hub' : editForm.routeMode === 'site' ? 'site' : 'none';
+      const route = {
+        mode: routeMode,
+        ...(routeMode === 'hub' ? { hubHost: editForm.routeHost.trim() || undefined } : {}),
+        ...(routeMode === 'site' ? { siteHost: editForm.routeHost.trim() || undefined } : {}),
+        ...(routeMode !== 'none' ? routeWiringFromRoute(editTarget.route) : {}),
+      };
       await patchFleetApp(editTarget.name, {
         version: editForm.version || undefined,
         valuesYaml: editForm.valuesYaml || undefined,
@@ -447,11 +488,10 @@ export function AppsPage() {
     }
   };
 
-  const applyRockySizing = (cpu: string, memory: string, disk: string) => {
-    setRockyCpu(cpu);
-    setRockyMemory(memory);
-    setRockyDisk(disk);
-    setForm((f) => ({ ...f, valuesYaml: rockyVmValuesYaml(cpu, memory, disk) }));
+  const updateRocky = (patch: Partial<RockyForm>) => {
+    const next = { ...rocky, ...patch };
+    setRocky(next);
+    setForm((f) => ({ ...f, valuesYaml: rockyValuesFromForm(next) }));
   };
 
   return (
@@ -652,12 +692,12 @@ export function AppsPage() {
               id="app-chart-custom"
               value={form.chart}
               onChange={(_e, v) => {
-                const rocky = isRocky10VmChart(v);
+                const profile = chartInstallProfile(v);
                 setForm((f) => ({
                   ...f,
                   chart: v,
-                  valuesYaml: rocky ? rockyVmValuesYaml(rockyCpu, rockyMemory, rockyDisk) : f.valuesYaml,
-                  route: rocky ? { mode: 'none' } : f.route,
+                  valuesYaml: profile.kind === 'kubevirt' ? rockyValuesFromForm(rocky) : f.valuesYaml,
+                  route: profile.supportsRoute ? f.route : { mode: 'none' },
                 }));
               }}
             />
@@ -669,24 +709,110 @@ export function AppsPage() {
                   id="app-rocky-cpu"
                   type="number"
                   min={1}
-                  value={rockyCpu}
-                  onChange={(_e, v) => applyRockySizing(v, rockyMemory, rockyDisk)}
+                  value={rocky.cpu}
+                  onChange={(_e, v) => updateRocky({ cpu: v })}
                 />
               </LabeledField>
               <LabeledField label="Memory" fieldId="app-rocky-memory" help={getFieldHelp('apps.rockyMemory')}>
                 <TextInput
                   id="app-rocky-memory"
-                  value={rockyMemory}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, v, rockyDisk)}
+                  value={rocky.memory}
+                  onChange={(_e, v) => updateRocky({ memory: v })}
                 />
               </LabeledField>
               <LabeledField label="Disk size" fieldId="app-rocky-disk" help={getFieldHelp('apps.rockyDisk')}>
                 <TextInput
                   id="app-rocky-disk"
-                  value={rockyDisk}
-                  onChange={(_e, v) => applyRockySizing(rockyCpu, rockyMemory, v)}
+                  value={rocky.disk}
+                  onChange={(_e, v) => updateRocky({ disk: v })}
                 />
               </LabeledField>
+              <LabeledField
+                label="SSH public key(s)"
+                fieldId="app-rocky-ssh"
+                help={getFieldHelp('apps.rockySshKeys')}
+              >
+                <TextArea
+                  id="app-rocky-ssh"
+                  value={rocky.sshKeys}
+                  onChange={(_e, v) => updateRocky({ sshKeys: v })}
+                  rows={3}
+                  placeholder="ssh-ed25519 AAAA... user@host (one per line)"
+                />
+              </LabeledField>
+              <LabeledField label="Network" fieldId="app-rocky-net-mode" help={getFieldHelp('apps.rockyNetMode')}>
+                <FleetModalSelect
+                  id="app-rocky-net-mode"
+                  value={rocky.netMode}
+                  onChange={(v) => updateRocky({ netMode: v as RockyVmNetworkMode })}
+                  options={[
+                    { value: 'pod', label: 'pod — NAT on the cluster network' },
+                    { value: 'lan', label: 'lan — Multus L2 (DHCP or static IP)' },
+                  ]}
+                />
+              </LabeledField>
+              {rocky.netMode === 'lan' ? (
+                <LabeledField
+                  label="Multus network"
+                  fieldId="app-rocky-multus"
+                  help={getFieldHelp('apps.rockyMultusNetwork')}
+                >
+                  <TextInput
+                    id="app-rocky-multus"
+                    value={rocky.multusNetwork}
+                    onChange={(_e, v) => updateRocky({ multusNetwork: v })}
+                    placeholder="default/mgmt-l2"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' ? (
+                <LabeledField
+                  label="Static IPv4 (CIDR)"
+                  fieldId="app-rocky-static-ip"
+                  help={getFieldHelp('apps.rockyStaticIP')}
+                >
+                  <TextInput
+                    id="app-rocky-static-ip"
+                    value={rocky.staticIP}
+                    onChange={(_e, v) => updateRocky({ staticIP: v })}
+                    placeholder="172.16.10.150/24 (empty = DHCP)"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' && rocky.staticIP.trim() ? (
+                <LabeledField label="Gateway" fieldId="app-rocky-gateway" help={getFieldHelp('apps.rockyGateway')}>
+                  <TextInput
+                    id="app-rocky-gateway"
+                    value={rocky.gateway}
+                    onChange={(_e, v) => updateRocky({ gateway: v })}
+                    placeholder="172.16.10.1"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' && rocky.staticIP.trim() ? (
+                <LabeledField label="DNS servers" fieldId="app-rocky-dns" help={getFieldHelp('apps.rockyDns')}>
+                  <TextInput
+                    id="app-rocky-dns"
+                    value={rocky.dns}
+                    onChange={(_e, v) => updateRocky({ dns: v })}
+                    placeholder="172.16.10.1, 1.1.1.1"
+                  />
+                </LabeledField>
+              ) : null}
+              {rocky.netMode === 'lan' && rocky.staticIP.trim() ? (
+                <LabeledField
+                  label="Guest interface"
+                  fieldId="app-rocky-iface"
+                  help={getFieldHelp('apps.rockyInterface')}
+                >
+                  <TextInput
+                    id="app-rocky-iface"
+                    value={rocky.iface}
+                    onChange={(_e, v) => updateRocky({ iface: v })}
+                    placeholder="enp1s0"
+                  />
+                </LabeledField>
+              ) : null}
             </>
           ) : null}
           {isLlamaCppChart(form.chart) ? (
@@ -761,59 +887,139 @@ export function AppsPage() {
               onChange={(_e, v) => setForm((f) => ({ ...f, namespace: v }))}
             />
           </LabeledField>
-          {isLlamaCppChart(form.chart) && (form.route?.mode || 'none') !== 'none' ? (
-            <Alert variant="warning" isInline title="Route vs hub LiteLLM" style={{ marginBottom: '0.75rem' }}>
-              {getFieldHelp('apps.llamaRoute')?.description}{' '}
-              <Link to="/infrastructure">LLM platform</Link> reaches the GPU spoke via WireGuard upstream, not this
-              hostname.
-            </Alert>
-          ) : null}
-          <LabeledField label="Route" fieldId="app-route" help={getFieldHelp('apps.routeMode')}>
-            <FleetModalSelect
-              id="app-route"
-              value={form.route?.mode || 'none'}
-              onChange={(v) =>
-                setForm((f) => ({ ...f, route: { ...f.route, mode: v as FleetAppRouteMode } }))
-              }
-              options={[
-                { value: 'none', label: 'none — no fleet-managed ingress' },
-                { value: 'hub', label: 'hub — Traefik on the hub' },
-                { value: 'site', label: 'site — spoke ingress' },
-              ]}
-            />
-          </LabeledField>
-          {isLlamaCppChart(form.chart) && (form.route?.mode || 'none') === 'none' ? (
-            <p style={{ fontSize: '0.85rem', marginTop: '0.35rem', maxWidth: '36rem' }}>
-              Recommended for llama-cpp: leave route <code>none</code> unless you expose the Service yourself. Hub
-              LiteLLM does not use FleetApp route hostnames.
-            </p>
-          ) : null}
-          {form.route?.mode === 'hub' || form.route?.mode === 'site' ? (
-            <LabeledField
-              label={form.route?.mode === 'site' ? 'Site hostname' : 'Hub hostname'}
-              fieldId="app-route-host"
-              help={getFieldHelp(form.route?.mode === 'site' ? 'apps.siteHost' : 'apps.hubHost')}
-            >
-              <TextInput
-                id="app-route-host"
-                value={routeHostValue}
-                placeholder={routeHostPlaceholder}
-                onChange={(_e, v) =>
-                  setForm((f) => ({
-                    ...f,
-                    route:
-                      f.route?.mode === 'site'
-                        ? { ...f.route, siteHost: v, hubHost: undefined }
-                        : { ...f.route, hubHost: v, siteHost: undefined },
-                  }))
-                }
-              />
-              {siteRouteNeedsManualHost ? (
-                <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
-                  Reverse-proxy clusters have no site DNS zone — enter the public hostname manually.
-                </p>
+          {chartProfile.supportsRoute ? (
+            <>
+              <LabeledField label="Route" fieldId="app-route" help={getFieldHelp('apps.routeMode')}>
+                <FleetModalSelect
+                  id="app-route"
+                  value={form.route?.mode || 'none'}
+                  onChange={(v) =>
+                    setForm((f) => ({ ...f, route: { ...f.route, mode: v as FleetAppRouteMode } }))
+                  }
+                  options={[
+                    { value: 'none', label: 'none — no fleet-managed ingress' },
+                    { value: 'hub', label: 'hub — Traefik on the hub' },
+                    { value: 'site', label: 'site — spoke ingress' },
+                  ]}
+                />
+              </LabeledField>
+              {form.route?.mode === 'hub' || form.route?.mode === 'site' ? (
+                <LabeledField
+                  label={form.route?.mode === 'site' ? 'Site hostname' : 'Hub hostname'}
+                  fieldId="app-route-host"
+                  help={getFieldHelp(form.route?.mode === 'site' ? 'apps.siteHost' : 'apps.hubHost')}
+                >
+                  <TextInput
+                    id="app-route-host"
+                    value={routeHostValue}
+                    placeholder={routeHostPlaceholder}
+                    onChange={(_e, v) =>
+                      setForm((f) => ({
+                        ...f,
+                        route:
+                          f.route?.mode === 'site'
+                            ? { ...f.route, siteHost: v, hubHost: undefined }
+                            : { ...f.route, hubHost: v, siteHost: undefined },
+                      }))
+                    }
+                  />
+                  {siteRouteNeedsManualHost ? (
+                    <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                      Reverse-proxy clusters have no site DNS zone — enter the public hostname manually.
+                    </p>
+                  ) : null}
+                </LabeledField>
               ) : null}
-            </LabeledField>
+              {chartProfile.kind === 'custom' &&
+              (form.route?.mode === 'hub' || form.route?.mode === 'site') ? (
+                <div
+                  style={{
+                    margin: '0.75rem 0',
+                    padding: '0.75rem 1rem',
+                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                  }}
+                >
+                  <Title headingLevel="h4" size="md" style={{ marginBottom: '0.25rem' }}>
+                    Route wiring
+                  </Title>
+                  <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    The chart must create a Kubernetes Service. The route targets{' '}
+                    <code>serviceName:servicePort</code> in <code>serviceNamespace</code> and health-checks{' '}
+                    <code>healthPath</code>. Make sure your Values create a matching Service.
+                  </p>
+                  <LabeledField
+                    label="Service name"
+                    fieldId="app-route-svc"
+                    help={getFieldHelp('apps.routeServiceName')}
+                  >
+                    <TextInput
+                      id="app-route-svc"
+                      value={form.route?.serviceName || ''}
+                      onChange={(_e, v) => setForm((f) => ({ ...f, route: { ...f.route, serviceName: v } }))}
+                      placeholder={form.releaseName || 'app'}
+                    />
+                  </LabeledField>
+                  <LabeledField
+                    label="Service port"
+                    fieldId="app-route-port"
+                    help={getFieldHelp('apps.routeServicePort')}
+                  >
+                    <TextInput
+                      id="app-route-port"
+                      type="number"
+                      min={1}
+                      value={form.route?.servicePort ?? ''}
+                      onChange={(_e, v) => {
+                        const n = Number.parseInt(v, 10);
+                        setForm((f) => ({
+                          ...f,
+                          route: {
+                            ...f.route,
+                            servicePort: Number.isFinite(n) && n > 0 ? n : undefined,
+                          },
+                        }));
+                      }}
+                      placeholder="80"
+                    />
+                  </LabeledField>
+                  <LabeledField
+                    label="Service namespace"
+                    fieldId="app-route-svcns"
+                    help={getFieldHelp('apps.routeServiceNamespace')}
+                  >
+                    <TextInput
+                      id="app-route-svcns"
+                      value={form.route?.serviceNamespace || ''}
+                      onChange={(_e, v) =>
+                        setForm((f) => ({ ...f, route: { ...f.route, serviceNamespace: v } }))
+                      }
+                      placeholder={form.namespace || 'default'}
+                    />
+                  </LabeledField>
+                  <LabeledField
+                    label="Health path"
+                    fieldId="app-route-health"
+                    help={getFieldHelp('apps.routeHealthPath')}
+                  >
+                    <TextInput
+                      id="app-route-health"
+                      value={form.route?.healthPath || ''}
+                      onChange={(_e, v) => setForm((f) => ({ ...f, route: { ...f.route, healthPath: v } }))}
+                      placeholder="/"
+                    />
+                  </LabeledField>
+                  <Checkbox
+                    id="app-route-require-auth"
+                    label="Require fleet ingress auth"
+                    isChecked={!!form.route?.requireAuth}
+                    onChange={(_e, checked) =>
+                      setForm((f) => ({ ...f, route: { ...f.route, requireAuth: checked } }))
+                    }
+                  />
+                </div>
+              ) : null}
+            </>
           ) : null}
           <LabeledField
             label="Values (YAML)"
