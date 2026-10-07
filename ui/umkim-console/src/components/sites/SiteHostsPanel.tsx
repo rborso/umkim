@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -49,6 +49,7 @@ function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey
 }
 
 export function SiteHostsPanel({ siteName }: Props) {
+  const navigate = useNavigate();
   const [hosts, setHosts] = useState<SiteHostRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -531,6 +532,20 @@ export function SiteHostsPanel({ siteName }: Props) {
                         Apply cluster
                       </Button>
                     )}
+                    {(host.status?.phase === 'Ready' || host.status?.phase === 'Declared') &&
+                      hostAnsibleAddr(host) && (
+                        <Button
+                          variant="link"
+                          isInline
+                          onClick={() =>
+                            navigate(
+                              `/clusters?site=${encodeURIComponent(siteName)}&create=1&node=${encodeURIComponent(host.name)}`,
+                            )
+                          }
+                        >
+                          Make new cluster
+                        </Button>
+                      )}
                   </div>
                 </Td>
               </Tr>
