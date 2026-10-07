@@ -52,6 +52,45 @@ uplinks:
 	}
 }
 
+func TestPromoteDiscoveryReplacesAddHostStub(t *testing.T) {
+	remote := map[string]string{
+		"host_vars/lab-single-0.yml": "---\n# Bare-metal node lab-single-0 (bare_metals.yml — not a libvirt guest).\nansible_host: 172.16.10.4\nos: rocky-10\n",
+		"generated/host_vars/lab-single-0.yml": `---
+generated:
+  tool: check_host_details
+os: rocky-10
+disks:
+  - name: disk0
+    disk: disk/by-id/ata-TOSHIBA
+`,
+	}
+	promoted := PromoteDiscoveryFiles(nil, remote)
+	got := promoted["host_vars/lab-single-0.yml"]
+	if !strings.Contains(got, "disks:") {
+		t.Fatalf("expected discovery draft to replace add-host stub, got %q", got)
+	}
+	if strings.Contains(got, "generated:") {
+		t.Fatalf("expected generated metadata stripped, got %q", got)
+	}
+}
+
+func TestPromoteDiscoveryReplacesHypervisorStub(t *testing.T) {
+	remote := map[string]string{
+		"host_vars/new-hv01.yml": "---\n# Discovery stub for new-hv01. Run Discover (SSH or PXE), then import preview to promote drafts.\nansible_host: 172.16.10.99\n",
+		"generated/host_vars/new-hv01.yml": `---
+generated:
+  tool: check_host_details
+uplinks:
+  - mac_address: "aa:bb:cc:dd:ee:ff"
+`,
+	}
+	promoted := PromoteDiscoveryFiles(nil, remote)
+	got := promoted["host_vars/new-hv01.yml"]
+	if !strings.Contains(got, "aa:bb:cc:dd:ee:ff") {
+		t.Fatalf("expected hypervisor stub replaced by draft, got %q", got)
+	}
+}
+
 func TestPromoteDiscoveryHypervisorsMerge(t *testing.T) {
 	local := map[string]string{
 		"file.hypervisors.yml": `hypervisors:

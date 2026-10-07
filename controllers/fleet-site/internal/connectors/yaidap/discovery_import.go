@@ -46,8 +46,9 @@ func PromoteDiscoveryFiles(localData map[string]string, remoteFiles map[string]s
 			continue
 		}
 		canonical := "host_vars/" + name + ".yml"
-		if existing, ok := remoteFiles[canonical]; ok && strings.TrimSpace(existing) != "" {
+		if existing, ok := remoteFiles[canonical]; ok && strings.TrimSpace(existing) != "" && !isDiscoveryStub(existing) {
 			// Synced or hand-edited host_vars wins over stale generated drafts.
+			// An un-promoted add-host stub does not: the draft supersedes it.
 			continue
 		}
 		promoted[canonical] = stripGeneratedMetadata(content)
@@ -72,6 +73,13 @@ func PromoteDiscoveryFiles(localData map[string]string, remoteFiles map[string]s
 	}
 
 	return promoted
+}
+
+// isDiscoveryStub reports whether host_vars content is the placeholder written by
+// the console/CLI add-host flow. Such a stub is meant to be superseded by a
+// discovery draft; hand-edited host_vars (which no longer carry the marker) are not.
+func isDiscoveryStub(content string) bool {
+	return strings.Contains(content, discoveryStubMarker) || strings.Contains(content, bareMetalStubMarker)
 }
 
 func stripGeneratedMetadata(content string) string {

@@ -8,6 +8,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Markers on the placeholder host_vars written by the console/CLI add-host flow.
+// PromoteDiscoveryFiles lets a discovery draft replace a file that still carries
+// one of these markers (an un-promoted stub), while protecting hand-edited
+// host_vars that no longer do.
+const (
+	discoveryStubMarker = "# Discovery stub for "
+	bareMetalStubMarker = "# Bare-metal node "
+)
+
 // HostIntent is the minimal, kind-aware description of a host to add to a site's
 // YAIDAP inventory. Everything not set is filled from the site catalog.
 type HostIntent struct {
@@ -304,7 +313,7 @@ func renderGuestHostVars(h HostIntent, catalog Catalog) string {
 func renderBareMetalHostVars(h HostIntent) string {
 	var b strings.Builder
 	b.WriteString("---\n")
-	fmt.Fprintf(&b, "# Bare-metal node %s (bare_metals.yml — not a libvirt guest).\n", h.Name)
+	fmt.Fprintf(&b, "%s%s (bare_metals.yml — not a libvirt guest).\n", bareMetalStubMarker, h.Name)
 	if h.AnsibleHost != "" {
 		fmt.Fprintf(&b, "ansible_host: %s\n", h.AnsibleHost)
 	}
@@ -329,7 +338,7 @@ func renderHypervisorHostVars(h HostIntent, catalog Catalog) string {
 	physical := physicalNetworkFor(catalog, h.NetworkName)
 	var b strings.Builder
 	b.WriteString("---\n")
-	fmt.Fprintf(&b, "# Discovery stub for %s. Run Discover (SSH or PXE), then import preview to promote drafts.\n", h.Name)
+	fmt.Fprintf(&b, "%s%s. Run Discover (SSH or PXE), then import preview to promote drafts.\n", discoveryStubMarker, h.Name)
 	if h.AnsibleHost != "" {
 		fmt.Fprintf(&b, "ansible_host: %s\n", h.AnsibleHost)
 	}
