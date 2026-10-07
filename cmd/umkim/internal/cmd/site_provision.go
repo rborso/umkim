@@ -219,6 +219,11 @@ func waitProvisionAction(site, id string) error {
 		if err != nil {
 			return err
 		}
+		if code == 404 {
+			// The action may not be registered in history yet; retry briefly.
+			time.Sleep(5 * time.Second)
+			continue
+		}
 		if err := mustOK(raw, code); err != nil {
 			return err
 		}

@@ -2,6 +2,7 @@ package yaidap
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -94,6 +95,34 @@ func physicalNetworkFor(catalog Catalog, name string) string {
 		return strings.TrimSpace(n.PhysicalNetwork)
 	}
 	return "lab_access_l1"
+}
+
+// deriveMAC builds a deterministic, collision-resistant MAC from an IPv4 address
+// (52:54:00 + last three octets) so VMs do not all default to the same MAC.
+func deriveMAC(ip string) string {
+	parts := strings.Split(strings.TrimSpace(ip), ".")
+	if len(parts) != 4 {
+		return ""
+	}
+	var b [3]int
+	for i := 0; i < 3; i++ {
+		n, err := strconv.Atoi(parts[i+1])
+		if err != nil || n < 0 || n > 255 {
+			return ""
+		}
+		b[i] = n
+	}
+	return fmt.Sprintf("52:54:00:%02x:%02x:%02x", b[0], b[1], b[2])
+}
+
+func macOrDerive(h HostIntent) string {
+	if m := strings.TrimSpace(h.MACAddress); m != "" {
+		return m
+	}
+	if m := deriveMAC(h.AnsibleHost); m != "" {
+		return m
+	}
+	return "52:54:00:00:00:01"
 }
 
 func yamlScalar(v string) string {
@@ -232,10 +261,7 @@ func mergeClusterGroup(current, cluster, host string) (string, error) {
 
 func renderGuestHostVars(h HostIntent, catalog Catalog) string {
 	physical := physicalNetworkFor(catalog, h.NetworkName)
-	mac := h.MACAddress
-	if mac == "" {
-		mac = "52:54:00:00:00:01"
-	}
+	mac := macOrDerive(h)
 	bridge := fmt.Sprintf("n0p0_%s", h.NetworkName)
 	var b strings.Builder
 	b.WriteString("---\n")
@@ -288,7 +314,7 @@ func renderBareMetalHostVars(h HostIntent) string {
 		b.WriteString("tempxe_discovery:\n")
 		fmt.Fprintf(&b, "  enabled: %t\n", h.PXE)
 		b.WriteString("uplinks:\n  - name: n0p0\n    physical_network: CHANGE_ME\n")
-		fmt.Fprintf(&b, "    mac_address: %q\n", firstNonEmpty(h.MACAddress, "aa:bb:cc:dd:ee:ff"))
+		fmt.Fprintf(&b, "    mac_address: %q\n", macOrDerive(h))
 		b.WriteString("    networks:\n      - zone: lab\n        network_name: CHANGE_ME\n        cloudinit: false\n        pxe: true\n        vm_network: false\n")
 		if h.AnsibleHost != "" {
 			fmt.Fprintf(&b, "        ip: %q\n", h.AnsibleHost)
@@ -299,7 +325,7 @@ func renderBareMetalHostVars(h HostIntent) string {
 }
 
 func renderHypervisorHostVars(h HostIntent, catalog Catalog) string {
-	mac := firstNonEmpty(h.MACAddress, "aa:bb:cc:dd:ee:ff")
+	mac := macOrDerive(h)
 	physical := physicalNetworkFor(catalog, h.NetworkName)
 	var b strings.Builder
 	b.WriteString("---\n")
