@@ -73,6 +73,30 @@ func ManagedClusterExists(ctx context.Context, c client.Client, clusterName stri
 	return true
 }
 
+// ForceDeleteManagedCluster removes the hub ManagedCluster, clearing finalizers so
+// deletion completes even when the spoke/klusterlet is unreachable (for example
+// after the node was reinstalled). Returns nil when already gone.
+func ForceDeleteManagedCluster(ctx context.Context, c client.Client, clusterName string) error {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(managedClusterGVK)
+	if err := c.Get(ctx, client.ObjectKey{Name: clusterName}, obj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if len(obj.GetFinalizers()) > 0 {
+		obj.SetFinalizers(nil)
+		if err := c.Update(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	if err := c.Delete(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 type edgeEntry struct {
 	Site            string `yaml:"site"`
 	DirectIngress   bool   `yaml:"direct_ingress"`
