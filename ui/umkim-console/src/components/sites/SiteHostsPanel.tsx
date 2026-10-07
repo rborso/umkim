@@ -533,6 +533,9 @@ export function SiteHostsPanel({ siteName }: Props) {
                       </Button>
                     )}
                     {(host.status?.phase === 'Ready' || host.status?.phase === 'Declared') &&
+                      host.kind !== 'hypervisor' &&
+                      !(host.clusters?.length) &&
+                      !host.clusterIntent &&
                       hostAnsibleAddr(host) && (
                         <Button
                           variant="link"

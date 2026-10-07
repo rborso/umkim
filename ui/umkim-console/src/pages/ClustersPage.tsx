@@ -214,7 +214,27 @@ export function ClustersPage() {
   );
 
   const hostAddr = (h: SiteHostRecord) => (h.ansible_host || h.status?.ansible_host || '').trim();
-  const hostOptions = useMemo(() => siteHosts.filter((h) => hostAddr(h).length > 0), [siteHosts]);
+  const selectedHostNames = useMemo(
+    () => new Set((form.nodes || []).map((n) => (n.hostname || '').trim()).filter(Boolean)),
+    [form.nodes],
+  );
+  // Selectable nodes: has an address, is not a hypervisor, and is not already a
+  // member of a cluster.
+  const hostOptions = useMemo(
+    () =>
+      siteHosts.filter(
+        (h) =>
+          hostAddr(h).length > 0 &&
+          h.kind !== 'hypervisor' &&
+          !(h.clusters?.length) &&
+          !h.clusterIntent,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [siteHosts],
+  );
+  // Keep a slot's own value visible while hiding hosts picked in other slots.
+  const hostSelectOptions = (current: string) =>
+    hostOptions.filter((h) => h.name === current || !selectedHostNames.has(h.name));
   const hostByName = useMemo(() => {
     const m: Record<string, SiteHostRecord> = {};
     for (const h of siteHosts) m[h.name] = h;
@@ -860,7 +880,7 @@ export function ClustersPage() {
                         style={{ marginBottom: '0.5rem' }}
                       >
                         <FormSelectOption value="" label="Select inventory host…" />
-                        {hostOptions.map((h) => (
+                        {hostSelectOptions(controlNodes[i]?.hostname || '').map((h) => (
                           <FormSelectOption
                             key={h.name}
                             value={h.name}
@@ -961,7 +981,7 @@ export function ClustersPage() {
                         style={{ marginBottom: '0.5rem' }}
                       >
                         <FormSelectOption value="" label="Select inventory host…" />
-                        {hostOptions.map((h) => (
+                        {hostSelectOptions(w.hostname || '').map((h) => (
                           <FormSelectOption
                             key={h.name}
                             value={h.name}
@@ -1023,7 +1043,7 @@ export function ClustersPage() {
                     style={{ marginBottom: '0.5rem' }}
                   >
                     <FormSelectOption value="" label="Select inventory host…" />
-                    {hostOptions.map((h) => (
+                    {hostSelectOptions(form.nodes?.[0]?.hostname || '').map((h) => (
                       <FormSelectOption
                         key={h.name}
                         value={h.name}
