@@ -302,7 +302,7 @@
               if fleet_provision_action == 'create_vm' and (fleet_provision_yaidap_recreate | default(false) | bool)
               else [])
             + (['-e', 'fleet_ansible_ssh_pubkey=' + fleet_provision_fleet_ansible_ssh_pubkey]
-              if fleet_provision_action == 'create_vm' and (fleet_provision_fleet_ansible_ssh_pubkey | default('') | length > 0)
+              if fleet_provision_action in ['create_vm', 'install_bm'] and (fleet_provision_fleet_ansible_ssh_pubkey | default('') | length > 0)
               else [])
             + (['-e', 'configure_firewalld=false']
               if fleet_provision_action in ['prepare_hypervisor', 'prepare_gpu_passthrough', 'prepare_hypervisor_gpu']
