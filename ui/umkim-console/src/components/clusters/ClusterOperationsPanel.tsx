@@ -20,6 +20,7 @@ import {
   prepFleetClusterGpuHost,
   fetchFleetClusterNodeOperationLogs,
   listFleetClusterNodeOperations,
+  listSiteHosts,
   removeFleetClusterNode,
   replaceFleetClusterControlPlane,
   validateFleetClusterNodeOperation,
@@ -31,10 +32,12 @@ import type {
   FleetCluster,
   FleetNode,
   NodeOperationValidateResult,
+  SiteHostRecord,
 } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
 import { LabeledField } from '../forms/LabeledField';
 import { getFieldHelp } from '../../help/fieldHelp';
+import { eligibleClusterHosts, hostAnsibleAddr } from '../../utils/clusterHosts';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 
 type Props = {
@@ -330,6 +333,43 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
 
   const workerNodes = useMemo(() => nodes.filter(isWorkerNode), [nodes]);
   const controlNodes = useMemo(() => nodes.filter(isControlNode), [nodes]);
+
+  const [siteHosts, setSiteHosts] = useState<SiteHostRecord[]>([]);
+  useEffect(() => {
+    const site = cluster.site;
+    if (!site) {
+      setSiteHosts([]);
+      return;
+    }
+    let cancelled = false;
+    listSiteHosts(site)
+      .then((list) => {
+        if (!cancelled) setSiteHosts(list);
+      })
+      .catch(() => {
+        if (!cancelled) setSiteHosts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cluster.site]);
+
+  const hostAddr = hostAnsibleAddr;
+  // Candidate new nodes: has an address, is not a hypervisor, and is not already
+  // a member of a cluster.
+  const pickableHosts = useMemo(() => eligibleClusterHosts(siteHosts), [siteHosts]);
+  const applyHostToAdd = (name: string) => {
+    const h = siteHosts.find((x) => x.name === name);
+    if (!h) return;
+    setAddAddress(hostAddr(h));
+    setAddHostname(h.name);
+  };
+  const applyHostToReplace = (name: string) => {
+    const h = siteHosts.find((x) => x.name === name);
+    if (!h) return;
+    setReplaceAddress(hostAddr(h));
+    setReplaceHostname(h.name);
+  };
 
   const [addAddress, setAddAddress] = useState('');
   const [addHostname, setAddHostname] = useState('');
@@ -887,6 +927,25 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
         <Title headingLevel="h3" size="md">
           Add worker
         </Title>
+        {pickableHosts.length > 0 && (
+          <LabeledField label="Select inventory host" fieldId="addWorkerHost">
+            <FormSelect
+              id="addWorkerHost"
+              value={pickableHosts.some((h) => h.name === addHostname) ? addHostname : ''}
+              onChange={(_e, v) => applyHostToAdd(v)}
+              isDisabled={!canMutate}
+            >
+              <FormSelectOption value="" label="Select inventory host…" />
+              {pickableHosts.map((h) => (
+                <FormSelectOption
+                  key={h.name}
+                  value={h.name}
+                  label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                />
+              ))}
+            </FormSelect>
+          </LabeledField>
+        )}
         <LabeledField
           label="Address"
           fieldId="addWorkerAddress"
@@ -989,6 +1048,25 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
                 ))}
               </FormSelect>
             </LabeledField>
+            {pickableHosts.length > 0 && (
+              <LabeledField label="Select inventory host" fieldId="replaceNewHost">
+                <FormSelect
+                  id="replaceNewHost"
+                  value={pickableHosts.some((h) => h.name === replaceHostname) ? replaceHostname : ''}
+                  onChange={(_e, v) => applyHostToReplace(v)}
+                  isDisabled={!canMutate}
+                >
+                  <FormSelectOption value="" label="Select inventory host…" />
+                  {pickableHosts.map((h) => (
+                    <FormSelectOption
+                      key={h.name}
+                      value={h.name}
+                      label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                    />
+                  ))}
+                </FormSelect>
+              </LabeledField>
+            )}
             <LabeledField
               label="New node address"
               fieldId="replaceNewAddress"
