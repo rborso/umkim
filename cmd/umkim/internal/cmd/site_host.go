@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/rborso/umkim/cmd/umkim/internal/output"
 	"github.com/spf13/cobra"
@@ -15,6 +16,7 @@ func siteHostCmd() *cobra.Command {
 	}
 	cmd.AddCommand(siteHostListCmd())
 	cmd.AddCommand(siteHostGetCmd())
+	cmd.AddCommand(siteHostAddCmd())
 	cmd.AddCommand(siteHostProvisionCmd())
 	cmd.AddCommand(siteHostDestroyCmd())
 	cmd.AddCommand(siteHostPrepareCmd())
@@ -61,6 +63,102 @@ func siteHostGetCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func siteHostAddCmd() *cobra.Command {
+	var kind, name, ip, mac, hypervisor, network, zone, storage, osFamily, cluster string
+	var cores, memory, disk int
+	var gpu, pxe, discover bool
+	c := &cobra.Command{
+		Use:   "add [site]",
+		Short: "Add a host to site inventory (minimal fields; catalog defaults; optional discovery)",
+		Long: `Add a host to a site's YAIDAP inventory from a minimal, kind-aware request.
+
+Only a name plus an address (IP for SSH, or MAC for PXE) is required; everything
+else is filled from the site catalog. Use --discover to chain discovery (SSH by
+default, PXE with --pxe).`,
+		Example: `  umkim site host add homelab --kind bare_metal --name bm01 --ip 172.16.10.50 --discover
+  umkim site host add homelab --kind bare_metal --name bm02 --mac aa:bb:cc:dd:ee:ff --pxe
+  umkim site host add homelab --kind vm --name vm01 --hypervisor virt04 --cluster lab-ha-0`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			site := args[0]
+			body := map[string]interface{}{"kind": kind, "name": name}
+			set := func(k, v string) {
+				if strings.TrimSpace(v) != "" {
+					body[k] = v
+				}
+			}
+			set("ansibleHost", ip)
+			set("macAddress", mac)
+			set("hypervisor", hypervisor)
+			set("networkName", network)
+			set("zone", zone)
+			set("storage", storage)
+			set("os", osFamily)
+			set("cluster", cluster)
+			if cores > 0 {
+				body["cores"] = cores
+			}
+			if memory > 0 {
+				body["memory"] = memory
+			}
+			if disk > 0 {
+				body["diskSizeGi"] = disk
+			}
+			if gpu {
+				body["gpuPassthrough"] = true
+			}
+			if pxe {
+				body["pxe"] = true
+			}
+			raw, code, err := api.Post("/sites/"+site+"/provision/inventory/hosts", body)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200); err != nil {
+				return err
+			}
+			printJSON(raw)
+			if discover {
+				action := "discover"
+				if pxe {
+					action = "discover_pxe"
+				}
+				praw, pcode, perr := retryOnHTTP409(func() ([]byte, int, error) {
+					return api.Post("/sites/"+site+"/hosts/"+name+"/provision", map[string]interface{}{
+						"action":  action,
+						"confirm": pxe,
+					})
+				})
+				if perr != nil {
+					return perr
+				}
+				if err := mustOK(praw, pcode, 200, 202); err != nil {
+					return err
+				}
+				printJSON(praw)
+			}
+			return nil
+		},
+	}
+	c.Flags().StringVar(&kind, "kind", "bare_metal", "vm | bare_metal | hypervisor")
+	c.Flags().StringVar(&name, "name", "", "host name (required)")
+	c.Flags().StringVar(&ip, "ip", "", "ansible_host / management IP (SSH path)")
+	c.Flags().StringVar(&mac, "mac", "", "MAC address (PXE path)")
+	c.Flags().StringVar(&hypervisor, "hypervisor", "", "hypervisor for VM guests (default least-utilized)")
+	c.Flags().StringVar(&network, "network", "", "network_name from the site catalog")
+	c.Flags().StringVar(&zone, "zone", "", "zone from the site catalog")
+	c.Flags().StringVar(&storage, "storage", "", "storage from the site catalog")
+	c.Flags().StringVar(&osFamily, "os", "", "OS family (default from catalog, e.g. rocky-10)")
+	c.Flags().StringVar(&cluster, "cluster", "", "optional cluster group to join")
+	c.Flags().IntVar(&cores, "cores", 0, "vCPU cores (VM)")
+	c.Flags().IntVar(&memory, "memory", 0, "memory in MiB (VM)")
+	c.Flags().IntVar(&disk, "disk", 0, "boot disk in GiB (VM)")
+	c.Flags().BoolVar(&gpu, "gpu", false, "GPU passthrough guest (VM)")
+	c.Flags().BoolVar(&pxe, "pxe", false, "PXE host (sets tempxe_discovery; discover_pxe with --discover)")
+	c.Flags().BoolVar(&discover, "discover", false, "chain discovery after adding (SSH, or PXE with --pxe)")
+	return c
 }
 
 func siteHostProvisionCmd() *cobra.Command {

@@ -177,6 +177,61 @@ export interface SiteHostRecord {
   external?: boolean;
 }
 
+export interface SiteInventoryNetworkRef {
+  name: string;
+  physical_network?: string;
+  zone?: string;
+  bridge_name_suffix?: string;
+}
+
+export interface SiteInventoryStorageRef {
+  name: string;
+  pool?: string;
+}
+
+export interface SiteInventoryDefaults {
+  os?: string;
+  memory?: number;
+  cores?: number;
+  diskGi?: number;
+  storage?: string;
+  physical_network?: string;
+  zone?: string;
+  network_name?: string;
+  provisioning_provider?: string;
+}
+
+export interface SiteInventoryCatalog {
+  networks?: SiteInventoryNetworkRef[];
+  storages?: SiteInventoryStorageRef[];
+  hypervisors?: string[];
+  defaults?: SiteInventoryDefaults;
+}
+
+export interface SiteHostIntent {
+  kind: SiteHostKind;
+  name: string;
+  ansibleHost?: string;
+  macAddress?: string;
+  hypervisor?: string;
+  cores?: number;
+  memory?: number;
+  diskSizeGi?: number;
+  networkName?: string;
+  zone?: string;
+  storage?: string;
+  os?: string;
+  cluster?: string;
+  gpuPassthrough?: boolean;
+  pxe?: boolean;
+}
+
+export interface SiteHostIntentResult {
+  host?: { name?: string; kind?: string };
+  paths?: string[];
+  warnings?: string[];
+}
+
 export interface SiteProvisionHistoryItem {
   id: string;
   action?: string;

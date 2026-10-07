@@ -313,6 +313,9 @@ List and provision guests defined in inventory YAML:
 ```bash
 umkim site host list SITE
 umkim site host get SITE guest01
+umkim site host add SITE --kind bare_metal --name bm01 --ip 172.16.10.50 --discover
+umkim site host add SITE --kind bare_metal --name bm02 --mac aa:bb:cc:dd:ee:ff --pxe
+umkim site host add SITE --kind vm --name vm01 --hypervisor virt04 --cluster lab-ha-0
 umkim site host cluster-apply SITE guest01
 umkim site host provision SITE guest01 --action plan_vm --wait
 umkim site host provision SITE guest01 --wait
@@ -366,8 +369,7 @@ into canonical hub paths; `notes.json` stays on the jumphost for reference.
 
 **Hypervisor prepare and GPU passthrough (VFIO)** — hypervisor hosts only; set
 `gpu_passthrough_host` in `host_vars` before GPU prepare (see YAIDAP inventory model).
-Maintainer GPU lab fixtures are not in this public tree. Hub inventory:
-[examples/inventory/hub-only/](../../examples/inventory/hub-only/) (replace `CHANGE_ME`).
+Lab walkthrough: [examples/homelab/lab-gpu-passthrough-cli.md](../../examples/homelab/lab-gpu-passthrough-cli.md).
 
 ```bash
 umkim site host prepare SITE hv01 --wait
@@ -474,7 +476,7 @@ umkim login
 | Unit | `cmd/umkim/internal/.../*_test.go` — client, config, bootstrap SSH args |
 | Integration | `go test ./...` with `httptest` mock auth + fleet API |
 | Lab smoke | `scripts/verify-umkim-cli.sh` — login, list clusters, node-op history |
-| Hub inventory | [`examples/inventory/hub-only/`](../../examples/inventory/hub-only/) — replace `CHANGE_ME`. Maintainer lab inventory is not in this public tree. |
+| Maintainer homelab rebuild | [`examples/homelab/rebuild-homelab-cli.md`](../../examples/homelab/rebuild-homelab-cli.md) — full CLI runbook with timing logs (site + BM + HA clusters) |
 
 ## Roadmap (post v0.2)
 
@@ -488,5 +490,5 @@ umkim login
 - [fleet-site.md](fleet-site.md) — API and FCJ lifecycle
 - [fleet-console-auth.md](../fleet-console-auth.md) — roles and service accounts
 - [install.md](../install.md) — hub install (Ansible)
-- [examples/inventory/hub-only/README.md](../../examples/inventory/hub-only/README.md) — hub inventory template (`CHANGE_ME` placeholders)
+- [examples/homelab/rebuild-homelab-cli.md](../../examples/homelab/rebuild-homelab-cli.md) — maintainer lab rebuild via CLI (inventory in `examples/homelab/`)
 - [playbooks/flows/README.md](../../playbooks/flows/README.md) — legacy API flow playbooks

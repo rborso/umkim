@@ -64,7 +64,10 @@ on **Sites → detail → Edge and DNS** (and on create). **Sites → detail →
 manages hub site host inventory, provision actions, and optional cluster automation
 (enroll single-node or HA group, add worker, replace control plane) for registry sites.
 **Sites → detail → Provisioner inventory** (YAIDAP sites) edits the native YAML tree;
-use **Add VM guest** (name/placement, then CPU/memory/disk) to seed `guests.yml` + `host_vars/` templates, **Sync to jumphost**,
+use **Add host** (guided, kind-aware: name + IP/MAC, catalog-driven network/storage)
+to add bare metal, VM, or hypervisor hosts and then Discover (SSH first, PXE
+fallback), or **Add VM guest** (name/placement, then CPU/memory/disk) to seed
+`guests.yml` + `host_vars/` templates, **Sync to jumphost**,
 then provision on **Site hosts**. See [yaidap-integration.md](../../docs/components/yaidap-integration.md). Cluster
 jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equivalents:
 `umkim site patch`, `umkim site host`, and `umkim cluster patch`
