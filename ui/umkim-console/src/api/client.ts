@@ -1061,13 +1061,14 @@ export async function applySiteInventoryImport(
   site: string,
   paths: string[],
   confirm = true,
+  content?: Record<string, string>,
 ): Promise<{ applied?: number; status?: string }> {
   return fleetSiteRequest<{ applied?: number; status?: string }>(
     '/sites/' + encodeURIComponent(site) + '/provision/inventory/import/apply',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirm, paths }),
+      body: JSON.stringify(content ? { confirm, paths, content } : { confirm, paths }),
     },
   );
 }

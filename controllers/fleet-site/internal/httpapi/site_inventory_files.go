@@ -186,8 +186,11 @@ func (s *Server) migrateSiteInventory(ctx context.Context, w http.ResponseWriter
 }
 
 type importApplyBody struct {
-	Paths   []string `json:"paths"`
-	Confirm bool     `json:"confirm"`
+	Paths   []string          `json:"paths"`
+	Confirm bool              `json:"confirm"`
+	// Content optionally overrides the stored preview body per path, so an
+	// operator can review and edit a promoted draft before applying it.
+	Content map[string]string `json:"content"`
 }
 
 func (s *Server) applySiteInventoryImport(ctx context.Context, w http.ResponseWriter, r *http.Request, siteName string, fs *fleetv1alpha1.FleetSite) {
@@ -225,10 +228,17 @@ func (s *Server) applySiteInventoryImport(ctx context.Context, w http.ResponseWr
 		if len(selected) > 0 && !selected[ch.Path] {
 			continue
 		}
-		if ch.Status == "unchanged" || ch.Remote == "" {
+		content, edited := req.Content[ch.Path]
+		if !edited {
+			if ch.Status == "unchanged" || ch.Remote == "" {
+				continue
+			}
+			content = ch.Remote
+		}
+		if strings.TrimSpace(content) == "" {
 			continue
 		}
-		put[ch.Path] = ch.Remote
+		put[ch.Path] = content
 	}
 	if len(put) == 0 {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "no changes"})
