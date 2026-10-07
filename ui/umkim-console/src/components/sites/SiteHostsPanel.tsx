@@ -6,6 +6,7 @@ import {
   Checkbox,
   Label,
   Modal,
+  TextArea,
   Title,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
@@ -83,6 +84,9 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [importItems, setImportItems] = useState<SiteInventoryImportChange[]>([]);
   const [importSelected, setImportSelected] = useState<Record<string, boolean>>({});
   const [importHostFilter, setImportHostFilter] = useState('');
+  const [importEdits, setImportEdits] = useState<Record<string, string>>({});
+  const [importEditPath, setImportEditPath] = useState<string | null>(null);
+  const [importEditText, setImportEditText] = useState('');
 
   const load = useCallback(async (opts?: { background?: boolean; refreshHistory?: boolean }) => {
     const background = opts?.background ?? false;
@@ -194,6 +198,7 @@ export function SiteHostsPanel({ siteName }: Props) {
           );
           const useItems = filtered.length > 0 ? filtered : items;
           setImportItems(useItems);
+          setImportEdits({});
           const sel: Record<string, boolean> = {};
           for (const item of useItems) {
             if (item.status !== 'unchanged') {
@@ -220,7 +225,11 @@ export function SiteHostsPanel({ siteName }: Props) {
       const paths = Object.entries(importSelected)
         .filter(([, v]) => v)
         .map(([p]) => p);
-      await applySiteInventoryImport(siteName, paths, true);
+      const content: Record<string, string> = {};
+      for (const p of paths) {
+        if (importEdits[p] !== undefined) content[p] = importEdits[p];
+      }
+      await applySiteInventoryImport(siteName, paths, true, Object.keys(content).length > 0 ? content : undefined);
       setImportOpen(false);
       await load({ refreshHistory: true });
     } catch (e) {
@@ -752,6 +761,7 @@ export function SiteHostsPanel({ siteName }: Props) {
               <Th>Path</Th>
               <Th>Status</Th>
               <Th>Warnings</Th>
+              <Th>Edit</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -783,10 +793,56 @@ export function SiteHostsPanel({ siteName }: Props) {
                     '—'
                   )}
                 </Td>
+                <Td>
+                  <Button
+                    variant="link"
+                    isInline
+                    onClick={() => {
+                      setImportEditPath(item.path);
+                      setImportEditText(importEdits[item.path] ?? item.remote ?? item.local ?? '');
+                    }}
+                  >
+                    {importEdits[item.path] !== undefined ? 'Edit ✓' : 'Edit'}
+                  </Button>
+                </Td>
               </Tr>
             ))}
           </Tbody>
         </Table>
+      </Modal>
+
+      <Modal
+        title={`Edit ${importEditPath ?? ''}`}
+        isOpen={importEditPath !== null}
+        onClose={() => setImportEditPath(null)}
+        variant="large"
+        actions={[
+          <Button
+            key="save"
+            variant="primary"
+            onClick={() => {
+              if (importEditPath !== null) {
+                setImportEdits((prev) => ({ ...prev, [importEditPath]: importEditText }));
+                setImportSelected((prev) => ({ ...prev, [importEditPath]: true }));
+              }
+              setImportEditPath(null);
+            }}
+          >
+            Save edit
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setImportEditPath(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>Adjust the promoted content before applying — resolve CHANGE_ME placeholders here.</p>
+        <TextArea
+          id="import-edit"
+          value={importEditText}
+          onChange={(_e, v) => setImportEditText(v)}
+          rows={18}
+          style={{ fontFamily: 'monospace' }}
+        />
       </Modal>
     </div>
   );
