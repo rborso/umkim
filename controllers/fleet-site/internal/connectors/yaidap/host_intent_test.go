@@ -80,6 +80,15 @@ func TestBuildHostFilesRejectsBadInput(t *testing.T) {
 	}
 }
 
+func TestDeriveMAC(t *testing.T) {
+	if got := deriveMAC("172.16.10.80"); got != "52:54:00:10:0a:50" {
+		t.Errorf("deriveMAC = %q, want 52:54:00:10:0a:50", got)
+	}
+	if got := deriveMAC("bad"); got != "" {
+		t.Errorf("deriveMAC(bad) = %q, want empty", got)
+	}
+}
+
 func TestBuildHostFilesMergePreservesExisting(t *testing.T) {
 	current := map[string]string{
 		"guests.yml": "guests:\n  hosts:\n    vm00:\n      vm_location: virt01\n",
