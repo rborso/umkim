@@ -171,6 +171,15 @@ Three surfaces share one store:
 **Bare-metal node (console):** **Add bare metal node** writes `bare_metals.yml` +
 `host_vars/{name}.yml` (optional `tempxe_discovery.enabled` and uplink MAC for PXE discover).
 
+**Guided add (console + CLI):** **Add host** is the recommended path — pick the
+host kind, give a name plus an address (IP for SSH, or MAC for PXE), and choose
+network/storage/zone from the site catalog. It calls
+`POST /sites/{name}/provision/inventory/hosts` (kind-aware intent), which composes
+`guests.yml` / `bare_metals.yml` / `hypervisors.yml` and `host_vars/{name}.yml`
+server-side. Discovery (SSH first, PXE fallback) is offered as the next step; the
+raw YAML editor stays available for advanced edits. The same intent is exposed on
+the CLI as `umkim site host add`.
+
 **Host kinds** on `GET /sites/{name}/hosts`: `vm` (`guests.hosts`), `bare_metal`
 (`bare_metals.yml`), `hypervisor` (`hypervisors.yml`). On jumphost sync, hub
 `bare_metals.yml` is merged into YAIDAP `guests.yml` → `external.hosts` (not
@@ -404,6 +413,7 @@ and `fleet_provision_action=sync_inventory` or `import_inventory_preview`.
 | `POST` | `/sites/{name}/provision/actions` | Start action |
 | `GET` | `/sites/{name}/provision/actions[/{id}]` | Poll / history |
 | `GET` | `/sites/{name}/provision/inventory` | Meta + file index |
+| `POST` | `/sites/{name}/provision/inventory/hosts` | Guided host intent (compose inventory from minimal fields) |
 | `GET`/`PUT`/`DELETE` | `/sites/{name}/provision/inventory/files/{path}` | YAML CRUD |
 | `POST` | `/sites/{name}/provision/inventory/sync` | Push to jumphost |
 | `POST` | `/sites/{name}/provision/inventory/migrate` | Legacy → native YAML |

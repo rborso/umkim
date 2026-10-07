@@ -3,6 +3,9 @@ import type {
   FleetSiteCreate,
   FleetSitePatch,
   SiteHostRecord,
+  SiteHostIntent,
+  SiteHostIntentResult,
+  SiteInventoryCatalog,
   SiteProvisionHistoryItem,
   SiteProvisionLogs,
   SiteProvisionBinding,
@@ -919,6 +922,26 @@ export async function provisionSiteHost(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
+    },
+  );
+}
+
+export async function getSiteInventoryCatalog(site: string): Promise<SiteInventoryCatalog> {
+  return fleetSiteRequest<SiteInventoryCatalog>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/catalog',
+  );
+}
+
+export async function createSiteHost(
+  site: string,
+  intent: SiteHostIntent,
+): Promise<SiteHostIntentResult> {
+  return fleetSiteRequest<SiteHostIntentResult>(
+    '/sites/' + encodeURIComponent(site) + '/provision/inventory/hosts',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(intent),
     },
   );
 }

@@ -41,11 +41,14 @@ func (s *Server) handleSiteInventoryFileRoutes(ctx context.Context, w http.Respo
 		}
 		return true
 	case rest == "provision/inventory/hosts":
-		if r.Method != http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
+			s.listSiteInventoryHosts(ctx, w, siteName)
+		case http.MethodPost:
+			s.createSiteInventoryHost(ctx, w, r, siteName)
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return true
 		}
-		s.listSiteInventoryHosts(ctx, w, siteName)
 		return true
 	case rest == "provision/inventory/clusters":
 		if r.Method != http.MethodGet {

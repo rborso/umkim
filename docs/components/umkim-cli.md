@@ -313,6 +313,9 @@ List and provision guests defined in inventory YAML:
 ```bash
 umkim site host list SITE
 umkim site host get SITE guest01
+umkim site host add SITE --kind bare_metal --name bm01 --ip 172.16.10.50 --discover
+umkim site host add SITE --kind bare_metal --name bm02 --mac aa:bb:cc:dd:ee:ff --pxe
+umkim site host add SITE --kind vm --name vm01 --hypervisor virt04 --cluster lab-ha-0
 umkim site host cluster-apply SITE guest01
 umkim site host provision SITE guest01 --action plan_vm --wait
 umkim site host provision SITE guest01 --wait

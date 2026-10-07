@@ -29,6 +29,7 @@ import {
 } from '../../api/client';
 import type { SiteInventoryFileInfo, SiteInventoryImportChange, SiteInventoryRevision } from '../../api/types';
 import { ErrorAlert } from '../ErrorAlert';
+import { SiteAddHostWizard } from './SiteAddHostWizard';
 import {
   gpuPassthroughGuestHostVarsTemplate,
   guestHostVarsTemplate,
@@ -180,6 +181,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
   const [addVmOpen, setAddVmOpen] = useState(false);
+  const [addHostOpen, setAddHostOpen] = useState(false);
   const [addVmStep, setAddVmStep] = useState(1);
   const [vmGuestName, setVmGuestName] = useState('');
   const [vmLocation, setVmLocation] = useState('least-utilized');
@@ -608,7 +610,10 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         <p style={{ fontSize: '0.9rem', color: 'var(--pf-v6-global--Color--200)' }}>{vmMessage}</p>
       ) : null}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <Button variant="primary" isLoading={busy} onClick={() => void runSync()}>
+        <Button variant="primary" onClick={() => setAddHostOpen(true)}>
+          Add host
+        </Button>
+        <Button variant="secondary" isLoading={busy} onClick={() => void runSync()}>
           Sync to jumphost
         </Button>
         <Button variant="secondary" onClick={openAddVmModal}>
@@ -709,6 +714,13 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
           ))}
         </Tbody>
       </Table>
+
+      <SiteAddHostWizard
+        siteName={siteName}
+        isOpen={addHostOpen}
+        onClose={() => setAddHostOpen(false)}
+        onCreated={() => void load()}
+      />
 
       <Modal title="New inventory file" isOpen={newFileOpen} onClose={() => setNewFileOpen(false)}>
         <Form>
