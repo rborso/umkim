@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -30,6 +30,7 @@ import {
   fleetSiteEffectiveId,
   fleetSiteIsManagement,
   fleetSiteLabelForId,
+  listSiteHosts,
 } from '../api/client';
 import type {
   FleetCluster,
@@ -37,6 +38,7 @@ import type {
   FleetClusterNodeInput,
   FleetClusterTopology,
   FleetSite,
+  SiteHostRecord,
 } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { NfsStorageSetupHelp } from '../components/clusters/NfsStorageSetupHelp';
@@ -148,6 +150,8 @@ export function ClustersPage() {
   const [nfsMountPath, setNfsMountPath] = useState('');
   const [clusterLabels, setClusterLabels] = useState<Record<string, string>>({});
   const [topology, setTopology] = useState<FleetClusterTopology>('single_node');
+  const [siteHosts, setSiteHosts] = useState<SiteHostRecord[]>([]);
+  const [pendingNode, setPendingNode] = useState('');
   const [filterGpu, setFilterGpu] = useState(false);
   const [filterKvm, setFilterKvm] = useState(false);
   const [filterKubevirt, setFilterKubevirt] = useState(false);
@@ -167,6 +171,8 @@ export function ClustersPage() {
   }, [rows, filterGpu, filterKvm, filterKubevirt, filterHa, filterRwx]);
 
   const sitePrefill = searchParams.get('site') || '';
+  const createPrefill = searchParams.get('create') === '1';
+  const nodePrefill = searchParams.get('node') || '';
 
   const registrySites = useMemo(
     () =>
@@ -182,6 +188,11 @@ export function ClustersPage() {
     () => fleetSiteById(registrySites, form.siteId),
     [registrySites, form.siteId],
   );
+
+  const prefillSiteId = useMemo(() => {
+    const s = fleetSiteById(registrySites, sitePrefill);
+    return s ? fleetSiteEffectiveId(s) : sitePrefill;
+  }, [registrySites, sitePrefill]);
 
   const ingressOptions = useMemo(
     () => selectedSite?.spec.edge?.ingress || [],
@@ -201,6 +212,78 @@ export function ClustersPage() {
     () => (form.nodes || []).filter((n) => n.role === 'worker'),
     [form.nodes],
   );
+
+  const hostAddr = (h: SiteHostRecord) => (h.ansible_host || h.status?.ansible_host || '').trim();
+  const hostOptions = useMemo(() => siteHosts.filter((h) => hostAddr(h).length > 0), [siteHosts]);
+  const hostByName = useMemo(() => {
+    const m: Record<string, SiteHostRecord> = {};
+    for (const h of siteHosts) m[h.name] = h;
+    return m;
+  }, [siteHosts]);
+
+  // Load the selected site's inventory hosts for the node pickers.
+  useEffect(() => {
+    if (!modalOpen || !form.siteId) {
+      setSiteHosts([]);
+      return;
+    }
+    let cancelled = false;
+    listSiteHosts(form.siteId)
+      .then((list) => {
+        if (!cancelled) setSiteHosts(list);
+      })
+      .catch(() => {
+        if (!cancelled) setSiteHosts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modalOpen, form.siteId]);
+
+  const applyHostToNode = (index: number, role: FleetClusterNodeInput['role'], hostName: string) => {
+    const h = hostByName[hostName];
+    const addr = h ? hostAddr(h) : '';
+    setForm((f) => {
+      const base =
+        topology === 'ha_3_node' ? f.nodes || defaultHaControlNodes(f.clusterName) : f.nodes || [];
+      const nodes = [...base];
+      const targets = nodes.map((n, i) => ({ n, i })).filter((x) => (x.n.role || 'control') === role);
+      const t = targets[index]?.i ?? index;
+      nodes[t] = { ...nodes[t], hostname: hostName, address: addr, role };
+      return {
+        ...f,
+        nodes,
+        bootstrapHost: role === 'control' && index === 0 && addr ? addr : f.bootstrapHost,
+      };
+    });
+  };
+
+  // Apply a queued host selection once the site's hosts are loaded.
+  useEffect(() => {
+    if (!pendingNode) return;
+    const h = hostByName[pendingNode];
+    if (!h) return;
+    const addr = hostAddr(h);
+    setForm((f) => ({
+      ...f,
+      bootstrapHost: addr || f.bootstrapHost,
+      nodes:
+        topology === 'ha_3_node'
+          ? (f.nodes || []).map((n, i) =>
+              i === 0 ? { ...n, hostname: h.name, address: addr || n.address } : n,
+            )
+          : [
+              {
+                hostname: h.name,
+                address: addr || f.bootstrapHost,
+                role: 'control' as const,
+                labels: f.nodes?.[0]?.labels,
+              },
+            ],
+    }));
+    setPendingNode('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNode, hostByName, topology]);
 
   const deleteConsoleProvisioned = deleteTarget
     ? fleetClusterIsConsoleProvisioned(deleteTarget)
@@ -237,13 +320,14 @@ export function ClustersPage() {
   };
 
   useEffect(() => {
-    if (sitePrefill) {
-      setForm((f) => ({ ...f, siteId: sitePrefill }));
+    if (createPrefill) return;
+    if (prefillSiteId) {
+      setForm((f) => ({ ...f, siteId: prefillSiteId }));
     }
-  }, [sitePrefill]);
+  }, [prefillSiteId, createPrefill]);
 
   const openWizard = () => {
-    const siteId = defaultClusterSiteId(registrySites, sitePrefill);
+    const siteId = defaultClusterSiteId(registrySites, prefillSiteId);
     const site = registrySites.find((s) => fleetSiteEffectiveId(s) === siteId);
     setForm({
       ...emptyClusterForm(siteId),
@@ -264,6 +348,17 @@ export function ClustersPage() {
     setActionError(null);
     setModalOpen(true);
   };
+
+  // Hosts-tab shortcut: /clusters?site=X&create=1&node=Y opens the wizard with the
+  // selected inventory host prefilled as the node.
+  const prefillApplied = useRef(false);
+  useEffect(() => {
+    if (prefillApplied.current || !createPrefill || registrySites.length === 0) return;
+    prefillApplied.current = true;
+    openWizard();
+    if (nodePrefill) setPendingNode(nodePrefill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createPrefill, nodePrefill, registrySites.length]);
 
   const addWorkerNode = () => {
     const workers = workerNodes.length;
@@ -756,6 +851,24 @@ export function ClustersPage() {
                     fieldId={`node-${i}`}
                     help={getFieldHelp('clusterJoin.controlNodeIp')}
                   >
+                    {hostOptions.length > 0 && (
+                      <FormSelect
+                        id={`node-host-${i}`}
+                        value={hostByName[controlNodes[i]?.hostname || ''] ? controlNodes[i]?.hostname : ''}
+                        onChange={(_e, v) => applyHostToNode(i, 'control', v)}
+                        aria-label={`Control node ${i + 1} inventory host`}
+                        style={{ marginBottom: '0.5rem' }}
+                      >
+                        <FormSelectOption value="" label="Select inventory host…" />
+                        {hostOptions.map((h) => (
+                          <FormSelectOption
+                            key={h.name}
+                            value={h.name}
+                            label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                          />
+                        ))}
+                      </FormSelect>
+                    )}
                     <TextInput
                       id={`node-${i}`}
                       value={controlNodes[i]?.address || ''}
@@ -839,6 +952,24 @@ export function ClustersPage() {
                     fieldId={`worker-${wi}`}
                     help={getFieldHelp('clusterJoin.workerNodeIp')}
                   >
+                    {hostOptions.length > 0 && (
+                      <FormSelect
+                        id={`worker-host-${wi}`}
+                        value={hostByName[w.hostname || ''] ? w.hostname : ''}
+                        onChange={(_e, v) => applyHostToNode(wi, 'worker', v)}
+                        aria-label={`Worker ${wi + 1} inventory host`}
+                        style={{ marginBottom: '0.5rem' }}
+                      >
+                        <FormSelectOption value="" label="Select inventory host…" />
+                        {hostOptions.map((h) => (
+                          <FormSelectOption
+                            key={h.name}
+                            value={h.name}
+                            label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                          />
+                        ))}
+                      </FormSelect>
+                    )}
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <TextInput
                         id={`worker-${wi}`}
@@ -883,6 +1014,24 @@ export function ClustersPage() {
           ) : (
             <>
               <LabeledField label="Control node IP" isRequired fieldId="bootstrapHost" help={getFieldHelp('clusterJoin.bootstrapHost')}>
+                {hostOptions.length > 0 && (
+                  <FormSelect
+                    id="bootstrapHostHost"
+                    value={hostByName[form.nodes?.[0]?.hostname || ''] ? form.nodes?.[0]?.hostname : ''}
+                    onChange={(_e, v) => applyHostToNode(0, 'control', v)}
+                    aria-label="Control node inventory host"
+                    style={{ marginBottom: '0.5rem' }}
+                  >
+                    <FormSelectOption value="" label="Select inventory host…" />
+                    {hostOptions.map((h) => (
+                      <FormSelectOption
+                        key={h.name}
+                        value={h.name}
+                        label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                      />
+                    ))}
+                  </FormSelect>
+                )}
                 <TextInput
                   id="bootstrapHost"
                   value={form.bootstrapHost}
