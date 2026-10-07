@@ -46,12 +46,17 @@ func PromoteDiscoveryFiles(localData map[string]string, remoteFiles map[string]s
 			continue
 		}
 		canonical := "host_vars/" + name + ".yml"
-		if existing, ok := remoteFiles[canonical]; ok && strings.TrimSpace(existing) != "" && !isDiscoveryStub(existing) {
-			// Synced or hand-edited host_vars wins over stale generated drafts.
-			// An un-promoted add-host stub does not: the draft supersedes it.
-			continue
+		promotedContent := stripGeneratedMetadata(content)
+		if existing, ok := remoteFiles[canonical]; ok && strings.TrimSpace(existing) != "" {
+			if !isDiscoveryStub(existing) {
+				// Synced or hand-edited host_vars wins over stale generated drafts.
+				continue
+			}
+			// An un-promoted add-host stub is superseded by the draft, but the
+			// discovery draft omits ansible_host — carry the stub's over.
+			promotedContent = carryStubAnsibleHost(existing, promotedContent)
 		}
-		promoted[canonical] = stripGeneratedMetadata(content)
+		promoted[canonical] = promotedContent
 	}
 
 	hvContent := promoted["hypervisors.yml"]
@@ -80,6 +85,32 @@ func PromoteDiscoveryFiles(localData map[string]string, remoteFiles map[string]s
 // discovery draft; hand-edited host_vars (which no longer carry the marker) are not.
 func isDiscoveryStub(content string) bool {
 	return strings.Contains(content, discoveryStubMarker) || strings.Contains(content, bareMetalStubMarker)
+}
+
+// carryStubAnsibleHost copies ansible_host from an add-host stub into the promoted
+// discovery draft when the draft has none (discovery drafts omit ansible_host, but
+// Ansible still needs the address to target the host).
+func carryStubAnsibleHost(stub, draft string) string {
+	var sd, dd map[string]interface{}
+	if yaml.Unmarshal([]byte(stub), &sd) != nil {
+		return draft
+	}
+	host, _ := sd["ansible_host"].(string)
+	if strings.TrimSpace(host) == "" {
+		return draft
+	}
+	if yaml.Unmarshal([]byte(draft), &dd) != nil {
+		return draft
+	}
+	if v, _ := dd["ansible_host"].(string); strings.TrimSpace(v) != "" {
+		return draft
+	}
+	dd["ansible_host"] = strings.TrimSpace(host)
+	out, err := yaml.Marshal(dd)
+	if err != nil {
+		return draft
+	}
+	return string(out)
 }
 
 func stripGeneratedMetadata(content string) string {

@@ -72,6 +72,9 @@ disks:
 	if strings.Contains(got, "generated:") {
 		t.Fatalf("expected generated metadata stripped, got %q", got)
 	}
+	if !strings.Contains(got, "ansible_host: 172.16.10.4") {
+		t.Fatalf("expected stub ansible_host carried into draft, got %q", got)
+	}
 }
 
 func TestPromoteDiscoveryReplacesHypervisorStub(t *testing.T) {
