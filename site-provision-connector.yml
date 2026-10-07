@@ -289,6 +289,9 @@
             + (['-e', 'tempxe_confirm=true']
               if fleet_provision_action in ['install_bm', 'discover_pxe'] and (fleet_provision_confirm | default(false) | bool)
               else [])
+            + (['-e', 'allow_reboot=true']
+              if fleet_provision_action == 'discover_pxe' and (fleet_provision_confirm | default(false) | bool)
+              else [])
             + (['-e', 'install_os=true']
               if fleet_provision_action == 'install_bm' and (fleet_provision_confirm | default(false) | bool)
               else [])
