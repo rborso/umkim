@@ -1023,10 +1023,12 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
           </>
         )}
 
-        <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
-          Replace control plane
-        </Title>
-        {controlNodes.length === 0 ? (
+        {!singleNode && (
+          <Title headingLevel="h3" size="md" style={{ marginTop: '1.5rem' }}>
+            Replace control plane
+          </Title>
+        )}
+        {!singleNode && (controlNodes.length === 0 ? (
           <p style={{ fontSize: '0.875rem', color: 'var(--pf-v6-global--Color--200)' }}>
             No control-plane nodes in the cluster node list.
           </p>
@@ -1117,7 +1119,7 @@ export function ClusterOperationsPanel({ cluster, nodes, onUpdated }: Props) {
               Replace control plane
             </Button>
           </>
-        )}
+        ))}
       </Form>
 
       <Modal
