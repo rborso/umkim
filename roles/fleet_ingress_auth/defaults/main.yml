@@ -18,6 +18,11 @@ fleet_ingress_auth_lldap_base_dn: "{{ fleet_auth_ldap_base_dn | default('dc=umki
 fleet_ingress_auth_lldap_admin_email: "admin@{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
 fleet_ingress_auth_lldap_jwt_secret: "{{ fleet_ingress_auth_lldap_jwt_secret_vault | default('fleet-lldap-jwt-change-me') }}"
 fleet_ingress_auth_lldap_admin_password: "{{ fleet_ingress_auth_bootstrap_password | default('fleet-lldap-admin-change-me') }}"
+# Shared low-privilege LLDAP service bind account for apps. The password is
+# derived from the per-cluster LLDAP JWT secret (stable + secret, no new plumbing).
+fleet_ingress_auth_lldap_bind_username: svc-bind
+fleet_ingress_auth_lldap_bind_group: lldap_strict_readonly
+fleet_ingress_auth_lldap_bind_password: "{{ (fleet_ingress_auth_lldap_jwt_secret | string) | hash('sha256') }}"
 
 fleet_ingress_auth_authelia_image: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/authelia/authelia:4.38.19"
 fleet_ingress_auth_authelia_port: 9091

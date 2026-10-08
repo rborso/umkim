@@ -31,6 +31,12 @@ lldap:
   adminPassword: {{ _lldap_pass | quote }}
   exposeWebUI: {{ _expose_lldap }}
   webUIHost: {{ (_lldap_host if _expose_lldap else '') | quote }}
+  bindAccount:
+    enabled: true
+    username: {{ fleet_ingress_auth_lldap_bind_username | default('svc-bind') | quote }}
+    group: {{ fleet_ingress_auth_lldap_bind_group | default('lldap_strict_readonly') | quote }}
+    password: {{ (_lldap_jwt | string) | hash('sha256') | quote }}
+    secretName: lldap-service-accounts
 
 authelia:
   image: {{ fleet_ingress_auth_authelia_image }}
