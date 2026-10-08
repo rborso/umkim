@@ -47,6 +47,9 @@ type ClusterAuthConfig struct {
 	SecretsRef        string
 	ExposeLLDAPWebUI  bool
 	LLDAPWebUIHost    string
+	// SpokeTLS is false for reverse_proxy clusters (external TLS), so the Authelia
+	// portal is published on the plain HTTP entrypoint for the operator proxy.
+	SpokeTLS          bool
 }
 
 func EnsureSecret(ctx context.Context, c client.Client, ns, name string) error {
@@ -172,12 +175,11 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 			continue
 		}
 		dns := DNSFromFCJStatus(&fcj)
-		if dns.PortalHost == "" {
-			resolved, err := ResolveClusterDNS(ctx, c, cfg, name, &fcj)
-			if err != nil {
-				continue
-			}
+		if resolved, err := ResolveClusterDNS(ctx, c, cfg, name, &fcj); err == nil {
 			dns = resolved
+		}
+		if dns.PortalHost == "" {
+			continue
 		}
 		enabledSet[name] = struct{}{}
 		out.EnabledClusters = append(out.EnabledClusters, name)
@@ -188,6 +190,7 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 			AccessDomains:    dns.AccessDomains,
 			SecretsRef:       secretRef,
 			ExposeLLDAPWebUI: fcj.Spec.IngressAuth.ExposeLLDAPWebUI,
+			SpokeTLS:         dns.SpokeTLS,
 		}
 		if fcj.Spec.IngressAuth.ExposeLLDAPWebUI {
 			cfgEntry.LLDAPWebUIHost = dns.LLDAPWebUIHost
@@ -299,6 +302,7 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 				}
 			}
 			lines = append(lines, "    expose_lldap_webui: "+boolYAML(cc.ExposeLLDAPWebUI))
+			lines = append(lines, "    spoke_tls: "+boolYAML(cc.SpokeTLS))
 			if cc.ExposeLLDAPWebUI && cc.LLDAPWebUIHost != "" {
 				lines = append(lines, "    lldap_webui_host: \""+yamlQuote(cc.LLDAPWebUIHost)+"\"")
 			}

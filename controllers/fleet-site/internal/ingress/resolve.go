@@ -63,6 +63,12 @@ func ResolveClusterIngress(site fleetv1alpha1.FleetSiteSpec, ingressID string) (
 	case fleetv1alpha1.IngressMethodReverseProxy:
 		out.TlsPolicy = fleetv1alpha1.TLSPolicyExternal
 		out.AllowsSiteRoute = true
+		// TLS terminates on the operator's proxy, but Authelia forward-auth can still
+		// run on the spoke Traefik. A zone (external domain) is required to derive the
+		// portal host, cookie domain, and access domains.
+		if out.Zone != "" {
+			out.AllowsAuth = true
+		}
 	default:
 		return ClusterIngress{}, fmt.Errorf("ingress %q: unsupported method %q", ingressID, ent.Method)
 	}

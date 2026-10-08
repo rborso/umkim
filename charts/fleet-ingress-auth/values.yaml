@@ -15,17 +15,17 @@ lldap:
   httpPort: 17170
   baseDN: dc=example,dc=com
   adminEmail: admin@mgmt.example.com
-  jwtSecret: CHANGE_ME
-  adminPassword: CHANGE_ME
+  jwtSecret: change-me-lldap-jwt
+  adminPassword: change-me-lldap-admin
   exposeWebUI: false
   webUIHost: ""
 
 authelia:
   image: ghcr.io/authelia/authelia:4.38.19
   port: 9091
-  sessionSecret: CHANGE_ME
-  storageEncryptionKey: CHANGE_ME
-  resetPasswordJWTSecret: CHANGE_ME
+  sessionSecret: change-me-authelia-session
+  storageEncryptionKey: change-me-authelia-storage
+  resetPasswordJWTSecret: change-me-authelia-reset-jwt
   ldapPassword: ""
   cookieDomain: mgmt.example.com
   portalHost: auth.mgmt.example.com
@@ -39,6 +39,10 @@ traefik:
   middlewareName: fleet-ingress-authelia
   middlewareNamespace: fleet-ingress
   stripAuthorizationMiddlewareName: strip-authorization
+  # Portal entrypoint/TLS. port_forward spokes terminate TLS (websecure + ACME);
+  # reverse_proxy spokes publish the portal on web for the external proxy.
+  portalEntrypoint: websecure
+  portalTLS: true
 
 registry:
   prefix: ""

@@ -20,6 +20,10 @@ type ClusterDNSConfig struct {
 	PortalHost     string
 	LLDAPWebUIHost string
 	AccessDomains  []string
+	// SpokeTLS is true when the spoke Traefik terminates TLS (port_forward). For
+	// reverse_proxy the external proxy terminates TLS, so the Authelia portal is
+	// published on the plain HTTP entrypoint instead.
+	SpokeTLS bool
 }
 
 func PortalHost(zone string) string {
@@ -83,13 +87,14 @@ func ResolveClusterDNS(ctx context.Context, c client.Client, cfg config.Config, 
 		return ClusterDNSConfig{}, err
 	}
 	if !ci.AllowsAuth || ci.Zone == "" {
-		return ClusterDNSConfig{}, fmt.Errorf("ingress auth requires port_forward ingress with a DNS zone")
+		return ClusterDNSConfig{}, fmt.Errorf("ingress auth requires an ingress with a DNS zone (port_forward, or reverse_proxy with a zone)")
 	}
 	return ClusterDNSConfig{
 		PrimaryZone:    ci.Zone,
 		PortalHost:     PortalHost(ci.Zone),
 		LLDAPWebUIHost: LLDAPWebUIHost(ci.Zone),
 		AccessDomains:  AccessDomainsForZones([]string{ci.Zone}),
+		SpokeTLS:       ci.Method == fleetv1alpha1.IngressMethodPortForward,
 	}, nil
 }
 

@@ -23,7 +23,7 @@ type clusterIngressAuthEnableBody struct {
 
 var (
 	errClusterIngressAuthNotReady    = errors.New("cluster must be Ready before enabling ingress auth")
-	errClusterIngressDisabled        = errors.New("ingress auth requires port_forward ingress with a DNS zone")
+	errClusterIngressDisabled        = errors.New("ingress auth requires an ingress with a DNS zone (port_forward, or reverse_proxy with a zone)")
 	errClusterIngressAuthPassword    = errors.New("lldapAdminPassword is required")
 	errClusterIngressAuthUseEnable   = errors.New("use POST /clusters/{name}/ingress-auth/enable with lldapAdminPassword")
 )
