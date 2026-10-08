@@ -19,6 +19,16 @@ lldap:
   adminPassword: change-me-lldap-admin
   exposeWebUI: false
   webUIHost: ""
+  # Shared low-privilege LLDAP bind account for apps (Authelia, Jellyfin, ...).
+  # Created by a post-install/upgrade Job and added to lldap_strict_readonly.
+  # Set password from the role (per-cluster); empty disables creation.
+  bindAccount:
+    enabled: true
+    username: svc-bind
+    displayName: "Shared service bind account"
+    group: lldap_strict_readonly
+    password: ""
+    secretName: lldap-service-accounts
 
 authelia:
   image: ghcr.io/authelia/authelia:4.38.19

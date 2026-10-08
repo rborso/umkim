@@ -11,6 +11,12 @@ lldap:
   adminEmail: {{ fleet_ingress_auth_lldap_admin_email | quote }}
   jwtSecret: {{ fleet_ingress_auth_lldap_jwt_secret }}
   adminPassword: {{ fleet_ingress_auth_lldap_admin_password }}
+  bindAccount:
+    enabled: true
+    username: {{ fleet_ingress_auth_lldap_bind_username | quote }}
+    group: {{ fleet_ingress_auth_lldap_bind_group | quote }}
+    password: {{ (fleet_ingress_auth_lldap_jwt_secret | string) | hash('sha256') | quote }}
+    secretName: lldap-service-accounts
 
 authelia:
   image: {{ fleet_ingress_auth_authelia_image }}

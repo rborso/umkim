@@ -31,6 +31,23 @@ not automatically receive platform-administrator access to the UMKIM console.
 Create named human users and grant the minimum required group membership and
 role binding.
 
+## Ingress service bind account
+
+The ingress-auth stack creates a shared, low-privilege LLDAP bind account
+(`svc-bind` by default) and adds it to LLDAP's `lldap_strict_readonly` group.
+Applications that search or authenticate against the directory — Authelia, and
+optionally apps such as Jellyfin — use this account instead of the directory
+administrator (`admin` / `lldap_admin`).
+
+- Created by the `fleet-ingress-auth` chart's `lldap-bind-account` Job on
+  install/upgrade. The account name, group, and password are chart values
+  (`lldap.bindAccount.*`) rendered from the `fleet_ingress_auth` role defaults.
+- The password is derived per cluster from that cluster's LLDAP JWT secret and
+  published in the `lldap-service-accounts` Secret in the `fleet-ingress-auth`
+  namespace. Charts in other namespaces must copy or sync it; never commit it.
+- `lldap_strict_readonly` grants read/search only. A leaked bind credential
+  cannot change users, groups, or passwords.
+
 ## Safe administration
 
 - Use a restricted management channel for the LLDAP web interface.
