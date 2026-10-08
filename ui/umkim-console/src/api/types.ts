@@ -397,6 +397,8 @@ export type FleetAppPhase = 'Pending' | 'Installing' | 'Ready' | 'Failed' | 'Del
 export type FleetAppRouteMode = 'none' | 'hub' | 'site';
 
 export interface FleetAppRoute {
+  /** Route key for multi-route apps (spec.routes[]); defaults to serviceName. */
+  key?: string;
   mode?: FleetAppRouteMode;
   hubHost?: string;
   siteHost?: string;
@@ -416,9 +418,12 @@ export interface FleetApp {
   namespace: string;
   valuesYaml?: string;
   route?: FleetAppRoute;
+  /** Multiple routes for a multi-service release; takes precedence over route. */
+  routes?: FleetAppRoute[];
   phase?: FleetAppPhase;
   message?: string;
   routeName?: string;
+  routeNames?: string[];
   /** When false, hub LiteLLM auto-discovery skips this llama-cpp app. */
   llmBackend?: boolean;
 }
@@ -433,6 +438,7 @@ export interface FleetAppCreate {
   values?: Record<string, unknown>;
   valuesYaml?: string;
   route?: FleetAppRoute;
+  routes?: FleetAppRoute[];
   /** Llama-cpp only: register as a hub LiteLLM backend when Ready. */
   llmBackend?: boolean;
 }
@@ -738,6 +744,7 @@ export interface FleetAppPatch {
   valuesYaml?: string;
   namespace?: string;
   route?: FleetAppRoute;
+  routes?: FleetAppRoute[];
   llmBackend?: boolean;
 }
 

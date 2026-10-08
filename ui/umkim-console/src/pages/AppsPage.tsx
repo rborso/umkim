@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Form,
+  FormGroup,
   Label,
   Modal,
   ModalVariant,
@@ -118,6 +119,20 @@ function rockyValuesFromForm(f: RockyForm): string {
 }
 
 /** Route target wiring for custom charts (carried through install and edit). */
+function updateRoute(
+  routes: FleetAppRoute[] | undefined,
+  index: number,
+  patch: Partial<FleetAppRoute>,
+): FleetAppRoute[] {
+  const list = [...(routes || [])];
+  list[index] = { ...list[index], ...patch };
+  return list;
+}
+
+function removeRouteAt(routes: FleetAppRoute[] | undefined, index: number): FleetAppRoute[] {
+  return (routes || []).filter((_, i) => i !== index);
+}
+
 function routeWiringFromRoute(route?: FleetAppRoute): Partial<FleetAppRoute> {
   if (!route) return {};
   const wiring: Partial<FleetAppRoute> = {};
@@ -335,6 +350,7 @@ export function AppsPage() {
         ...(mode !== 'none' ? routeWiringFromRoute(form.route) : {}),
       };
       const llama = isLlamaCppChart(form.chart);
+      const multiRoutes = form.routes && form.routes.length > 0 ? form.routes : undefined;
       const body: FleetAppCreate = {
         ...form,
         name: form.releaseName || form.name,
@@ -344,7 +360,8 @@ export function AppsPage() {
         releaseName: form.releaseName,
         namespace: form.namespace || 'default',
         valuesYaml: form.valuesYaml || undefined,
-        route,
+        route: multiRoutes ? undefined : route,
+        ...(multiRoutes ? { routes: multiRoutes } : {}),
         ...(llama ? { llmBackend: registerLiteLLM } : {}),
       };
       await createFleetApp(body);
@@ -1019,6 +1036,135 @@ export function AppsPage() {
                   />
                 </div>
               ) : null}
+            </>
+          ) : null}
+          <FormGroup fieldId="app-multi-route">
+            <Checkbox
+              id="app-multi-route"
+              label="Multiple routes (one per service; multi-service charts)"
+              isChecked={form.routes !== undefined}
+              onChange={(_e, c) =>
+                setForm((f) => ({
+                  ...f,
+                  routes: c
+                    ? f.routes ?? [{ key: 'app1', mode: 'site', siteHost: '', requireAuth: true }]
+                    : undefined,
+                }))
+              }
+            />
+          </FormGroup>
+          {form.routes ? (
+            <>
+              {form.routes.map((r, i) => (
+                <div
+                  key={i}
+                  style={{
+                    margin: '0.5rem 0',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid var(--pf-v5-global--BorderColor--100)',
+                    borderRadius: 'var(--pf-v5-global--BorderRadius--sm)',
+                  }}
+                >
+                  <LabeledField label={`Route ${i + 1} key`} fieldId={`app-routes-${i}-key`}>
+                    <TextInput
+                      id={`app-routes-${i}-key`}
+                      value={r.key || ''}
+                      onChange={(_e, v) => setForm((f) => ({ ...f, routes: updateRoute(f.routes, i, { key: v }) }))}
+                      placeholder="sonarr"
+                    />
+                  </LabeledField>
+                  <LabeledField label="Mode" fieldId={`app-routes-${i}-mode`}>
+                    <FleetModalSelect
+                      id={`app-routes-${i}-mode`}
+                      value={r.mode || 'site'}
+                      onChange={(v) =>
+                        setForm((f) => ({
+                          ...f,
+                          routes: updateRoute(f.routes, i, { mode: v as FleetAppRouteMode }),
+                        }))
+                      }
+                      options={[
+                        { value: 'site', label: 'site — spoke ingress' },
+                        { value: 'hub', label: 'hub — Traefik on the hub' },
+                        { value: 'none', label: 'none' },
+                      ]}
+                    />
+                  </LabeledField>
+                  <LabeledField
+                    label={r.mode === 'hub' ? 'Hub hostname' : 'Site hostname'}
+                    fieldId={`app-routes-${i}-host`}
+                  >
+                    <TextInput
+                      id={`app-routes-${i}-host`}
+                      value={(r.mode === 'hub' ? r.hubHost : r.siteHost) || ''}
+                      onChange={(_e, v) =>
+                        setForm((f) => ({
+                          ...f,
+                          routes: updateRoute(f.routes, i, r.mode === 'hub' ? { hubHost: v } : { siteHost: v }),
+                        }))
+                      }
+                      placeholder="sonarr.devtest.otthol.hu"
+                    />
+                  </LabeledField>
+                  <LabeledField label="Service name" fieldId={`app-routes-${i}-svc`}>
+                    <TextInput
+                      id={`app-routes-${i}-svc`}
+                      value={r.serviceName || ''}
+                      onChange={(_e, v) =>
+                        setForm((f) => ({ ...f, routes: updateRoute(f.routes, i, { serviceName: v }) }))
+                      }
+                      placeholder="sonarr"
+                    />
+                  </LabeledField>
+                  <LabeledField label="Service port" fieldId={`app-routes-${i}-port`}>
+                    <TextInput
+                      id={`app-routes-${i}-port`}
+                      type="number"
+                      min={1}
+                      value={r.servicePort ?? ''}
+                      onChange={(_e, v) => {
+                        const n = Number.parseInt(v, 10);
+                        setForm((f) => ({
+                          ...f,
+                          routes: updateRoute(f.routes, i, {
+                            servicePort: Number.isFinite(n) && n > 0 ? n : undefined,
+                          }),
+                        }));
+                      }}
+                      placeholder="80"
+                    />
+                  </LabeledField>
+                  <Checkbox
+                    id={`app-routes-${i}-auth`}
+                    label="Require fleet ingress auth"
+                    isChecked={!!r.requireAuth}
+                    onChange={(_e, c) =>
+                      setForm((f) => ({ ...f, routes: updateRoute(f.routes, i, { requireAuth: c }) }))
+                    }
+                  />
+                  <Button
+                    variant="plain"
+                    icon={<TrashIcon />}
+                    aria-label={`Remove route ${i + 1}`}
+                    onClick={() => setForm((f) => ({ ...f, routes: removeRouteAt(f.routes, i) }))}
+                  />
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                icon={<PlusIcon />}
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    routes: [
+                      ...(f.routes || []),
+                      { key: `app${(f.routes?.length || 0) + 1}`, mode: 'site', siteHost: '', requireAuth: true },
+                    ],
+                  }))
+                }
+              >
+                Add route
+              </Button>
             </>
           ) : null}
           <LabeledField
