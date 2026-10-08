@@ -136,8 +136,9 @@ spec:
 {% endif %}
 {% if spoke_ingress_method == 'reverse_proxy' %}
                     # TLS terminates on the operator's external proxy; trust its
-                    # X-Forwarded-Proto so Authelia forward-auth sees https.
-                    - --entrypoints.web.forwardedHeaders.trustedIPs={{ phase6_traefik_forwarded_trusted_ips | default('10.0.0.0/8,172.16.0.0/12,192.168.0.0/16') }}
+                    # X-Forwarded-* headers so Authelia forward-auth sees https.
+                    # The spoke web entrypoint is only reachable through that proxy.
+                    - --entrypoints.web.forwardedHeaders.insecure=true
 {% endif %}
 {% if phase6_spoke_acme %}
                     - --certificatesresolvers.letsencrypt.acme.email={{ fleet_edge_acme_email }}
