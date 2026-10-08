@@ -16,40 +16,44 @@ import (
 )
 
 type appPatchBody struct {
-	Version    string                            `json:"version"`
-	Values     json.RawMessage                   `json:"values"`
-	ValuesYAML string                            `json:"valuesYaml"`
-	Namespace  string                            `json:"namespace"`
-	Route      fleetv1alpha1.FleetAppRouteIntent `json:"route"`
-	LlmBackend *bool                             `json:"llmBackend,omitempty"`
+	Version    string                              `json:"version"`
+	Values     json.RawMessage                     `json:"values"`
+	ValuesYAML string                              `json:"valuesYaml"`
+	Namespace  string                              `json:"namespace"`
+	Route      fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
+	Routes     []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
+	LlmBackend *bool                               `json:"llmBackend,omitempty"`
 }
 
 type appCreateBody struct {
-	Name        string                            `json:"name"`
-	ClusterName string                            `json:"clusterName"`
-	Chart       string                            `json:"chart"`
-	Version     string                            `json:"version"`
-	ReleaseName string                            `json:"releaseName"`
-	Namespace   string                            `json:"namespace"`
-	Values      json.RawMessage                   `json:"values"`
-	ValuesYAML  string                            `json:"valuesYaml"`
-	Route       fleetv1alpha1.FleetAppRouteIntent `json:"route"`
-	LlmBackend  *bool                             `json:"llmBackend,omitempty"`
+	Name        string                              `json:"name"`
+	ClusterName string                              `json:"clusterName"`
+	Chart       string                              `json:"chart"`
+	Version     string                              `json:"version"`
+	ReleaseName string                              `json:"releaseName"`
+	Namespace   string                              `json:"namespace"`
+	Values      json.RawMessage                     `json:"values"`
+	ValuesYAML  string                              `json:"valuesYaml"`
+	Route       fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
+	Routes      []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
+	LlmBackend  *bool                               `json:"llmBackend,omitempty"`
 }
 
 type appResponse struct {
-	Name        string                            `json:"name"`
-	ClusterName string                            `json:"clusterName"`
-	Chart       string                            `json:"chart"`
-	Version     string                            `json:"version,omitempty"`
-	ReleaseName string                            `json:"releaseName"`
-	Namespace   string                            `json:"namespace"`
-	ValuesYAML  string                            `json:"valuesYaml,omitempty"`
-	Route       fleetv1alpha1.FleetAppRouteIntent `json:"route"`
-	Phase       string                            `json:"phase"`
-	Message     string                            `json:"message,omitempty"`
-	RouteName   string                            `json:"routeName,omitempty"`
-	LlmBackend  bool                              `json:"llmBackend,omitempty"`
+	Name        string                              `json:"name"`
+	ClusterName string                              `json:"clusterName"`
+	Chart       string                              `json:"chart"`
+	Version     string                              `json:"version,omitempty"`
+	ReleaseName string                              `json:"releaseName"`
+	Namespace   string                              `json:"namespace"`
+	ValuesYAML  string                              `json:"valuesYaml,omitempty"`
+	Route       fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
+	Routes      []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
+	Phase       string                              `json:"phase"`
+	Message     string                              `json:"message,omitempty"`
+	RouteName   string                              `json:"routeName,omitempty"`
+	RouteNames  []string                            `json:"routeNames,omitempty"`
+	LlmBackend  bool                                `json:"llmBackend,omitempty"`
 }
 
 type appsListResponse struct {
@@ -191,6 +195,12 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "route.mode must be none, hub, or site"})
 		return
 	}
+	for _, rt := range body.Routes {
+		if !appchart.ValidRouteMode(rt.Mode) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "routes[].mode must be none, hub, or site"})
+			return
+		}
+	}
 	valuesYAML := strings.TrimSpace(body.ValuesYAML)
 	if valuesYAML == "" && len(body.Values) > 0 && string(body.Values) != "null" {
 		y, err := jsonValuesToYAML(body.Values)
@@ -210,9 +220,10 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 			Namespace:   ns,
 			ValuesYAML:  valuesYAML,
 			Route:       body.Route,
+			Routes:      body.Routes,
 		},
 	}
-	if app.Spec.Route.Mode == "" {
+	if len(app.Spec.Routes) == 0 && app.Spec.Route.Mode == "" {
 		app.Spec.Route.Mode = fleetv1alpha1.AppRouteModeNone
 	}
 	if body.LlmBackend != nil && llm.IsLlamaChart(chart) {
@@ -286,7 +297,17 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 		app.Spec.ValuesYAML = valuesYAML
 		changed = true
 	}
-	if body.Route.Mode != "" {
+	if len(body.Routes) > 0 {
+		for _, rt := range body.Routes {
+			if !appchart.ValidRouteMode(rt.Mode) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "routes[].mode must be none, hub, or site"})
+				return
+			}
+		}
+		app.Spec.Routes = body.Routes
+		app.Spec.Route = fleetv1alpha1.FleetAppRouteIntent{}
+		changed = true
+	} else if body.Route.Mode != "" {
 		if !appchart.ValidRouteMode(body.Route.Mode) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "route.mode must be none, hub, or site"})
 			return
@@ -354,9 +375,11 @@ func appToResponse(app *fleetv1alpha1.FleetApp) appResponse {
 		Namespace:   app.Spec.EffectiveNamespace(),
 		ValuesYAML:  app.Spec.ValuesYAML,
 		Route:       app.Spec.Route,
+		Routes:      app.Spec.Routes,
 		Phase:       app.Status.Phase,
 		Message:     app.Status.Message,
 		RouteName:   app.Status.RouteName,
+		RouteNames:  app.Status.RouteNames,
 		LlmBackend:  app.RegistersLLMBackend(),
 	}
 }

@@ -26,7 +26,13 @@ const (
 
 // FleetAppRouteIntent is the operator-selected public route for a Helm release.
 // There is no placement engine: traffic is always the cluster in spec.clusterName.
+// A FleetApp may declare several routes (spec.routes[]) for multi-service charts;
+// each entry gets its own FleetAppRoute.
 type FleetAppRouteIntent struct {
+	// Key names this route when spec.routes[] has more than one entry. It must be a
+	// DNS-1123 label. Defaults to the service name. The first route keeps the app
+	// name; later routes are named <app>-<key>.
+	Key              string `json:"key,omitempty"`
 	Mode             string `json:"mode,omitempty"`
 	HubHost          string `json:"hubHost,omitempty"`
 	SiteHost         string `json:"siteHost,omitempty"`
@@ -51,8 +57,12 @@ type FleetAppSpec struct {
 	// Namespace is the spoke namespace. Defaults to default.
 	Namespace string `json:"namespace,omitempty"`
 	// ValuesYAML is a Helm values document applied with -f.
-	ValuesYAML string              `json:"valuesYaml,omitempty"`
-	Route      FleetAppRouteIntent `json:"route,omitempty"`
+	ValuesYAML string `json:"valuesYaml,omitempty"`
+	// Route is the single public route (legacy). Ignored when Routes is set.
+	Route FleetAppRouteIntent `json:"route,omitempty"`
+	// Routes declares multiple public routes for one release (multi-service
+	// charts). Each entry becomes its own FleetAppRoute. When set, Route is ignored.
+	Routes []FleetAppRouteIntent `json:"routes,omitempty"`
 }
 
 type FleetAppStatus struct {
@@ -66,6 +76,7 @@ type FleetAppStatus struct {
 	ClusterName        string             `json:"clusterName,omitempty"`
 	Chart              string             `json:"chart,omitempty"`
 	RouteName          string             `json:"routeName,omitempty"`
+	RouteNames         []string           `json:"routeNames,omitempty"`
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
@@ -130,6 +141,72 @@ func (s FleetAppSpec) EffectiveHealthPath() string {
 		return p
 	}
 	return "/"
+}
+
+// EffectiveRoutes returns the routes to materialize: spec.routes when set,
+// otherwise the single spec.route (when it declares anything).
+func (s FleetAppSpec) EffectiveRoutes() []FleetAppRouteIntent {
+	if len(s.Routes) > 0 {
+		return s.Routes
+	}
+	if routeDeclared(s.Route) {
+		return []FleetAppRouteIntent{s.Route}
+	}
+	return nil
+}
+
+func routeDeclared(r FleetAppRouteIntent) bool {
+	return strings.TrimSpace(r.Mode) != "" ||
+		strings.TrimSpace(r.HubHost) != "" ||
+		strings.TrimSpace(r.SiteHost) != "" ||
+		strings.TrimSpace(r.ServiceName) != "" ||
+		r.ServicePort > 0 ||
+		strings.TrimSpace(r.ServiceNamespace) != "" ||
+		strings.TrimSpace(r.HealthPath) != "" ||
+		r.RequireAuth
+}
+
+func (r FleetAppRouteIntent) EffectiveMode() string {
+	m := strings.ToLower(strings.TrimSpace(r.Mode))
+	if m == "" {
+		return AppRouteModeNone
+	}
+	return m
+}
+
+func (r FleetAppRouteIntent) EffectiveServiceName(fallback string) string {
+	if n := strings.TrimSpace(r.ServiceName); n != "" {
+		return n
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func (r FleetAppRouteIntent) EffectiveServiceNamespace(fallback string) string {
+	if n := strings.TrimSpace(r.ServiceNamespace); n != "" {
+		return n
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func (r FleetAppRouteIntent) EffectiveServicePort() int32 {
+	if r.ServicePort > 0 {
+		return r.ServicePort
+	}
+	return 80
+}
+
+func (r FleetAppRouteIntent) EffectiveHealthPath() string {
+	if p := strings.TrimSpace(r.HealthPath); p != "" {
+		return p
+	}
+	return "/"
+}
+
+func (r FleetAppRouteIntent) RouteKey(fallback string) string {
+	if k := strings.TrimSpace(r.Key); k != "" {
+		return k
+	}
+	return strings.TrimSpace(fallback)
 }
 
 // RegistersLLMBackend reports whether a Ready llama-cpp FleetApp should appear in FleetLLM auto-discovery.

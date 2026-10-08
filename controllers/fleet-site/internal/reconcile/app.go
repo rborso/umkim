@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -316,30 +317,100 @@ func (r *AppReconciler) ensureImageMapCM(ctx context.Context, app *fleetv1alpha1
 }
 
 func (r *AppReconciler) ensureRoute(ctx context.Context, app *fleetv1alpha1.FleetApp, release, ns, mode string) error {
+	return r.ensureRoutes(ctx, app, release)
+}
+
+// ensureRoutes materializes one FleetAppRoute per spec.routes entry (or the single
+// legacy spec.route) and removes routes no longer declared.
+func (r *AppReconciler) ensureRoutes(ctx context.Context, app *fleetv1alpha1.FleetApp, release string) error {
 	routeNS := r.Cfg.EdgeRoutesNamespace
 	if routeNS == "" {
 		routeNS = "fleet-system"
 	}
-	if mode == "" || mode == fleetv1alpha1.AppRouteModeNone {
-		return r.deleteRoute(ctx, app)
+	desired := map[string]struct{}{}
+	names := []string{}
+	for i, rt := range app.Spec.EffectiveRoutes() {
+		if rt.EffectiveMode() == fleetv1alpha1.AppRouteModeNone {
+			continue
+		}
+		name := routeObjectName(app.Name, i, rt)
+		if err := r.ensureOneRoute(ctx, app, release, routeNS, name, rt); err != nil {
+			return err
+		}
+		desired[name] = struct{}{}
+		names = append(names, name)
 	}
-	hubHost := strings.TrimSpace(app.Spec.Route.HubHost)
+	var existing fleetedge.FleetAppRouteList
+	if err := r.List(ctx, &existing, client.InNamespace(routeNS), client.MatchingLabels{"fleet.umkim.com/app": app.Name}); err == nil {
+		for i := range existing.Items {
+			if _, ok := desired[existing.Items[i].Name]; !ok {
+				_ = r.Delete(ctx, &existing.Items[i])
+			}
+		}
+	}
+	sort.Strings(names)
+	app.Status.RouteNames = names
+	app.Status.RouteName = ""
+	if len(names) > 0 {
+		app.Status.RouteName = names[0]
+	}
+	return nil
+}
+
+// routeObjectName returns the FleetAppRoute name for a route: the app name for the
+// first route (back-compat) and <app>-<key> for the rest.
+func routeObjectName(appName string, index int, rt fleetv1alpha1.FleetAppRouteIntent) string {
+	if index == 0 {
+		return appName
+	}
+	key := sanitizeRouteKey(rt.RouteKey(rt.ServiceName))
+	if key == "" {
+		key = fmt.Sprintf("r%d", index)
+	}
+	return appName + "-" + key
+}
+
+func sanitizeRouteKey(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, ch := range s {
+		switch {
+		case ch >= 'a' && ch <= 'z', ch >= '0' && ch <= '9', ch == '-':
+			b.WriteRune(ch)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if len(out) > 40 {
+		out = out[:40]
+	}
+	return strings.Trim(out, "-")
+}
+
+func (r *AppReconciler) ensureOneRoute(ctx context.Context, app *fleetv1alpha1.FleetApp, release, routeNS, name string, rt fleetv1alpha1.FleetAppRouteIntent) error {
+	mode := rt.EffectiveMode()
+	hubHost := strings.TrimSpace(rt.HubHost)
 	if hubHost == "" && mode == fleetv1alpha1.AppRouteModeHub {
 		hubHost = defaultRouteHostname(release, r.Cfg.HubEdgeDomain)
 	}
 	if hubHost == "" && mode == fleetv1alpha1.AppRouteModeHub {
-		return fmt.Errorf("route.hubHost is required for mode %s", mode)
+		return fmt.Errorf("route %q: hubHost is required for mode %s", name, mode)
 	}
-	siteHost := strings.TrimSpace(app.Spec.Route.SiteHost)
+	siteHost := strings.TrimSpace(rt.SiteHost)
 	if siteHost == "" && mode == fleetv1alpha1.AppRouteModeSite {
-		siteHost = defaultRouteHostname(release, r.clusterEdgeDomain(ctx, app.Spec.ClusterName))
+		fallback := release
+		if name != app.Name {
+			fallback = name
+		}
+		siteHost = defaultRouteHostname(fallback, r.clusterEdgeDomain(ctx, app.Spec.ClusterName))
 	}
 	if siteHost == "" && mode == fleetv1alpha1.AppRouteModeSite {
-		return fmt.Errorf("route.siteHost is required for mode %s", mode)
+		return fmt.Errorf("route %q: siteHost is required for mode %s", name, mode)
 	}
 	far := &fleetedge.FleetAppRoute{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      app.Name,
+			Name:      name,
 			Namespace: routeNS,
 			Labels:    map[string]string{"fleet.umkim.com/app": app.Name},
 		},
@@ -347,28 +418,22 @@ func (r *AppReconciler) ensureRoute(ctx context.Context, app *fleetv1alpha1.Flee
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, far, func() error {
 		far.Labels = map[string]string{"fleet.umkim.com/app": app.Name}
 		far.Spec = fleetedge.FleetAppRouteSpec{
-			InstanceID:  app.Name,
+			InstanceID:  name,
 			Cluster:     app.Spec.ClusterName,
 			Mode:        mode,
 			HubHost:     hubHost,
 			SiteHost:    siteHost,
-			RequireAuth: app.Spec.Route.RequireAuth,
-			HealthPath:  app.Spec.EffectiveHealthPath(),
+			RequireAuth: rt.RequireAuth,
+			HealthPath:  rt.EffectiveHealthPath(),
 			Service: fleetedge.ServiceRef{
-				Namespace: app.Spec.EffectiveServiceNamespace(),
-				Name:      app.Spec.EffectiveServiceName(release),
-				Port:      app.Spec.EffectiveServicePort(),
+				Namespace: rt.EffectiveServiceNamespace(app.Spec.EffectiveNamespace()),
+				Name:      rt.EffectiveServiceName(release),
+				Port:      rt.EffectiveServicePort(),
 			},
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	if app.Status.RouteName != far.Name {
-		app.Status.RouteName = far.Name
-	}
-	return nil
+	return err
 }
 
 func (r *AppReconciler) deleteRoute(ctx context.Context, app *fleetv1alpha1.FleetApp) error {
@@ -376,11 +441,20 @@ func (r *AppReconciler) deleteRoute(ctx context.Context, app *fleetv1alpha1.Flee
 	if routeNS == "" {
 		routeNS = "fleet-system"
 	}
-	far := &fleetedge.FleetAppRoute{ObjectMeta: metav1.ObjectMeta{Name: app.Name, Namespace: routeNS}}
-	if err := r.Delete(ctx, far); err != nil && !apierrors.IsNotFound(err) {
+	var existing fleetedge.FleetAppRouteList
+	if err := r.List(ctx, &existing, client.InNamespace(routeNS), client.MatchingLabels{"fleet.umkim.com/app": app.Name}); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
+	for i := range existing.Items {
+		if err := r.Delete(ctx, &existing.Items[i]); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
 	app.Status.RouteName = ""
+	app.Status.RouteNames = nil
 	return nil
 }
 
