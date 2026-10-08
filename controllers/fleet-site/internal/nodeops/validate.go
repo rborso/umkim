@@ -230,6 +230,10 @@ func validatePreRemoveWorker(fcj *fleetv1alpha1.FleetClusterJoin, req *Request, 
 }
 
 func validatePreReplaceControl(fcj *fleetv1alpha1.FleetClusterJoin, req *Request, nodes []NodeInfo, add func(string, CheckStatus, string)) {
+	if fcj.Spec.Topology == fleetv1alpha1.ClusterTopologySingleNode {
+		add("topology", CheckFail, "replace control plane is not supported for single_node clusters")
+		return
+	}
 	oldNode := strings.TrimSpace(req.OldNode)
 	if oldNode == "" {
 		add("old_node", CheckFail, "oldNode is required")

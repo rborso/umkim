@@ -169,6 +169,10 @@ func (s *Server) submitNodeOperation(ctx context.Context, w http.ResponseWriter,
 		http.Error(w, "cluster is not ready", http.StatusConflict)
 		return
 	}
+	if op.Type == fleetv1alpha1.NodeOpTypeReplaceControlPlane && fcj.Spec.Topology == fleetv1alpha1.ClusterTopologySingleNode {
+		http.Error(w, "replace control plane is not supported for single_node clusters", http.StatusBadRequest)
+		return
+	}
 	if !s.preValidateNodeOperation(ctx, w, clusterName, nodeOperationRequestFromAPI(op, op.Force)) {
 		return
 	}
