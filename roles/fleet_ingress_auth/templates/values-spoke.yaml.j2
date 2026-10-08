@@ -3,6 +3,7 @@
 {% set _cookie = _cc.cookie_domain | default(_portal | regex_replace('^auth\\.', '')) %}
 {% set _access = _cc.access_domains | default(fia_spoke_access_domains | default(fleet_ingress_auth_access_domains | default([]))) %}
 {% set _expose_lldap = _cc.expose_lldap_webui | default(fleet_ingress_auth_lldap_expose_webui | default(false)) | bool %}
+{% set _spoke_tls = _cc.spoke_tls | default(true) | bool %}
 {% set _secrets = _cc.secrets_dir | default('/secrets/ingress-auth/clusters/' + ocm_target_cluster) %}
 {% set _lldap_host = _cc.lldap_webui_host | default(fleet_ingress_auth_lldap_webui_host | default('')) %}
 {# Prefer per-cluster Secret files (console enable / Job mounts); fall back to hub defaults. #}
@@ -49,6 +50,8 @@ traefik:
   deploySpokeMiddleware: true
   middlewareName: {{ fleet_ingress_auth_traefik_middleware_name }}
   middlewareNamespace: {{ fleet_ingress_auth_spoke_traefik_namespace }}
+  portalEntrypoint: {{ 'websecure' if _spoke_tls else 'web' }}
+  portalTLS: {{ _spoke_tls | bool | lower }}
 
 registry:
   prefix: ""

@@ -39,6 +39,10 @@ traefik:
   middlewareName: fleet-ingress-authelia
   middlewareNamespace: fleet-ingress
   stripAuthorizationMiddlewareName: strip-authorization
+  # Portal entrypoint/TLS. port_forward spokes terminate TLS (websecure + ACME);
+  # reverse_proxy spokes publish the portal on web for the external proxy.
+  portalEntrypoint: websecure
+  portalTLS: true
 
 registry:
   prefix: ""

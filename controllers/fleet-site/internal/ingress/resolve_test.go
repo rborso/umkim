@@ -58,6 +58,44 @@ func TestValidateBinding_reverseProxyShared(t *testing.T) {
 	}
 }
 
+func TestResolveClusterIngress_reverseProxyAuth(t *testing.T) {
+	withZone := fleetv1alpha1.FleetSiteSpec{
+		Edge: fleetv1alpha1.FleetSiteEdgeSpec{
+			Ingress: []fleetv1alpha1.FleetSiteIngressSpec{{
+				ID: "rp1", Method: fleetv1alpha1.IngressMethodReverseProxy, Zone: "otthol.hu",
+			}},
+		},
+	}
+	ci, err := ResolveClusterIngress(withZone, "rp1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ci.AllowsAuth {
+		t.Fatalf("reverse_proxy with a zone should allow ingress auth: %#v", ci)
+	}
+	if ci.AllowsSpokeACME {
+		t.Fatal("reverse_proxy must not enable spoke ACME")
+	}
+	if ci.TlsPolicy != fleetv1alpha1.TLSPolicyExternal {
+		t.Fatalf("reverse_proxy TLS policy = %q, want external", ci.TlsPolicy)
+	}
+
+	noZone := fleetv1alpha1.FleetSiteSpec{
+		Edge: fleetv1alpha1.FleetSiteEdgeSpec{
+			Ingress: []fleetv1alpha1.FleetSiteIngressSpec{{
+				ID: "rp1", Method: fleetv1alpha1.IngressMethodReverseProxy,
+			}},
+		},
+	}
+	ci, err = ResolveClusterIngress(noZone, "rp1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ci.AllowsAuth {
+		t.Fatal("reverse_proxy without a zone must not allow ingress auth")
+	}
+}
+
 func TestHostMatchesWildcard(t *testing.T) {
 	if !HostMatchesWildcard("app.demo.example.com", "*.demo.example.com") {
 		t.Fatal("expected match")
