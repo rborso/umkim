@@ -94,7 +94,7 @@ func (i Invite) Expired(now time.Time) bool {
 }
 
 // Load reads the invite Secret. A missing Secret yields an empty map.
-func Load(ctx context.Context, c client.Client, ns, name string) (map[string]Invite, error) {
+func Load(ctx context.Context, c client.Reader, ns, name string) (map[string]Invite, error) {
 	var sec corev1.Secret
 	err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &sec)
 	if apierrors.IsNotFound(err) {
@@ -158,7 +158,7 @@ func Create(ctx context.Context, c client.Client, ns, name string, inv Invite) e
 }
 
 // Get returns one invite by id.
-func Get(ctx context.Context, c client.Client, ns, name, id string) (Invite, bool, error) {
+func Get(ctx context.Context, c client.Reader, ns, name, id string) (Invite, bool, error) {
 	all, err := Load(ctx, c, ns, name)
 	if err != nil {
 		return Invite{}, false, err
@@ -181,7 +181,7 @@ func Delete(ctx context.Context, c client.Client, ns, name, id string) error {
 }
 
 // FindByToken returns the invite whose token hash matches, if any.
-func FindByToken(ctx context.Context, c client.Client, ns, name, token string) (Invite, bool, error) {
+func FindByToken(ctx context.Context, c client.Reader, ns, name, token string) (Invite, bool, error) {
 	all, err := Load(ctx, c, ns, name)
 	if err != nil {
 		return Invite{}, false, err
