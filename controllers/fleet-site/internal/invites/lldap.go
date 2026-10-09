@@ -152,3 +152,58 @@ func (l *LLDAP) AddUserToGroup(ctx context.Context, token, userID string, groupI
 	query := "mutation($u:String!,$g:Int!){addUserToGroup(userId:$u,groupId:$g){__typename}}"
 	return l.gql(ctx, token, query, map[string]any{"u": userID, "g": groupID}, nil)
 }
+
+// RemoveUserFromGroup removes a user from a group (idempotent).
+func (l *LLDAP) RemoveUserFromGroup(ctx context.Context, token, userID string, groupID int) error {
+	query := "mutation($u:String!,$g:Int!){removeUserFromGroup(userId:$u,groupId:$g){__typename}}"
+	return l.gql(ctx, token, query, map[string]any{"u": userID, "g": groupID}, nil)
+}
+
+// DirectoryUser is a directory user summary.
+type DirectoryUser struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+}
+
+// DirectoryGroup is a directory group with its members.
+type DirectoryGroup struct {
+	ID          int             `json:"id"`
+	DisplayName string          `json:"displayName"`
+	Users       []DirectoryUser `json:"users"`
+}
+
+// ListGroups returns all directory groups with their members.
+func (l *LLDAP) ListGroups(ctx context.Context, token string) ([]DirectoryGroup, error) {
+	var out struct {
+		Groups []DirectoryGroup `json:"groups"`
+	}
+	query := "{groups{id displayName users{id displayName email}}}"
+	if err := l.gql(ctx, token, query, nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Groups, nil
+}
+
+// ListUsers returns all directory users.
+func (l *LLDAP) ListUsers(ctx context.Context, token string) ([]DirectoryUser, error) {
+	var out struct {
+		Users []DirectoryUser `json:"users"`
+	}
+	if err := l.gql(ctx, token, "{users{id displayName email}}", nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Users, nil
+}
+
+// CreateGroup creates a directory group.
+func (l *LLDAP) CreateGroup(ctx context.Context, token, name string) error {
+	query := "mutation($n:String!){createGroup(name:$n){id}}"
+	return l.gql(ctx, token, query, map[string]any{"n": name}, nil)
+}
+
+// DeleteGroup deletes a directory group by id.
+func (l *LLDAP) DeleteGroup(ctx context.Context, token string, groupID int) error {
+	query := "mutation($g:Int!){deleteGroup(groupId:$g){__typename}}"
+	return l.gql(ctx, token, query, map[string]any{"g": groupID}, nil)
+}
