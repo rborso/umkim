@@ -102,7 +102,7 @@ export function InviteRedeemPage() {
               />
             </FormGroup>
             <Button type="submit" variant="primary" isLoading={busy} isDisabled={busy}>
-              Create account
+              {busy ? 'Creating account…' : 'Create account'}
             </Button>
           </Form>
         </>
