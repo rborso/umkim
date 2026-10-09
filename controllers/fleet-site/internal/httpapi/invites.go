@@ -11,6 +11,7 @@ import (
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingressauth"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/invites"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	batchv1 "k8s.io/api/batch/v1"
@@ -211,12 +212,16 @@ func (s *Server) inviteSignupLinks(ctx context.Context, token string) []inviteSi
 		if !fcj.Spec.IngressAuth.Enabled || fcj.Spec.IngressAuth.Directory != "hub" {
 			continue
 		}
+		name := fcj.Spec.EffectiveClusterName(fcj.Name)
 		host := strings.TrimSpace(fcj.Status.IngressAuth.PortalHost)
+		if dns, err := ingressauth.ResolveClusterDNS(ctx, s.Client, s.Cfg, name, fcj); err == nil && dns.PortalHost != "" {
+			host = dns.PortalHost
+		}
 		if host == "" {
 			continue
 		}
 		links = append(links, inviteSignupLink{
-			Cluster: fcj.Spec.EffectiveClusterName(fcj.Name),
+			Cluster: name,
 			URL:     "https://" + host + "/invite?token=" + token,
 		})
 	}
