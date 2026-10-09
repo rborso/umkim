@@ -49,6 +49,9 @@ type Config struct {
 	LldapServiceAccountsSecret string
 	LldapCredentialsSecret     string
 	InvitesSecretName          string
+	// ConsolePublicURL is the externally reachable console base URL used to
+	// build invite sign-up links (empty means hub links are not offered).
+	ConsolePublicURL string
 	// RequireIdentity when true rejects mutating API calls without X-Fleet-Subject-* headers.
 	RequireIdentity bool
 	// HelmOCIPrefixes is a comma-separated allowlist of oci:// chart prefixes.
@@ -102,6 +105,7 @@ func FromEnv() Config {
 		LldapServiceAccountsSecret:        env("FLEET_LLDAP_SERVICE_ACCOUNTS_SECRET", "lldap-service-accounts"),
 		LldapCredentialsSecret:            env("FLEET_LLDAP_CREDENTIALS_SECRET", "lldap-credentials"),
 		InvitesSecretName:                 env("FLEET_INVITES_SECRET", "fleet-invites"),
+		ConsolePublicURL:                  env("FLEET_CONSOLE_PUBLIC_URL", ""),
 		RequireIdentity:                   envBool("FLEET_SITE_REQUIRE_IDENTITY", true),
 		HelmOCIPrefixes:                   env("FLEET_HELM_OCI_PREFIXES", ""),
 		ChartInboxDir:                     env("FLEET_CHART_INBOX", "/var/lib/umkim/chart-inbox"),

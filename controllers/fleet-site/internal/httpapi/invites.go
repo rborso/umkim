@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/invites"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	batchv1 "k8s.io/api/batch/v1"
@@ -181,9 +182,45 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 		"id":        id,
 		"token":     token,
 		"path":      "/fleet/invite?token=" + token,
+		"links":     s.inviteSignupLinks(r.Context(), token),
 		"groups":    groups,
 		"expiresAt": inv.ExpiresAt,
 	})
+}
+
+// inviteSignupLink is a reachable sign-up URL for an invite.
+type inviteSignupLink struct {
+	Cluster string `json:"cluster"`
+	URL     string `json:"url"`
+}
+
+// inviteSignupLinks returns publicly reachable sign-up pages for an invite:
+// one per cluster that uses the shared hub directory (its Authelia portal host
+// serves /invite), plus the hub console when a public console URL is configured.
+func (s *Server) inviteSignupLinks(ctx context.Context, token string) []inviteSignupLink {
+	links := []inviteSignupLink{}
+	if base := strings.TrimRight(strings.TrimSpace(s.Cfg.ConsolePublicURL), "/"); base != "" {
+		links = append(links, inviteSignupLink{Cluster: "hub", URL: base + "/fleet/invite?token=" + token})
+	}
+	var joins fleetv1alpha1.FleetClusterJoinList
+	if err := s.reader().List(ctx, &joins, client.InNamespace(s.Cfg.Namespace)); err != nil {
+		return links
+	}
+	for i := range joins.Items {
+		fcj := &joins.Items[i]
+		if !fcj.Spec.IngressAuth.Enabled || fcj.Spec.IngressAuth.Directory != "hub" {
+			continue
+		}
+		host := strings.TrimSpace(fcj.Status.IngressAuth.PortalHost)
+		if host == "" {
+			continue
+		}
+		links = append(links, inviteSignupLink{
+			Cluster: fcj.Spec.EffectiveClusterName(fcj.Name),
+			URL:     "https://" + host + "/invite?token=" + token,
+		})
+	}
+	return links
 }
 
 func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request, id string) {
