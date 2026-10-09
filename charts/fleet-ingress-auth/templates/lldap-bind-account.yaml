@@ -56,7 +56,7 @@ spec:
                 -H "Authorization: Bearer ${token}" -H 'Content-Type: application/json' --data "$1"; }
 
               # Create the service user (ignore "already exists").
-              gql "{\"query\":\"mutation(\$u:CreateUserInput!){createUser(user:\$u){id}}\",\"variables\":{\"u\":{\"id\":\"${BIND_USERNAME}\",\"displayName\":\"${BIND_DISPLAY_NAME}\"}}}" >/dev/null 2>&1 || true
+              gql "{\"query\":\"mutation(\$u:CreateUserInput!){createUser(user:\$u){id}}\",\"variables\":{\"u\":{\"id\":\"${BIND_USERNAME}\",\"displayName\":\"${BIND_DISPLAY_NAME}\",\"email\":\"${BIND_USERNAME}@fleet.local\"}}}" >/dev/null 2>&1 || true
 
               # Resolve the target group id, then add the user to it.
               groups=$(gql '{"query":"{ groups { id displayName } }"}' 2>/dev/null || true)
