@@ -8,83 +8,9 @@ metadata:
     app: invite-signup
 data:
   nginx.conf: |
-    server {
-      listen 8080;
-      location = /invite/redeem {
-        proxy_pass {{ .Values.signup.hubRedeemURL }};
-        proxy_http_version 1.1;
-        proxy_set_header Content-Type application/json;
-      }
-      location /invite {
-        root /usr/share/nginx/html;
-        try_files /index.html =404;
-      }
-      location / {
-        return 302 /invite;
-      }
-    }
+{{ include "fleet-ingress-auth.inviteSignupNginx" . | indent 4 }}
   index.html: |
-    <!doctype html>
-    <html lang="en">
-    <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Accept invitation</title>
-    <style>
-    body{font-family:system-ui,sans-serif;max-width:28rem;margin:3rem auto;padding:0 1rem;color:#151515}
-    label{display:block;margin:.75rem 0 .25rem;font-weight:600}
-    input{width:100%;padding:.5rem;box-sizing:border-box}
-    button{margin-top:1rem;padding:.6rem 1rem;font-weight:600}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .msg{margin-top:1rem;padding:.75rem;border-radius:.25rem}
-    .err{background:#faeae8;color:#a30000}
-    .ok{background:#e7f5e8;color:#1e7b34}
-    </style>
-    </head>
-    <body>
-    <h1>Accept invitation</h1>
-    <p>Create your account for the shared directory.</p>
-    <form id="f">
-      <label>Username</label><input id="username" required pattern="[a-z0-9-]+">
-      <label>Display name</label><input id="displayName">
-      <label>Email</label><input id="email" type="email">
-      <label>Password (min 8 characters)</label><input id="password" type="password" required>
-      <label>Confirm password</label><input id="confirm" type="password" required>
-      <button id="submit" type="submit">Create account</button>
-    </form>
-    <div id="msg"></div>
-    <script>
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token') || '';
-    const msg = document.getElementById('msg');
-    const btn = document.getElementById('submit');
-    let busy = false;
-    document.getElementById('f').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (busy) return;
-      msg.className = 'msg'; msg.textContent = '';
-      const username = document.getElementById('username').value.trim().toLowerCase();
-      const password = document.getElementById('password').value;
-      const confirm = document.getElementById('confirm').value;
-      if (password.length < 8) { msg.className='msg err'; msg.textContent='Password must be at least 8 characters.'; return; }
-      if (password !== confirm) { msg.className='msg err'; msg.textContent='Passwords do not match.'; return; }
-      busy = true; btn.disabled = true; btn.textContent = 'Creating account…';
-      msg.className='msg'; msg.textContent='Creating your account, this can take a few seconds…';
-      try {
-        const r = await fetch('/invite/redeem', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,username,password,displayName:document.getElementById('displayName').value,email:document.getElementById('email').value})});
-        const text = await r.text();
-        if (!r.ok) throw new Error(text || ('HTTP '+r.status));
-        msg.className='msg ok'; msg.textContent='Account created: '+username+'. You can now sign in.';
-      } catch (err) {
-        msg.className='msg err'; msg.textContent=String(err.message||err);
-      } finally {
-        busy = false; btn.disabled = false; btn.textContent = 'Create account';
-      }
-    });
-    if (!token) { msg.className='msg err'; msg.textContent='This link is missing its invite token.'; }
-    </script>
-    </body>
-    </html>
+{{ include "fleet-ingress-auth.inviteSignupIndex" . | indent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -103,7 +29,7 @@ spec:
       labels:
         app: invite-signup
       annotations:
-        checksum/config: {{ .Values.signup | toYaml | sha256sum }}
+        checksum/config: {{ printf "%s|%s|%s" (include "fleet-ingress-auth.inviteSignupNginx" .) (include "fleet-ingress-auth.inviteSignupIndex" .) (.Values.signup | toYaml) | sha256sum }}
     spec:
       containers:
         - name: nginx
