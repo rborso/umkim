@@ -87,7 +87,7 @@ spec:
           image: alpine:3.20
           env:
             - name: LLDAP_BIND_DN
-              value: {{ printf "uid=admin,ou=people,%s" .Values.lldap.baseDN | quote }}
+              value: {{ .Values.authelia.ldapUser | default (printf "uid=admin,ou=people,%s" .Values.lldap.baseDN) | quote }}
             - name: LLDAP_BIND_PASSWORD
               value: {{ $ldapPass | quote }}
           command:
@@ -110,7 +110,7 @@ spec:
           image: alpine:3.20
           env:
             - name: LLDAP_BIND_DN
-              value: {{ printf "uid=admin,ou=people,%s" .Values.lldap.baseDN | quote }}
+              value: {{ .Values.authelia.ldapUser | default (printf "uid=admin,ou=people,%s" .Values.lldap.baseDN) | quote }}
             - name: LLDAP_BIND_PASSWORD
               value: {{ $ldapPass | quote }}
             - name: LLDAP_URL
