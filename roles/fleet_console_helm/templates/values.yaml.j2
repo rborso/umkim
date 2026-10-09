@@ -61,3 +61,14 @@ lldap:
   bootstrap:
     enabled: {{ fleet_auth_lldap_bootstrap_enabled | default(true) | bool }}
     groups: {{ fleet_auth_lldap_bootstrap_groups | default(['fleet-admins', 'fleet-site-admins', 'fleet-cluster-admins', 'fleet-viewers']) }}
+  serviceAccounts:
+    enabled: true
+    secretName: lldap-service-accounts
+    bind:
+      username: svc-bind
+      group: lldap_strict_readonly
+      password: {{ (((fleet_auth_lldap_admin_password | default('CHANGE_ME')) ~ '-bind') | hash('sha256')) | quote }}
+    admin:
+      username: dir-admin
+      group: lldap_admin
+      password: {{ (((fleet_auth_lldap_admin_password | default('CHANGE_ME')) ~ '-admin') | hash('sha256')) | quote }}
