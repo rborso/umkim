@@ -27,9 +27,11 @@ type tenantGroupView struct {
 	Members []invites.DirectoryUser `json:"members"`
 }
 
-// isSystemGroup marks LLDAP-internal groups that must not be deleted here.
+// isSystemGroup marks reserved directory groups: LLDAP internals and the fleet
+// role groups (managed through console RBAC). They are not tenants and are not
+// offered for tenant management or invitations.
 func isSystemGroup(name string) bool {
-	return strings.HasPrefix(name, "lldap_")
+	return strings.HasPrefix(name, "lldap_") || strings.HasPrefix(name, "fleet-")
 }
 
 func (s *Server) lldapClient(r *http.Request) (*invites.LLDAP, string, error) {

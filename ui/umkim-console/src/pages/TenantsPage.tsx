@@ -4,7 +4,6 @@ import {
   Button,
   Form,
   FormGroup,
-  Label,
   PageSection,
   TextInput,
   Title,
@@ -33,7 +32,8 @@ export function TenantsPage() {
   const load = () => {
     void listTenants()
       .then((d) => {
-        setGroups(d.groups ?? []);
+        // Tenants only: hide reserved LLDAP-internal and fleet role groups.
+        setGroups((d.groups ?? []).filter((g) => !g.system));
         setUsers(d.users ?? []);
       })
       .catch((e) => setError(String(e)));
@@ -93,9 +93,7 @@ export function TenantsPage() {
         <Tbody>
           {groups.map((g) => (
             <Tr key={g.name}>
-              <Td>
-                {g.name} {g.system ? <Label isCompact color="grey">system</Label> : null}
-              </Td>
+              <Td>{g.name}</Td>
               <Td>
                 {(g.members ?? []).map((m) => (
                   <Button
@@ -137,11 +135,9 @@ export function TenantsPage() {
                 </Button>
               </Td>
               <Td>
-                {!g.system ? (
-                  <Button variant="link" isDanger onClick={() => void run(() => deleteTenant(g.name))}>
-                    Delete
-                  </Button>
-                ) : null}
+                <Button variant="link" isDanger onClick={() => void run(() => deleteTenant(g.name))}>
+                  Delete
+                </Button>
               </Td>
             </Tr>
           ))}
