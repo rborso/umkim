@@ -403,6 +403,8 @@ export interface FleetAppRoute {
   hubHost?: string;
   siteHost?: string;
   requireAuth?: boolean;
+  /** Restrict the route to these directory groups (tenants) when requireAuth is set. */
+  requireAuthGroups?: string[];
   serviceName?: string;
   servicePort?: number;
   serviceNamespace?: string;

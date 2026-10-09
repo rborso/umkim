@@ -141,7 +141,18 @@ function routeWiringFromRoute(route?: FleetAppRoute): Partial<FleetAppRoute> {
   if (route.serviceNamespace?.trim()) wiring.serviceNamespace = route.serviceNamespace.trim();
   if (route.healthPath?.trim()) wiring.healthPath = route.healthPath.trim();
   if (route.requireAuth) wiring.requireAuth = true;
+  if (route.requireAuth && route.requireAuthGroups?.length) {
+    wiring.requireAuthGroups = route.requireAuthGroups;
+  }
   return wiring;
+}
+
+function parseAuthGroups(value: string): string[] | undefined {
+  const groups = value
+    .split(',')
+    .map((g) => g.trim())
+    .filter(Boolean);
+  return groups.length ? groups : undefined;
 }
 
 function clusterSiteDomain(sites: FleetSite[], cluster?: FleetCluster): string {
@@ -1034,6 +1045,24 @@ export function AppsPage() {
                       setForm((f) => ({ ...f, route: { ...f.route, requireAuth: checked } }))
                     }
                   />
+                  {form.route?.requireAuth ? (
+                    <LabeledField
+                      label="Tenant groups (comma-separated)"
+                      fieldId="app-route-groups"
+                    >
+                      <TextInput
+                        id="app-route-groups"
+                        value={(form.route?.requireAuthGroups || []).join(', ')}
+                        onChange={(_e, v) =>
+                          setForm((f) => ({
+                            ...f,
+                            route: { ...f.route, requireAuthGroups: parseAuthGroups(v) },
+                          }))
+                        }
+                        placeholder="tenant-a, tenant-b"
+                      />
+                    </LabeledField>
+                  ) : null}
                 </div>
               ) : null}
             </>
@@ -1142,6 +1171,24 @@ export function AppsPage() {
                       setForm((f) => ({ ...f, routes: updateRoute(f.routes, i, { requireAuth: c }) }))
                     }
                   />
+                  {r.requireAuth ? (
+                    <LabeledField
+                      label="Tenant groups (comma-separated)"
+                      fieldId={`app-routes-${i}-groups`}
+                    >
+                      <TextInput
+                        id={`app-routes-${i}-groups`}
+                        value={(r.requireAuthGroups || []).join(', ')}
+                        onChange={(_e, v) =>
+                          setForm((f) => ({
+                            ...f,
+                            routes: updateRoute(f.routes, i, { requireAuthGroups: parseAuthGroups(v) }),
+                          }))
+                        }
+                        placeholder="tenant-a, tenant-b"
+                      />
+                    </LabeledField>
+                  ) : null}
                   <Button
                     variant="plain"
                     icon={<TrashIcon />}
