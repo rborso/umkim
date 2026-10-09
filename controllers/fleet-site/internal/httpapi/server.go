@@ -107,6 +107,15 @@ func (s *Server) Handler() http.Handler {
 		}
 		s.handleChartByName(w, r, sub)
 	})
+	mux.HandleFunc("/api/v1alpha1/invites", s.handleInvites)
+	mux.HandleFunc("/api/v1alpha1/invites/", func(w http.ResponseWriter, r *http.Request) {
+		sub := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/invites/"), "/")
+		if sub == "" {
+			s.handleInvites(w, r)
+			return
+		}
+		s.handleInvitesSub(w, r, sub)
+	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
 }

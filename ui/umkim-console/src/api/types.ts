@@ -396,6 +396,43 @@ export type FleetAppPhase = 'Pending' | 'Installing' | 'Ready' | 'Failed' | 'Del
 
 export type FleetAppRouteMode = 'none' | 'hub' | 'site';
 
+export interface Invite {
+  id: string;
+  groups?: string[];
+  displayNameHint?: string;
+  emailHint?: string;
+  note?: string;
+  createdBy?: string;
+  createdAt: string;
+  expiresAt: string;
+  used: boolean;
+  usedAt?: string;
+  redeemedBy?: string;
+  expired: boolean;
+}
+
+export interface InviteCreate {
+  groups: string[];
+  ttlHours?: number;
+  displayNameHint?: string;
+  emailHint?: string;
+  note?: string;
+}
+
+export interface InviteCreateResult {
+  id: string;
+  token: string;
+  path: string;
+  groups?: string[];
+  expiresAt: string;
+}
+
+export interface InviteRedeemResult {
+  status: string;
+  username: string;
+  groups?: string[];
+}
+
 export interface FleetAppRoute {
   /** Route key for multi-route apps (spec.routes[]); defaults to serviceName. */
   key?: string;

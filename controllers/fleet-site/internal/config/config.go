@@ -43,6 +43,12 @@ type Config struct {
 	DefaultRockyMajor                 string
 	ConsoleNamespace                  string
 	LldapWebUINodePort                int
+	// LldapURL is the in-cluster LLDAP HTTP API used for directory operations.
+	LldapURL                   string
+	LldapImage                 string
+	LldapServiceAccountsSecret string
+	LldapCredentialsSecret     string
+	InvitesSecretName          string
 	// RequireIdentity when true rejects mutating API calls without X-Fleet-Subject-* headers.
 	RequireIdentity bool
 	// HelmOCIPrefixes is a comma-separated allowlist of oci:// chart prefixes.
@@ -91,6 +97,11 @@ func FromEnv() Config {
 		DefaultRockyMajor:                 env("FLEET_SITE_ROCKY_MAJOR", "10"),
 		ConsoleNamespace:                  env("FLEET_CONSOLE_NAMESPACE", "fleet-console"),
 		LldapWebUINodePort:                envInt("FLEET_LLAP_WEBUI_NODEPORT", 30917),
+		LldapURL:                          env("FLEET_LLDAP_URL", "http://lldap.fleet-console.svc.cluster.local:17170"),
+		LldapImage:                        env("FLEET_LLDAP_IMAGE", "ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8"),
+		LldapServiceAccountsSecret:        env("FLEET_LLDAP_SERVICE_ACCOUNTS_SECRET", "lldap-service-accounts"),
+		LldapCredentialsSecret:            env("FLEET_LLDAP_CREDENTIALS_SECRET", "lldap-credentials"),
+		InvitesSecretName:                 env("FLEET_INVITES_SECRET", "fleet-invites"),
 		RequireIdentity:                   envBool("FLEET_SITE_REQUIRE_IDENTITY", true),
 		HelmOCIPrefixes:                   env("FLEET_HELM_OCI_PREFIXES", ""),
 		ChartInboxDir:                     env("FLEET_CHART_INBOX", "/var/lib/umkim/chart-inbox"),

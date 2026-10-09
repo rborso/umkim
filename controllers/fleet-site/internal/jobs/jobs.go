@@ -1025,3 +1025,49 @@ func ChartPublishJob(opts ChartPublishJobOpts) *batchv1.Job {
 		},
 	}
 }
+
+// InvitePasswordJob sets an invited user's initial password with the LLDAP
+// image's lldap_set_password tool. LLDAP exposes no GraphQL password mutation
+// (passwords use the OPAQUE protocol), so this single step runs out-of-band.
+func InvitePasswordJob(ns, name, image, lldapURL, username, adminSecret, passwordSecret string) *batchv1.Job {
+	backoff := int32(1)
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels:    map[string]string{"app": "fleet-invite"},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: &backoff,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "fleet-invite"}},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{{
+						Name:            "set-password",
+						Image:           image,
+						ImagePullPolicy: corev1.PullAlways,
+						Command:         []string{"/bin/bash", "-c"},
+						Args: []string{
+							`/app/lldap_set_password --base-url "$LLDAP_URL" --admin-username "$LLDAP_ADMIN_USERNAME" --admin-password "$LLDAP_ADMIN_PASSWORD" --username "$TARGET_USER"`,
+						},
+						Env: []corev1.EnvVar{
+							{Name: "LLDAP_URL", Value: lldapURL},
+							{Name: "TARGET_USER", Value: username},
+							{Name: "LLDAP_ADMIN_USERNAME", ValueFrom: secretKeyRefEnv(adminSecret, "admin-username")},
+							{Name: "LLDAP_ADMIN_PASSWORD", ValueFrom: secretKeyRefEnv(adminSecret, "admin-password")},
+							{Name: "LLDAP_USER_PASSWORD", ValueFrom: secretKeyRefEnv(passwordSecret, "password")},
+						},
+					}},
+				},
+			},
+		},
+	}
+}
+
+func secretKeyRefEnv(name, key string) *corev1.EnvVarSource {
+	return &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: name},
+		Key:                  key,
+	}}
+}
