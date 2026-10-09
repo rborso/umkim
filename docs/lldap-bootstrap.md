@@ -67,6 +67,12 @@ groups. Create a group per tenant and reference it from routes with
 directory the cluster binds to. Directory membership alone does not grant
 platform access; review Fleet role bindings separately.
 
+Platform administrators manage tenants from the console **Access control →
+Tenants** page: list groups with their members, create/delete tenant groups, and
+add/remove directory users. LLDAP-internal `lldap_*` groups are read-only there.
+Per-cluster directory placement is selected in the cluster edge tab (local vs
+shared hub directory).
+
 ## Invitations
 
 A platform administrator can mint a single-use invite from the console
