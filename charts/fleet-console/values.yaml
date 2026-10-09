@@ -53,6 +53,9 @@ lldap:
   httpPort: 17170
   # When > 0, expose LLDAP web UI on a fixed NodePort (WireGuard-only in lab; use Infrastructure toggle post-install).
   webUINodePort: 0
+  # When > 0, expose the LLDAP LDAP port on a fixed NodePort so spokes/apps can bind
+  # over WireGuard (blocked on the WAN NIC by the hub firewall).
+  ldapNodePort: 0
   baseDN: dc=umkim,dc=com
   jwtSecret: CHANGE_ME
   adminPassword: CHANGE_ME
@@ -63,6 +66,17 @@ lldap:
       - fleet-site-admins
       - fleet-cluster-admins
       - fleet-viewers
+  serviceAccounts:
+    enabled: true
+    secretName: lldap-service-accounts
+    bind:
+      username: svc-bind
+      group: lldap_strict_readonly
+      password: CHANGE_ME
+    admin:
+      username: dir-admin
+      group: lldap_admin
+      password: CHANGE_ME
 
 registry:
   prefix: ""

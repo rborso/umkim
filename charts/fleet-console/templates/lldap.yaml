@@ -70,13 +70,16 @@ metadata:
   name: lldap
   namespace: {{ include "fleet-console.namespace" . }}
 spec:
-  type: {{ if gt (int .Values.lldap.webUINodePort) 0 }}NodePort{{ else }}ClusterIP{{ end }}
+  type: {{ if or (gt (int .Values.lldap.webUINodePort) 0) (gt (int .Values.lldap.ldapNodePort) 0) }}NodePort{{ else }}ClusterIP{{ end }}
   selector:
     app: lldap
   ports:
     - name: ldap
       port: {{ .Values.lldap.ldapPort }}
       targetPort: ldap
+      {{- if gt (int .Values.lldap.ldapNodePort) 0 }}
+      nodePort: {{ .Values.lldap.ldapNodePort }}
+      {{- end }}
     - name: http
       port: {{ .Values.lldap.httpPort }}
       targetPort: http
