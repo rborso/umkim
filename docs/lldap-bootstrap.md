@@ -101,6 +101,14 @@ auth NodePort; that port is blocked on the public interface.
 - `lldap_strict_readonly` grants read/search only. A leaked bind credential
   cannot change users, groups, or passwords.
 
+## Verification
+
+Run `scripts/verify-shared-directory.sh` on the hub for a read-only check of the
+hub services, the directory service accounts, and the WireGuard-only NodePorts.
+Spoke-side behavior (no spoke LLDAP, Authelia binding the hub directory, tenant
+group enforcement, invite redemption) is deployment-specific; verify it against
+each cluster as described above.
+
 ## Safe administration
 
 - Use a restricted management channel for the LLDAP web interface.

@@ -653,3 +653,14 @@
   handler: checks/fleet-infra-patch.sh
   timeout_s: 600
   blocking: true
+
+- id: directory.shared-hub
+  layer: [1]
+  suite: [hub, core]
+  module: S4
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/verify-shared-directory.sh
+  timeout_s: 120
+  blocking: true
