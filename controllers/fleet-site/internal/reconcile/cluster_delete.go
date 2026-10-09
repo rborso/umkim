@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -23,6 +24,10 @@ const (
 	annotationWGPeersRemoved     = "fleet.umkim.com/wg-peers-removed"
 	annotationCleanupKubernetes  = "fleet.umkim.com/cleanup-kubernetes"
 	annotationDeleteJobSucceeded = "fleet.umkim.com/delete-job-succeeded"
+	annotationDeleteJobFails     = "fleet.umkim.com/delete-job-fails"
+	// deleteJobMaxAttempts bounds Ansible delete-job retries before the hub falls
+	// back to forcing local cleanup (spoke unreachable, e.g. node reinstalled).
+	deleteJobMaxAttempts = 3
 )
 
 func wgPeersRemoved(fcj *fleetv1alpha1.FleetClusterJoin) bool {
@@ -35,6 +40,23 @@ func clusterCleanupKubernetes(fcj *fleetv1alpha1.FleetClusterJoin) bool {
 
 func deleteJobSucceeded(fcj *fleetv1alpha1.FleetClusterJoin) bool {
 	return fcj.Annotations != nil && fcj.Annotations[annotationDeleteJobSucceeded] == "true"
+}
+
+func deleteJobFailCount(fcj *fleetv1alpha1.FleetClusterJoin) int {
+	if fcj.Annotations == nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(fcj.Annotations[annotationDeleteJobFails])
+	return n
+}
+
+func (r *ClusterJoinReconciler) setDeleteJobFailCount(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, n int) error {
+	return r.patchClusterJoin(ctx, fcj, func(latest *fleetv1alpha1.FleetClusterJoin) {
+		if latest.Annotations == nil {
+			latest.Annotations = map[string]string{}
+		}
+		latest.Annotations[annotationDeleteJobFails] = strconv.Itoa(n)
+	})
 }
 
 // clusterNeedsDeleteJob is true until one delete Job succeeds. A later pass
@@ -54,6 +76,7 @@ func (r *ClusterJoinReconciler) markDeleteJobSucceeded(ctx context.Context, fcj 
 			latest.Annotations = map[string]string{}
 		}
 		latest.Annotations[annotationDeleteJobSucceeded] = "true"
+		delete(latest.Annotations, annotationDeleteJobFails)
 	}); err != nil {
 		return err
 	}
@@ -156,14 +179,25 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 		}
 		fcj.Status.DeleteJobName = ""
 		if !ok {
-			if teardown.ManagedClusterExists(ctx, r.Client, clusterName) {
-				fcj.Status.Message = fmt.Sprintf("Cluster delete job failed (%s); retrying", msg)
+			fails := deleteJobFailCount(fcj) + 1
+			if fails < deleteJobMaxAttempts && teardown.ManagedClusterExists(ctx, r.Client, clusterName) {
+				if err := r.setDeleteJobFailCount(ctx, fcj, fails); err != nil {
+					return ctrl.Result{}, err
+				}
+				fcj.Status.Message = fmt.Sprintf("Cluster delete job failed (%s); retrying (%d/%d)", msg, fails, deleteJobMaxAttempts)
 				if err := r.Status().Update(ctx, fcj); err != nil {
 					return ctrl.Result{}, err
 				}
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			}
-			fcj.Status.Message = "Cluster delete job failed after hub unjoin; continuing teardown"
+			// The spoke may be permanently unreachable (for example the node was
+			// reinstalled). Force hub-side teardown so the entry is removed rather
+			// than retrying the Ansible job forever.
+			fcj.Status.Message = "Cluster delete job failed or spoke unreachable; forcing hub cleanup"
+			_ = teardown.DeleteManifestWorks(ctx, r.Client, clusterName)
+			if err := teardown.ForceDeleteManagedCluster(ctx, r.Client, clusterName); err != nil {
+				return r.failClusterDelete(ctx, fcj, err)
+			}
 		}
 		if err := r.Status().Update(ctx, fcj); err != nil {
 			return ctrl.Result{}, err
