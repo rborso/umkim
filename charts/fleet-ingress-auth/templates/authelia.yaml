@@ -34,6 +34,11 @@ data:
             - {{ printf "group:%s" . | quote }}
 {{- end }}
           policy: one_factor
+        # Deny authenticated users who are not in the allowed groups; Authelia
+        # skips a subject rule when it does not match, so an explicit deny must
+        # precede the zone wildcard rules.
+        - domain: {{ .domain | quote }}
+          policy: deny
 {{- end }}
 {{- range .Values.authelia.accessDomains }}
         - domain: {{ . | quote }}
@@ -87,6 +92,10 @@ spec:
     metadata:
       labels:
         app: authelia
+      annotations:
+        # Roll Authelia when its rendered config changes (access rules/domains,
+        # LDAP bind, secrets); it reads configuration.yml only at startup.
+        checksum/authelia-config: {{ .Values.authelia | toYaml | sha256sum }}
     spec:
       enableServiceLinks: false
 {{- if .Values.lldap.deploy }}
