@@ -128,8 +128,10 @@ identity_providers:
         client_secret: {{ .clientSecret | quote }}
         public: false
         authorization_policy: {{ .authorizationPolicy | default "one_factor" }}
-        require_pkce: {{ .requirePkce | default true }}
+        require_pkce: {{ if hasKey . "requirePkce" }}{{ .requirePkce }}{{ else }}true{{ end }}
+{{- if or (not (hasKey . "requirePkce")) .requirePkce }}
         pkce_challenge_method: S256
+{{- end }}
         redirect_uris:
 {{- range .redirectUris }}
           - {{ . | quote }}
