@@ -67,6 +67,25 @@ groups. Create a group per tenant and reference it from routes with
 directory the cluster binds to. Directory membership alone does not grant
 platform access; review Fleet role bindings separately.
 
+## Invitations
+
+A platform administrator can mint a single-use invite from the console
+(**Access control → Invitations**). The invite records the tenant groups the
+new user should join and expires after 72 hours by default. Only a SHA-256 hash
+of the token is stored, in the `fleet-invites` Secret; the one-time link is
+shown once at creation.
+
+Redeeming the link creates the user in the shared hub directory, adds the
+recorded groups, and sets the chosen password. LLDAP exposes no GraphQL
+password mutation (passwords use the OPAQUE protocol), so the controller creates
+the user and group membership over GraphQL as `dir-admin` and then runs a
+short-lived Job using the LLDAP image's `lldap_set_password` for the password.
+
+The sign-up page is available on the hub console (`/fleet/invite`) and, for
+clusters bound to `directory: hub`, on the Authelia portal host (`/invite`).
+The cluster page proxies redemption to the hub over WireGuard on the console
+auth NodePort; that port is blocked on the public interface.
+
 - Created by the `fleet-ingress-auth` chart's `lldap-bind-account` Job on
   install/upgrade. The account name, group, and password are chart values
   (`lldap.bindAccount.*`) rendered from the `fleet_ingress_auth` role defaults.

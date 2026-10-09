@@ -17,6 +17,12 @@ the proxy, or place tokens in documentation, shell history, or source control.
 Enrollment is a separate bootstrap flow and uses its own bearer token; it is
 not an anonymous public API.
 
+One deliberate exception is invite redemption: `POST /api/v1alpha1/invites/redeem`
+is reachable without a session because the one-time invite token is the
+credential. Every other fleet API path still requires an authenticated,
+authorized session. Administrators mint invites from **Access control →
+Invitations**; see [lldap-bootstrap.md](lldap-bootstrap.md).
+
 ## Identity providers
 
 The chart can be configured for:
