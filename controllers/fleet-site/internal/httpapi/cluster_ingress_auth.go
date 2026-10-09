@@ -42,6 +42,12 @@ func (s *Server) handleClusterIngressAuth(w http.ResponseWriter, r *http.Request
 			return
 		}
 		s.handleDisableClusterIngressAuth(r.Context(), w, clusterName)
+	case "directory":
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.handleSetClusterDirectory(r.Context(), w, r, clusterName)
 	case "":
 		http.Error(w, "not found", http.StatusNotFound)
 	default:
@@ -213,4 +219,58 @@ func (s *Server) buildClusterSummary(ctx context.Context, name string) (clusterS
 		applyFleetClusterJoinSummary(&cs, fcj)
 	}
 	return cs, nil
+}
+
+type clusterDirectoryBody struct {
+	Directory string `json:"directory"`
+}
+
+// handleSetClusterDirectory sets FleetClusterJoin.spec.ingressAuth.directory to
+// "local" (own LLDAP) or "hub" (shared hub directory) and reconciles.
+func (s *Server) handleSetClusterDirectory(ctx context.Context, w http.ResponseWriter, r *http.Request, clusterName string) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var req clusterDirectoryBody
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dir := strings.ToLower(strings.TrimSpace(req.Directory))
+	switch dir {
+	case "", "local", "hub":
+	default:
+		http.Error(w, "directory must be local or hub", http.StatusBadRequest)
+		return
+	}
+	fcj, err := s.findFleetClusterJoin(ctx, clusterName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			http.Error(w, "cluster join not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !fcj.Spec.IngressAuth.Enabled {
+		http.Error(w, "ingress auth is not enabled for this cluster", http.StatusConflict)
+		return
+	}
+	fcj.Spec.IngressAuth.Directory = dir
+	if err := s.Client.Update(ctx, fcj); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.triggerIngressAuthReconcile(ctx); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cs, err := s.buildClusterSummary(ctx, clusterName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, cs)
 }

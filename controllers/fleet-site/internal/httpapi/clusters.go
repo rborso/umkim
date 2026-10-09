@@ -63,6 +63,8 @@ type clusterIngressAuthStatusJSON struct {
 	PortalHost     string   `json:"portalHost,omitempty"`
 	LLDAPWebUIHost string   `json:"lldapWebUIHost,omitempty"`
 	AccessDomains  []string `json:"accessDomains,omitempty"`
+	// Directory is "local" (own LLDAP) or "hub" (shared hub directory).
+	Directory string `json:"directory,omitempty"`
 }
 
 type clusterStorageStatusJSON struct {

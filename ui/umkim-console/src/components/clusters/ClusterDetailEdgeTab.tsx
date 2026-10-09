@@ -63,6 +63,8 @@ export type ClusterDetailEdgeTabProps = {
   portalHost?: string;
   portalUrl?: string;
   lldapWebUIUrl?: string;
+  directory?: string;
+  onSetDirectory: (dir: 'local' | 'hub') => void;
   showClusterAcme: boolean;
   acmeEnabled: boolean;
   acmeCanEnable: boolean;
@@ -110,6 +112,8 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
     portalHost,
     portalUrl,
     lldapWebUIUrl,
+    directory,
+    onSetDirectory,
     showClusterAcme,
     acmeEnabled,
     acmeCanEnable,
@@ -344,6 +348,19 @@ export function ClusterDetailEdgeTab(props: ClusterDetailEdgeTabProps) {
             ) : null}
           </p>
         )}
+        {authEnabled ? (
+          <LabeledField label="Directory" fieldId="clusterDirectory" help={getFieldHelp('clusterDetail.ingressAuth')}>
+            <FormSelect
+              id="clusterDirectory"
+              value={directory === 'hub' ? 'hub' : 'local'}
+              onChange={(_e, v) => onSetDirectory(v as 'local' | 'hub')}
+              isDisabled={authActionBusy}
+            >
+              <FormSelectOption value="local" label="local — this cluster runs its own LLDAP" />
+              <FormSelectOption value="hub" label="hub — shared hub directory (WireGuard)" />
+            </FormSelect>
+          </LabeledField>
+        ) : null}
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
           <Button
             variant="primary"

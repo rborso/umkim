@@ -433,6 +433,24 @@ export interface InviteRedeemResult {
   groups?: string[];
 }
 
+export interface DirectoryUser {
+  id: string;
+  displayName?: string;
+  email?: string;
+}
+
+export interface TenantGroup {
+  name: string;
+  id: number;
+  system: boolean;
+  members: DirectoryUser[];
+}
+
+export interface TenantsResponse {
+  groups: TenantGroup[];
+  users: DirectoryUser[];
+}
+
 export interface FleetAppRoute {
   /** Route key for multi-route apps (spec.routes[]); defaults to serviceName. */
   key?: string;
@@ -640,6 +658,7 @@ export interface FleetClusterIngressAuthStatus {
   secretsRef?: string;
   portalHost?: string;
   lldapWebUIHost?: string;
+  directory?: string;
   accessDomains?: string[];
 }
 
