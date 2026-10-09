@@ -33,6 +33,16 @@ authelia:
 {% for d in fleet_ingress_auth_access_domains %}
     - {{ d | quote }}
 {% endfor %}
+{% if fleet_ingress_auth_access_rules | default([]) | length > 0 %}
+  accessRules:
+{% for r in fleet_ingress_auth_access_rules %}
+    - domain: {{ r.domain | quote }}
+      groups:
+{% for g in r.groups %}
+        - {{ g | quote }}
+{% endfor %}
+{% endfor %}
+{% endif %}
 
 traefik:
   deploySpokeMiddleware: false

@@ -10,8 +10,22 @@ func (in *FleetAppRoute) DeepCopyInto(out *FleetAppRoute) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = in.Spec
+	in.Spec.DeepCopyInto(&out.Spec)
 	out.Status = in.Status
+}
+
+func (in *FleetAppRouteSpec) DeepCopyInto(out *FleetAppRouteSpec) {
+	*out = *in
+	if in.ClusterTargets != nil {
+		in, out := &in.ClusterTargets, &out.ClusterTargets
+		*out = make([]ClusterTarget, len(*in))
+		copy(*out, *in)
+	}
+	if in.RequireAuthGroups != nil {
+		in, out := &in.RequireAuthGroups, &out.RequireAuthGroups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 }
 
 func (in *FleetAppRoute) DeepCopy() *FleetAppRoute {

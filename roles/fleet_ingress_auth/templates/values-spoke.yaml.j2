@@ -2,6 +2,7 @@
 {% set _portal = _cc.portal_host | default(fleet_ingress_auth_portal_host) %}
 {% set _cookie = _cc.cookie_domain | default(_portal | regex_replace('^auth\\.', '')) %}
 {% set _access = _cc.access_domains | default(fia_spoke_access_domains | default(fleet_ingress_auth_access_domains | default([]))) %}
+{% set _access_rules = _cc.access_rules | default([]) %}
 {% set _expose_lldap = _cc.expose_lldap_webui | default(fleet_ingress_auth_lldap_expose_webui | default(false)) | bool %}
 {% set _spoke_tls = _cc.spoke_tls | default(true) | bool %}
 {% set _secrets = _cc.secrets_dir | default('/secrets/ingress-auth/clusters/' + ocm_target_cluster) %}
@@ -54,6 +55,16 @@ authelia:
 {% for d in _access %}
     - {{ d | quote }}
 {% endfor %}
+{% if _access_rules | length > 0 %}
+  accessRules:
+{% for r in _access_rules %}
+    - domain: {{ r.domain | quote }}
+      groups:
+{% for g in r.groups %}
+        - {{ g | quote }}
+{% endfor %}
+{% endfor %}
+{% endif %}
 {% if _hub_dir %}
   # Bind to the shared hub directory with the read-only account (LDAP over WireGuard).
   ldapUser: {{ ('uid=' ~ (fleet_ingress_auth_lldap_bind_username | default('svc-bind')) ~ ',ou=people,' ~ fleet_ingress_auth_lldap_base_dn) | quote }}

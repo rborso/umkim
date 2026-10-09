@@ -73,6 +73,10 @@ spec:
                       type: string
                     requireAuth:
                       type: boolean
+                    requireAuthGroups:
+                      type: array
+                      items:
+                        type: string
                     serviceName:
                       type: string
                     servicePort:
@@ -102,6 +106,10 @@ spec:
                         type: string
                       requireAuth:
                         type: boolean
+                      requireAuthGroups:
+                        type: array
+                        items:
+                          type: string
                       serviceName:
                         type: string
                       servicePort:

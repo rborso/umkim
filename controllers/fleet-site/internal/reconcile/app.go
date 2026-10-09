@@ -423,8 +423,9 @@ func (r *AppReconciler) ensureOneRoute(ctx context.Context, app *fleetv1alpha1.F
 			Mode:        mode,
 			HubHost:     hubHost,
 			SiteHost:    siteHost,
-			RequireAuth: rt.RequireAuth,
-			HealthPath:  rt.EffectiveHealthPath(),
+			RequireAuth:       rt.RequireAuth,
+			RequireAuthGroups: append([]string(nil), rt.RequireAuthGroups...),
+			HealthPath:        rt.EffectiveHealthPath(),
 			Service: fleetedge.ServiceRef{
 				Namespace: rt.EffectiveServiceNamespace(app.Spec.EffectiveNamespace()),
 				Name:      rt.EffectiveServiceName(release),

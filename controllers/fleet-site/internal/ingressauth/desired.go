@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"sort"
 	"strings"
 
+	fleetedge "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/hubwan"
@@ -35,8 +37,17 @@ type DesiredState struct {
 	PortalHost           string
 	CookieDomain         string
 	AccessDomains        []string
+	// AccessRules are host-level Authelia rules for hub-mode routes.
+	AccessRules          []RouteAuthRule
 	GlobalEnabled        bool
 	ClusterConfigs       map[string]ClusterAuthConfig
+}
+
+// RouteAuthRule restricts a public host to the listed directory groups (tenants).
+// Empty Groups means any authenticated user.
+type RouteAuthRule struct {
+	Domain string   `yaml:"domain"`
+	Groups []string `yaml:"groups,omitempty"`
 }
 
 type ClusterAuthConfig struct {
@@ -44,6 +55,8 @@ type ClusterAuthConfig struct {
 	PortalHost        string
 	CookieDomain      string
 	AccessDomains     []string
+	// AccessRules are host-level Authelia rules for this cluster's site routes.
+	AccessRules       []RouteAuthRule
 	SecretsRef        string
 	ExposeLLDAPWebUI  bool
 	LLDAPWebUIHost    string
@@ -209,6 +222,20 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 	out.EnabledClusters = sortedKeys(enabledSet)
 	out.AccessDomains = sortedKeys(accessUnion)
 
+	rules, err := loadRouteAccessRules(ctx, c, cfg)
+	if err != nil {
+		return out, err
+	}
+	out.AccessRules = rules.hub
+	for name, perCluster := range rules.byCluster {
+		cc, ok := out.ClusterConfigs[name]
+		if !ok {
+			continue
+		}
+		cc.AccessRules = perCluster
+		out.ClusterConfigs[name] = cc
+	}
+
 	edge, err := loadEdgeClusters(ctx, c, cfg.EdgeClustersCMNamespace, cfg.EdgeClustersCMName)
 	if err != nil {
 		return out, err
@@ -244,6 +271,89 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 	out.ControllerAuth = out.HubEnabled || len(out.EnabledClusters) > 0
 	out.GlobalEnabled = out.ControllerAuth
 	return out, nil
+}
+
+type routeAccessRulesResult struct {
+	hub       []RouteAuthRule
+	byCluster map[string][]RouteAuthRule
+}
+
+// loadRouteAccessRules maps requireAuthGroups route intents to per-host Authelia
+// rules: hub-mode routes apply on the hub Authelia, site-mode routes on the
+// owning cluster's spoke Authelia.
+func loadRouteAccessRules(ctx context.Context, c client.Client, cfg config.Config) (routeAccessRulesResult, error) {
+	res := routeAccessRulesResult{byCluster: map[string][]RouteAuthRule{}}
+	ns := cfg.EdgeRoutesNamespace
+	if ns == "" {
+		ns = "fleet-system"
+	}
+	var routes fleetedge.FleetAppRouteList
+	if err := c.List(ctx, &routes, client.InNamespace(ns)); err != nil {
+		if apierrors.IsNotFound(err) {
+			return res, nil
+		}
+		return res, err
+	}
+	for i := range routes.Items {
+		r := &routes.Items[i]
+		if !r.Spec.RequireAuth {
+			continue
+		}
+		groups := normalizeAuthGroups(r.Spec.RequireAuthGroups)
+		if len(groups) == 0 {
+			continue
+		}
+		switch r.Spec.Mode {
+		case fleetedge.RouteModeHub:
+			if r.Spec.HubHost != "" {
+				res.hub = append(res.hub, RouteAuthRule{Domain: r.Spec.HubHost, Groups: groups})
+			}
+		case fleetedge.RouteModeSite:
+			if r.Spec.SiteHost != "" && r.Spec.Cluster != "" {
+				res.byCluster[r.Spec.Cluster] = append(res.byCluster[r.Spec.Cluster], RouteAuthRule{Domain: r.Spec.SiteHost, Groups: groups})
+			}
+		}
+	}
+	res.hub = normalizeRouteRules(res.hub)
+	for name, rules := range res.byCluster {
+		res.byCluster[name] = normalizeRouteRules(rules)
+	}
+	return res, nil
+}
+
+func normalizeAuthGroups(in []string) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, g := range in {
+		g = strings.TrimSpace(g)
+		if g == "" {
+			continue
+		}
+		if _, ok := seen[g]; ok {
+			continue
+		}
+		seen[g] = struct{}{}
+		out = append(out, g)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func normalizeRouteRules(in []RouteAuthRule) []RouteAuthRule {
+	out := make([]RouteAuthRule, 0, len(in))
+	for _, r := range in {
+		r.Domain = strings.TrimSpace(r.Domain)
+		if r.Domain == "" {
+			continue
+		}
+		r.Groups = normalizeAuthGroups(r.Groups)
+		if len(r.Groups) == 0 {
+			continue
+		}
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Domain < out[j].Domain })
+	return out
 }
 
 func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alpha1.FleetIngressAuth, edgeClusters map[string]AnsibleEdgeCluster) string {
@@ -290,6 +400,16 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 			lines = append(lines, "  - \""+yamlQuote(d)+"\"")
 		}
 	}
+	if len(desired.AccessRules) > 0 {
+		lines = append(lines, "fleet_ingress_auth_access_rules:")
+		for _, r := range desired.AccessRules {
+			lines = append(lines, "  - domain: \""+yamlQuote(r.Domain)+"\"")
+			lines = append(lines, "    groups:")
+			for _, g := range r.Groups {
+				lines = append(lines, "      - \""+yamlQuote(g)+"\"")
+			}
+		}
+	}
 	if len(desired.ClusterConfigs) > 0 {
 		lines = append(lines, "fleet_ingress_auth_cluster_configs:")
 		for _, name := range sortedKeys(sliceToSet(desired.EnabledClusters)) {
@@ -302,6 +422,16 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 				lines = append(lines, "    access_domains:")
 				for _, d := range cc.AccessDomains {
 					lines = append(lines, "      - \""+yamlQuote(d)+"\"")
+				}
+			}
+			if len(cc.AccessRules) > 0 {
+				lines = append(lines, "    access_rules:")
+				for _, r := range cc.AccessRules {
+					lines = append(lines, "      - domain: \""+yamlQuote(r.Domain)+"\"")
+					lines = append(lines, "        groups:")
+					for _, g := range r.Groups {
+						lines = append(lines, "          - \""+yamlQuote(g)+"\"")
+					}
 				}
 			}
 			lines = append(lines, "    expose_lldap_webui: "+boolYAML(cc.ExposeLLDAPWebUI))

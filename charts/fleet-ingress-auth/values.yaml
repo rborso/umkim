@@ -46,6 +46,9 @@ authelia:
   accessDomains:
     - "*.mgmt.example.com"
     - "mgmt.example.com"
+  # Host-level rules that restrict a route to directory groups (tenants). These
+  # are evaluated before accessDomains. Empty groups means any authenticated user.
+  accessRules: []
 
 traefik:
   deploySpokeMiddleware: true
