@@ -68,7 +68,8 @@ Console install fields adapt to the chart:
 - **Custom charts** get the generic fields (cluster, chart, version, release,
   namespace, values) plus an optional Route. Selecting `hub`/`site` reveals the
   wiring (`serviceName`, `servicePort`, `serviceNamespace`, `healthPath`,
-  `requireAuth`); the chart must create a matching Kubernetes Service.
+  `requireAuth`, `requireAuthGroups`); the chart must create a matching
+  Kubernetes Service.
 
 ### Update (patch)
 
@@ -143,8 +144,11 @@ cluster is bound to a **`port_forward`** ingress (zone comes from that ingress r
 
 Set `route.hubHost` or `route.siteHost` on create to override the default hostname. The console **Install chart** dialog exposes the same fields when route mode is `hub` or `site`.
 
-`requireAuth` opts the route into ingress-auth when that stack is ready. See
-[fleet-edge.md](fleet-edge.md) and [fleet-ingress-auth.md](../fleet-ingress-auth.md).
+`requireAuth` opts the route into ingress-auth when that stack is ready.
+`requireAuthGroups` (a list of directory group names) additionally restricts the
+route to those groups (tenants); an empty list allows any authenticated user. It
+only applies when `requireAuth` is set. See [fleet-edge.md](fleet-edge.md) and
+[fleet-ingress-auth.md](../fleet-ingress-auth.md).
 
 Hub-routed apps stop when the hub is unavailable. `site` and `none` apps can
 remain reachable on their own paths when site ingress is healthy.

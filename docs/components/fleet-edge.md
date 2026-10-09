@@ -72,7 +72,9 @@ host leaves the existing host in place.
 
 Set `route.requireAuth: true` only after the relevant ingress-auth stack is
 ready. It is an explicit per-route opt-in; routes without it remain public by
-design. See [fleet-ingress-auth.md](../fleet-ingress-auth.md).
+design. `route.requireAuthGroups` further restricts the route to the listed
+directory groups (tenants); leave it empty to allow any authenticated user.
+See [fleet-ingress-auth.md](../fleet-ingress-auth.md).
 
 ## TLS and availability limitations
 
