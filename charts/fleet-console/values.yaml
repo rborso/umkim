@@ -51,10 +51,10 @@ lldap:
   image: ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8
   ldapPort: 3890
   httpPort: 17170
-  # When > 0, expose LLDAP web UI on a fixed NodePort (WireGuard-only in lab; use Infrastructure toggle post-install).
-  webUINodePort: 0
-  # When > 0, expose the LLDAP LDAP port on a fixed NodePort so spokes/apps can bind
-  # over WireGuard (blocked on the WAN NIC by the hub firewall).
+  # When > 0, expose the LLDAP LDAP port on a dedicated NodePort Service
+  # (lldap-ldap) so spokes/apps can bind over WireGuard. The hub firewall drops
+  # this port on the WAN NIC. The LLDAP web UI NodePort is managed separately by
+  # the fleet-site-controller (lldap-webui Service), not by this chart.
   ldapNodePort: 0
   baseDN: dc=umkim,dc=com
   jwtSecret: change-me-lldap-jwt
