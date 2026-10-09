@@ -6,6 +6,8 @@
 {% set _spoke_tls = _cc.spoke_tls | default(true) | bool %}
 {% set _secrets = _cc.secrets_dir | default('/secrets/ingress-auth/clusters/' + ocm_target_cluster) %}
 {% set _lldap_host = _cc.lldap_webui_host | default(fleet_ingress_auth_lldap_webui_host | default('')) %}
+{% set _directory = _cc.directory | default('local') %}
+{% set _hub_dir = (_directory == 'hub') %}
 {# Prefer per-cluster Secret files (console enable / Job mounts); fall back to hub defaults. #}
 {% set _lldap_pass = lookup('ansible.builtin.file', _secrets + '/lldapAdminPassword', errors='ignore') | default(fleet_ingress_auth_lldap_admin_password, true) | trim %}
 {% set _lldap_jwt = lookup('ansible.builtin.file', _secrets + '/lldapJwtSecret', errors='ignore') | default(fleet_ingress_auth_lldap_jwt_secret, true) | trim %}
@@ -21,8 +23,8 @@ persistence:
   storageClass: {{ fleet_ingress_auth_persistence_storage_class | default('local-path') | quote }}
 
 lldap:
-  deploy: true
-  externalUrl: ""
+  deploy: {{ (not _hub_dir) | bool | lower }}
+  externalUrl: {{ (fleet_ingress_auth_hub_directory_url | default('ldap://10.10.0.1:30389')) if _hub_dir else '' | quote }}
   image: {{ fleet_ingress_auth_lldap_image }}
   ldapPort: {{ fleet_ingress_auth_lldap_ldap_port }}
   httpPort: {{ fleet_ingress_auth_lldap_http_port | default(17170) }}
@@ -32,8 +34,8 @@ lldap:
   exposeWebUI: {{ _expose_lldap }}
   webUIHost: {{ (_lldap_host if _expose_lldap else '') | quote }}
   bindAccount:
-    # Spokes run their own LLDAP, so create the shared bind account here.
-    enabled: true
+    # Only clusters that run their own LLDAP create the shared bind account.
+    enabled: {{ (not _hub_dir) | bool | lower }}
     username: {{ fleet_ingress_auth_lldap_bind_username | default('svc-bind') | quote }}
     group: {{ fleet_ingress_auth_lldap_bind_group | default('lldap_strict_readonly') | quote }}
     password: {{ (_lldap_jwt | string) | hash('sha256') | quote }}
@@ -52,6 +54,11 @@ authelia:
 {% for d in _access %}
     - {{ d | quote }}
 {% endfor %}
+{% if _hub_dir %}
+  # Bind to the shared hub directory with the read-only account (LDAP over WireGuard).
+  ldapUser: {{ ('uid=' ~ (fleet_ingress_auth_lldap_bind_username | default('svc-bind')) ~ ',ou=people,' ~ fleet_ingress_auth_lldap_base_dn) | quote }}
+  ldapPassword: {{ fleet_ingress_auth_hub_directory_bind_password | default('') | quote }}
+{% endif %}
 
 traefik:
   deploySpokeMiddleware: true

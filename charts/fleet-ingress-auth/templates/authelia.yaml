@@ -20,7 +20,7 @@ data:
         address: {{ .Values.lldap.externalUrl | default (printf "ldap://lldap.%s.svc.cluster.local:%v" (include "fleet-ingress-auth.namespace" .) .Values.lldap.ldapPort) | quote }}
         implementation: lldap
         base_dn: {{ .Values.lldap.baseDN | quote }}
-        user: 'uid=admin,ou=people,{{ .Values.lldap.baseDN }}'
+        user: {{ .Values.authelia.ldapUser | default (printf "uid=admin,ou=people,%s" .Values.lldap.baseDN) | quote }}
         password: {{ $ldapPass | quote }}
     access_control:
       default_policy: deny

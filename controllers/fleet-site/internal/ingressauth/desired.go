@@ -47,6 +47,8 @@ type ClusterAuthConfig struct {
 	SecretsRef        string
 	ExposeLLDAPWebUI  bool
 	LLDAPWebUIHost    string
+	// Directory is "" / "local" (own LLDAP) or "hub" (shared hub directory).
+	Directory         string
 	// SpokeTLS is false for reverse_proxy clusters (external TLS), so the Authelia
 	// portal is published on the plain HTTP entrypoint for the operator proxy.
 	SpokeTLS          bool
@@ -190,6 +192,7 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 			AccessDomains:    dns.AccessDomains,
 			SecretsRef:       secretRef,
 			ExposeLLDAPWebUI: fcj.Spec.IngressAuth.ExposeLLDAPWebUI,
+			Directory:        fcj.Spec.IngressAuth.Directory,
 			SpokeTLS:         dns.SpokeTLS,
 		}
 		if fcj.Spec.IngressAuth.ExposeLLDAPWebUI {
@@ -303,6 +306,7 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 			}
 			lines = append(lines, "    expose_lldap_webui: "+boolYAML(cc.ExposeLLDAPWebUI))
 			lines = append(lines, "    spoke_tls: "+boolYAML(cc.SpokeTLS))
+			lines = append(lines, "    directory: \""+yamlQuote(cc.Directory)+"\"")
 			if cc.ExposeLLDAPWebUI && cc.LLDAPWebUIHost != "" {
 				lines = append(lines, "    lldap_webui_host: \""+yamlQuote(cc.LLDAPWebUIHost)+"\"")
 			}
