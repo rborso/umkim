@@ -15,6 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // RouteHealthReconciler probes hub-routed FleetAppRoutes and updates health status.
@@ -156,5 +157,9 @@ func (r *RouteHealthReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("fleetapproute-health").
 		For(&fleetv1alpha1.FleetAppRoute{}).
+		// Only react to spec changes (generation) and the periodic RequeueAfter.
+		// Without this, the probe's own status writes (LastProbeAt/ConsecutiveFailures)
+		// re-trigger the reconcile immediately, producing a tight probe/patch loop.
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }
