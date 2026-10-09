@@ -43,6 +43,30 @@ This applies to clusters that deploy their own LLDAP (spokes). The hub uses the
 shared fleet-console directory, which already provides a bind account, so the
 hub sets `lldap.bindAccount.enabled: false` and creates no second account.
 
+## Hub (shared) directory accounts
+
+The fleet-console chart creates two service accounts in the hub directory when
+LLDAP is enabled (values under `lldap.serviceAccounts`):
+
+- `svc-bind` in `lldap_strict_readonly` — the shared read-only account Authelia
+  and applications bind with, including spokes configured with
+  `ingressAuth.directory: hub`.
+- `dir-admin` in `lldap_admin` — a dedicated privileged account for directory
+  administration (tenant/group and invite operations), separate from the
+  bootstrap `admin` identity.
+
+Both are created idempotently by the `lldap-service-accounts` Job. The shared
+directory is exposed to spokes only over WireGuard on a dedicated NodePort; the
+hub firewall drops that port on the public interface.
+
+## Tenants
+
+Tenant separation uses flat directory groups only; there are no per-application
+groups. Create a group per tenant and reference it from routes with
+`route.requireAuthGroups`. Authelia enforces membership against whichever
+directory the cluster binds to. Directory membership alone does not grant
+platform access; review Fleet role bindings separately.
+
 - Created by the `fleet-ingress-auth` chart's `lldap-bind-account` Job on
   install/upgrade. The account name, group, and password are chart values
   (`lldap.bindAccount.*`) rendered from the `fleet_ingress_auth` role defaults.

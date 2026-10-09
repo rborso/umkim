@@ -19,6 +19,35 @@ is configured to do so. Otherwise ingress authentication has its own
 directory. Do not mix administrator credentials, secrets, or recovery
 procedures between the two deployments.
 
+## Directory placement
+
+Each `FleetClusterJoin.spec.ingressAuth.directory` selects the directory an
+enabled cluster authenticates against:
+
+| Value | Result |
+|---|---|
+| `""` / `local` | The cluster runs its own LLDAP in the `fleet-ingress-auth` namespace |
+| `hub` | The cluster runs no LLDAP; Authelia binds to the shared hub (console) directory |
+
+When the hub directory is enabled, the hub chart publishes a dedicated
+`lldap-ldap` NodePort for the LDAP port (default `30389`) so spokes can bind
+over WireGuard. The hub firewall drops that port on the public interface; keep
+it reachable only on the overlay. Clusters using `directory: hub` bind with the
+shared read-only account (`svc-bind`), not the directory administrator.
+
+Changing `directory` is a spec change; reconcile the ingress-auth stack for it
+to take effect (the console enable/disable actions do this automatically).
+
+## Tenant groups
+
+A route may restrict access to directory groups (tenants) with
+`route.requireAuthGroups` (see [fleet-apps.md](components/fleet-apps.md)). The
+controller emits a host-level Authelia rule that allows the listed groups and
+then denies other authenticated users, before the zone wildcard rules. Use flat
+group names that exist in the directory the cluster binds to; the hub directory
+holds them when `directory: hub` is set. Groups are not per-application: create
+a tenant group and grant it to the routes that belong to that tenant.
+
 ## Before enabling a public route
 
 1. Confirm the cluster is ready and ingress matches the route:
