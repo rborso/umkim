@@ -56,6 +56,12 @@ spec:
                   type: string
                 valuesYaml:
                   type: string
+                oidcClientId:
+                  type: string
+                  description: >-
+                    Cluster Authelia OIDC client whose issuer and secret are
+                    substituted for ${OIDC_ISSUER_URL} / ${OIDC_CLIENT_ID} /
+                    ${OIDC_CLIENT_SECRET} in valuesYaml. Defaults to the app name.
                 route:
                   type: object
                   properties:

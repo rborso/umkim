@@ -61,6 +61,10 @@ type FleetAppSpec struct {
 	Namespace string `json:"namespace,omitempty"`
 	// ValuesYAML is a Helm values document applied with -f.
 	ValuesYAML string `json:"valuesYaml,omitempty"`
+	// OIDCClientID selects the cluster Authelia OIDC client whose issuer and
+	// client secret are substituted for ${OIDC_ISSUER_URL} / ${OIDC_CLIENT_ID} /
+	// ${OIDC_CLIENT_SECRET} in ValuesYAML. Defaults to the app name.
+	OIDCClientID string `json:"oidcClientId,omitempty"`
 	// Route is the single public route (legacy). Ignored when Routes is set.
 	Route FleetAppRouteIntent `json:"route,omitempty"`
 	// Routes declares multiple public routes for one release (multi-service
