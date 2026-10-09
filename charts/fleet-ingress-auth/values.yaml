@@ -46,6 +46,13 @@ authelia:
   accessDomains:
     - "*.mgmt.example.com"
     - "mgmt.example.com"
+  # OIDC provider for applications that only speak OIDC (Immich, ...). Authelia
+  # authenticates against the same LLDAP directory and issues tokens.
+  oidc:
+    enabled: false
+    hmacSecret: ""
+    issuerPrivateKey: ""
+    clients: []
   # Host-level rules that restrict a route to directory groups (tenants). These
   # are evaluated before accessDomains. Empty groups means any authenticated user.
   accessRules: []
