@@ -15,6 +15,11 @@
 {% set _session = lookup('ansible.builtin.file', _secrets + '/sessionSecret', errors='ignore') | default(fleet_ingress_auth_session_secret, true) | trim %}
 {% set _storage = lookup('ansible.builtin.file', _secrets + '/storageEncryptionKey', errors='ignore') | default(fleet_ingress_auth_storage_encryption_key, true) | trim %}
 {% set _reset = lookup('ansible.builtin.file', _secrets + '/resetJwtSecret', errors='ignore') | default(fleet_ingress_auth_reset_jwt_secret, true) | trim %}
+{% set _oidc_clients = _cc.oidc_clients | default([]) %}
+{% set _oidc_hmac = lookup('ansible.builtin.file', _secrets + '/oidcHmacSecret', errors='ignore') | default('') | trim %}
+{% set _oidc_key = lookup('ansible.builtin.file', _secrets + '/oidcIssuerPrivateKey', errors='ignore') | default('') | trim %}
+{% set _oidc_raw = lookup('ansible.builtin.file', _secrets + '/oidcClientSecrets', errors='ignore') %}
+{% set _oidc_secrets = (_oidc_raw | from_json) if (_oidc_raw is defined and _oidc_raw) else {} %}
 namespace: {{ fleet_ingress_auth_namespace }}
 
 enabled: true
@@ -62,6 +67,29 @@ authelia:
       groups:
 {% for g in r.groups %}
         - {{ g | quote }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% if _oidc_clients | length > 0 %}
+  # OIDC provider (Authelia over LLDAP) for OIDC-only apps.
+  oidc:
+    enabled: true
+    hmacSecret: {{ _oidc_hmac | quote }}
+    issuerPrivateKey: |
+{{ _oidc_key | indent(6, true) }}
+    clients:
+{% for c in _oidc_clients %}
+      - clientId: {{ c.client_id | quote }}
+        clientName: {{ c.client_name | default(c.client_id) | quote }}
+        clientSecret: {{ _oidc_secrets.get(c.client_id, '') | quote }}
+        authorizationPolicy: one_factor
+        redirectUris:
+{% for u in c.redirect_uris | default([]) %}
+          - {{ u | quote }}
+{% endfor %}
+        scopes:
+{% for s in c.scopes | default(['openid', 'profile', 'email']) %}
+          - {{ s | quote }}
 {% endfor %}
 {% endfor %}
 {% endif %}

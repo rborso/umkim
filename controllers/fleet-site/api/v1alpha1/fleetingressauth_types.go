@@ -85,6 +85,17 @@ type FleetClusterJoinIngressAuthSpec struct {
 	// Directory selects where the LLDAP directory lives: "" / "local" runs its own
 	// LLDAP on the spoke; "hub" uses the shared hub directory over WireGuard.
 	Directory string `json:"directory,omitempty"`
+	// OIDCClients registers Authelia OIDC clients for OIDC-only applications
+	// (e.g. Immich). The client secret is generated and stored by UMKIM.
+	OIDCClients []IngressAuthOIDCClient `json:"oidcClients,omitempty"`
+}
+
+// IngressAuthOIDCClient declares one Authelia OIDC client.
+type IngressAuthOIDCClient struct {
+	ClientID     string   `json:"clientId"`
+	ClientName   string   `json:"clientName,omitempty"`
+	RedirectURIs []string `json:"redirectUris,omitempty"`
+	Scopes       []string `json:"scopes,omitempty"`
 }
 
 type FleetClusterJoinIngressAuthStatus struct {

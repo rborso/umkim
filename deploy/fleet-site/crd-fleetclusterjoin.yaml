@@ -172,6 +172,27 @@ spec:
                         LLDAP directory placement: "" or "local" runs its own LLDAP
                         on the spoke; "hub" uses the shared hub directory over WireGuard.
                       enum: ["", "local", "hub"]
+                    oidcClients:
+                      type: array
+                      description: >-
+                        Authelia OIDC clients for OIDC-only applications (e.g. Immich).
+                        The client secret is generated and stored by UMKIM.
+                      items:
+                        type: object
+                        required: ["clientId"]
+                        properties:
+                          clientId:
+                            type: string
+                          clientName:
+                            type: string
+                          redirectUris:
+                            type: array
+                            items:
+                              type: string
+                          scopes:
+                            type: array
+                            items:
+                              type: string
                 acme:
                   type: object
                   properties:
