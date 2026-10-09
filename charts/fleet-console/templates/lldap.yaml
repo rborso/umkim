@@ -70,20 +70,38 @@ metadata:
   name: lldap
   namespace: {{ include "fleet-console.namespace" . }}
 spec:
-  type: {{ if or (gt (int .Values.lldap.webUINodePort) 0) (gt (int .Values.lldap.ldapNodePort) 0) }}NodePort{{ else }}ClusterIP{{ end }}
+  # Primary Service stays ClusterIP: in-cluster consumers (fleet-console-auth)
+  # use it directly, and the LLDAP web UI NodePort is managed separately by the
+  # fleet-site-controller (lldap-webui Service).
+  type: ClusterIP
   selector:
     app: lldap
   ports:
     - name: ldap
       port: {{ .Values.lldap.ldapPort }}
       targetPort: ldap
-      {{- if gt (int .Values.lldap.ldapNodePort) 0 }}
-      nodePort: {{ .Values.lldap.ldapNodePort }}
-      {{- end }}
     - name: http
       port: {{ .Values.lldap.httpPort }}
       targetPort: http
-      {{- if gt (int .Values.lldap.webUINodePort) 0 }}
-      nodePort: {{ .Values.lldap.webUINodePort }}
-      {{- end }}
+{{- if gt (int .Values.lldap.ldapNodePort) 0 }}
+---
+# Dedicated NodePort for the LDAP port only, so spokes/apps can bind over
+# WireGuard. The hub firewall drops this port on the WAN NIC. It is separate
+# from the primary Service to avoid Kubernetes auto-allocating a NodePort for
+# the LLDAP web UI port.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lldap-ldap
+  namespace: {{ include "fleet-console.namespace" . }}
+spec:
+  type: NodePort
+  selector:
+    app: lldap
+  ports:
+    - name: ldap
+      port: {{ .Values.lldap.ldapPort }}
+      targetPort: ldap
+      nodePort: {{ .Values.lldap.ldapNodePort }}
+{{- end }}
 {{- end }}
