@@ -27,6 +27,14 @@ data:
       rules:
         - domain: {{ .Values.authelia.portalHost | quote }}
           policy: bypass
+{{- range .Values.authelia.accessRules }}
+        - domain: {{ .domain | quote }}
+          subject:
+{{- range .groups }}
+            - {{ printf "group:%s" . | quote }}
+{{- end }}
+          policy: one_factor
+{{- end }}
 {{- range .Values.authelia.accessDomains }}
         - domain: {{ . | quote }}
           policy: one_factor

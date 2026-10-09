@@ -36,8 +36,9 @@ func ConsoleLLDAPDeployed(ctx context.Context, c client.Client, ns string) (bool
 	return err == nil, err
 }
 
-// AnsibleSpecHash fingerprints spec fields that require an Ansible reconcile job.
-func AnsibleSpecHash(fia *fleetv1alpha1.FleetIngressAuth) string {
+// AnsibleSpecHash fingerprints spec fields and computed route auth rules that
+// require an Ansible reconcile job.
+func AnsibleSpecHash(fia *fleetv1alpha1.FleetIngressAuth, desired DesiredState) string {
 	h := sha256.New()
 	parts := []string{
 		fmt.Sprintf("hubEnabled=%v", fia.Spec.HubEnabled),
@@ -47,6 +48,15 @@ func AnsibleSpecHash(fia *fleetv1alpha1.FleetIngressAuth) string {
 	}
 	for _, d := range fia.Spec.AccessDomains {
 		parts = append(parts, "ad="+d)
+	}
+	for _, r := range desired.AccessRules {
+		parts = append(parts, "hr="+r.Domain+"="+strings.Join(r.Groups, ","))
+	}
+	for _, name := range sortedKeys(sliceToSet(desired.EnabledClusters)) {
+		cc := desired.ClusterConfigs[name]
+		for _, r := range cc.AccessRules {
+			parts = append(parts, "cr="+name+"/"+r.Domain+"="+strings.Join(r.Groups, ","))
+		}
 	}
 	_, _ = h.Write([]byte(strings.Join(parts, "|")))
 	return hex.EncodeToString(h.Sum(nil))
@@ -60,8 +70,8 @@ func storedAnsibleSpecHash(fia *fleetv1alpha1.FleetIngressAuth) string {
 }
 
 // AnsibleSpecChanged reports whether Ansible-relevant spec differs from the last applied hash.
-func AnsibleSpecChanged(fia *fleetv1alpha1.FleetIngressAuth) bool {
-	current := AnsibleSpecHash(fia)
+func AnsibleSpecChanged(fia *fleetv1alpha1.FleetIngressAuth, desired DesiredState) bool {
+	current := AnsibleSpecHash(fia, desired)
 	stored := storedAnsibleSpecHash(fia)
 	return stored == "" || stored != current
 }

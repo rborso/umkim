@@ -37,6 +37,9 @@ type FleetAppRouteIntent struct {
 	HubHost          string `json:"hubHost,omitempty"`
 	SiteHost         string `json:"siteHost,omitempty"`
 	RequireAuth      bool   `json:"requireAuth,omitempty"`
+	// RequireAuthGroups restricts the route to members of these directory groups
+	// (tenants) when RequireAuth is set. Empty means any authenticated user.
+	RequireAuthGroups []string `json:"requireAuthGroups,omitempty"`
 	ServiceName      string `json:"serviceName,omitempty"`
 	ServicePort      int32  `json:"servicePort,omitempty"`
 	ServiceNamespace string `json:"serviceNamespace,omitempty"`
@@ -163,7 +166,8 @@ func routeDeclared(r FleetAppRouteIntent) bool {
 		r.ServicePort > 0 ||
 		strings.TrimSpace(r.ServiceNamespace) != "" ||
 		strings.TrimSpace(r.HealthPath) != "" ||
-		r.RequireAuth
+		r.RequireAuth ||
+		len(r.RequireAuthGroups) > 0
 }
 
 func (r FleetAppRouteIntent) EffectiveMode() string {

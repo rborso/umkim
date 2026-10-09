@@ -63,6 +63,9 @@ type FleetAppRouteSpec struct {
 	HealthPath     string          `json:"healthPath,omitempty"`
 	FailoverMode   string          `json:"failoverMode,omitempty"`
 	RequireAuth    bool            `json:"requireAuth,omitempty"`
+	// RequireAuthGroups restricts the route to these directory groups (tenants)
+	// when RequireAuth is set. Empty means any authenticated user.
+	RequireAuthGroups []string `json:"requireAuthGroups,omitempty"`
 	Service        ServiceRef      `json:"service"`
 }
 

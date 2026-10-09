@@ -66,6 +66,11 @@ spec:
                 requireAuth:
                   type: boolean
                   description: Apply Authelia forward-auth middleware on hub (hub mode) or spoke ingress (site mode)
+                requireAuthGroups:
+                  type: array
+                  description: Restrict the route to these directory groups (tenants) when requireAuth is set; empty means any authenticated user
+                  items:
+                    type: string
                 service:
                   type: object
                   required:

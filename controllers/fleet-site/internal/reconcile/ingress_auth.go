@@ -149,7 +149,7 @@ func (r *IngressAuthReconciler) needsIngressAuthReconcile(fia *fleetv1alpha1.Fle
 			return true
 		}
 	}
-	if ingressauth.AnsibleSpecChanged(fia) {
+	if ingressauth.AnsibleSpecChanged(fia, desired) {
 		return true
 	}
 	if desired.GlobalEnabled && fia.Status.Phase != fleetv1alpha1.IngressAuthPhaseReady && fia.Status.Phase != fleetv1alpha1.IngressAuthPhaseApplying {
@@ -201,7 +201,7 @@ func (r *IngressAuthReconciler) completeIngressAuth(ctx context.Context, fia *fl
 	if err := r.Status().Update(ctx, fia); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.patchAnsibleSpecHash(ctx, fia); err != nil {
+	if err := r.patchAnsibleSpecHash(ctx, fia, desired); err != nil {
 		return ctrl.Result{}, err
 	}
 	phase := fleetv1alpha1.IngressAuthClusterPhaseDisabled
@@ -214,7 +214,7 @@ func (r *IngressAuthReconciler) completeIngressAuth(ctx context.Context, fia *fl
 	return ctrl.Result{RequeueAfter: time.Duration(r.Cfg.RequeueIntervalSec) * time.Second}, nil
 }
 
-func (r *IngressAuthReconciler) patchAnsibleSpecHash(ctx context.Context, fia *fleetv1alpha1.FleetIngressAuth) error {
+func (r *IngressAuthReconciler) patchAnsibleSpecHash(ctx context.Context, fia *fleetv1alpha1.FleetIngressAuth, desired ingressauth.DesiredState) error {
 	var current fleetv1alpha1.FleetIngressAuth
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fleetv1alpha1.FleetIngressAuthName}, &current); err != nil {
 		return err
@@ -223,7 +223,7 @@ func (r *IngressAuthReconciler) patchAnsibleSpecHash(ctx context.Context, fia *f
 	if current.Annotations == nil {
 		current.Annotations = map[string]string{}
 	}
-	current.Annotations[ingressauth.AnsibleSpecHashAnnotation] = ingressauth.AnsibleSpecHash(fia)
+	current.Annotations[ingressauth.AnsibleSpecHashAnnotation] = ingressauth.AnsibleSpecHash(fia, desired)
 	return r.Patch(ctx, &current, client.MergeFrom(orig))
 }
 
