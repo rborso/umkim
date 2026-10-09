@@ -47,6 +47,25 @@
         or 'has been installed' in fia_helm.stdout
         or 'REVISION' in fia_helm.stdout
 
+    - name: Fleet ingress auth | Read hub directory bind credentials
+      ansible.builtin.command:
+        cmd: >-
+          kubectl -n {{ fleet_console_namespace | default('fleet-console') }}
+          get secret lldap-service-accounts -o jsonpath='{.data.bind-password}'
+      environment:
+        KUBECONFIG: "{{ ocm_kubeconfig }}"
+        PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/bin:/bin') }}"
+      register: fia_hub_dir_bind
+      failed_when: false
+      changed_when: false
+
+    - name: Fleet ingress auth | Set hub directory bind password
+      ansible.builtin.set_fact:
+        fleet_ingress_auth_hub_directory_bind_password: >-
+          {{ (fia_hub_dir_bind.stdout | b64decode)
+             if (fia_hub_dir_bind.rc | default(1) == 0 and (fia_hub_dir_bind.stdout | default('')) | length > 0)
+             else fleet_ingress_auth_hub_directory_bind_password }}
+
     - name: Fleet ingress auth | Wait for lldap
       ansible.builtin.command:
         cmd: kubectl -n {{ fleet_ingress_auth_namespace }} rollout status deployment/lldap --timeout=300s

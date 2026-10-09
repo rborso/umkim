@@ -166,6 +166,12 @@ spec:
                     exposeLldapWebUI:
                       type: boolean
                       default: false
+                    directory:
+                      type: string
+                      description: >-
+                        LLDAP directory placement: "" or "local" runs its own LLDAP
+                        on the spoke; "hub" uses the shared hub directory over WireGuard.
+                      enum: ["", "local", "hub"]
                 acme:
                   type: object
                   properties:

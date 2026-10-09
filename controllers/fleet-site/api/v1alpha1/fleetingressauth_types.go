@@ -82,6 +82,9 @@ type FleetIngressAuthList struct {
 type FleetClusterJoinIngressAuthSpec struct {
 	Enabled          bool `json:"enabled,omitempty"`
 	ExposeLLDAPWebUI bool `json:"exposeLldapWebUI,omitempty"`
+	// Directory selects where the LLDAP directory lives: "" / "local" runs its own
+	// LLDAP on the spoke; "hub" uses the shared hub directory over WireGuard.
+	Directory string `json:"directory,omitempty"`
 }
 
 type FleetClusterJoinIngressAuthStatus struct {

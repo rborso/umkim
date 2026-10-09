@@ -23,6 +23,11 @@ fleet_ingress_auth_lldap_admin_password: "{{ fleet_ingress_auth_bootstrap_passwo
 fleet_ingress_auth_lldap_bind_username: svc-bind
 fleet_ingress_auth_lldap_bind_group: lldap_strict_readonly
 fleet_ingress_auth_lldap_bind_password: "{{ (fleet_ingress_auth_lldap_jwt_secret | string) | hash('sha256') }}"
+# Shared hub LLDAP directory (LDAP over WireGuard). Clusters with
+# ingressAuth.directory: hub bind to this instead of running their own LLDAP.
+# The bind password is read from the hub lldap-service-accounts Secret at reconcile.
+fleet_ingress_auth_hub_directory_url: "ldap://10.10.0.1:30389"
+fleet_ingress_auth_hub_directory_bind_password: "{{ fleet_ingress_auth_hub_directory_bind_password_vault | default('') }}"
 
 fleet_ingress_auth_authelia_image: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/authelia/authelia:4.38.19"
 fleet_ingress_auth_authelia_port: 9091

@@ -37,6 +37,9 @@ authelia:
   storageEncryptionKey: change-me-authelia-storage
   resetPasswordJWTSecret: change-me-authelia-reset-jwt
   ldapPassword: ""
+  # LDAP bind user DN. Defaults to the directory admin; set to a read-only bind
+  # account (e.g. uid=svc-bind,ou=people,<baseDN>) for shared directories.
+  ldapUser: ""
   cookieDomain: mgmt.example.com
   portalHost: auth.mgmt.example.com
   publicURL: "https://auth.mgmt.example.com"
