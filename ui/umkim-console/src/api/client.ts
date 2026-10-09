@@ -27,6 +27,10 @@ import type {
   HubInfrastructure,
   FleetVM,
   FleetVMPowerAction,
+  Invite,
+  InviteCreate,
+  InviteCreateResult,
+  InviteRedeemResult,
 } from './types';
 import { fleetSitePortForwardZone } from '../edge/ingressMethod';
 
@@ -1202,4 +1206,35 @@ export function fleetClusterVMConsoleWSURL(
     sub;
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return proto + '//' + window.location.host + path;
+}
+
+export async function listInvites(): Promise<Invite[]> {
+  const data = await fleetSiteRequest<{ invites?: Invite[] }>('/invites');
+  return data.invites ?? [];
+}
+
+export async function createInvite(body: InviteCreate): Promise<InviteCreateResult> {
+  return fleetSiteRequest<InviteCreateResult>('/invites', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteInvite(id: string): Promise<void> {
+  await fleetSiteRequest<void>('/invites/' + encodeURIComponent(id), { method: 'DELETE' });
+}
+
+export async function redeemInvite(body: {
+  token: string;
+  username: string;
+  password: string;
+  displayName?: string;
+  email?: string;
+}): Promise<InviteRedeemResult> {
+  return fleetSiteRequest<InviteRedeemResult>('/invites/redeem', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
