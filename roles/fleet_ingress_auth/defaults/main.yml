@@ -29,7 +29,7 @@ fleet_ingress_auth_lldap_bind_password: "{{ (fleet_ingress_auth_lldap_jwt_secret
 fleet_ingress_auth_hub_directory_url: "ldap://10.10.0.1:30389"
 fleet_ingress_auth_hub_directory_bind_password: "{{ fleet_ingress_auth_hub_directory_bind_password_vault | default('') }}"
 # Hub console auth proxy (invite redemption) reachable from spokes over WireGuard.
-fleet_ingress_auth_hub_redeem_url: "http://10.10.0.1:30918/proxy/fleet/api/v1alpha1/invites/redeem"
+fleet_ingress_auth_hub_redeem_url: "http://10.10.0.1:30919/proxy/fleet/api/v1alpha1/invites/redeem"
 fleet_ingress_auth_signup_image: "nginx:1.27-alpine"
 
 fleet_ingress_auth_authelia_image: "{{ harbor_host }}:{{ harbor_nodeport_https }}/{{ harbor_proxy_project_ghcr }}/authelia/authelia:4.38.19"
