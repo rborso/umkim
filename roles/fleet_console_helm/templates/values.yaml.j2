@@ -11,7 +11,7 @@ auth:
     pullPolicy: Always
   port: {{ fleet_console_auth_http_port }}
   # Console auth proxy NodePort for spoke invite redemption over WireGuard.
-  wgNodePort: {{ fleet_console_auth_wg_nodeport | default(30918) }}
+  wgNodePort: {{ fleet_console_auth_wg_nodeport | default(30919) }}
   sessionSecret: {{ fleet_console_auth_session_secret | quote }}
   sessionTTL: {{ fleet_console_auth_session_ttl | quote }}
   sessionSecure: {{ fleet_console_auth_session_secure | bool }}
