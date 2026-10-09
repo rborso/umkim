@@ -39,6 +39,10 @@ Applications that search or authenticate against the directory — Authelia, and
 optionally apps such as Jellyfin — use this account instead of the directory
 administrator (`admin` / `lldap_admin`).
 
+This applies to clusters that deploy their own LLDAP (spokes). The hub uses the
+shared fleet-console directory, which already provides a bind account, so the
+hub sets `lldap.bindAccount.enabled: false` and creates no second account.
+
 - Created by the `fleet-ingress-auth` chart's `lldap-bind-account` Job on
   install/upgrade. The account name, group, and password are chart values
   (`lldap.bindAccount.*`) rendered from the `fleet_ingress_auth` role defaults.

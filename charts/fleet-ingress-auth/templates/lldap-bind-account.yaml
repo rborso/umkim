@@ -1,4 +1,4 @@
-{{- if and .Values.enabled .Values.lldap.deploy .Values.lldap.bindAccount.enabled }}
+{{- if and .Values.enabled .Values.lldap.bindAccount.enabled }}
 {{- $b := .Values.lldap.bindAccount }}
 apiVersion: v1
 kind: Secret
