@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Button,
+  Checkbox,
   Form,
   FormGroup,
   PageSection,
@@ -9,22 +10,16 @@ import {
   Title,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { Navigate } from 'react-router-dom';
-import { createInvite, deleteInvite, listInvites } from '../api/client';
+import { Link, Navigate } from 'react-router-dom';
+import { createInvite, deleteInvite, listInvites, listTenants } from '../api/client';
 import type { Invite } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-
-function parseGroups(value: string): string[] {
-  return value
-    .split(',')
-    .map((g) => g.trim())
-    .filter(Boolean);
-}
 
 export function InvitesPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Invite[]>([]);
-  const [groups, setGroups] = useState('');
+  const [tenants, setTenants] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [ttlHours, setTtlHours] = useState('72');
   const [note, setNote] = useState('');
   const [links, setLinks] = useState<{ cluster: string; url: string }[]>([]);
@@ -35,6 +30,9 @@ export function InvitesPage() {
     void listInvites()
       .then(setRows)
       .catch((e) => setError(String(e)));
+    void listTenants()
+      .then((d) => setTenants((d.groups ?? []).filter((g) => !g.system).map((g) => g.name)))
+      .catch((e) => setError(String(e)));
   };
 
   useEffect(() => {
@@ -43,18 +41,21 @@ export function InvitesPage() {
 
   if (!user?.dcAdmin) return <Navigate to="/" replace />;
 
+  const toggle = (name: string, checked: boolean) => {
+    setSelected((s) => (checked ? [...s, name] : s.filter((x) => x !== name)));
+  };
+
   const submit = async () => {
     setError(null);
     setLinks([]);
-    const list = parseGroups(groups);
-    if (list.length === 0) {
-      setError('Enter at least one tenant group.');
+    if (selected.length === 0) {
+      setError('Select at least one tenant group.');
       return;
     }
     setBusy(true);
     try {
       const res = await createInvite({
-        groups: list,
+        groups: selected,
         ttlHours: Number.parseInt(ttlHours, 10) || undefined,
         note: note || undefined,
       });
@@ -63,7 +64,7 @@ export function InvitesPage() {
           ? res.links
           : [{ cluster: 'hub', url: window.location.origin + res.path }],
       );
-      setGroups('');
+      setSelected([]);
       setNote('');
       load();
     } catch (e) {
@@ -88,19 +89,30 @@ export function InvitesPage() {
       <Title headingLevel="h1">Invitations</Title>
       <Alert variant="info" isInline title="One-time directory invitations" style={{ marginBottom: '1rem' }}>
         Create a single-use link for a new user. Redeeming it creates the user in the shared directory,
-        adds the tenant groups, and sets the initial password. Links expire after 72 hours by default.
+        adds the selected tenant groups, and sets the initial password. Links expire after 72 hours by default.
       </Alert>
       {error ? (
         <Alert variant="danger" isInline title={error} style={{ marginBottom: '1rem' }} />
       ) : null}
       <Form onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ marginBottom: '1.5rem' }}>
-        <FormGroup label="Tenant groups (comma-separated)" isRequired fieldId="invite-groups">
-          <TextInput
-            id="invite-groups"
-            value={groups}
-            onChange={(_e, v) => setGroups(v)}
-            placeholder="tenant-a, tenant-b"
-          />
+        <FormGroup label="Tenant groups" isRequired fieldId="invite-groups">
+          {tenants.length === 0 ? (
+            <Alert variant="warning" isInline title="No tenant groups yet">
+              Create one on the <Link to="/admin/tenants">Tenants</Link> page first.
+            </Alert>
+          ) : (
+            <div>
+              {tenants.map((g) => (
+                <Checkbox
+                  key={g}
+                  id={`invite-group-${g}`}
+                  label={g}
+                  isChecked={selected.includes(g)}
+                  onChange={(_e, checked) => toggle(g, checked)}
+                />
+              ))}
+            </div>
+          )}
         </FormGroup>
         <FormGroup label="Expires in (hours)" fieldId="invite-ttl">
           <TextInput
@@ -114,7 +126,12 @@ export function InvitesPage() {
         <FormGroup label="Note" fieldId="invite-note">
           <TextInput id="invite-note" value={note} onChange={(_e, v) => setNote(v)} placeholder="optional" />
         </FormGroup>
-        <Button type="submit" variant="primary" isLoading={busy} isDisabled={busy}>
+        <Button
+          type="submit"
+          variant="primary"
+          isLoading={busy}
+          isDisabled={busy || selected.length === 0}
+        >
           Create invite
         </Button>
       </Form>
