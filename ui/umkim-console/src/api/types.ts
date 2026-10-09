@@ -419,10 +419,16 @@ export interface InviteCreate {
   note?: string;
 }
 
+export interface InviteSignupLink {
+  cluster: string;
+  url: string;
+}
+
 export interface InviteCreateResult {
   id: string;
   token: string;
   path: string;
+  links?: InviteSignupLink[];
   groups?: string[];
   expiresAt: string;
 }

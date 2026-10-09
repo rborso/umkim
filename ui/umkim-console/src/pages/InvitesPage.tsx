@@ -27,7 +27,7 @@ export function InvitesPage() {
   const [groups, setGroups] = useState('');
   const [ttlHours, setTtlHours] = useState('72');
   const [note, setNote] = useState('');
-  const [link, setLink] = useState('');
+  const [links, setLinks] = useState<{ cluster: string; url: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -45,7 +45,7 @@ export function InvitesPage() {
 
   const submit = async () => {
     setError(null);
-    setLink('');
+    setLinks([]);
     const list = parseGroups(groups);
     if (list.length === 0) {
       setError('Enter at least one tenant group.');
@@ -58,7 +58,11 @@ export function InvitesPage() {
         ttlHours: Number.parseInt(ttlHours, 10) || undefined,
         note: note || undefined,
       });
-      setLink(window.location.origin + res.path);
+      setLinks(
+        res.links && res.links.length
+          ? res.links
+          : [{ cluster: 'hub', url: window.location.origin + res.path }],
+      );
       setGroups('');
       setNote('');
       load();
@@ -115,9 +119,18 @@ export function InvitesPage() {
         </Button>
       </Form>
 
-      {link ? (
+      {links.length ? (
         <Alert variant="success" isInline title="Invite link (shown once)" style={{ marginBottom: '1.5rem' }}>
-          <TextInput value={link} readOnlyVariant="default" aria-label="invite link" />
+          {links.map((l) => (
+            <div key={l.cluster} style={{ marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem' }}>{l.cluster}</div>
+              <TextInput
+                value={l.url}
+                readOnlyVariant="default"
+                aria-label={`invite link ${l.cluster}`}
+              />
+            </div>
+          ))}
         </Alert>
       ) : null}
 
