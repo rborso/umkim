@@ -69,7 +69,9 @@ platform access; review Fleet role bindings separately.
 
 Platform administrators manage tenants from the console **Access control →
 Tenants** page: list groups with their members, create/delete tenant groups, and
-add/remove directory users. LLDAP-internal `lldap_*` groups are read-only there.
+add/remove directory users. Reserved groups (`lldap_*` internals and the
+`fleet-*` console role groups) are not tenants; they are hidden from tenant
+management and from the invitation picker, and cannot be deleted there.
 Per-cluster directory placement is selected in the cluster edge tab (local vs
 shared hub directory).
 
