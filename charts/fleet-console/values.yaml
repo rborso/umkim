@@ -69,6 +69,9 @@ lldap:
       - fleet-site-admins
       - fleet-cluster-admins
       - fleet-viewers
+  # Directory service accounts for the shared (hub) directory:
+  #   bind  -> read-only account Authelia + apps use (lldap_strict_readonly)
+  #   admin -> dedicated privileged account for tenant/invite operations
   serviceAccounts:
     enabled: true
     secretName: lldap-service-accounts
