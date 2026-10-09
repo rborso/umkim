@@ -32,6 +32,7 @@ lldap:
   exposeWebUI: {{ _expose_lldap }}
   webUIHost: {{ (_lldap_host if _expose_lldap else '') | quote }}
   bindAccount:
+    # Spokes run their own LLDAP, so create the shared bind account here.
     enabled: true
     username: {{ fleet_ingress_auth_lldap_bind_username | default('svc-bind') | quote }}
     group: {{ fleet_ingress_auth_lldap_bind_group | default('lldap_strict_readonly') | quote }}

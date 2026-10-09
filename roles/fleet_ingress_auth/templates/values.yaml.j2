@@ -12,7 +12,9 @@ lldap:
   jwtSecret: {{ fleet_ingress_auth_lldap_jwt_secret }}
   adminPassword: {{ fleet_ingress_auth_lldap_admin_password }}
   bindAccount:
-    enabled: true
+    # Hub uses the shared fleet-console LLDAP, which already provides a
+    # low-privilege bind account; do not create a second one here.
+    enabled: false
     username: {{ fleet_ingress_auth_lldap_bind_username | quote }}
     group: {{ fleet_ingress_auth_lldap_bind_group | quote }}
     password: {{ (fleet_ingress_auth_lldap_jwt_secret | string) | hash('sha256') | quote }}
