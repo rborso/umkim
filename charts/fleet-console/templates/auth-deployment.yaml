@@ -117,4 +117,24 @@ spec:
     - name: http
       port: {{ .Values.auth.port }}
       targetPort: http
+{{- if gt (int .Values.auth.wgNodePort) 0 }}
+---
+# NodePort for spokes to reach the console auth proxy over WireGuard (invite
+# redemption). Blocked on the WAN NIC by the hub firewall. Only the redeem path
+# is public; every other fleet API path still requires a console session.
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-console-auth-wg
+  namespace: {{ include "fleet-console.namespace" . }}
+spec:
+  type: NodePort
+  selector:
+    app: fleet-console-auth
+  ports:
+    - name: http
+      port: {{ .Values.auth.port }}
+      targetPort: http
+      nodePort: {{ .Values.auth.wgNodePort }}
+{{- end }}
 {{- end }}

@@ -7,6 +7,9 @@ auth:
     tag: "0.2.0"
     pullPolicy: Always
   port: 18090
+  # When > 0, expose the console auth proxy on a NodePort so spokes can redeem
+  # invites over WireGuard. The hub firewall drops it on the WAN NIC.
+  wgNodePort: 0
   sessionSecret: change-me-fleet-console-auth
   sessionTTL: 8h
   sessionSecure: false
