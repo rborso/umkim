@@ -71,6 +71,12 @@ authelia:
   ldapPassword: {{ fleet_ingress_auth_hub_directory_bind_password | default('') | quote }}
 {% endif %}
 
+signup:
+  # Cluster-local sign-up page for clusters using the shared hub directory.
+  enabled: {{ _hub_dir | bool | lower }}
+  image: {{ fleet_ingress_auth_signup_image | default('nginx:1.27-alpine') | quote }}
+  hubRedeemURL: {{ (fleet_ingress_auth_hub_redeem_url | default('')) if _hub_dir else '' | quote }}
+
 traefik:
   deploySpokeMiddleware: true
   middlewareName: {{ fleet_ingress_auth_traefik_middleware_name }}

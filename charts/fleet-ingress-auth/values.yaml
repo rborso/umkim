@@ -50,6 +50,13 @@ authelia:
   # are evaluated before accessDomains. Empty groups means any authenticated user.
   accessRules: []
 
+# Cluster-local invite sign-up page. Enabled for clusters using the shared hub
+# directory (directory: hub); the form proxies redemption to the hub over WG.
+signup:
+  enabled: false
+  image: nginx:1.27-alpine
+  hubRedeemURL: ""
+
 traefik:
   deploySpokeMiddleware: true
   middlewareName: fleet-ingress-authelia

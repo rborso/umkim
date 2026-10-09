@@ -21,6 +21,8 @@ fleet_hub_firewall_block_public_tcp_ports:
   - 30917
   # LLDAP LDAP NodePort: reachable from spokes/apps over WireGuard only.
   - 30389
+  # Console auth proxy NodePort: invite redemption from cluster sign-up pages.
+  - 30918
 
 # When true: allow WAN :80/:443 (hub ACME / hub_gateway apps).
 fleet_hub_firewall_public_ingress_enabled: "{{ fleet_edge_acme_enabled | default(false) | bool }}"
