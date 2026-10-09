@@ -21,6 +21,7 @@ import { DownloadIcon } from '@patternfly/react-icons';
 import {
   deleteFleetCluster,
   disableClusterIngressAuth,
+  setClusterDirectory,
   disableClusterAcme,
   downloadFleetClusterBootstrapBundle,
   downloadFleetClusterBootstrapScript,
@@ -376,6 +377,20 @@ export function ClusterDetailPage() {
     }
   };
 
+  const setDirectoryAction = async (dir: 'local' | 'hub') => {
+    if (!name) return;
+    setAuthActionBusy(true);
+    setAuthActionError(null);
+    try {
+      setCluster(await setClusterDirectory(name, dir));
+      await load();
+    } catch (e) {
+      setAuthActionError(e);
+    } finally {
+      setAuthActionBusy(false);
+    }
+  };
+
   const showClusterAcme = isPortForwardMethod(cluster?.method);
   const acmeEnabled = !!cluster?.acme_enabled;
   const acmeCanEnable =
@@ -648,6 +663,8 @@ export function ClusterDetailPage() {
                 portalHost={portalHost}
                 portalUrl={portalUrl}
                 lldapWebUIUrl={lldapWebUIUrl}
+                directory={cluster?.ingressAuthStatus?.directory}
+                onSetDirectory={(dir) => void setDirectoryAction(dir)}
                 showClusterAcme={showClusterAcme}
                 acmeEnabled={acmeEnabled}
                 acmeCanEnable={acmeCanEnable}

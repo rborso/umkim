@@ -118,6 +118,9 @@ export function AppLayout() {
                   <NavLink to="/admin/invites">Invitations</NavLink>
                 </NavItem>
                 <NavItem>
+                  <NavLink to="/admin/tenants">Tenants</NavLink>
+                </NavItem>
+                <NavItem>
                   <NavLink to="/admin/llm-api-keys">LLM API keys</NavLink>
                 </NavItem>
                 <NavItem>

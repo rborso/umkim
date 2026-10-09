@@ -31,6 +31,7 @@ import type {
   InviteCreate,
   InviteCreateResult,
   InviteRedeemResult,
+  TenantsResponse,
 } from './types';
 import { fleetSitePortForwardZone } from '../edge/ingressMethod';
 
@@ -423,6 +424,20 @@ export async function disableClusterIngressAuth(name: string): Promise<FleetClus
   return fleetSiteRequest<FleetCluster>(
     '/clusters/' + encodeURIComponent(name) + '/ingress-auth/disable',
     { method: 'POST' },
+  );
+}
+
+export async function setClusterDirectory(
+  name: string,
+  directory: 'local' | 'hub',
+): Promise<FleetCluster> {
+  return fleetSiteRequest<FleetCluster>(
+    '/clusters/' + encodeURIComponent(name) + '/ingress-auth/directory',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directory }),
+    },
   );
 }
 
@@ -1237,4 +1252,35 @@ export async function redeemInvite(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+export async function listTenants(): Promise<TenantsResponse> {
+  return fleetSiteRequest<TenantsResponse>('/tenants');
+}
+
+export async function createTenant(name: string): Promise<void> {
+  await fleetSiteRequest<void>('/tenants', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteTenant(name: string): Promise<void> {
+  await fleetSiteRequest<void>('/tenants/' + encodeURIComponent(name), { method: 'DELETE' });
+}
+
+export async function addTenantMember(name: string, username: string): Promise<void> {
+  await fleetSiteRequest<void>('/tenants/' + encodeURIComponent(name) + '/members', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+}
+
+export async function removeTenantMember(name: string, username: string): Promise<void> {
+  await fleetSiteRequest<void>(
+    '/tenants/' + encodeURIComponent(name) + '/members/' + encodeURIComponent(username),
+    { method: 'DELETE' },
+  );
 }

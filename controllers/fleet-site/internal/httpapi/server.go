@@ -127,6 +127,15 @@ func (s *Server) Handler() http.Handler {
 		}
 		s.handleInvitesSub(w, r, sub)
 	})
+	mux.HandleFunc("/api/v1alpha1/tenants", s.handleTenants)
+	mux.HandleFunc("/api/v1alpha1/tenants/", func(w http.ResponseWriter, r *http.Request) {
+		sub := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1alpha1/tenants/"), "/")
+		if sub == "" {
+			s.handleTenants(w, r)
+			return
+		}
+		s.handleTenantsSub(w, r, sub)
+	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
 }

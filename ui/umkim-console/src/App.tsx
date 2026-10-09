@@ -14,6 +14,7 @@ import { InfrastructurePage } from './pages/InfrastructurePage';
 import { LoginPage } from './pages/LoginPage';
 import { InviteRedeemPage } from './pages/InviteRedeemPage';
 import { InvitesPage } from './pages/InvitesPage';
+import { TenantsPage } from './pages/TenantsPage';
 import { UsersPage } from './pages/UsersPage';
 import { GroupsPage } from './pages/GroupsPage';
 import { RoleBindingsPage } from './pages/RoleBindingsPage';
@@ -51,6 +52,7 @@ export function App() {
             <Route path="admin/role-bindings" element={<RoleBindingsPage />} />
             <Route path="admin/service-accounts" element={<ServiceAccountsPage />} />
             <Route path="admin/invites" element={<InvitesPage />} />
+            <Route path="admin/tenants" element={<TenantsPage />} />
             <Route path="admin/audit" element={<AuditPage />} />
             <Route path="admin/llm-api-keys" element={<LLMApiKeysPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

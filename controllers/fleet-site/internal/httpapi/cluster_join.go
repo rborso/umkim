@@ -160,7 +160,8 @@ func applyFleetClusterJoinSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetCl
 	applyProvidersToSummary(cs, fcj)
 	cs.IngressAuthEnabled = fcj.Spec.IngressAuth.Enabled
 	if fcj.Status.IngressAuth.Phase != "" || fcj.Status.IngressAuth.JobName != "" || fcj.Status.IngressAuth.Message != "" ||
-		fcj.Status.IngressAuth.PortalHost != "" || fcj.Status.IngressAuth.LLDAPWebUIHost != "" || len(fcj.Status.IngressAuth.AccessDomains) > 0 {
+		fcj.Status.IngressAuth.PortalHost != "" || fcj.Status.IngressAuth.LLDAPWebUIHost != "" || len(fcj.Status.IngressAuth.AccessDomains) > 0 ||
+		fcj.Spec.IngressAuth.Directory != "" {
 		cs.IngressAuthStatus = &clusterIngressAuthStatusJSON{
 			Phase:          fcj.Status.IngressAuth.Phase,
 			JobName:        fcj.Status.IngressAuth.JobName,
@@ -169,6 +170,7 @@ func applyFleetClusterJoinSummary(cs *clusterSummary, fcj *fleetv1alpha1.FleetCl
 			PortalHost:     fcj.Status.IngressAuth.PortalHost,
 			LLDAPWebUIHost: fcj.Status.IngressAuth.LLDAPWebUIHost,
 			AccessDomains:  append([]string(nil), fcj.Status.IngressAuth.AccessDomains...),
+			Directory:      fcj.Spec.IngressAuth.Directory,
 		}
 	}
 	cs.AcmeEnabled = fcj.Spec.Acme.Enabled
