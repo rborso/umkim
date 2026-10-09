@@ -23,8 +23,19 @@ import (
 
 type Server struct {
 	Client     client.Client
+	// APIReader is a direct (uncached) reader for freshly written objects.
+	APIReader  client.Reader
 	Cfg        config.Config
 	RESTConfig *rest.Config
+}
+
+// reader returns the direct API reader when available so freshly created
+// objects (invites, password Jobs) are observed without cache lag.
+func (s *Server) reader() client.Reader {
+	if s.APIReader != nil {
+		return s.APIReader
+	}
+	return s.Client
 }
 
 type enrollRequest struct {

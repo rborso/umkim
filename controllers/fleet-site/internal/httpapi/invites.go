@@ -106,7 +106,7 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	if !s.requireIdentity(w, r) {
 		return
 	}
-	all, err := invites.Load(r.Context(), s.Client, s.Cfg.Namespace, s.Cfg.InvitesSecretName)
+	all, err := invites.Load(r.Context(), s.reader(), s.Cfg.Namespace, s.Cfg.InvitesSecretName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -234,7 +234,7 @@ func (s *Server) redeemInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inv, found, err := invites.FindByToken(r.Context(), s.Client, s.Cfg.Namespace, s.Cfg.InvitesSecretName, token)
+	inv, found, err := invites.FindByToken(r.Context(), s.reader(), s.Cfg.Namespace, s.Cfg.InvitesSecretName, token)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -344,15 +344,29 @@ func (s *Server) setInvitedUserPassword(ctx context.Context, username, password 
 	}()
 
 	deadline := time.Now().Add(150 * time.Second)
+	seen := false
 	for {
 		var cur batchv1.Job
-		if err := s.Client.Get(ctx, types.NamespacedName{Namespace: ns, Name: jobName}, &cur); err != nil {
-			if apierrors.IsNotFound(err) {
-				// Job reaped; assume success only if it completed earlier.
+		if err := s.reader().Get(ctx, types.NamespacedName{Namespace: ns, Name: jobName}, &cur); err != nil {
+			if apierrors.IsNotFound(err) && seen {
+				// Job reaped after we observed it running; treat as complete.
 				return nil
+			}
+			if apierrors.IsNotFound(err) {
+				// Not visible yet (direct read lag); keep polling.
+				if time.Now().After(deadline) {
+					return fmt.Errorf("password job %s never appeared", jobName)
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(2 * time.Second):
+				}
+				continue
 			}
 			return err
 		}
+		seen = true
 		for _, c := range cur.Status.Conditions {
 			if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
 				return nil

@@ -101,7 +101,7 @@ func main() {
 		setupLog.Error(err, "llama profile seed")
 	}
 
-	api := &httpapi.Server{Client: mgr.GetClient(), Cfg: cfg, RESTConfig: restConfig}
+	api := &httpapi.Server{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Cfg: cfg, RESTConfig: restConfig}
 	go func() {
 		setupLog.Info("starting HTTP API", "addr", apiAddr)
 		if err := http.ListenAndServe(apiAddr, api.Handler()); err != nil {
