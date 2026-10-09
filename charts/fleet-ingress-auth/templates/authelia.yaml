@@ -22,6 +22,36 @@ data:
         base_dn: {{ .Values.lldap.baseDN | quote }}
         user: {{ .Values.authelia.ldapUser | default (printf "uid=admin,ou=people,%s" .Values.lldap.baseDN) | quote }}
         password: {{ $ldapPass | quote }}
+{{- if .Values.authelia.oidc.enabled }}
+    identity_providers:
+      oidc:
+        hmac_secret: {{ .Values.authelia.oidc.hmacSecret | quote }}
+        issuer_private_key: |
+{{ .Values.authelia.oidc.issuerPrivateKey | indent 10 }}
+        clients:
+{{- range .Values.authelia.oidc.clients }}
+          - client_id: {{ .clientId | quote }}
+            client_name: {{ .clientName | default .clientId | quote }}
+            client_secret: {{ .clientSecret | quote }}
+            public: false
+            authorization_policy: {{ .authorizationPolicy | default "one_factor" }}
+            require_pkce: {{ .requirePkce | default true }}
+            pkce_challenge_method: S256
+            redirect_uris:
+{{- range .redirectUris }}
+              - {{ . | quote }}
+{{- end }}
+            scopes:
+{{- range (.scopes | default (list "openid" "profile" "email")) }}
+              - {{ . | quote }}
+{{- end }}
+            response_types:
+              - code
+            grant_types:
+              - authorization_code
+            token_endpoint_auth_method: {{ .tokenEndpointAuthMethod | default "client_secret_basic" }}
+{{- end }}
+{{- end }}
     access_control:
       default_policy: deny
       rules:
