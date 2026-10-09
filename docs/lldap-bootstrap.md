@@ -92,6 +92,12 @@ clusters bound to `directory: hub`, on the Authelia portal host (`/invite`).
 The cluster page proxies redemption to the hub over WireGuard on the console
 auth NodePort; that port is blocked on the public interface.
 
+When the hub console is not publicly reachable, the console is WireGuard-only
+and a link built from the browser origin is useless to an invitee. The create
+response therefore returns public sign-up links: one per `directory: hub`
+cluster (its Authelia portal host) plus the hub console when
+`FLEET_CONSOLE_PUBLIC_URL` is set. Share one of those links.
+
 - Created by the `fleet-ingress-auth` chart's `lldap-bind-account` Job on
   install/upgrade. The account name, group, and password are chart values
   (`lldap.bindAccount.*`) rendered from the `fleet_ingress_auth` role defaults.
