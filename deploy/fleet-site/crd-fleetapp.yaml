@@ -62,6 +62,30 @@ spec:
                     Cluster Authelia OIDC client whose issuer and secret are
                     substituted for ${OIDC_ISSUER_URL} / ${OIDC_CLIENT_ID} /
                     ${OIDC_CLIENT_SECRET} in valuesYaml. Defaults to the app name.
+                oidcClient:
+                  type: object
+                  description: >-
+                    Ask UMKIM to register an Authelia OIDC client for this app on
+                    its cluster, deriving redirect URIs from the app's route host.
+                  properties:
+                    clientId:
+                      type: string
+                    clientName:
+                      type: string
+                    scopes:
+                      type: array
+                      items:
+                        type: string
+                    requirePkce:
+                      type: boolean
+                    redirectPaths:
+                      type: array
+                      items:
+                        type: string
+                    extraRedirectUris:
+                      type: array
+                      items:
+                        type: string
                 route:
                   type: object
                   properties:

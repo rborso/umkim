@@ -99,6 +99,8 @@ type IngressAuthOIDCClient struct {
 	// RequirePKCE defaults to true; set false for clients that do not send a
 	// code_challenge (e.g. django-allauth).
 	RequirePKCE *bool `json:"requirePkce,omitempty"`
+	// Owner is the FleetApp that manages this client (empty for manual entries).
+	Owner string `json:"owner,omitempty"`
 }
 
 type FleetClusterJoinIngressAuthStatus struct {

@@ -65,11 +65,29 @@ type FleetAppSpec struct {
 	// client secret are substituted for ${OIDC_ISSUER_URL} / ${OIDC_CLIENT_ID} /
 	// ${OIDC_CLIENT_SECRET} in ValuesYAML. Defaults to the app name.
 	OIDCClientID string `json:"oidcClientId,omitempty"`
+	// OIDCClient asks UMKIM to register an Authelia OIDC client for this app on
+	// its cluster (redirect URIs derived from the app's route host).
+	OIDCClient *FleetAppOIDCClient `json:"oidcClient,omitempty"`
 	// Route is the single public route (legacy). Ignored when Routes is set.
 	Route FleetAppRouteIntent `json:"route,omitempty"`
 	// Routes declares multiple public routes for one release (multi-service
 	// charts). Each entry becomes its own FleetAppRoute. When set, Route is ignored.
 	Routes []FleetAppRouteIntent `json:"routes,omitempty"`
+}
+
+// FleetAppOIDCClient declares the Authelia OIDC client an app needs. UMKIM
+// registers it on the app's cluster and manages its lifecycle.
+type FleetAppOIDCClient struct {
+	// ClientID defaults to the FleetApp name.
+	ClientID    string   `json:"clientId,omitempty"`
+	ClientName  string   `json:"clientName,omitempty"`
+	Scopes      []string `json:"scopes,omitempty"`
+	RequirePKCE *bool    `json:"requirePkce,omitempty"`
+	// RedirectPaths are host-relative; UMKIM prefixes them with the app's route
+	// host (https://<host><path>).
+	RedirectPaths []string `json:"redirectPaths,omitempty"`
+	// ExtraRedirectURIs are absolute URIs (e.g. app.immich:///oauth-callback).
+	ExtraRedirectURIs []string `json:"extraRedirectUris,omitempty"`
 }
 
 type FleetAppStatus struct {
