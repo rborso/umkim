@@ -110,6 +110,12 @@ umkim app create … --route-mode hub|site --route-host H --require-auth [--requ
 umkim app create … --route-mode hub|site --route-host H --service-name SVC --service-port PORT
 umkim app delete NAME [NAME...]
 
+umkim tenant list | create NAME | delete NAME
+umkim tenant add-member TENANT USERNAME | remove-member TENANT USERNAME
+umkim tenant add-user TENANT USERNAME --password P [--display-name D] [--email E]
+umkim invite list | create --groups TENANT[,TENANT] [--ttl-hours N] | delete ID
+umkim invite redeem --token T --username U --password P
+
 umkim infra get hub
 umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
 umkim acme get | set [--hub-enabled] [--staging] [--email E]
