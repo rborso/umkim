@@ -75,7 +75,24 @@ func TestReconcileSpokeACMESkipDoesNotMarkApplied(t *testing.T) {
 			Service:    fleetv1alpha1.ServiceRef{Namespace: "default", Name: "app", Port: 80},
 		},
 	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(route).WithObjects(clustersCM, route).Build()
+	// A legitimate holder for the cluster's ACME slot: it has a real route, so it
+	// is not dropped by the route-less cleanup.
+	holder := &fleetv1alpha1.FleetAppRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "holder",
+			Namespace:  ns,
+			Finalizers: []string{finalizerName},
+		},
+		Spec: fleetv1alpha1.FleetAppRouteSpec{
+			InstanceID: "holder",
+			Mode:       fleetv1alpha1.RouteModeSite,
+			Cluster:    "lab",
+			HubHost:    "other.example.com",
+			SiteHost:   "other.example.com",
+			Service:    fleetv1alpha1.ServiceRef{Namespace: "default", Name: "holder", Port: 80},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(route).WithObjects(clustersCM, route, holder).Build()
 	queue := newSpokeACMEQueue()
 	queue.active["lab"] = "other.example.com"
 	r := &RouteReconciler{

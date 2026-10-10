@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-edge/internal/clusters"
@@ -16,15 +17,17 @@ import (
 
 // spokeACMEQueue serializes TLS ingress pushes per cluster (one site hostname at a time).
 type spokeACMEQueue struct {
-	mu      sync.Mutex
-	active  map[string]string
-	pending map[string][]string
+	mu          sync.Mutex
+	active      map[string]string
+	pending     map[string][]string
+	activeSince map[string]time.Time
 }
 
 func newSpokeACMEQueue() *spokeACMEQueue {
 	return &spokeACMEQueue{
-		active:  map[string]string{},
-		pending: map[string][]string{},
+		active:      map[string]string{},
+		pending:     map[string][]string{},
+		activeSince: map[string]time.Time{},
 	}
 }
 
@@ -46,6 +49,7 @@ func (q *spokeACMEQueue) allow(cluster, host string) bool {
 		return false
 	}
 	q.active[cluster] = host
+	q.activeSince[cluster] = time.Now()
 	return true
 }
 
@@ -66,12 +70,58 @@ func (q *spokeACMEQueue) release(cluster, host string) {
 	if q.active[cluster] != host {
 		return
 	}
+	q.promoteNextLocked(cluster)
+}
+
+// promoteNextLocked drops the current active host and activates the next pending
+// one (if any), resetting the staleness clock.
+func (q *spokeACMEQueue) promoteNextLocked(cluster string) {
 	delete(q.active, cluster)
+	delete(q.activeSince, cluster)
 	if len(q.pending[cluster]) > 0 {
 		next := q.pending[cluster][0]
 		q.pending[cluster] = q.pending[cluster][1:]
 		q.active[cluster] = next
+		q.activeSince[cluster] = time.Now()
 	}
+}
+
+// rotate moves the active host to the back of the queue so a hostname that never
+// completes issuance cannot starve the other site hostnames for a cluster.
+func (q *spokeACMEQueue) rotate(cluster string) {
+	cluster = normalizeHostname(cluster)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	cur, ok := q.active[cluster]
+	if !ok {
+		return
+	}
+	delete(q.active, cluster)
+	delete(q.activeSince, cluster)
+	if len(q.pending[cluster]) > 0 {
+		next := q.pending[cluster][0]
+		q.pending[cluster] = q.pending[cluster][1:]
+		q.active[cluster] = next
+		q.activeSince[cluster] = time.Now()
+		q.pending[cluster] = append(q.pending[cluster], cur)
+	} else {
+		// Nothing else queued: keep it active but reset the clock so it is not
+		// rotated in a tight loop.
+		q.active[cluster] = cur
+		q.activeSince[cluster] = time.Now()
+	}
+}
+
+// staleFor reports how long the active host for a cluster has held the slot.
+func (q *spokeACMEQueue) staleFor(cluster string) time.Duration {
+	cluster = normalizeHostname(cluster)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	since, ok := q.activeSince[cluster]
+	if !ok {
+		return 0
+	}
+	return time.Since(since)
 }
 
 func (q *spokeACMEQueue) activeHost(cluster string) string {
@@ -80,6 +130,11 @@ func (q *spokeACMEQueue) activeHost(cluster string) string {
 	defer q.mu.Unlock()
 	return q.active[cluster]
 }
+
+// spokeACMEHostStaleAfter bounds how long one site hostname may hold a cluster's
+// ACME slot without its certificate becoming ready. After this the hostname is
+// rotated to the back of the queue so it cannot starve the others.
+const spokeACMEHostStaleAfter = 3 * time.Minute
 
 func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName string, regCluster clusters.Cluster) {
 	if r.spokeACME == nil || !regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled) {
@@ -96,12 +151,21 @@ func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName
 		}
 		route := r.routeForSiteHost(ctx, host, clusterName)
 		if route == nil {
-			return
+			// Hostname no longer has a route (app deleted or renamed): drop it so
+			// it cannot hold the cluster's ACME slot forever, and try the next.
+			r.spokeACME.release(clusterName, host)
+			probeHost = ""
+			continue
 		}
 
 		if r.Config.SpokeACMEPreflightEnabled && !spokeStagingOK(route) {
 			ok, err := probeACMECert(probeHost, host, true)
 			if err != nil || !ok {
+				if r.spokeACME.staleFor(clusterName) >= spokeACMEHostStaleAfter {
+					r.spokeACME.rotate(clusterName)
+					probeHost = ""
+					continue
+				}
 				return
 			}
 			_ = r.annotateSpokeStagingOK(ctx, route)
@@ -111,6 +175,13 @@ func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName
 
 		ok, err := probeACMECert(probeHost, host, false)
 		if err != nil || !ok {
+			// A stuck hostname must not block the rest of the cluster's queue:
+			// rotate it to the back after the staleness window.
+			if r.spokeACME.staleFor(clusterName) >= spokeACMEHostStaleAfter {
+				r.spokeACME.rotate(clusterName)
+				probeHost = ""
+				continue
+			}
 			return
 		}
 		r.spokeACME.release(clusterName, host)

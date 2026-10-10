@@ -50,6 +50,25 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 		return spokeACMEState{Blocked: true, TLSPhase: fleetv1alpha1.TLSPhasePendingPreflight, TLSMessage: msg}
 	}
 
+	probeHost := spokeProbeHost(ctx, siteHost, regCluster)
+	probePort := spokeProbeHTTPSPort(regCluster)
+	if probeHost == "" {
+		msg := fmt.Sprintf("cannot determine public probe address for %s", siteHost)
+		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseFailed, msg)
+		return spokeACMEState{Blocked: true, TLSPhase: fleetv1alpha1.TLSPhaseFailed, TLSMessage: msg}
+	}
+
+	// A hostname whose production certificate is already live needs no issuance,
+	// so it must not queue behind hostnames that are still being issued.
+	if prodOK, _ := probeACMECertOnPort(probeHost, probePort, siteHost, false); prodOK {
+		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseReady, "")
+		return spokeACMEState{
+			ApplyACME:    true,
+			CertResolver: certResolverProduction,
+			TLSPhase:     fleetv1alpha1.TLSPhaseReady,
+		}
+	}
+
 	if r.spokeACME == nil {
 		r.spokeACME = newSpokeACMEQueue()
 	}
@@ -60,23 +79,6 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 			SkipApply:  true,
 			TLSPhase:   fleetv1alpha1.TLSPhaseQueued,
 			TLSMessage: "waiting for spoke ACME queue",
-		}
-	}
-
-	probeHost := spokeProbeHost(ctx, siteHost, regCluster)
-	probePort := spokeProbeHTTPSPort(regCluster)
-	if probeHost == "" {
-		msg := fmt.Sprintf("cannot determine public probe address for %s", siteHost)
-		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseFailed, msg)
-		return spokeACMEState{Blocked: true, TLSPhase: fleetv1alpha1.TLSPhaseFailed, TLSMessage: msg}
-	}
-
-	if prodOK, _ := probeACMECertOnPort(probeHost, probePort, siteHost, false); prodOK {
-		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseReady, "")
-		return spokeACMEState{
-			ApplyACME:    true,
-			CertResolver: certResolverProduction,
-			TLSPhase:     fleetv1alpha1.TLSPhaseReady,
 		}
 	}
 
