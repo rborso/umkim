@@ -124,6 +124,9 @@ Image policy: external (default), proxy, or copy.`,
 				if valuesYAML != "" {
 					fields["valuesYaml"] = valuesYAML
 				}
+				if force {
+					fields["force"] = "true"
+				}
 				raw, code, err := api.PostMultipart("/charts", "chart", tgzPath, fields)
 				if err != nil {
 					return err

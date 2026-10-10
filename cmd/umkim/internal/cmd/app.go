@@ -108,7 +108,7 @@ func appCreateCmd() *cobra.Command {
 	var (
 		jsonFile, cluster, chart, version, release, namespace, valuesFile, appName string
 		routeMode, routeHost                                                        string
-		llamaProfile, llmBackendOpt                                                 string
+		llamaProfile, llmBackendOpt, oidcClient                                     string
 	)
 	c := &cobra.Command{
 		Use:   "create",
@@ -179,6 +179,16 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 			if err := applyOptionalLLMBackend(body, llmBackendOpt); err != nil {
 				return err
 			}
+			if strings.TrimSpace(oidcClient) != "" {
+				var oc map[string]interface{}
+				if err := json.Unmarshal([]byte(oidcClient), &oc); err != nil {
+					return fmt.Errorf("--oidc-client must be JSON: %w", err)
+				}
+				body["oidcClient"] = oc
+				if cid, _ := oc["clientId"].(string); cid != "" {
+					body["oidcClientId"] = cid
+				}
+			}
 			raw, code, err := api.Post("/apps", body)
 			if err != nil {
 				return err
@@ -210,6 +220,7 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 	c.Flags().StringVar(&appName, "name", "", "FleetApp resource name (defaults to release)")
 	c.Flags().StringVar(&namespace, "namespace", "default", "Target namespace")
 	c.Flags().StringVar(&valuesFile, "values-file", "", "Helm values YAML file")
+	c.Flags().StringVar(&oidcClient, "oidc-client", "", "Register an Authelia OIDC client (JSON: {clientId,redirectPaths,...})")
 	c.Flags().StringVar(&llamaProfile, "llama-profile", "", "Built-in llama-cpp-helm values profile id (hub API)")
 	c.Flags().StringVar(&llmBackendOpt, "llm-backend", "", "Llama-cpp only: register hub LiteLLM backend when Ready (true|false)")
 	c.Flags().StringVar(&routeMode, "route-mode", "none", "Route mode: none|hub|site")
