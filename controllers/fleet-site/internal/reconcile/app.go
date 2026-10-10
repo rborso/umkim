@@ -232,7 +232,7 @@ func (r *AppReconciler) ensureValuesCM(ctx context.Context, app *fleetv1alpha1.F
 		}
 		data = merged
 	}
-	data, err := r.substituteOIDC(ctx, app, data)
+	data, err := r.substitutePlaceholders(ctx, app, data)
 	if err != nil {
 		return err
 	}
@@ -256,10 +256,38 @@ func (r *AppReconciler) ensureValuesCM(ctx context.Context, app *fleetv1alpha1.F
 	return r.Update(ctx, &existing)
 }
 
-// substituteOIDC replaces ${OIDC_ISSUER_URL}, ${OIDC_CLIENT_ID}, and
-// ${OIDC_CLIENT_SECRET} in the app values with the cluster's Authelia OIDC
-// settings, so the app install never carries the client secret in its spec.
-func (r *AppReconciler) substituteOIDC(ctx context.Context, app *fleetv1alpha1.FleetApp, data string) (string, error) {
+// substitutePlaceholders resolves UMKIM-managed values in the app values:
+//   ${APP_HOST}                  public host of the app's route
+//   ${FORWARD_AUTH}              "true" when any route requires Authelia
+//   ${FORWARD_AUTH_MIDDLEWARE}   the Authelia forward-auth middleware name
+//   ${OIDC_ISSUER_URL}           cluster Authelia OIDC issuer
+//   ${OIDC_CLIENT_ID}            app OIDC client id
+//   ${OIDC_CLIENT_SECRET}        generated app OIDC client secret
+//
+// This lets a chart opt into UMKIM's route/OIDC wiring without the operator
+// wiring hosts, middleware names, or secrets by hand.
+func (r *AppReconciler) substitutePlaceholders(ctx context.Context, app *fleetv1alpha1.FleetApp, data string) (string, error) {
+	if !strings.Contains(data, "${") {
+		return data, nil
+	}
+	host := ""
+	forwardAuth := "false"
+	for _, rt := range app.Spec.EffectiveRoutes() {
+		h := strings.TrimSpace(rt.SiteHost)
+		if h == "" {
+			h = strings.TrimSpace(rt.HubHost)
+		}
+		if host == "" && h != "" {
+			host = h
+		}
+		if rt.RequireAuth {
+			forwardAuth = "true"
+		}
+	}
+	data = strings.ReplaceAll(data, "${APP_HOST}", host)
+	data = strings.ReplaceAll(data, "${FORWARD_AUTH}", forwardAuth)
+	data = strings.ReplaceAll(data, "${FORWARD_AUTH_MIDDLEWARE}", "fleet-ingress-authelia@file")
+
 	if !strings.Contains(data, "${OIDC_") {
 		return data, nil
 	}
