@@ -13,6 +13,7 @@ import (
 	fleetedge "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/appchart"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingressauth"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/llm"
 	batchv1 "k8s.io/api/batch/v1"
@@ -231,6 +232,10 @@ func (r *AppReconciler) ensureValuesCM(ctx context.Context, app *fleetv1alpha1.F
 		}
 		data = merged
 	}
+	data, err := r.substituteOIDC(ctx, app, data)
+	if err != nil {
+		return err
+	}
 	if data == "" {
 		data = "{}\n"
 	}
@@ -249,6 +254,40 @@ func (r *AppReconciler) ensureValuesCM(ctx context.Context, app *fleetv1alpha1.F
 	}
 	existing.Data = cm.Data
 	return r.Update(ctx, &existing)
+}
+
+// substituteOIDC replaces ${OIDC_ISSUER_URL}, ${OIDC_CLIENT_ID}, and
+// ${OIDC_CLIENT_SECRET} in the app values with the cluster's Authelia OIDC
+// settings, so the app install never carries the client secret in its spec.
+func (r *AppReconciler) substituteOIDC(ctx context.Context, app *fleetv1alpha1.FleetApp, data string) (string, error) {
+	if !strings.Contains(data, "${OIDC_") {
+		return data, nil
+	}
+	clientID := strings.TrimSpace(app.Spec.OIDCClientID)
+	if clientID == "" {
+		clientID = app.Name
+	}
+	var fcj fleetv1alpha1.FleetClusterJoin
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: app.Spec.ClusterName}, &fcj); err != nil {
+		return data, nil
+	}
+	issuer := ""
+	if dns, err := ingressauth.ResolveClusterDNS(ctx, r.Client, r.Cfg, app.Spec.ClusterName, &fcj); err == nil && dns.PortalHost != "" {
+		issuer = "https://" + dns.PortalHost
+	}
+	secret := ""
+	var sec corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: ingressauth.ClusterSecretName(app.Spec.ClusterName)}, &sec); err == nil {
+		m := map[string]string{}
+		if raw := sec.Data["oidcClientSecrets"]; len(raw) > 0 {
+			_ = json.Unmarshal(raw, &m)
+		}
+		secret = m[clientID]
+	}
+	data = strings.ReplaceAll(data, "${OIDC_ISSUER_URL}", issuer)
+	data = strings.ReplaceAll(data, "${OIDC_CLIENT_ID}", clientID)
+	data = strings.ReplaceAll(data, "${OIDC_CLIENT_SECRET}", secret)
+	return data, nil
 }
 
 func (r *AppReconciler) libraryChart(ctx context.Context, app *fleetv1alpha1.FleetApp) *fleetv1alpha1.FleetChart {

@@ -97,3 +97,92 @@ if (!token) { msg.className='msg err'; msg.textContent='This link is missing its
 </body>
 </html>
 {{- end -}}
+
+{{- define "fleet-ingress-auth.autheliaConfig" -}}
+{{- $ldapPass := .Values.authelia.ldapPassword | default .Values.lldap.adminPassword -}}
+theme: light
+server:
+  address: 'tcp://0.0.0.0:{{ .Values.authelia.port }}'
+log:
+  level: info
+identity_validation:
+  reset_password:
+    jwt_secret: {{ .Values.authelia.resetPasswordJWTSecret | quote }}
+authentication_backend:
+  ldap:
+    address: {{ .Values.lldap.externalUrl | default (printf "ldap://lldap.%s.svc.cluster.local:%v" (include "fleet-ingress-auth.namespace" .) .Values.lldap.ldapPort) | quote }}
+    implementation: lldap
+    base_dn: {{ .Values.lldap.baseDN | quote }}
+    user: {{ .Values.authelia.ldapUser | default (printf "uid=admin,ou=people,%s" .Values.lldap.baseDN) | quote }}
+    password: {{ $ldapPass | quote }}
+{{- if .Values.authelia.oidc.enabled }}
+identity_providers:
+  oidc:
+    hmac_secret: {{ .Values.authelia.oidc.hmacSecret | quote }}
+    issuer_private_key: |
+{{ .Values.authelia.oidc.issuerPrivateKey | indent 6 }}
+    clients:
+{{- range .Values.authelia.oidc.clients }}
+      - client_id: {{ .clientId | quote }}
+        client_name: {{ .clientName | default .clientId | quote }}
+        client_secret: {{ .clientSecret | quote }}
+        public: false
+        authorization_policy: {{ .authorizationPolicy | default "one_factor" }}
+        require_pkce: {{ .requirePkce | default true }}
+        pkce_challenge_method: S256
+        redirect_uris:
+{{- range .redirectUris }}
+          - {{ . | quote }}
+{{- end }}
+        scopes:
+{{- range (.scopes | default (list "openid" "profile" "email")) }}
+          - {{ . | quote }}
+{{- end }}
+        response_types:
+          - code
+        grant_types:
+          - authorization_code
+        consent_mode: {{ .consentMode | default "implicit" }}
+        token_endpoint_auth_method: {{ .tokenEndpointAuthMethod | default "client_secret_basic" }}
+{{- end }}
+{{- end }}
+access_control:
+  default_policy: deny
+  rules:
+    - domain: {{ .Values.authelia.portalHost | quote }}
+      policy: bypass
+{{- range .Values.authelia.accessRules }}
+    - domain: {{ .domain | quote }}
+      subject:
+{{- range .groups }}
+        - {{ printf "group:%s" . | quote }}
+{{- end }}
+      policy: one_factor
+    # Deny authenticated users who are not in the allowed groups; Authelia
+    # skips a subject rule when it does not match, so an explicit deny must
+    # precede the zone wildcard rules.
+    - domain: {{ .domain | quote }}
+      policy: deny
+{{- end }}
+{{- range .Values.authelia.accessDomains }}
+    - domain: {{ . | quote }}
+      policy: one_factor
+{{- end }}
+session:
+  secret: {{ .Values.authelia.sessionSecret | quote }}
+  cookies:
+    - domain: {{ .Values.authelia.cookieDomain | quote }}
+      name: authelia_session
+      same_site: lax
+      expiration: 8h
+      inactivity: 30m
+      authelia_url: {{ .Values.authelia.publicURL | quote }}
+      default_redirection_url: {{ printf "https://%s" .Values.authelia.cookieDomain | quote }}
+storage:
+  encryption_key: {{ .Values.authelia.storageEncryptionKey | quote }}
+  local:
+    path: /data/db.sqlite3
+notifier:
+  filesystem:
+    filename: /data/notification.txt
+{{- end -}}
