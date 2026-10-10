@@ -49,6 +49,7 @@ type OIDCClientConfig struct {
 	ClientName   string
 	RedirectURIs []string
 	Scopes       []string
+	RequirePKCE  *bool
 }
 
 // RouteAuthRule restricts a public host to the listed directory groups (tenants).
@@ -376,7 +377,7 @@ func normalizeOIDCClients(in []fleetv1alpha1.IngressAuthOIDCClient) []OIDCClient
 		if len(scopes) == 0 {
 			scopes = []string{"openid", "profile", "email"}
 		}
-		out = append(out, OIDCClientConfig{ClientID: id, ClientName: name, RedirectURIs: uris, Scopes: scopes})
+		out = append(out, OIDCClientConfig{ClientID: id, ClientName: name, RedirectURIs: uris, Scopes: scopes, RequirePKCE: c.RequirePKCE})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ClientID < out[j].ClientID })
 	return out
@@ -493,6 +494,9 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 						for _, s := range oc.Scopes {
 							lines = append(lines, "          - \""+yamlQuote(s)+"\"")
 						}
+					}
+					if oc.RequirePKCE != nil {
+						lines = append(lines, "        require_pkce: "+boolYAML(*oc.RequirePKCE))
 					}
 				}
 			}

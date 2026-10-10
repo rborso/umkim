@@ -96,6 +96,9 @@ type IngressAuthOIDCClient struct {
 	ClientName   string   `json:"clientName,omitempty"`
 	RedirectURIs []string `json:"redirectUris,omitempty"`
 	Scopes       []string `json:"scopes,omitempty"`
+	// RequirePKCE defaults to true; set false for clients that do not send a
+	// code_challenge (e.g. django-allauth).
+	RequirePKCE *bool `json:"requirePkce,omitempty"`
 }
 
 type FleetClusterJoinIngressAuthStatus struct {

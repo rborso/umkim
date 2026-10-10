@@ -193,6 +193,11 @@ spec:
                             type: array
                             items:
                               type: string
+                          requirePkce:
+                            type: boolean
+                            description: >-
+                              Defaults to true; set false for clients that do not
+                              send a code_challenge (e.g. django-allauth).
                 acme:
                   type: object
                   properties:

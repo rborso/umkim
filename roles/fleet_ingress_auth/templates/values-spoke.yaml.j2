@@ -91,6 +91,7 @@ authelia:
 {% for s in c.scopes | default(['openid', 'profile', 'email']) %}
           - {{ s | quote }}
 {% endfor %}
+        requirePkce: {{ (c.require_pkce | default(true)) | bool | lower }}
 {% endfor %}
 {% endif %}
 {% if _hub_dir %}
