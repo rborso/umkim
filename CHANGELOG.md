@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-11 — lab / reference
+
+- FleetApp: create an Authelia OIDC client at install time. Chart `umkim.oidc`
+  metadata is published as `FleetChart.status.oidcDefaults`; the console and
+  `umkim app create --oidc-client` prompt from it and set
+  `FleetApp.spec.oidcClient`. The controller registers the client on the target
+  cluster's `FleetClusterJoin` (owner-tagged) and removes it on app delete.
+- CLI: `umkim tenant` (list/create/delete/add-member/remove-member/add-user) and
+  `umkim invite` (list/create/delete/redeem); hub tenant app deploy walkthrough.
+- fleet-edge: bound `kubectl` calls so a stuck ManifestWork delete cannot hang
+  reconcile; ACME queue starvation fix (drop route-less hosts, rotate stale
+  hosts, probe before queue); duplicate route host rejected with **409**.
+- WireGuard: pin operator client addresses so adding a client stops renumbering;
+  fix the route task guard.
+- ingress-auth: per-client `requirePkce` override.
+
 ## [0.2.0] — 2026-09-12 — lab / reference
 
 - Rocky Linux 10 only; one management hub. Hub images are tagged from this
