@@ -329,6 +329,18 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 		}
 		changed = true
 	}
+	if body.Route.ServiceName != "" {
+		app.Spec.Route.ServiceName = body.Route.ServiceName
+		changed = true
+	}
+	if body.Route.ServicePort > 0 {
+		app.Spec.Route.ServicePort = body.Route.ServicePort
+		changed = true
+	}
+	if body.Route.ServiceNamespace != "" {
+		app.Spec.Route.ServiceNamespace = body.Route.ServiceNamespace
+		changed = true
+	}
 	if body.OIDCClient != nil || strings.TrimSpace(body.OIDCClientID) != "" {
 		app.Spec.OIDCClient = body.OIDCClient
 		app.Spec.OIDCClientID = strings.TrimSpace(body.OIDCClientID)

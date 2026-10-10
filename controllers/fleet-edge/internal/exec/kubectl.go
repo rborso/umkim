@@ -6,9 +6,19 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
+// defaultTimeout bounds a single kubectl invocation so a stuck API server or
+// unreachable cluster cannot block the reconcile worker forever.
+const defaultTimeout = 60 * time.Second
+
 func Kubectl(ctx context.Context, kubeconfig string, args ...string) (string, error) {
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+	}
 	var cmdArgs []string
 	if kubeconfig != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig="+kubeconfig)
@@ -40,6 +50,8 @@ func ApplyYAML(ctx context.Context, kubeconfig, yaml string) error {
 }
 
 func DeleteManifestWork(ctx context.Context, kubeconfig, ns, name string) error {
-	_, err := Kubectl(ctx, kubeconfig, "-n", ns, "delete", "manifestwork", name, "--ignore-not-found")
+	// --wait=false: a ManifestWork with a stuck finalizer would otherwise block
+	// kubectl delete indefinitely and hang the reconcile worker.
+	_, err := Kubectl(ctx, kubeconfig, "-n", ns, "delete", "manifestwork", name, "--ignore-not-found", "--wait=false")
 	return err
 }
