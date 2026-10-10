@@ -49,6 +49,7 @@ data:
               - code
             grant_types:
               - authorization_code
+            consent_mode: {{ .consentMode | default "implicit" }}
             token_endpoint_auth_method: {{ .tokenEndpointAuthMethod | default "client_secret_basic" }}
 {{- end }}
 {{- end }}

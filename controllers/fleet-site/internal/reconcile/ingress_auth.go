@@ -70,6 +70,18 @@ func (r *IngressAuthReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return r.failIngressAuth(ctx, fia, err)
 	}
+	for name, cc := range desired.ClusterConfigs {
+		if len(cc.OIDCClients) == 0 {
+			continue
+		}
+		ids := make([]string, 0, len(cc.OIDCClients))
+		for _, oc := range cc.OIDCClients {
+			ids = append(ids, oc.ClientID)
+		}
+		if _, err := ingressauth.EnsureOIDCSecrets(ctx, r.Client, r.Cfg.Namespace, name, ids); err != nil {
+			return r.failIngressAuth(ctx, fia, err)
+		}
+	}
 
 	if err := ingressauth.ReconcileHubLLDAPWebUI(ctx, r.Client, r.Cfg, fia); err != nil {
 		logger.Error(err, "reconcile hub LLDAP web UI")

@@ -43,6 +43,14 @@ type DesiredState struct {
 	ClusterConfigs       map[string]ClusterAuthConfig
 }
 
+// OIDCClientConfig is one Authelia OIDC client for an application.
+type OIDCClientConfig struct {
+	ClientID     string
+	ClientName   string
+	RedirectURIs []string
+	Scopes       []string
+}
+
 // RouteAuthRule restricts a public host to the listed directory groups (tenants).
 // Empty Groups means any authenticated user.
 type RouteAuthRule struct {
@@ -57,6 +65,8 @@ type ClusterAuthConfig struct {
 	AccessDomains     []string
 	// AccessRules are host-level Authelia rules for this cluster's site routes.
 	AccessRules       []RouteAuthRule
+	// OIDCClients are Authelia OIDC clients for OIDC-only apps on this cluster.
+	OIDCClients       []OIDCClientConfig
 	SecretsRef        string
 	ExposeLLDAPWebUI  bool
 	LLDAPWebUIHost    string
@@ -207,6 +217,7 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 			ExposeLLDAPWebUI: fcj.Spec.IngressAuth.ExposeLLDAPWebUI,
 			Directory:        fcj.Spec.IngressAuth.Directory,
 			SpokeTLS:         dns.SpokeTLS,
+			OIDCClients:      normalizeOIDCClients(fcj.Spec.IngressAuth.OIDCClients),
 		}
 		if fcj.Spec.IngressAuth.ExposeLLDAPWebUI {
 			cfgEntry.LLDAPWebUIHost = dns.LLDAPWebUIHost
@@ -339,6 +350,38 @@ func normalizeAuthGroups(in []string) []string {
 	return out
 }
 
+func normalizeOIDCClients(in []fleetv1alpha1.IngressAuthOIDCClient) []OIDCClientConfig {
+	out := make([]OIDCClientConfig, 0, len(in))
+	for _, c := range in {
+		id := strings.TrimSpace(c.ClientID)
+		if id == "" {
+			continue
+		}
+		name := strings.TrimSpace(c.ClientName)
+		if name == "" {
+			name = id
+		}
+		uris := make([]string, 0, len(c.RedirectURIs))
+		for _, u := range c.RedirectURIs {
+			if u = strings.TrimSpace(u); u != "" {
+				uris = append(uris, u)
+			}
+		}
+		scopes := make([]string, 0, len(c.Scopes))
+		for _, s := range c.Scopes {
+			if s = strings.TrimSpace(s); s != "" {
+				scopes = append(scopes, s)
+			}
+		}
+		if len(scopes) == 0 {
+			scopes = []string{"openid", "profile", "email"}
+		}
+		out = append(out, OIDCClientConfig{ClientID: id, ClientName: name, RedirectURIs: uris, Scopes: scopes})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ClientID < out[j].ClientID })
+	return out
+}
+
 func normalizeRouteRules(in []RouteAuthRule) []RouteAuthRule {
 	out := make([]RouteAuthRule, 0, len(in))
 	for _, r := range in {
@@ -431,6 +474,25 @@ func BuildInventoryYAML(cfg config.Config, desired DesiredState, fia *fleetv1alp
 					lines = append(lines, "        groups:")
 					for _, g := range r.Groups {
 						lines = append(lines, "          - \""+yamlQuote(g)+"\"")
+					}
+				}
+			}
+			if len(cc.OIDCClients) > 0 {
+				lines = append(lines, "    oidc_clients:")
+				for _, oc := range cc.OIDCClients {
+					lines = append(lines, "      - client_id: \""+yamlQuote(oc.ClientID)+"\"")
+					lines = append(lines, "        client_name: \""+yamlQuote(oc.ClientName)+"\"")
+					if len(oc.RedirectURIs) > 0 {
+						lines = append(lines, "        redirect_uris:")
+						for _, u := range oc.RedirectURIs {
+							lines = append(lines, "          - \""+yamlQuote(u)+"\"")
+						}
+					}
+					if len(oc.Scopes) > 0 {
+						lines = append(lines, "        scopes:")
+						for _, s := range oc.Scopes {
+							lines = append(lines, "          - \""+yamlQuote(s)+"\"")
+						}
 					}
 				}
 			}
