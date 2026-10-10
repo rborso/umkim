@@ -45,51 +45,80 @@ fi
 mkdir -p "$(dirname "$WG_VARS")"
 
 python3 - "$CLIENT_NAME" "$WG_VARS" <<'PY'
+import re
 import sys
 from pathlib import Path
 
 name, path_s = sys.argv[1], Path(sys.argv[2])
-marker = f"- name: {name}"
 
-if path_s.is_file():
-    text = path_s.read_text()
-    if marker in text:
-        print(f"[wg-dev-client] {name} already listed in {path_s}")
-        sys.exit(0)
-    lines = text.splitlines()
-    out = []
-    inserted = False
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        if not inserted and line.strip().startswith("wireguard_operator_clients:"):
-            rest = line.split(":", 1)[1].strip()
-            if rest == "[]":
-                out.append("wireguard_operator_clients:")
-                out.append(f"  {marker}")
-            elif rest:
-                out.append(line)
-                out.append(f"  {marker}")
-            else:
-                out.append(line)
-                out.append(f"  {marker}")
-            inserted = True
-            i += 1
+DEFAULT_POOL = 100
+SUBNET_PREFIX = "10.10.0."
+
+
+def parse_pool(text):
+    m = re.search(r'^\s*wireguard_operator_client_pool_octet:\s*(\d+)\s*$', text, re.M)
+    return int(m.group(1)) if m else DEFAULT_POOL
+
+
+def parse_clients(text):
+    """Return [(name, address_or_None)] in file order."""
+    clients = []
+    cur = None
+    for line in text.splitlines():
+        m = re.match(r'^\s*-\s*name:\s*(\S+)\s*$', line)
+        if m:
+            if cur is not None:
+                clients.append(cur)
+            cur = [m.group(1), None]
             continue
-        out.append(line)
-        i += 1
-    if not inserted:
-        raise SystemExit(f"error: could not find wireguard_operator_clients: in {path_s}")
-    path_s.write_text("\n".join(out).rstrip() + "\n")
-else:
-    path_s.write_text(
-        "---\n"
-        "# Operator PCs — split-tunnel overlay access (managed by scripts/wg-dev-client.sh)\n"
-        "wireguard_operator_clients:\n"
-        f"  {marker}\n"
-        "wireguard_operator_client_pool_octet: 100\n"
-    )
-print(f"[wg-dev-client] added {name} to {path_s}")
+        m2 = re.match(r'^\s*address:\s*(\S+)\s*$', line)
+        if m2 and cur is not None:
+            cur[1] = m2.group(1)
+    if cur is not None:
+        clients.append(cur)
+    return clients
+
+
+text = path_s.read_text() if path_s.is_file() else ""
+pool = parse_pool(text)
+clients = parse_clients(text)
+
+if any(c[0] == name for c in clients):
+    print(f"[wg-dev-client] {name} already listed in {path_s}")
+    sys.exit(0)
+
+# Effective address per client: an explicit address, else pool+index (legacy
+# position-based layout). Persisting every address keeps existing clients stable
+# so adding a client never renumbers the others.
+effective = []
+used = set()
+for i, (cname, addr) in enumerate(clients):
+    if not addr:
+        addr = f"{SUBNET_PREFIX}{pool + i}/32"
+    effective.append((cname, addr))
+    m = re.match(r'^' + re.escape(SUBNET_PREFIX) + r'(\d+)/32$', addr)
+    if m:
+        used.add(int(m.group(1)))
+
+# First free octet at or after the pool.
+octet = pool
+while octet in used:
+    octet += 1
+new_addr = f"{SUBNET_PREFIX}{octet}/32"
+
+out = [
+    "---",
+    "# Operator PCs — split-tunnel overlay access. Add names here or use scripts/wg-dev-client.sh.",
+    "wireguard_operator_clients:",
+]
+for cname, addr in effective:
+    out.append(f"  - name: {cname}")
+    out.append(f"    address: {addr}")
+out.append(f"  - name: {name}")
+out.append(f"    address: {new_addr}")
+out.append(f"wireguard_operator_client_pool_octet: {pool}")
+path_s.write_text("\n".join(out) + "\n")
+print(f"[wg-dev-client] added {name} ({new_addr}) to {path_s}")
 PY
 
 cd "$REPO_ROOT"
