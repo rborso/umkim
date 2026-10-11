@@ -88,6 +88,11 @@ owner-tagged), and removes it when the app is deleted. The CLI equivalent is
 `umkim app create --oidc-client '{"clientId":"app","redirectPaths":["/callback"]}'`.
 Apps with native LDAP bind the directory directly instead.
 
+The ingress-auth reconciler generates the client secret asynchronously. The
+controller waits for that secret to exist on the cluster before rendering the
+app `valuesYaml`, so `${OIDC_CLIENT_SECRET}` (and `${OIDC_CLIENT_ID}` /
+`${OIDC_ISSUER_URL}`) are never substituted empty.
+
 ### Update (patch)
 
 `PATCH /fleet/api/v1alpha1/apps/{name}` updates `version`, `valuesYaml`,
