@@ -253,6 +253,11 @@ export function SiteHostsPanel({ siteName }: Props) {
     }
   };
 
+  // Re-running create_vm on a host that already has a VM destroys and recreates
+  // it (YAIDAP yaidap_recreate), so it is destructive and labelled "Reprovision".
+  const provisionIsReprovision =
+    provisionAction === 'create_vm' && provisionTarget?.status?.phase === 'Ready';
+
   const needsConfirm =
     provisionAction !== 'plan_vm' && provisionTarget?.status?.phase === 'Ready';
 
@@ -503,13 +508,24 @@ export function SiteHostsPanel({ siteName }: Props) {
                     )}
                     {host.kind === 'vm' && (
                       <>
-                        <Button
-                          variant="link"
-                          isInline
-                          onClick={() => openProvision(host, 'create_vm')}
-                        >
-                          Provision
-                        </Button>
+                        {host.status?.phase === 'Ready' ? (
+                          <Button
+                            variant="link"
+                            isInline
+                            isDanger
+                            onClick={() => openProvision(host, 'create_vm')}
+                          >
+                            Reprovision
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="link"
+                            isInline
+                            onClick={() => openProvision(host, 'create_vm')}
+                          >
+                            Provision
+                          </Button>
+                        )}
                         {canPlanPlacement(host) && (
                           <Button variant="link" isInline onClick={() => openProvision(host, 'plan_vm')}>
                             Plan placement
@@ -564,18 +580,28 @@ export function SiteHostsPanel({ siteName }: Props) {
       />
 
       <Modal
-        title={provisionAction === 'plan_vm' ? 'Plan VM placement' : 'Provision host'}
+        title={
+          provisionAction === 'plan_vm'
+            ? 'Plan VM placement'
+            : provisionIsReprovision
+              ? 'Reprovision host'
+              : 'Provision host'
+        }
         isOpen={provisionOpen}
         onClose={() => setProvisionOpen(false)}
         actions={[
           <Button
             key="run"
-            variant="primary"
+            variant={provisionIsReprovision ? 'danger' : 'primary'}
             onClick={() => void runProvision()}
             isLoading={provisioning}
             isDisabled={needsConfirm && !provisionConfirm}
           >
-            {provisionAction === 'plan_vm' ? 'Run placement plan' : 'Run provision'}
+            {provisionAction === 'plan_vm'
+              ? 'Run placement plan'
+              : provisionIsReprovision
+                ? 'Reprovision (recreate VM)'
+                : 'Run provision'}
           </Button>,
           <Button key="cancel" variant="link" onClick={() => setProvisionOpen(false)}>
             Cancel
@@ -599,12 +625,23 @@ export function SiteHostsPanel({ siteName }: Props) {
             </>
           )}
         </p>
+        {provisionIsReprovision && (
+          <p style={{ marginTop: '0.5rem' }}>
+            <strong>Destructive:</strong> this host already has a VM. Provisioning again destroys the
+            existing libvirt domain and its disk, then recreates it from the inventory profile. Any
+            data on the VM is lost.
+          </p>
+        )}
         {needsConfirm && (
           <Checkbox
             id="provisionConfirm"
             isChecked={provisionConfirm}
             onChange={(_e, c) => setProvisionConfirm(c)}
-            label="I confirm this destructive or bare-metal install action"
+            label={
+              provisionIsReprovision
+                ? 'I confirm recreating this VM (existing domain and disk are destroyed)'
+                : 'I confirm this destructive or bare-metal install action'
+            }
           />
         )}
       </Modal>
