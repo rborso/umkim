@@ -318,6 +318,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       await putSiteInventoryFile(siteName, selectedPath, editorContent);
       setEditorDirty(false);
       setFileMissing(false);
+      await syncToJumphost();
       await load();
     } catch (e) {
       setError(e);
@@ -402,7 +403,8 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
       setAddVmOpen(false);
       resetAddVmForm();
-      setVmMessage(`Saved guests.yml and ${hostVarsPath}. Sync to jumphost, then provision on the Site hosts tab.`);
+      await syncToJumphost();
+      setVmMessage(`Saved guests.yml and ${hostVarsPath} and synced to the jumphost. Provision on the Site hosts tab.`);
       await load();
       setSelectedPath(hostVarsPath);
       setEditorContent(hostVarsYaml);
@@ -425,6 +427,16 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       setError(e);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Push inventory to the jumphost after a mutation so YAIDAP actions read the
+  // latest files without an extra manual "Sync to jumphost" step.
+  const syncToJumphost = async () => {
+    try {
+      await syncSiteInventory(siteName);
+    } catch (e) {
+      setError(e);
     }
   };
 
@@ -457,8 +469,9 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
       setAddBmOpen(false);
       resetAddBmForm();
+      await syncToJumphost();
       setVmMessage(
-        `Saved bare_metals.yml and ${hostVarsPath}. Sync to jumphost, then Discover (SSH/PXE) or Install bare metal.`,
+        `Saved bare_metals.yml and ${hostVarsPath} and synced to the jumphost. Discover (SSH/PXE) or Install bare metal on the Site hosts tab.`,
       );
       await load();
       setSelectedPath(hostVarsPath);
@@ -501,8 +514,9 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
       setAddDiscOpen(false);
       resetAddDiscForm();
+      await syncToJumphost();
       setVmMessage(
-        `Saved hypervisors.yml and ${hostVarsPath}. Sync to jumphost, then run Discover on the Site hosts tab.`,
+        `Saved hypervisors.yml and ${hostVarsPath} and synced to the jumphost. Run Discover on the Site hosts tab.`,
       );
       await load();
       setSelectedPath(hostVarsPath);
