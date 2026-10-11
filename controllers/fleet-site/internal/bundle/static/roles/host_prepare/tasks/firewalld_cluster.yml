@@ -89,3 +89,14 @@
     immediate: true
     state: enabled
   tags: [host_prepare]
+
+# Rebuild the runtime from the permanent config so the profile that is active now
+# is exactly the profile that survives a restart. Without this, the runtime can
+# keep stale rules from an earlier firewalld state and silently filter IPIP or
+# cross-node pod traffic.
+- name: Host prepare | Reload firewalld for a deterministic runtime
+  ansible.builtin.command:
+    cmd: firewall-cmd --reload
+  changed_when: false
+  failed_when: false
+  tags: [host_prepare]

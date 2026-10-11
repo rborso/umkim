@@ -93,8 +93,9 @@
   args:
     executable: /bin/bash
   when:
-    - k3s_overlay_wg_iface.stdout | trim | length > 0
-    - k3s_overlay_pod_cidrs.stdout | trim | length > 0
+    # Agents have no readable /etc/rancher/k3s/k3s.yaml, so pod CIDR detection can
+    # be empty there. Still trust the WireGuard interface on those hosts.
+    - (k3s_overlay_wg_iface.stdout | trim | length > 0) or (k3s_overlay_pod_cidrs.stdout | trim | length > 0)
   register: k3s_overlay_firewalld
   changed_when: k3s_overlay_firewalld.stdout | default('') | length > 0
   failed_when: false
@@ -136,3 +137,19 @@
   changed_when: k3s_traefik_firewalld.stdout | default('') | length > 0
   failed_when: false
 
+# The cluster firewalld profile is applied during bootstrap and the Calico pod
+# CIDRs / NodePorts are added later, during provision. The runtime ruleset can
+# therefore diverge from the permanent config across runs, and firewalld's nft
+# FORWARD hook then rejects cross-node pod traffic (spoke Traefik /ping fails
+# until a manual reload). Reload once so the runtime equals the permanent config.
+- name: K3s | Reload firewalld for a deterministic runtime
+  ansible.builtin.shell: |
+    set -euo pipefail
+    command -v firewall-cmd >/dev/null 2>&1 || exit 0
+    firewall-cmd --state >/dev/null 2>&1 || exit 0
+    firewall-cmd --reload >/dev/null
+  args:
+    executable: /bin/bash
+  changed_when: false
+  failed_when: false
+  tags: [k3s, k3s_overlay_nat, fleet_cluster_provision]
