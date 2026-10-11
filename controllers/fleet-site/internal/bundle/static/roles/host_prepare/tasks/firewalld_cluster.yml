@@ -12,13 +12,15 @@
   tags: [host_prepare]
 
 - name: Host prepare | Unmask and start firewalld
-  ansible.builtin.systemd:
-    name: firewalld
-    masked: false
-    enabled: true
-    state: started
-  # firewalld start reloads nftables and can drop the Ansible SSH session.
-  # Keep the host in the play and reconnect before opening ports.
+  ansible.builtin.shell: |
+    set -e
+    systemctl unmask firewalld
+    systemctl enable firewalld >/dev/null 2>&1 || true
+    systemctl start --no-block firewalld
+  # firewalld start reloads nftables and can drop the Ansible SSH session. Use
+  # --no-block so the task returns before the ruleset flush (a blocking module call
+  # otherwise blackholes and hangs the whole play), then reconnect below before
+  # opening ports.
   ignore_unreachable: true
   tags: [host_prepare]
 

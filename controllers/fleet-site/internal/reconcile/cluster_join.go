@@ -778,7 +778,11 @@ func (r *ClusterJoinReconciler) effectiveJumphost(ctx context.Context, fcj *flee
 }
 
 func (r *ClusterJoinReconciler) inventorySSH(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, hubRunner bool) (sshArgs string, useMgmtLAN bool) {
-	base := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+	// Keepalives so a connection dropped by a node-side action (for example
+	// firewalld starting and flushing nftables) fails fast instead of blackholing
+	// and hanging the whole play.
+	base := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " +
+		"-o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=15"
 	jh := r.effectiveJumphost(ctx, fcj)
 	if hubRunner && jh != "" {
 		return ssh.AnsibleSSHCommonArgs(base, jh, r.Cfg.SSHUser, "/root/.ssh/id_rsa"), true
