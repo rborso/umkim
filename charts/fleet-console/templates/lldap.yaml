@@ -36,6 +36,11 @@ spec:
       labels:
         app: lldap
     spec:
+      # Service-link env injection from the lldap-ldap NodePort Service creates
+      # LLDAP_LDAP_PORT=tcp://<clusterIP>:3890, which LLDAP parses as
+      # --ldap-port and rejects on a fresh install (the Service exists before
+      # the pod). Disable service links so the container keeps its defaults.
+      enableServiceLinks: false
       containers:
         - name: lldap
           image: {{ .Values.lldap.image | quote }}
