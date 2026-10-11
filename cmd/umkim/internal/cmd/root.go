@@ -61,6 +61,8 @@ func init() {
 	rootCmd.AddCommand(nodeCmd())
 	rootCmd.AddCommand(nodeOpCmd())
 	rootCmd.AddCommand(vmCmd())
+	rootCmd.AddCommand(tenantCmd())
+	rootCmd.AddCommand(inviteCmd())
 }
 
 func printJSON(raw []byte) {
