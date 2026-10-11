@@ -662,6 +662,18 @@ func (in *FleetApp) DeepCopyInto(out *FleetApp) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.Spec = in.Spec
+	if in.Spec.OIDCClient != nil {
+		oc := new(FleetAppOIDCClient)
+		*oc = *in.Spec.OIDCClient
+		oc.Scopes = append([]string(nil), in.Spec.OIDCClient.Scopes...)
+		oc.RedirectPaths = append([]string(nil), in.Spec.OIDCClient.RedirectPaths...)
+		oc.ExtraRedirectURIs = append([]string(nil), in.Spec.OIDCClient.ExtraRedirectURIs...)
+		if in.Spec.OIDCClient.RequirePKCE != nil {
+			b := *in.Spec.OIDCClient.RequirePKCE
+			oc.RequirePKCE = &b
+		}
+		out.Spec.OIDCClient = oc
+	}
 	in.Status.DeepCopyInto(&out.Status)
 }
 

@@ -57,6 +57,13 @@ func AnsibleSpecHash(fia *fleetv1alpha1.FleetIngressAuth, desired DesiredState) 
 		for _, r := range cc.AccessRules {
 			parts = append(parts, "cr="+name+"/"+r.Domain+"="+strings.Join(r.Groups, ","))
 		}
+		for _, oc := range cc.OIDCClients {
+			pkce := "true"
+			if oc.RequirePKCE != nil && !*oc.RequirePKCE {
+				pkce = "false"
+			}
+			parts = append(parts, "oc="+name+"/"+oc.ClientID+"/"+pkce+"/"+strings.Join(oc.RedirectURIs, ","))
+		}
 	}
 	_, _ = h.Write([]byte(strings.Join(parts, "|")))
 	return hex.EncodeToString(h.Sum(nil))

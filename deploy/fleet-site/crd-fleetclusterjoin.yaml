@@ -198,6 +198,9 @@ spec:
                             description: >-
                               Defaults to true; set false for clients that do not
                               send a code_challenge (e.g. django-allauth).
+                          owner:
+                            type: string
+                            description: FleetApp that manages this client (empty for manual entries).
                 acme:
                   type: object
                   properties:

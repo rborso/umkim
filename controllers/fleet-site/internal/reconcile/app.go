@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -65,6 +66,11 @@ func (r *AppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	mode := app.Spec.EffectiveRouteMode()
 	if !appchart.ValidRouteMode(mode) {
 		return r.failApp(ctx, &app, "route.mode must be none, hub, or site")
+	}
+
+	// Register/refresh the app's Authelia OIDC client on its cluster.
+	if err := r.ensureAppOIDCClient(ctx, &app); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	hash := appSpecHash(app.Spec)
@@ -171,6 +177,7 @@ func (r *AppReconciler) reconcileDelete(ctx context.Context, app *fleetv1alpha1.
 		return ctrl.Result{}, nil
 	}
 	_ = r.deleteRoute(ctx, app)
+	_ = r.removeAppOIDCClient(ctx, app)
 	release := app.Spec.EffectiveReleaseName(app.Name)
 	ns := app.Spec.EffectiveNamespace()
 	jobName := appJobName("fa-u-", app.Name)
@@ -575,4 +582,138 @@ func (r *Reconciler) SetupAppWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.ConfigMap{}).
 		Complete(ar)
+}
+
+// appRouteHost returns the app's public host (site preferred, then hub).
+func appRouteHost(app *fleetv1alpha1.FleetApp) string {
+	for _, rt := range app.Spec.EffectiveRoutes() {
+		if h := strings.TrimSpace(rt.SiteHost); h != "" {
+			return h
+		}
+		if h := strings.TrimSpace(rt.HubHost); h != "" {
+			return h
+		}
+	}
+	return ""
+}
+
+// appOIDCClient builds the Authelia OIDC client an app declares, deriving
+// redirect URIs from the app's route host.
+func appOIDCClient(app *fleetv1alpha1.FleetApp) (fleetv1alpha1.IngressAuthOIDCClient, bool) {
+	oc := app.Spec.OIDCClient
+	if oc == nil {
+		return fleetv1alpha1.IngressAuthOIDCClient{}, false
+	}
+	clientID := strings.TrimSpace(oc.ClientID)
+	if clientID == "" {
+		clientID = app.Name
+	}
+	name := strings.TrimSpace(oc.ClientName)
+	if name == "" {
+		name = clientID
+	}
+	host := appRouteHost(app)
+	uris := []string{}
+	for _, p := range oc.RedirectPaths {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+		if host != "" {
+			uris = append(uris, "https://"+host+p)
+		}
+	}
+	for _, u := range oc.ExtraRedirectURIs {
+		if u = strings.TrimSpace(u); u != "" {
+			uris = append(uris, u)
+		}
+	}
+	return fleetv1alpha1.IngressAuthOIDCClient{
+		ClientID:     clientID,
+		ClientName:   name,
+		Scopes:       oc.Scopes,
+		RequirePKCE:  oc.RequirePKCE,
+		RedirectURIs: uris,
+		Owner:        app.Name,
+	}, true
+}
+
+// ensureAppOIDCClient registers or refreshes the app's Authelia OIDC client on
+// its cluster (owned by the app), leaving manual and other apps' clients alone.
+func (r *AppReconciler) ensureAppOIDCClient(ctx context.Context, app *fleetv1alpha1.FleetApp) error {
+	desired, ok := appOIDCClient(app)
+	if !ok {
+		return r.removeAppOIDCClient(ctx, app)
+	}
+	var fcj fleetv1alpha1.FleetClusterJoin
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: app.Spec.ClusterName}, &fcj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	base := fcj.DeepCopy()
+	clients := make([]fleetv1alpha1.IngressAuthOIDCClient, 0, len(fcj.Spec.IngressAuth.OIDCClients)+1)
+	for _, c := range fcj.Spec.IngressAuth.OIDCClients {
+		// Replace this app's own entry and any manual entry with the same
+		// client id (the app takes ownership of that id).
+		if c.Owner == app.Name || c.ClientID == desired.ClientID {
+			continue
+		}
+		clients = append(clients, c)
+	}
+	clients = append(clients, desired)
+	fcj.Spec.IngressAuth.OIDCClients = clients
+	if reflect.DeepEqual(base.Spec.IngressAuth.OIDCClients, fcj.Spec.IngressAuth.OIDCClients) {
+		return nil
+	}
+	if err := r.Patch(ctx, &fcj, client.MergeFrom(base)); err != nil {
+		return err
+	}
+	return r.triggerIngressAuthReconcile(ctx)
+}
+
+// removeAppOIDCClient drops the app's owned OIDC clients from its cluster.
+func (r *AppReconciler) removeAppOIDCClient(ctx context.Context, app *fleetv1alpha1.FleetApp) error {
+	var fcj fleetv1alpha1.FleetClusterJoin
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: app.Spec.ClusterName}, &fcj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	kept := make([]fleetv1alpha1.IngressAuthOIDCClient, 0, len(fcj.Spec.IngressAuth.OIDCClients))
+	changed := false
+	for _, c := range fcj.Spec.IngressAuth.OIDCClients {
+		if c.Owner == app.Name {
+			changed = true
+			continue
+		}
+		kept = append(kept, c)
+	}
+	if !changed {
+		return nil
+	}
+	base := fcj.DeepCopy()
+	fcj.Spec.IngressAuth.OIDCClients = kept
+	if err := r.Patch(ctx, &fcj, client.MergeFrom(base)); err != nil {
+		return err
+	}
+	return r.triggerIngressAuthReconcile(ctx)
+}
+
+// triggerIngressAuthReconcile annotates FleetIngressAuth to run a reconcile.
+func (r *AppReconciler) triggerIngressAuthReconcile(ctx context.Context) error {
+	var fia fleetv1alpha1.FleetIngressAuth
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fleetv1alpha1.FleetIngressAuthName}, &fia); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	if fia.Annotations == nil {
+		fia.Annotations = map[string]string{}
+	}
+	fia.Annotations[ingressauth.ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339)
+	return r.Update(ctx, &fia)
 }
