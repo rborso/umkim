@@ -782,6 +782,143 @@ func HelmAppJob(opts HelmAppJobOpts) *batchv1.Job {
 	}
 }
 
+// ClusterBootstrapJobOpts configures a hub job that runs the cluster bootstrap
+// bundle on the first control node via the site jumphost (the same flow as
+// `umkim cluster bootstrap`, executed server-side so the console can chain it).
+type ClusterBootstrapJobOpts struct {
+	Namespace    string
+	JobName      string
+	Cluster      string
+	TargetHost   string
+	SSHUser      string
+	JumpUser     string
+	JumpHost     string
+	JumpPort     string
+	RunnerImage  string
+	BundleSecret string
+	SSHSecret    string
+}
+
+const clusterBootstrapScript = `set -euo pipefail
+BUNDLE=/bundle/bootstrap.tar.gz
+test -s "${BUNDLE}"
+OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes)
+TARGET="${SSH_USER}@${TARGET_HOST}"
+JUMP="${JUMP_USER}@${JUMP_HOST}"
+JT="/tmp/bootstrap-${CLUSTER_NAME}.tar.gz"
+RD="/tmp/bootstrap-${CLUSTER_NAME}"
+
+# Peer addresses of the cluster nodes (control + workers) from the bundle inventory.
+python3 - "${BUNDLE}" > /tmp/peers <<'PY'
+import re, sys, tarfile
+tf = tarfile.open(sys.argv[1])
+try:
+    inv = tf.extractfile("inventory.ini").read().decode()
+except Exception:
+    inv = ""
+sect = False
+for line in inv.splitlines():
+    s = line.strip()
+    if s.startswith("["):
+        sect = s in ("[fleet_cluster_control]", "[fleet_cluster_workers]")
+        continue
+    if not sect or not s or s.startswith("#"):
+        continue
+    m = re.search(r"ansible_host=(\S+)", s)
+    if m:
+        print(m.group(1))
+PY
+
+python3 - "${BUNDLE}" > /tmp/pub <<'PY'
+import sys, tarfile
+tf = tarfile.open(sys.argv[1])
+sys.stdout.write(tf.extractfile("ssh/id_rsa.pub").read().decode().strip() + "\n")
+PY
+
+# Seed the bundle SSH key on the other nodes so the first control node can join them.
+while IFS= read -r peer; do
+  [ -n "${peer}" ] || continue
+  [ "${peer}" = "${TARGET_HOST}" ] && continue
+  ssh -p "${JUMP_PORT}" "${OPTS[@]}" "${JUMP}" \
+    "ssh ${OPTS[*]} '${TARGET}' 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'" \
+    < /tmp/pub
+  echo "seeded peer ${peer}"
+done < /tmp/peers
+
+scp -P "${JUMP_PORT}" "${OPTS[@]}" "${BUNDLE}" "${JUMP}:${JT}"
+
+ssh -p "${JUMP_PORT}" "${OPTS[@]}" "${JUMP}" bash -s <<REMOTE
+set -euo pipefail
+scp ${OPTS[*]} '${JT}' '${TARGET}:${JT}'
+ssh ${OPTS[*]} '${TARGET}' 'set -euo pipefail
+sudo dnf install -y tar gzip >/dev/null 2>&1 || true
+rm -rf "${RD}"
+mkdir -p "${RD}"
+tar -xzf "${JT}" -C "${RD}"
+chmod +x "${RD}/bootstrap.sh"
+cd "${RD}" && sudo ./bootstrap.sh'
+REMOTE
+echo "cluster bootstrap complete for ${CLUSTER_NAME}"
+`
+
+func ClusterBootstrapJob(opts ClusterBootstrapJobOpts) *batchv1.Job {
+	backoff := int32(1)
+	deadline := int64(3600)
+	ttl := int32(86400)
+	env := []corev1.EnvVar{
+		{Name: "CLUSTER_NAME", Value: opts.Cluster},
+		{Name: "TARGET_HOST", Value: opts.TargetHost},
+		{Name: "SSH_USER", Value: opts.SSHUser},
+		{Name: "JUMP_USER", Value: opts.JumpUser},
+		{Name: "JUMP_HOST", Value: opts.JumpHost},
+		{Name: "JUMP_PORT", Value: opts.JumpPort},
+	}
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opts.JobName,
+			Namespace: opts.Namespace,
+			Labels:    map[string]string{"app": "fleet-cluster-bootstrap", "fleet-cluster": opts.Cluster},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit:            &backoff,
+			ActiveDeadlineSeconds:   &deadline,
+			TTLSecondsAfterFinished: &ttl,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "fleet-cluster-bootstrap", "fleet-cluster": opts.Cluster},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					HostNetwork:   true,
+					NodeSelector:  map[string]string{"node-role.kubernetes.io/control-plane": "true"},
+					Tolerations: []corev1.Toleration{
+						{Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule},
+					},
+					Containers: []corev1.Container{{
+						Name:            "bootstrap",
+						Image:           opts.RunnerImage,
+						ImagePullPolicy: corev1.PullAlways,
+						Command:         []string{"/bin/bash", "-c", clusterBootstrapScript},
+						Env:             env,
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: "bundle", MountPath: "/bundle", ReadOnly: true},
+							{Name: "ssh", MountPath: "/root/.ssh", ReadOnly: true},
+						},
+					}},
+					Volumes: []corev1.Volume{
+						{Name: "bundle", VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{SecretName: opts.BundleSecret},
+						}},
+						{Name: "ssh", VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{SecretName: opts.SSHSecret, DefaultMode: ptrInt32(0600)},
+						}},
+					},
+				},
+			},
+		},
+	}
+}
+
 type ChartPublishJobOpts struct {
 	Namespace      string
 	JobName        string

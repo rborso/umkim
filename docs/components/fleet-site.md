@@ -164,8 +164,16 @@ intent from root + `group_vars/` cluster files; use `POST …/cluster` to retry 
    empty) to the concrete hypervisor, marks inventory `dirty`, and enqueues an
    inventory sync so the jumphost matches the hub.
 4. Reconciler **cluster-apply** — creates `FleetClusterJoin` from cluster group files when members are Ready.
-5. Download bootstrap bundle; run `bootstrap.sh` on first control (via jumphost).
+5. Bootstrap the first control node: run the bundle `bootstrap.sh` manually, or
+   `POST /clusters/{name}/bootstrap` (server-side equivalent of `umkim cluster
+   bootstrap`) which pushes the bundle from the hub and runs it via the site
+   jumphost, seeding the bundle key on the other nodes.
 6. `POST /clusters/{name}/provision` — hub finalize (OCM, edge, providers).
+
+The console **Create cluster** wizard can chain steps 3–6 (**Provision now**):
+it creates any selected **`Declared`** VM guests, creates the intent, bootstraps,
+and provisions. Without it the intent is created idle (`POST /clusters`),
+matching the CLI.
 
 VM hosts created through the connector use **`minRootDiskGi: 38`** on the FCJ
 (40G vdisk root LV is smaller than 40 GiB after EFI/boot). Bare-metal enroll
