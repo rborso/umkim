@@ -34,12 +34,14 @@
     state: enabled
   notify: Fleet spoke firewall | Reload firewalld
 
-- name: Fleet spoke firewall | Allow Calico IPIP from overlay
+- name: Fleet spoke firewall | Allow Calico IPIP between nodes
   ansible.posix.firewalld:
-    rich_rule: >-
-      rule family="ipv4" source address="{{ fleet_spoke_firewall_overlay_subnet }}"
-      protocol value="ipv4" accept
+    # IPIP is protocol 4, exchanged between node management IPs (not the overlay
+    # subnet). The previous `protocol value="ipv4"` was not a valid protocol and
+    # the rule never matched node-to-node IPIP.
+    rich_rule: rule family="ipv4" protocol value="ipip" accept
     permanent: true
+    immediate: true
     state: enabled
   when:
     - fleet_spoke_firewall_enabled | default(false) | bool
