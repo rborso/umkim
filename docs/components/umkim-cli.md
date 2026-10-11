@@ -105,6 +105,7 @@ umkim chart delete NAME
 umkim app list | get NAME | create [--cluster C --chart CHART …] [-f app.json]
 umkim app update NAME [--version V] [--values-file F] [--route-mode …] [--llm-backend true|false]
 umkim app create … --llama-profile qwen35-2b-ud-4g [--llm-backend true|false]
+umkim app create … --oidc-client '{"clientId":"app","redirectPaths":["/callback"]}'
 umkim app delete NAME [NAME...]
 
 umkim infra get hub

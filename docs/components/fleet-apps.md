@@ -71,6 +71,23 @@ Console install fields adapt to the chart:
   `requireAuth`, `requireAuthGroups`); the chart must create a matching
   Kubernetes Service.
 
+### Authelia OIDC client
+
+Apps without native directory support sign in through Authelia OIDC over the
+shared directory. A chart declares its recommended client under `umkim.oidc` in
+its values; this is metadata only — the chart does not render or create the
+client. The chart publish job reads the block into
+`FleetChart.status.oidcDefaults`.
+
+On install the console prompts **Create an Authelia OIDC client for this app**,
+pre-filled from those defaults (client id, redirect paths, extra redirect URIs,
+PKCE). Confirming sets `FleetApp.spec.oidcClient` and `spec.oidcClientId`. The
+controller derives the redirect URIs from the Route host, registers the client
+on the target cluster's `FleetClusterJoin` (`spec.ingressAuth.oidcClients`,
+owner-tagged), and removes it when the app is deleted. The CLI equivalent is
+`umkim app create --oidc-client '{"clientId":"app","redirectPaths":["/callback"]}'`.
+Apps with native LDAP bind the directory directly instead.
+
 ### Update (patch)
 
 `PATCH /fleet/api/v1alpha1/apps/{name}` updates `version`, `valuesYaml`,
