@@ -42,6 +42,9 @@ type chartResponse struct {
 	Phase        string                                `json:"phase"`
 	Message      string                                `json:"message,omitempty"`
 	ImagesCopied []fleetv1alpha1.FleetChartCopiedImage `json:"imagesCopied,omitempty"`
+	// OIDCDefaults is the app's recommended Authelia OIDC client (JSON), used to
+	// pre-fill the install prompt.
+	OIDCDefaults string `json:"oidcDefaults,omitempty"`
 }
 
 type chartsListResponse struct {
@@ -345,6 +348,7 @@ func chartToResponse(ch *fleetv1alpha1.FleetChart) chartResponse {
 		Phase:        ch.Status.Phase,
 		Message:      ch.Status.Message,
 		ImagesCopied: copied,
+		OIDCDefaults: ch.Status.OIDCDefaults,
 	}
 }
 

@@ -938,6 +938,20 @@ elif [ "$POLICY" = "copy" ]; then
 fi
 printf '%s\n' "$COPIED_JSON" > /tmp/copied.json
 printf '%s\n' "$IMAGE_VALUES" > /tmp/image-values.yaml
+# Extract UMKIM app metadata (umkim.oidc) from the chart values, if present.
+: > /tmp/oidc-defaults.json
+if [ -n "$TGZ" ]; then
+  helm show values "$TGZ" > /tmp/chart-values.yaml 2>/dev/null || echo '{}' > /tmp/chart-values.yaml
+  python3 - <<'PY' > /tmp/oidc-defaults.json
+import json, yaml
+try:
+    v = yaml.safe_load(open("/tmp/chart-values.yaml")) or {}
+except Exception:
+    v = {}
+oidc = (v.get("umkim") or {}).get("oidc")
+print(json.dumps(oidc) if oidc else "")
+PY
+fi
 kubectl -n "${FLEET_CHART_NAMESPACE}" create configmap "${FLEET_CHART_RESULT_CM}" \
   --from-literal=name="${NAME}" \
   --from-literal=version="${VER}" \
@@ -945,6 +959,7 @@ kubectl -n "${FLEET_CHART_NAMESPACE}" create configmap "${FLEET_CHART_RESULT_CM}
   --from-literal=chart="${CHART}" \
   --from-file=imagesCopied.json=/tmp/copied.json \
   --from-file=imageValues.yaml=/tmp/image-values.yaml \
+  --from-file=oidcDefaults.json=/tmp/oidc-defaults.json \
   --dry-run=client -o yaml | kubectl apply -f -
 echo published "${CHART}" "${VER}"
 `

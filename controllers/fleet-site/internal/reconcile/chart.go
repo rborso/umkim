@@ -154,6 +154,9 @@ func (r *ChartReconciler) applyPublishResult(ctx context.Context, ch *fleetv1alp
 			ch.Status.ImagesCopied = copied
 		}
 	}
+	if v := strings.TrimSpace(cm.Data["oidcDefaults.json"]); v != "" && v != "{}" && v != "null" {
+		ch.Status.OIDCDefaults = v
+	}
 }
 
 func (r *ChartReconciler) markHarborReady(ctx context.Context, ch *fleetv1alpha1.FleetChart, hash string) (ctrl.Result, error) {

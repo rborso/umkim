@@ -17,26 +17,30 @@ import (
 
 type appPatchBody struct {
 	Version    string                              `json:"version"`
-	Values     json.RawMessage                     `json:"values"`
-	ValuesYAML string                              `json:"valuesYaml"`
-	Namespace  string                              `json:"namespace"`
-	Route      fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
-	Routes     []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
-	LlmBackend *bool                               `json:"llmBackend,omitempty"`
+	Values       json.RawMessage                     `json:"values"`
+	ValuesYAML   string                              `json:"valuesYaml"`
+	Namespace    string                              `json:"namespace"`
+	Route        fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
+	Routes       []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
+	LlmBackend   *bool                               `json:"llmBackend,omitempty"`
+	OIDCClientID string                              `json:"oidcClientId,omitempty"`
+	OIDCClient   *fleetv1alpha1.FleetAppOIDCClient   `json:"oidcClient,omitempty"`
 }
 
 type appCreateBody struct {
-	Name        string                              `json:"name"`
-	ClusterName string                              `json:"clusterName"`
-	Chart       string                              `json:"chart"`
-	Version     string                              `json:"version"`
-	ReleaseName string                              `json:"releaseName"`
-	Namespace   string                              `json:"namespace"`
-	Values      json.RawMessage                     `json:"values"`
-	ValuesYAML  string                              `json:"valuesYaml"`
-	Route       fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
-	Routes      []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
-	LlmBackend  *bool                               `json:"llmBackend,omitempty"`
+	Name         string                              `json:"name"`
+	ClusterName  string                              `json:"clusterName"`
+	Chart        string                              `json:"chart"`
+	Version      string                              `json:"version"`
+	ReleaseName  string                              `json:"releaseName"`
+	Namespace    string                              `json:"namespace"`
+	Values       json.RawMessage                     `json:"values"`
+	ValuesYAML   string                              `json:"valuesYaml"`
+	Route        fleetv1alpha1.FleetAppRouteIntent   `json:"route"`
+	Routes       []fleetv1alpha1.FleetAppRouteIntent `json:"routes,omitempty"`
+	LlmBackend   *bool                               `json:"llmBackend,omitempty"`
+	OIDCClientID string                              `json:"oidcClientId,omitempty"`
+	OIDCClient   *fleetv1alpha1.FleetAppOIDCClient   `json:"oidcClient,omitempty"`
 }
 
 type appResponse struct {
@@ -218,9 +222,11 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 			Version:     strings.TrimSpace(body.Version),
 			ReleaseName: release,
 			Namespace:   ns,
-			ValuesYAML:  valuesYAML,
-			Route:       body.Route,
-			Routes:      body.Routes,
+			ValuesYAML:   valuesYAML,
+			Route:        body.Route,
+			Routes:       body.Routes,
+			OIDCClientID: strings.TrimSpace(body.OIDCClientID),
+			OIDCClient:   body.OIDCClient,
 		},
 	}
 	if len(app.Spec.Routes) == 0 && app.Spec.Route.Mode == "" {
@@ -321,6 +327,11 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 		if body.Route.SiteHost != "" {
 			app.Spec.Route.SiteHost = body.Route.SiteHost
 		}
+		changed = true
+	}
+	if body.OIDCClient != nil || strings.TrimSpace(body.OIDCClientID) != "" {
+		app.Spec.OIDCClient = body.OIDCClient
+		app.Spec.OIDCClientID = strings.TrimSpace(body.OIDCClientID)
 		changed = true
 	}
 	if body.LlmBackend != nil && llm.IsLlamaChart(app.Spec.Chart) {

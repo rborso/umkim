@@ -42,6 +42,7 @@ import type { RockyVmNetwork, RockyVmNetworkMode } from '../apps/rockyVm';
 import type {
   FleetApp,
   FleetAppCreate,
+  FleetAppOIDCClient,
   FleetAppRoute,
   FleetAppRouteMode,
   FleetChart,
@@ -49,6 +50,17 @@ import type {
   FleetCluster,
   FleetSite,
 } from '../api/types';
+
+function parseOidcDefaults(json?: string): FleetAppOIDCClient | undefined {
+  if (!json) return undefined;
+  try {
+    const d = JSON.parse(json);
+    if (!d || typeof d !== 'object') return undefined;
+    return d as FleetAppOIDCClient;
+  } catch {
+    return undefined;
+  }
+}
 import { ErrorAlert } from '../components/ErrorAlert';
 import { FleetModalSelect } from '../components/forms/FleetModalSelect';
 import { LabeledField } from '../components/forms/LabeledField';
@@ -232,6 +244,7 @@ export function AppsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [addChartOpen, setAddChartOpen] = useState(false);
   const [form, setForm] = useState<FleetAppCreate>(emptyForm());
+  const [oidcEnabled, setOidcEnabled] = useState(false);
   const [chartSource, setChartSource] = useState<'upload' | 'oci' | 'http'>('oci');
   const [chartOrigin, setChartOrigin] = useState('');
   const [chartVersion, setChartVersion] = useState('');
@@ -323,14 +336,18 @@ export function AppsPage() {
     const first = readyCharts[0]?.name || 'whoami';
     const firstProfile = chartInstallProfile(first);
     const rockyDefaults = newRockyForm();
+    const firstOidc = parseOidcDefaults(readyCharts[0]?.oidcDefaults);
     setRocky(rockyDefaults);
     setRegisterLiteLLM(false);
+    setOidcEnabled(!!firstOidc);
     setForm({
       ...emptyForm(readyClusters[0]?.name || '', first),
       version: readyCharts[0]?.version || '0.1.0',
       namespace: firstProfile.defaultNamespace || 'default',
       valuesYaml: firstProfile.kind === 'kubevirt' ? rockyValuesFromForm(rockyDefaults) : '',
       route: { mode: 'none' },
+      oidcClient: firstOidc,
+      oidcClientId: firstOidc?.clientId,
     });
     setModalOpen(true);
   };
@@ -374,6 +391,8 @@ export function AppsPage() {
         route: multiRoutes ? undefined : route,
         ...(multiRoutes ? { routes: multiRoutes } : {}),
         ...(llama ? { llmBackend: registerLiteLLM } : {}),
+        oidcClient: oidcEnabled ? form.oidcClient : undefined,
+        oidcClientId: oidcEnabled ? form.oidcClient?.clientId : undefined,
       };
       await createFleetApp(body);
       setModalOpen(false);
@@ -460,6 +479,8 @@ export function AppsPage() {
     if (rockyDefaults) {
       setRocky(rockyDefaults);
     }
+    const oidc = parseOidcDefaults(c?.oidcDefaults);
+    setOidcEnabled(!!oidc);
     setForm((f) => ({
       ...f,
       chart: name,
@@ -468,6 +489,8 @@ export function AppsPage() {
       namespace: profile.defaultNamespace || f.namespace,
       valuesYaml: rockyDefaults ? rockyValuesFromForm(rockyDefaults) : f.valuesYaml,
       route: profile.supportsRoute ? f.route : { mode: 'none' },
+      oidcClient: oidc,
+      oidcClientId: oidc?.clientId,
     }));
     if (llama && llamaProfileId) {
       void applyLlamaProfile(llamaProfileId).catch((e) => setActionError(e));
@@ -1212,6 +1235,81 @@ export function AppsPage() {
               >
                 Add route
               </Button>
+            </>
+          ) : null}
+          <FormGroup fieldId="app-oidc">
+            <Checkbox
+              id="app-oidc"
+              label="Create an Authelia OIDC client for this app"
+              isChecked={oidcEnabled}
+              onChange={(_e, c) => {
+                setOidcEnabled(c);
+                if (c && !form.oidcClient) {
+                  setForm((f) => ({
+                    ...f,
+                    oidcClient: { clientId: f.releaseName || f.name || '', redirectPaths: [] },
+                  }));
+                }
+              }}
+            />
+          </FormGroup>
+          {oidcEnabled ? (
+            <>
+              <LabeledField label="OIDC client id" fieldId="app-oidc-id">
+                <TextInput
+                  id="app-oidc-id"
+                  value={form.oidcClient?.clientId || ''}
+                  onChange={(_e, v) =>
+                    setForm((f) => ({ ...f, oidcClient: { ...f.oidcClient, clientId: v } }))
+                  }
+                  placeholder={form.releaseName || form.name}
+                />
+              </LabeledField>
+              <LabeledField
+                label="Redirect paths (one per line, host-relative)"
+                fieldId="app-oidc-paths"
+              >
+                <TextArea
+                  id="app-oidc-paths"
+                  rows={2}
+                  value={(form.oidcClient?.redirectPaths || []).join('\n')}
+                  onChange={(_e, v) =>
+                    setForm((f) => ({
+                      ...f,
+                      oidcClient: {
+                        ...f.oidcClient,
+                        redirectPaths: v.split('\n').map((s) => s.trim()).filter(Boolean),
+                      },
+                    }))
+                  }
+                  placeholder="/auth/login"
+                />
+              </LabeledField>
+              <LabeledField label="Extra redirect URIs (one per line)" fieldId="app-oidc-extra">
+                <TextArea
+                  id="app-oidc-extra"
+                  rows={2}
+                  value={(form.oidcClient?.extraRedirectUris || []).join('\n')}
+                  onChange={(_e, v) =>
+                    setForm((f) => ({
+                      ...f,
+                      oidcClient: {
+                        ...f.oidcClient,
+                        extraRedirectUris: v.split('\n').map((s) => s.trim()).filter(Boolean),
+                      },
+                    }))
+                  }
+                  placeholder="app.immich:///oauth-callback"
+                />
+              </LabeledField>
+              <Checkbox
+                id="app-oidc-pkce"
+                label="Require PKCE"
+                isChecked={form.oidcClient?.requirePkce !== false}
+                onChange={(_e, c) =>
+                  setForm((f) => ({ ...f, oidcClient: { ...f.oidcClient, requirePkce: c } }))
+                }
+              />
             </>
           ) : null}
           <LabeledField

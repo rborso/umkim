@@ -504,6 +504,10 @@ export interface FleetAppCreate {
   routes?: FleetAppRoute[];
   /** Llama-cpp only: register as a hub LiteLLM backend when Ready. */
   llmBackend?: boolean;
+  /** Register an Authelia OIDC client for this app (prompted at install). */
+  oidcClient?: FleetAppOIDCClient;
+  /** Client id whose issuer/secret are substituted for ${OIDC_*}. */
+  oidcClientId?: string;
 }
 
 export interface FleetAppDefaults {
@@ -534,6 +538,17 @@ export interface FleetChart {
   phase?: FleetChartPhase;
   message?: string;
   imagesCopied?: FleetChartCopiedImage[];
+  /** Recommended Authelia OIDC client (JSON) from the chart's umkim.oidc. */
+  oidcDefaults?: string;
+}
+
+export interface FleetAppOIDCClient {
+  clientId?: string;
+  clientName?: string;
+  scopes?: string[];
+  requirePkce?: boolean;
+  redirectPaths?: string[];
+  extraRedirectUris?: string[];
 }
 
 export interface FleetChartCreate {

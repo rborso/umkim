@@ -56,6 +56,10 @@ type FleetChartStatus struct {
 	Versions           []string                `json:"versions,omitempty"`
 	ImageValues        string                  `json:"imageValues,omitempty"`
 	ImagesCopied       []FleetChartCopiedImage `json:"imagesCopied,omitempty"`
+	// OIDCDefaults is the app's recommended Authelia OIDC client (JSON), read
+	// from the chart's `umkim.oidc` values at publish time. Used to pre-fill the
+	// install prompt.
+	OIDCDefaults string `json:"oidcDefaults,omitempty"`
 	Conditions         []metav1.Condition      `json:"conditions,omitempty"`
 }
 
