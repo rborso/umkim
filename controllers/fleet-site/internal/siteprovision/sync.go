@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -134,12 +135,17 @@ func applyYaidapJobResult(ctx context.Context, c client.Client, ns string, fs *f
 }
 
 func persistResolvedVmLocation(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, subject, loc string, cfg *config.Config) {
-	_, _ = yaidap.PersistResolvedVmLocation(ctx, c, ns, fs.Name, subject, loc, "system/provision")
-	_ = yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, subject, yaidap.GuestStatus{
+	logger := log.FromContext(ctx)
+	if _, err := yaidap.PersistResolvedVmLocation(ctx, c, ns, fs.Name, subject, loc, "system/provision"); err != nil {
+		logger.Error(err, "persist resolved vm_location", "guest", subject, "vm_location", loc)
+	}
+	if err := yaidap.UpdateGuestStatus(ctx, c, ns, fs.Name, subject, yaidap.GuestStatus{
 		Phase:      fleetv1alpha1.SiteHostPhaseReady,
 		VmLocation: loc,
 		Message:    "vm_location=" + loc,
-	})
+	}); err != nil {
+		logger.Error(err, "update guest status after vm_location", "guest", subject)
+	}
 	if cfg != nil {
 		_, _ = siteinventory.EnqueueInventorySync(ctx, c, *cfg, fs)
 	}
