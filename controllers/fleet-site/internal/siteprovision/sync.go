@@ -12,6 +12,7 @@ import (
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/siteinventory"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,7 +80,7 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 		}
 		return nil
 	}
-	if job.Status.Failed > 0 {
+	if jobTerminalFailed(&job) {
 		end := metav1.NewTime(time.Now().UTC())
 		cur.Phase = fleetv1alpha1.ProvisionPhaseFailed
 		cur.Message = "YAIDAP connector job failed"
@@ -92,6 +93,26 @@ func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *flee
 		return CommitAction(ctx, c, fs, *cur, true)
 	}
 	return nil
+}
+
+// jobTerminalFailed reports whether a Job has exhausted its retries. A connector
+// Job may retry (backoffLimit) and still succeed, so a non-zero failed count alone
+// must not be recorded as a failed operation in the history.
+func jobTerminalFailed(job *batchv1.Job) bool {
+	if job.Status.Succeeded > 0 {
+		return false
+	}
+	for _, c := range job.Status.Conditions {
+		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	// Fall back to the backoff budget when the failure condition is not yet set.
+	limit := int32(0)
+	if job.Spec.BackoffLimit != nil {
+		limit = *job.Spec.BackoffLimit
+	}
+	return job.Status.Failed > limit
 }
 
 func applyYaidapJobResult(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, cur *fleetv1alpha1.SiteProvisionActionRecord, logs string, cfg *config.Config) {
