@@ -184,6 +184,29 @@ only applies when `requireAuth` is set. See [fleet-edge.md](fleet-edge.md) and
 Hub-routed apps stop when the hub is unavailable. `site` and `none` apps can
 remain reachable on their own paths when site ingress is healthy.
 
+### TCP routes (L4 port forward)
+
+Not every service speaks HTTP — git-over-SSH, databases, and the like cannot ride
+the hub gateway or a hostname Ingress. Set `route.protocol: tcp` with
+`route.forwardPort` to publish a raw L4 port forward instead:
+
+```json
+{"protocol": "tcp", "forwardPort": 2222, "servicePort": 32222}
+```
+
+UMKIM runs a port-forwarder on the hub that listens on `forwardPort` and dials
+`servicePort` on the target cluster's node over the WireGuard overlay, so the
+app's Service must be published as a **NodePort** on the spoke (chart values) and
+`forwardPort` must be free on the hub.
+
+- No hostname, no TLS, and no Authelia — `requireAuth` does not apply to tcp routes.
+- The forwarder is a `fleet-app-pf-<route>` Deployment in the app's namespace,
+  owned by the FleetApp (deleted with it). Stale forwarders are pruned when the
+  route is removed.
+- CLI: `umkim app create … --route-protocol tcp --route-forward-port 2222 --service-port 32222`.
+- The chart should advertise the forwarded host/port so its own clone URLs are
+  right (for Gitea, `gitea.ssh.domain` + the NodePort).
+
 ## Verify
 
 After phase **Ready**, check the Helm release on the spoke (hub secret

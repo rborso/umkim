@@ -201,6 +201,10 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "route.mode must be none, hub, or site"})
 		return
 	}
+	if msg := validateRouteProtocols(body.Route, body.Routes); msg != "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
+		return
+	}
 	for _, rt := range body.Routes {
 		if !appchart.ValidRouteMode(rt.Mode) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "routes[].mode must be none, hub, or site"})
@@ -315,6 +319,10 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "routes[].mode must be none, hub, or site"})
 				return
 			}
+		}
+		if msg := validateRouteProtocols(fleetv1alpha1.FleetAppRouteIntent{}, body.Routes); msg != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
+			return
 		}
 		app.Spec.Routes = body.Routes
 		app.Spec.Route = fleetv1alpha1.FleetAppRouteIntent{}
@@ -485,6 +493,21 @@ func (s *Server) findRouteHostConflict(ctx context.Context, hosts []string, excl
 			if orig, ok := want[strings.ToLower(h)]; ok {
 				return fmt.Sprintf("host %q is already used by app %q", orig, other.Name)
 			}
+		}
+	}
+	return ""
+}
+
+// validateRouteProtocols checks route protocols and the tcp forwardPort
+// requirement, returning an operator-facing message ("" when valid).
+func validateRouteProtocols(route fleetv1alpha1.FleetAppRouteIntent, routes []fleetv1alpha1.FleetAppRouteIntent) string {
+	all := append([]fleetv1alpha1.FleetAppRouteIntent{route}, routes...)
+	for _, rt := range all {
+		if !appchart.ValidRouteProtocol(rt.Protocol) {
+			return "route protocol must be http or tcp"
+		}
+		if rt.EffectiveProtocol() == fleetv1alpha1.AppRouteProtocolTCP && rt.ForwardPort <= 0 {
+			return "route forwardPort is required for protocol tcp"
 		}
 	}
 	return ""

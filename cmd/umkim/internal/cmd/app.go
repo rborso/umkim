@@ -111,6 +111,8 @@ func appCreateCmd() *cobra.Command {
 		llamaProfile, llmBackendOpt, oidcClient, requireAuthGroups                  string
 		routeServiceName                                                            string
 		routeServicePort                                                            int
+		routeProtocol                                                               string
+		routeForwardPort                                                            int
 		requireAuth                                                                 bool
 	)
 	c := &cobra.Command{
@@ -168,6 +170,12 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 				}
 				if routeServicePort > 0 {
 					route["servicePort"] = routeServicePort
+				}
+				if strings.TrimSpace(routeProtocol) != "" {
+					route["protocol"] = strings.TrimSpace(routeProtocol)
+				}
+				if routeForwardPort > 0 {
+					route["forwardPort"] = routeForwardPort
 				}
 				if strings.TrimSpace(requireAuthGroups) != "" {
 					var groups []string
@@ -252,12 +260,15 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 	c.Flags().StringVar(&requireAuthGroups, "require-auth-groups", "", "Comma-separated directory groups allowed through the route")
 	c.Flags().StringVar(&routeServiceName, "service-name", "", "Backend Service name for the route (defaults to the release name)")
 	c.Flags().IntVar(&routeServicePort, "service-port", 0, "Backend Service port for the route (defaults to 80)")
+	c.Flags().StringVar(&routeProtocol, "route-protocol", "", "Route protocol: http (default) or tcp (hub L4 port forward)")
+	c.Flags().IntVar(&routeForwardPort, "route-forward-port", 0, "Hub port to listen on for a tcp route")
 	return c
 }
 
 func appUpdateCmd() *cobra.Command {
-	var version, valuesFile, namespace, routeMode, routeHost, llmBackendOpt, requireAuthGroups, routeServiceName string
+	var version, valuesFile, namespace, routeMode, routeHost, llmBackendOpt, requireAuthGroups, routeServiceName, routeProtocol string
 	var requireAuth bool
+	var routeForwardPort int
 	var routeServicePort int
 	c := &cobra.Command{
 		Use:   "update [name]",
@@ -278,7 +289,7 @@ func appUpdateCmd() *cobra.Command {
 				}
 				body["valuesYaml"] = string(raw)
 			}
-			if routeMode != "" || routeHost != "" || requireAuth || strings.TrimSpace(requireAuthGroups) != "" || routeServiceName != "" || routeServicePort > 0 {
+			if routeMode != "" || routeHost != "" || requireAuth || strings.TrimSpace(requireAuthGroups) != "" || routeServiceName != "" || routeServicePort > 0 || strings.TrimSpace(routeProtocol) != "" || routeForwardPort > 0 {
 				route := map[string]interface{}{}
 				if routeMode != "" {
 					switch routeMode {
@@ -308,6 +319,12 @@ func appUpdateCmd() *cobra.Command {
 				}
 				if routeServicePort > 0 {
 					route["servicePort"] = routeServicePort
+				}
+				if strings.TrimSpace(routeProtocol) != "" {
+					route["protocol"] = strings.TrimSpace(routeProtocol)
+				}
+				if routeForwardPort > 0 {
+					route["forwardPort"] = routeForwardPort
 				}
 				if strings.TrimSpace(requireAuthGroups) != "" {
 					var groups []string
@@ -356,6 +373,8 @@ func appUpdateCmd() *cobra.Command {
 	c.Flags().StringVar(&requireAuthGroups, "require-auth-groups", "", "Comma-separated directory groups allowed through the route")
 	c.Flags().StringVar(&routeServiceName, "service-name", "", "Backend Service name for the route")
 	c.Flags().IntVar(&routeServicePort, "service-port", 0, "Backend Service port for the route")
+	c.Flags().StringVar(&routeProtocol, "route-protocol", "", "Route protocol: http (default) or tcp (hub L4 port forward)")
+	c.Flags().IntVar(&routeForwardPort, "route-forward-port", 0, "Hub port to listen on for a tcp route")
 	c.Flags().StringVar(&llmBackendOpt, "llm-backend", "", "Llama-cpp only: hub LiteLLM backend registration (true|false)")
 	return c
 }
