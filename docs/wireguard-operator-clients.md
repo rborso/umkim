@@ -22,6 +22,11 @@ and writes an importable configuration under `output/wireguard-clients/`.
 Existing operator and FleetClusterJoin peers are added without rewriting the
 hub interface configuration.
 
+Each client has a **pinned overlay address** (`address:` in the inventory file).
+Adding a client appends it with the next free address and never renumbers the
+others, so existing devices keep working without re-importing their config. When
+editing the file by hand, give the new entry an explicit `address:`.
+
 Import the generated configuration with the approved WireGuard client on the
 operator device. Confirm that only the intended overlay routes are installed
 and that the management interface is reachable over the tunnel.

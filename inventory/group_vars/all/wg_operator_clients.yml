@@ -1,10 +1,17 @@
 ---
 # Operator PCs — split-tunnel overlay access. Add names here or use scripts/wg-dev-client.sh.
+# Addresses are pinned per client so adding a client never renumbers the others.
 wireguard_operator_clients:
   - name: qa-tester
+    address: 10.10.0.100/32
   - name: my-laptop
+    address: 10.10.0.101/32
   - name: my-notebook
+    address: 10.10.0.102/32
   - name: notebook
+    address: 10.10.0.103/32
   - name: laptop
-
+    address: 10.10.0.104/32
+  - name: my-phone
+    address: 10.10.0.105/32
 wireguard_operator_client_pool_octet: 100

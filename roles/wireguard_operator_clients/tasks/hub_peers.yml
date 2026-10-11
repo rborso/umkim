@@ -39,7 +39,7 @@
   loop_control:
     label: "{{ item.name | default('operator') }}"
   changed_when: true
-  when: item.allowed_ips is match('/32$')
+  when: (item.allowed_ips | string).endswith('/32')
   tags: [wireguard_clients, wireguard_operator_clients, wireguard_server]
 
 - name: WG operator clients | Collect FleetClusterJoin WireGuard peers
