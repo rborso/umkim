@@ -105,6 +105,7 @@ See [docs/design.md](docs/design.md) for the architecture and
 | Install a hub and first cluster | [docs/install.md](docs/install.md) |
 | Architecture and lifecycle | [docs/design.md](docs/design.md) |
 | Helm apps | [docs/components/fleet-apps.md](docs/components/fleet-apps.md) |
+| Install Immich / Paperless-ngx | [docs/app-install-immich-paperless.md](docs/app-install-immich-paperless.md) |
 | Site exposure profiles | [examples/site-profiles/](examples/site-profiles/) |
 | Versions and release pins | [VERSIONS.md](VERSIONS.md) |
 | Security and secrets | [SECURITY.md](SECURITY.md) · [docs/secrets.md](docs/secrets.md) |
