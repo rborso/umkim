@@ -19,6 +19,7 @@ import {
 } from '@patternfly/react-core';
 import { DownloadIcon } from '@patternfly/react-icons';
 import {
+  bootstrapFleetCluster,
   deleteFleetCluster,
   disableClusterIngressAuth,
   setClusterDirectory,
@@ -109,6 +110,8 @@ export function ClusterDetailPage() {
   const [error, setError] = useState<unknown>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<unknown>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<unknown>(null);
@@ -284,6 +287,20 @@ export function ClusterDetailPage() {
     }
   };
 
+  const runBootstrap = async () => {
+    if (!name) return;
+    setBootstrapping(true);
+    setBootstrapError(null);
+    try {
+      await bootstrapFleetCluster(name);
+      await load();
+    } catch (e) {
+      setBootstrapError(e);
+    } finally {
+      setBootstrapping(false);
+    }
+  };
+
   const downloadBootstrapBundle = async () => {
     if (!name) return;
     setSaveError(null);
@@ -454,6 +471,7 @@ export function ClusterDetailPage() {
       <PageSection>
         <ErrorAlert error={error} />
         <ErrorAlert error={saveError} />
+        <ErrorAlert error={bootstrapError} />
         {loading && <p>Loading…</p>}
         {cluster && deletingPhase && (
           <p>Cluster deletion in progress. WireGuard peers, OCM registration, and ManifestWorks are being removed.</p>
@@ -464,11 +482,11 @@ export function ClusterDetailPage() {
               Provisioning
             </Title>
             <p style={{ marginTop: '0.5rem' }}>
-              Download the bootstrap bundle, extract on the first control node with{' '}
-              <code>tar -xzf bootstrap-{name}.tar.gz</code>, then run <code>sudo ./bootstrap.sh</code>.
-              Validation and local K3s provision run inside the bundle. When phase is Validated, click
-              Provision for hub finalize (OCM join, cert-manager platform, spoke ingress). The cluster
-              is usable for workloads when phase is Ready.
+              Run bootstrap automatically via the site jumphost, or download the bundle, extract it on
+              the first control node with <code>tar -xzf bootstrap-{name}.tar.gz</code>, and run{' '}
+              <code>sudo ./bootstrap.sh</code>. Validation and local K3s provision run inside the
+              bundle. When phase is Validated, click Provision for hub finalize (OCM join, cert-manager
+              platform, spoke ingress). The cluster is usable for workloads when phase is Ready.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
               {(phase === 'ScriptIssued' ||
@@ -492,6 +510,11 @@ export function ClusterDetailPage() {
               {bundleMode && (
                 <Button variant="secondary" icon={<DownloadIcon />} onClick={() => void downloadBootstrap()}>
                   Download bootstrap script (debug)
+                </Button>
+              )}
+              {bundleMode && (phase === 'ScriptIssued' || phase === 'Pending' || phase === 'Failed') && (
+                <Button variant="primary" isLoading={bootstrapping} onClick={() => void runBootstrap()}>
+                  Bootstrap via jumphost
                 </Button>
               )}
               {(phase === 'Validated' || phase === 'Failed') && (

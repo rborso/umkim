@@ -712,6 +712,14 @@ export async function provisionFleetCluster(name: string): Promise<void> {
   });
 }
 
+/** Runs the cluster bootstrap bundle on the first control node via the jumphost. */
+export async function bootstrapFleetCluster(name: string): Promise<{ job?: string }> {
+  return fleetSiteRequest<{ job?: string }>(
+    '/clusters/' + encodeURIComponent(name) + '/bootstrap',
+    { method: 'POST' },
+  );
+}
+
 export async function configureFleetClusterStorage(
   name: string,
   body: import('./types').FleetClusterConfigureStorage,
