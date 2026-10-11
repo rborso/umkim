@@ -161,6 +161,11 @@ cluster is bound to a **`port_forward`** ingress (zone comes from that ingress r
 
 Set `route.hubHost` or `route.siteHost` on create to override the default hostname. The console **Install chart** dialog exposes the same fields when route mode is `hub` or `site`.
 
+For `hub` routes the hub gateway proxies to the spoke's `web-hub` entrypoint, so the
+route must point at the app's real Service: set `route.serviceName` / `route.servicePort`
+(the default is `<release>:80`, which rarely matches). `umkim app create --service-name S --service-port P`
+and the console expose this.
+
 `requireAuth` opts the route into ingress-auth when that stack is ready.
 `requireAuthGroups` (a list of directory group names) additionally restricts the
 route to those groups (tenants); an empty list allows any authenticated user. It

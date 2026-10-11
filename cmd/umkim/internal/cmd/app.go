@@ -108,7 +108,10 @@ func appCreateCmd() *cobra.Command {
 	var (
 		jsonFile, cluster, chart, version, release, namespace, valuesFile, appName string
 		routeMode, routeHost                                                        string
-		llamaProfile, llmBackendOpt, oidcClient                                     string
+		llamaProfile, llmBackendOpt, oidcClient, requireAuthGroups                  string
+		routeServiceName                                                            string
+		routeServicePort                                                            int
+		requireAuth                                                                 bool
 	)
 	c := &cobra.Command{
 		Use:   "create",
@@ -155,6 +158,26 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 						route["hubHost"] = routeHost
 					case "site":
 						route["siteHost"] = routeHost
+					}
+				}
+				if requireAuth {
+					route["requireAuth"] = true
+				}
+				if routeServiceName != "" {
+					route["serviceName"] = routeServiceName
+				}
+				if routeServicePort > 0 {
+					route["servicePort"] = routeServicePort
+				}
+				if strings.TrimSpace(requireAuthGroups) != "" {
+					var groups []string
+					for _, g := range strings.Split(requireAuthGroups, ",") {
+						if g = strings.TrimSpace(g); g != "" {
+							groups = append(groups, g)
+						}
+					}
+					if len(groups) > 0 {
+						route["requireAuthGroups"] = groups
 					}
 				}
 				body["route"] = route
@@ -225,11 +248,17 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 	c.Flags().StringVar(&llmBackendOpt, "llm-backend", "", "Llama-cpp only: register hub LiteLLM backend when Ready (true|false)")
 	c.Flags().StringVar(&routeMode, "route-mode", "none", "Route mode: none|hub|site")
 	c.Flags().StringVar(&routeHost, "route-host", "", "Route hostname (hubHost or siteHost per mode)")
+	c.Flags().BoolVar(&requireAuth, "require-auth", false, "Gate the route behind Authelia forward-auth")
+	c.Flags().StringVar(&requireAuthGroups, "require-auth-groups", "", "Comma-separated directory groups allowed through the route")
+	c.Flags().StringVar(&routeServiceName, "service-name", "", "Backend Service name for the route (defaults to the release name)")
+	c.Flags().IntVar(&routeServicePort, "service-port", 0, "Backend Service port for the route (defaults to 80)")
 	return c
 }
 
 func appUpdateCmd() *cobra.Command {
-	var version, valuesFile, namespace, routeMode, routeHost, llmBackendOpt string
+	var version, valuesFile, namespace, routeMode, routeHost, llmBackendOpt, requireAuthGroups, routeServiceName string
+	var requireAuth bool
+	var routeServicePort int
 	c := &cobra.Command{
 		Use:   "update [name]",
 		Short: "Update a FleetApp install (PATCH /apps/{name})",
@@ -249,7 +278,7 @@ func appUpdateCmd() *cobra.Command {
 				}
 				body["valuesYaml"] = string(raw)
 			}
-			if routeMode != "" || routeHost != "" {
+			if routeMode != "" || routeHost != "" || requireAuth || strings.TrimSpace(requireAuthGroups) != "" || routeServiceName != "" || routeServicePort > 0 {
 				route := map[string]interface{}{}
 				if routeMode != "" {
 					switch routeMode {
@@ -269,6 +298,26 @@ func appUpdateCmd() *cobra.Command {
 						}
 					case "site":
 						route["siteHost"] = routeHost
+					}
+				}
+				if requireAuth {
+					route["requireAuth"] = true
+				}
+				if routeServiceName != "" {
+					route["serviceName"] = routeServiceName
+				}
+				if routeServicePort > 0 {
+					route["servicePort"] = routeServicePort
+				}
+				if strings.TrimSpace(requireAuthGroups) != "" {
+					var groups []string
+					for _, g := range strings.Split(requireAuthGroups, ",") {
+						if g = strings.TrimSpace(g); g != "" {
+							groups = append(groups, g)
+						}
+					}
+					if len(groups) > 0 {
+						route["requireAuthGroups"] = groups
 					}
 				}
 				body["route"] = route
@@ -303,6 +352,10 @@ func appUpdateCmd() *cobra.Command {
 	c.Flags().StringVar(&namespace, "namespace", "", "Target namespace")
 	c.Flags().StringVar(&routeMode, "route-mode", "", "Route mode: none|hub|site")
 	c.Flags().StringVar(&routeHost, "route-host", "", "Route hostname")
+	c.Flags().BoolVar(&requireAuth, "require-auth", false, "Gate the route behind Authelia forward-auth")
+	c.Flags().StringVar(&requireAuthGroups, "require-auth-groups", "", "Comma-separated directory groups allowed through the route")
+	c.Flags().StringVar(&routeServiceName, "service-name", "", "Backend Service name for the route")
+	c.Flags().IntVar(&routeServicePort, "service-port", 0, "Backend Service port for the route")
 	c.Flags().StringVar(&llmBackendOpt, "llm-backend", "", "Llama-cpp only: hub LiteLLM backend registration (true|false)")
 	return c
 }
