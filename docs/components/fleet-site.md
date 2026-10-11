@@ -170,10 +170,12 @@ intent from root + `group_vars/` cluster files; use `POST …/cluster` to retry 
    jumphost, seeding the bundle key on the other nodes.
 6. `POST /clusters/{name}/provision` — hub finalize (OCM, edge, providers).
 
-The console **Create cluster** wizard can chain steps 3–6 (**Provision now**):
-it creates any selected **`Declared`** VM guests, creates the intent, bootstraps,
-and provisions. Without it the intent is created idle (`POST /clusters`),
-matching the CLI.
+The console **Create cluster** wizard **Provision now** sets
+`FleetClusterJoin.spec.autoProvision: true`. The controller then drives steps 3–6
+itself: it creates any **`Declared`** VM guests (each a connector pod), runs the
+bootstrap Job via the jumphost, and provisions — so the flow continues even if the
+browser closes. Without it the intent is created idle (`POST /clusters`), matching
+the CLI and `umkim cluster bootstrap`.
 
 VM hosts created through the connector use **`minRootDiskGi: 38`** on the FCJ
 (40G vdisk root LV is smaller than 40 GiB after EFI/boot). Bare-metal enroll

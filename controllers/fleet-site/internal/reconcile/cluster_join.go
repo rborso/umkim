@@ -140,6 +140,14 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		_ = r.Status().Update(ctx, &fcj)
 	}
 
+	// Controller-driven bring-up (spec.autoProvision): create declared VM guests,
+	// bootstrap via the jumphost, then provision. Every step runs in a pod.
+	if res, handled, err := r.reconcileClusterAutoProvision(ctx, &fcj, clusterName); err != nil {
+		return r.failClusterJoin(ctx, &fcj, err)
+	} else if handled {
+		return res, nil
+	}
+
 	if fcj.Status.Phase == fleetv1alpha1.JoinPhasePending {
 		if err := r.issueClusterScript(ctx, &fcj, clusterName); err != nil {
 			return r.failClusterJoin(ctx, &fcj, err)

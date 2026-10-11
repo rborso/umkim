@@ -939,6 +939,8 @@ export interface FleetClusterCreate {
   hubLanApi?: string;
   controlPlaneVip?: string;
   nodes?: FleetClusterNodeInput[];
+  /** Controller-driven bring-up: create Declared VM guests, bootstrap, provision. */
+  autoProvision?: boolean;
   edge?: {
     ingressId?: string;
   };

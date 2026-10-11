@@ -243,6 +243,10 @@ type FleetClusterJoinSpec struct {
 	Providers           ClusterProvidersSpec       `json:"providers,omitempty"`
 	IngressAuth         FleetClusterJoinIngressAuthSpec `json:"ingressAuth,omitempty"`
 	Acme                FleetClusterJoinAcmeSpec   `json:"acme,omitempty"`
+	// AutoProvision drives the full bring-up pipeline in the controller: create
+	// Declared VM guests, run the bootstrap bundle via the jumphost, then provision
+	// the hub side. When false the intent is created idle (operator runs the steps).
+	AutoProvision bool `json:"autoProvision,omitempty"`
 }
 
 type FleetClusterJoinStatus struct {
@@ -255,6 +259,8 @@ type FleetClusterJoinStatus struct {
 	EnrolledHostname        string       `json:"enrolledHostname,omitempty"`
 	ValidationErrors        []string     `json:"validationErrors,omitempty"`
 	ValidateJobName         string       `json:"validateJobName,omitempty"`
+	BootstrapJobName        string       `json:"bootstrapJobName,omitempty"`
+	PipelineStep            string       `json:"pipelineStep,omitempty"`
 	ProvisionJobName        string       `json:"provisionJobName,omitempty"`
 	DeleteJobName           string       `json:"deleteJobName,omitempty"`
 	WgRemoveJobName         string       `json:"wgRemoveJobName,omitempty"`

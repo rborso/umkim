@@ -60,6 +60,7 @@ type clusterCreateBody struct {
 	HubLanApi       string                                   `json:"hubLanApi,omitempty"`
 	ControlPlaneVip string                                   `json:"controlPlaneVip,omitempty"`
 	Nodes           []fleetv1alpha1.FleetClusterJoinNodeSpec `json:"nodes,omitempty"`
+	AutoProvision   bool                                     `json:"autoProvision,omitempty"`
 	Providers       *struct {
 		Install        fleetv1alpha1.ProviderInstallSpec `json:"install,omitempty"`
 		KubevirtBridge fleetv1alpha1.KubevirtBridgeSpec  `json:"kubevirtBridge,omitempty"`
@@ -408,6 +409,7 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 			HubLanApi:       req.HubLanApi,
 			ControlPlaneVip: strings.TrimSpace(req.ControlPlaneVip),
 			Nodes:           req.Nodes,
+			AutoProvision:   req.AutoProvision,
 		},
 		Status: fleetv1alpha1.FleetClusterJoinStatus{
 			Phase:   fleetv1alpha1.JoinPhasePending,
