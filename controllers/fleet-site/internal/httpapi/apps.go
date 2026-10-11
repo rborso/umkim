@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -232,6 +234,10 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 	if len(app.Spec.Routes) == 0 && app.Spec.Route.Mode == "" {
 		app.Spec.Route.Mode = fleetv1alpha1.AppRouteModeNone
 	}
+	if msg := s.findRouteHostConflict(r.Context(), routeHosts(body.Route, body.Routes), ""); msg != "" {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": msg})
+		return
+	}
 	if body.LlmBackend != nil && llm.IsLlamaChart(chart) {
 		app.SetLLMBackendAnnotation(*body.LlmBackend)
 	}
@@ -354,6 +360,10 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 		writeJSON(w, http.StatusOK, appToResponse(&app))
 		return
 	}
+	if msg := s.findRouteHostConflict(r.Context(), routeHosts(app.Spec.Route, app.Spec.Routes), app.Name); msg != "" {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": msg})
+		return
+	}
 	if err := s.Client.Update(r.Context(), &app); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -428,4 +438,54 @@ func jsonValuesToYAML(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+// routeHosts returns the hub/site hostnames an app's route(s) publish. When
+// routes[] is set it takes precedence over the single route.
+func routeHosts(route fleetv1alpha1.FleetAppRouteIntent, routes []fleetv1alpha1.FleetAppRouteIntent) []string {
+	var hosts []string
+	add := func(rt fleetv1alpha1.FleetAppRouteIntent) {
+		if h := strings.TrimSpace(rt.HubHost); h != "" {
+			hosts = append(hosts, h)
+		}
+		if h := strings.TrimSpace(rt.SiteHost); h != "" {
+			hosts = append(hosts, h)
+		}
+	}
+	if len(routes) > 0 {
+		for _, rt := range routes {
+			add(rt)
+		}
+		return hosts
+	}
+	add(route)
+	return hosts
+}
+
+// findRouteHostConflict returns a clear message when another FleetApp already
+// publishes one of hosts. excludeName skips the app being updated.
+func (s *Server) findRouteHostConflict(ctx context.Context, hosts []string, excludeName string) string {
+	if len(hosts) == 0 {
+		return ""
+	}
+	want := map[string]string{}
+	for _, h := range hosts {
+		want[strings.ToLower(strings.TrimSpace(h))] = h
+	}
+	var list fleetv1alpha1.FleetAppList
+	if err := s.Client.List(ctx, &list, client.InNamespace(s.Cfg.Namespace)); err != nil {
+		return ""
+	}
+	for i := range list.Items {
+		other := &list.Items[i]
+		if other.Name == excludeName {
+			continue
+		}
+		for _, h := range routeHosts(other.Spec.Route, other.Spec.Routes) {
+			if orig, ok := want[strings.ToLower(h)]; ok {
+				return fmt.Sprintf("host %q is already used by app %q", orig, other.Name)
+			}
+		}
+	}
+	return ""
 }
