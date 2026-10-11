@@ -237,11 +237,16 @@
   vars:
     fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
     fleet_cluster_cleanup_mode: "{{ 'reset' if (fleet_cluster_cleanup_kubernetes | default(false) | bool) else 'detach' }}"
+    fleet_cluster_hub_host: "{{ fleet_site_hub_inventory_name | default(groups['hub'] | default([]) | first) | default('umkim-hub') }}"
+    # fleet_cluster_mc_removed is set as a fact on the hub play; host facts are
+    # per-host, so a bare reference on the node hosts is always undefined. Read it
+    # through hostvars, otherwise node cleanup is silently skipped every time.
+    fleet_cluster_mc_removed_on_hub: "{{ hostvars[fleet_cluster_hub_host].fleet_cluster_mc_removed | default(false) }}"
   tasks:
     - name: Fleet cluster delete | Stage cleanup script on node
       when:
         - not (fleet_cluster_delete_hub_only | default(false) | bool)
-        - fleet_cluster_mc_removed | default(false) | bool
+        - fleet_cluster_mc_removed_on_hub | bool
       ansible.builtin.copy:
         src: /ansible/cleanup_node_local.sh
         dest: /tmp/fleet-node-cleanup.sh
@@ -254,7 +259,7 @@
     - name: Fleet cluster delete | Launch node cleanup in background
       when:
         - not (fleet_cluster_delete_hub_only | default(false) | bool)
-        - fleet_cluster_mc_removed | default(false) | bool
+        - fleet_cluster_mc_removed_on_hub | bool
       ansible.builtin.shell: |
         set -e
         LOG="/tmp/fleet-cleanup-{{ fleet_cluster_name }}.log"
