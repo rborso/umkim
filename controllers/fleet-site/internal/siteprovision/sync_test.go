@@ -487,3 +487,58 @@ func TestRefreshRunningJobTerminalFailure(t *testing.T) {
 		t.Fatalf("history=%+v, want a Failed entry", site.Status.Provision.History)
 	}
 }
+
+func TestRefreshRunningJobFinalizesSupersededHistory(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = fleetv1alpha1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	ns := "fleet-console"
+	site := &fleetv1alpha1.FleetSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			SiteName:         "homelab",
+			SiteId:           "homelab",
+			ProvisioningMode: fleetv1alpha1.ProvisioningModeRegistry,
+		},
+		Status: fleetv1alpha1.FleetSiteStatus{
+			Provision: &fleetv1alpha1.SiteProvisionStatus{
+				// The bootstrap step was superseded as current by the provision step.
+				Current: &fleetv1alpha1.SiteProvisionActionRecord{
+					ID: "prov1", Action: fleetv1alpha1.ProvisionActionProvision, Subject: "lab-ha-0",
+					Phase: fleetv1alpha1.ProvisionPhaseRunning, JobName: "fleet-cluster-provision-lab-ha-0",
+				},
+				History: []fleetv1alpha1.SiteProvisionActionRecord{{
+					ID: "boot1", Action: fleetv1alpha1.ProvisionActionBootstrap, Subject: "lab-ha-0",
+					Phase: fleetv1alpha1.ProvisionPhaseRunning, JobName: "fleet-cluster-bootstrap-lab-ha-0",
+				}},
+			},
+		},
+	}
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-bootstrap-lab-ha-0", Namespace: ns},
+		Status:     batchv1.JobStatus{Succeeded: 1},
+	}
+	// The provision job is still active, so the current action stays running.
+	provJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-provision-lab-ha-0", Namespace: ns},
+		Status:     batchv1.JobStatus{Active: 1},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, job, provJob).Build()
+
+	if err := RefreshRunningJob(context.Background(), c, ns, site, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	var got fleetv1alpha1.FleetSite
+	if err := c.Get(context.Background(), types.NamespacedName{Namespace: ns, Name: "homelab"}, &got); err != nil {
+		t.Fatal(err)
+	}
+	h := got.Status.Provision.History[0]
+	if h.Phase != fleetv1alpha1.ProvisionPhaseSucceeded {
+		t.Fatalf("superseded history entry phase=%q, want Succeeded", h.Phase)
+	}
+	if got.Status.Provision.Current == nil || got.Status.Provision.Current.ID != "prov1" {
+		t.Fatalf("current action changed: %+v", got.Status.Provision.Current)
+	}
+}
