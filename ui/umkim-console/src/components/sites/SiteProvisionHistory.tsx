@@ -13,6 +13,8 @@ const ACTION_LABELS: Record<string, string> = {
   discover: 'Discover (SSH)',
   discover_pxe: 'Discover (PXE)',
   status: 'Status',
+  bootstrap: 'Cluster bootstrap',
+  provision: 'Cluster provision',
 };
 
 function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey' {

@@ -74,6 +74,10 @@ const (
 	ProvisionActionPrepareHypervisor       = "prepare_hypervisor"
 	ProvisionActionPrepareGPUPassthrough   = "prepare_gpu_passthrough"
 	ProvisionActionPrepareHypervisorGPU    = "prepare_hypervisor_gpu"
+	// Cluster-level bring-up steps recorded in the site provision history by the
+	// controller pipeline (not manual site-host actions).
+	ProvisionActionBootstrap = "bootstrap"
+	ProvisionActionProvision = "provision"
 )
 
 // Provision action phases.
