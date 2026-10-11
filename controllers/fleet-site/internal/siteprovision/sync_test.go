@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -324,5 +325,72 @@ func TestRepairStaleGuestProvisioningDestroy(t *testing.T) {
 	}
 	if status.Guests["vm01"].Phase != fleetv1alpha1.SiteHostPhaseDeclared {
 		t.Fatalf("status=%+v", status.Guests["vm01"])
+	}
+}
+
+func provisionStatusCM(ns, phase string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      connectors.InventoryCMName("homelab", fleetv1alpha1.ProvisionProviderYaidap),
+			Namespace: ns,
+		},
+		Data: map[string]string{
+			"_meta.status.json": `{"guests":{"vm01":{"phase":"` + phase + `"}}}`,
+		},
+	}
+}
+
+func guestPhase(t *testing.T, c client.Client, ns string) string {
+	t.Helper()
+	var cm corev1.ConfigMap
+	if err := c.Get(context.Background(), types.NamespacedName{
+		Namespace: ns,
+		Name:      connectors.InventoryCMName("homelab", fleetv1alpha1.ProvisionProviderYaidap),
+	}, &cm); err != nil {
+		t.Fatal(err)
+	}
+	var status struct {
+		Guests map[string]struct {
+			Phase string `json:"phase"`
+		} `json:"guests"`
+	}
+	if err := json.Unmarshal([]byte(cm.Data["_meta.status.json"]), &status); err != nil {
+		t.Fatal(err)
+	}
+	return status.Guests["vm01"].Phase
+}
+
+// A placement plan is a dry-run: it must not flip the guest to Ready.
+func TestSyncHostInventoryPlanVMDoesNotMarkReady(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = fleetv1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	ns := "fleet-console"
+	c := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(provisionStatusCM(ns, fleetv1alpha1.SiteHostPhaseDeclared)).Build()
+
+	SyncHostInventory(context.Background(), c, ns, "homelab", fleetv1alpha1.SiteProvisionActionRecord{
+		ID: "run1", Action: fleetv1alpha1.ProvisionActionPlanVM, Subject: "vm01",
+		Phase: fleetv1alpha1.ProvisionPhaseSucceeded, Message: "placement: vm01->virt02",
+	})
+	if got := guestPhase(t, c, ns); got != fleetv1alpha1.SiteHostPhaseDeclared {
+		t.Fatalf("plan_vm changed phase to %q, want Declared", got)
+	}
+}
+
+func TestSyncHostInventoryCreateVMMarksReady(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = fleetv1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	ns := "fleet-console"
+	c := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(provisionStatusCM(ns, fleetv1alpha1.SiteHostPhaseProvisioning)).Build()
+
+	SyncHostInventory(context.Background(), c, ns, "homelab", fleetv1alpha1.SiteProvisionActionRecord{
+		ID: "run1", Action: fleetv1alpha1.ProvisionActionCreateVM, Subject: "vm01",
+		Phase: fleetv1alpha1.ProvisionPhaseSucceeded,
+	})
+	if got := guestPhase(t, c, ns); got != fleetv1alpha1.SiteHostPhaseReady {
+		t.Fatalf("create_vm phase=%q, want Ready", got)
 	}
 }
