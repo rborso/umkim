@@ -95,6 +95,24 @@ Resolve all hosts, registries, tags, and credentials from authorized inventory a
 This README documents the UI workflow only. It does not configure a backend,
 ingress, authentication provider, or external endpoint.
 
+## Mobile
+
+The console is usable on a phone (tested at 390×844):
+
+- The masthead hamburger toggles the navigation. `AppLayout` uses PatternFly's
+  `Page isManagedSidebar`, which collapses the sidebar below the large breakpoint
+  and restores it on desktop — there is no local sidebar state to keep in sync.
+- `src/index.css` carries the narrow-viewport rules: dialogs fill the width,
+  page sections scroll horizontally rather than pushing the document sideways,
+  long tokens wrap, and `.umkim-split` / `.umkim-split-even` stack two-column
+  panels.
+- PatternFly turns data tables into stacked grids below `md` (`pf-m-grid-md`).
+  Each `Td` therefore needs `dataLabel="<column>"` so the stacked cell keeps its
+  column name; keep it in step with the table's `<Th>` row. An unlabelled
+  actions column should use `dataLabel="Actions"`.
+- Terminal and noVNC surfaces stay desktop-sized; they scroll inside
+  `.umkim-console-surface`.
+
 ## References
 
 - [Console authentication guide](../../docs/fleet-console-auth.md)

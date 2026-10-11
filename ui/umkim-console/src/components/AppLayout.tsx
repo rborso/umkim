@@ -8,8 +8,10 @@ import {
   PageSidebar,
   PageSidebarBody,
   PageGroup,
+  PageToggleButton,
   Masthead,
   MastheadMain,
+  MastheadToggle,
   MastheadContent,
   Toolbar,
   ToolbarContent,
@@ -18,6 +20,7 @@ import {
   NavExpandable,
 } from '@patternfly/react-core';
 import {
+  BarsIcon,
   ChartLineIcon,
   CubeIcon,
   GlobeIcon,
@@ -46,9 +49,17 @@ const navItems: NavItemDef[] = [
 export function AppLayout() {
   const { user, logout, can } = useAuth();
 
+  // `isManagedSidebar` makes PatternFly own the sidebar state: it collapses below
+  // the large breakpoint (where it would otherwise cover the content) and the
+  // masthead hamburger toggles it. No local state to keep in sync.
   const header = (
     <Masthead>
       <MastheadMain>
+        <MastheadToggle>
+          <PageToggleButton variant="plain" aria-label="Global navigation">
+            <BarsIcon />
+          </PageToggleButton>
+        </MastheadToggle>
         <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>UMKIM</span>
       </MastheadMain>
       <MastheadContent>
@@ -62,7 +73,7 @@ export function AppLayout() {
                 Log out
               </Button>
             </ToolbarItem>
-            <ToolbarItem>
+            <ToolbarItem className="umkim-hide-sm">
               <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>
                 build {import.meta.env.VITE_BUILD_ID || 'dev'}
               </span>
@@ -135,7 +146,7 @@ export function AppLayout() {
   );
 
   return (
-    <Page header={header} sidebar={sidebar}>
+    <Page isManagedSidebar header={header} sidebar={sidebar}>
       <PageGroup>
         <Outlet />
       </PageGroup>

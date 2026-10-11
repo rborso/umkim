@@ -1,0 +1,72 @@
+/*
+ * Mobile-friendly adjustments.
+ *
+ * PatternFly is desktop-first: its layout is usable on a phone but a few things
+ * overflow or get cramped. Everything here is either scoped to a narrow viewport
+ * or a small opt-in helper, so the desktop layout is unchanged.
+ */
+
+/* --- Narrow viewports ---------------------------------------------------- */
+@media (max-width: 768px) {
+  /* Wide data tables scroll horizontally inside the page instead of pushing the
+     whole document sideways. */
+  .pf-v5-c-page__main-section {
+    overflow-x: auto;
+  }
+
+  /* Long unbroken tokens (hostnames, keys, digests, YAML) wrap instead of
+     stretching the layout. */
+  .pf-v5-c-page__main-section,
+  .pf-v5-c-modal-box,
+  .pf-v5-c-card {
+    overflow-wrap: anywhere;
+  }
+
+  /* Dialogs fill the viewport with a small gutter. The install dialog carries a
+     lot of fields and is unusable at PatternFly's medium width on a phone. */
+  .pf-v5-c-modal-box {
+    width: calc(100% - 1rem) !important;
+    max-width: none !important;
+  }
+
+  /* Give the page content a tighter gutter so more table fits. */
+  .pf-v5-c-page__main-section {
+    --pf-v5-c-page__main-section--PaddingRight: var(--pf-v5-global--spacer--md);
+    --pf-v5-c-page__main-section--PaddingLeft: var(--pf-v5-global--spacer--md);
+  }
+
+  /* Terminal / noVNC surfaces are inherently desktop-sized; keep them scrollable. */
+  .umkim-console-surface {
+    overflow: auto;
+  }
+}
+
+/* --- Small opt-in helpers ------------------------------------------------ */
+
+/* Hide a masthead item on phones (build id, secondary metadata). */
+@media (max-width: 640px) {
+  .umkim-hide-sm {
+    display: none !important;
+  }
+}
+
+/* Side-by-side panels that stack on narrow screens. Prefer these over inline
+   gridTemplateColumns so the breakpoint stays in one place. */
+.umkim-split {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  gap: 1rem;
+}
+
+.umkim-split-even {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .umkim-split,
+  .umkim-split-even {
+    grid-template-columns: 1fr;
+  }
+}

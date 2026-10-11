@@ -672,10 +672,10 @@ export function ClustersPage() {
               ].filter(Boolean);
               return (
                 <Tr key={c.name}>
-                  <Td>
+                  <Td dataLabel="Name">
                     <Link to={`/clusters/${c.name}`}>{c.name}</Link>
                   </Td>
-                  <Td>
+                  <Td dataLabel="Site">
                     {fleetSiteLabelForId(sites, c.site)}
                     {c.site && (
                       <>
@@ -684,31 +684,31 @@ export function ClustersPage() {
                       </>
                     )}
                   </Td>
-                  <Td>
+                  <Td dataLabel="Phase">
                     <Label color={phaseColor(phase)}>{phase}</Label>
                   </Td>
-                  <Td>
+                  <Td dataLabel="Available">
                     <Label color={c.available ? 'green' : 'grey'}>
                       {c.available ? 'Yes' : 'No'}
                     </Label>
                   </Td>
-                  <Td>
+                  <Td dataLabel="Caps">
                     {capBits.length > 0 ? (
                       <span style={{ fontSize: '0.85rem' }}>{capBits.join(' · ')}</span>
                     ) : (
                       <span style={{ color: 'var(--pf-v6-global--Color--200)' }}>—</span>
                     )}
                   </Td>
-                  <Td>{c.ingress_enabled ? 'Yes' : 'No'}</Td>
-                  <Td>{c.ingress_auth_enabled ? 'Yes' : 'No'}</Td>
-                  <Td>
+                  <Td dataLabel="Ingress">{c.ingress_enabled ? 'Yes' : 'No'}</Td>
+                  <Td dataLabel="Auth">{c.ingress_auth_enabled ? 'Yes' : 'No'}</Td>
+                  <Td dataLabel="Provisioner">
                     {c.topology?.provisioner || '—'}
                     {c.topology?.nest_depth && c.topology.nest_depth !== '0'
                       ? ` · depth ${c.topology.nest_depth}`
                       : ''}
                     {c.topology?.parent_cluster ? ` · parent ${c.topology.parent_cluster}` : ''}
                   </Td>
-                  <Td>
+                  <Td dataLabel="Actions">
                     {canDelete && (
                       <Button
                         variant="danger"

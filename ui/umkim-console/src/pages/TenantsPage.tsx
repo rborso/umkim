@@ -93,8 +93,8 @@ export function TenantsPage() {
         <Tbody>
           {groups.map((g) => (
             <Tr key={g.name}>
-              <Td>{g.name}</Td>
-              <Td>
+              <Td dataLabel="Tenant">{g.name}</Td>
+              <Td dataLabel="Members">
                 {(g.members ?? []).map((m) => (
                   <Button
                     key={m.id}
@@ -107,7 +107,7 @@ export function TenantsPage() {
                   </Button>
                 ))}
               </Td>
-              <Td>
+              <Td dataLabel="Add member">
                 <TextInput
                   value={memberInput[g.name] ?? ''}
                   onChange={(_e, v) => setMemberInput((s) => ({ ...s, [g.name]: v }))}
@@ -134,7 +134,7 @@ export function TenantsPage() {
                   Add
                 </Button>
               </Td>
-              <Td>
+              <Td dataLabel="Actions">
                 <Button variant="link" isDanger onClick={() => void run(() => deleteTenant(g.name))}>
                   Delete
                 </Button>

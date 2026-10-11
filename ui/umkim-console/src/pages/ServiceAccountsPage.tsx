@@ -26,8 +26,8 @@ export function ServiceAccountsPage() {
             const meta = (sa.metadata ?? {}) as Record<string, string>;
             return (
               <Tr key={meta.name}>
-                <Td>{meta.name}</Td>
-                <Td>{String(spec.displayName ?? '')}</Td>
+                <Td dataLabel="Name">{meta.name}</Td>
+                <Td dataLabel="Display">{String(spec.displayName ?? '')}</Td>
               </Tr>
             );
           })}

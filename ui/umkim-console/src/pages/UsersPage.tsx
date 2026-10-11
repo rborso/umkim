@@ -23,10 +23,10 @@ export function UsersPage() {
             const meta = (u.metadata ?? {}) as Record<string, string>;
             return (
               <Tr key={meta.name}>
-                <Td>{meta.name}</Td>
-                <Td>{String(spec.displayName ?? '')}</Td>
-                <Td>{String(spec.authMethod ?? '')}</Td>
-                <Td>{Array.isArray(spec.groups) ? spec.groups.join(', ') : ''}</Td>
+                <Td dataLabel="Name">{meta.name}</Td>
+                <Td dataLabel="Display">{String(spec.displayName ?? '')}</Td>
+                <Td dataLabel="Auth">{String(spec.authMethod ?? '')}</Td>
+                <Td dataLabel="Groups">{Array.isArray(spec.groups) ? spec.groups.join(', ') : ''}</Td>
               </Tr>
             );
           })}
