@@ -39,6 +39,12 @@ is opt-in (`cleanupKubernetes=true` on delete, or
 `fleet_flow_cleanup_kubernetes=true` in
 [playbooks/flows/cluster-delete.yml](../../playbooks/flows/cluster-delete.yml)).
 
+Both modes run `cleanup_node_local.sh` on every spoke node once the hub
+`ManagedCluster` is gone: detach removes the fleet WireGuard overlay and
+OCM/DCM glue but keeps K3s; reset (`cleanupKubernetes`) additionally uninstalls
+K3s and wipes CNI/kubelet state and the control-plane VIP. The node play is
+skipped for hub-only clusters that have no node records.
+
 ## Site ingress
 
 Each `FleetSite` carries `spec.edge.ingress[]` (port-forward and/or
