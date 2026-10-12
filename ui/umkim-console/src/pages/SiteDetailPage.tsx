@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Checkbox,
@@ -67,7 +67,7 @@ export function SiteDetailPage() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const [site, setSite] = useState<FleetSite | null>(null);
-  const [tab, setTab] = useState<string | number>(0);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -183,6 +183,23 @@ export function SiteDetailPage() {
   const clusterCount = site ? fleetSiteClusterCount(site) : 0;
   const canDelete = site ? fleetSiteCanDelete(site) : false;
   const canEditSiteId = site && !isManagement && clusterCount === 0;
+
+  // Keep the active subpage in the URL so a refresh (or shared link) returns to the
+  // same tab instead of resetting to Overview.
+  const tabKeys = ['overview', 'edge'];
+  if (isRegistry && !isManagement) {
+    tabKeys.push('hosts');
+    if (provisionBinding?.provider === 'yaidap') tabKeys.push('provisioner');
+  }
+  if (!isManagement && clusterCount > 0) tabKeys.push('kubevirt');
+  if (!isRegistry && (site?.status?.validationErrors?.length ?? 0) > 0) tabKeys.push('validation');
+  const requestedTab = searchParams.get('tab') || 'overview';
+  const tab = tabKeys.includes(requestedTab) ? requestedTab : 'overview';
+  const selectTab = (_e: unknown, key: string | number) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', String(key));
+    setSearchParams(next, { replace: true });
+  };
 
   const saveSiteId = async () => {
     if (!name || !siteIdEdit.trim()) return;
@@ -333,8 +350,8 @@ export function SiteDetailPage() {
         {loading && <p>Loading…</p>}
         {site && (
           <>
-            <Tabs activeKey={tab} onSelect={(_e, k) => setTab(k)}>
-              <Tab eventKey={0} title={<TabTitleText>Overview</TabTitleText>}>
+            <Tabs activeKey={tab} onSelect={selectTab}>
+              <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>}>
                 <DescriptionList isHorizontal style={{ marginTop: '1rem' }}>
                   <DescriptionListGroup>
                     <DescriptionListTerm>Site ID</DescriptionListTerm>
@@ -458,7 +475,7 @@ export function SiteDetailPage() {
                   </div>
                 )}
               </Tab>
-              <Tab eventKey={1} title={<TabTitleText>Edge and DNS</TabTitleText>}>
+              <Tab eventKey="edge" title={<TabTitleText>Edge and DNS</TabTitleText>}>
                 <Form style={{ maxWidth: '40rem', marginTop: '1rem' }}>
                   <LabeledField label="Display name" fieldId="displayName" help={getFieldHelp('site.displayName')}>
                     <TextInput
@@ -867,24 +884,24 @@ export function SiteDetailPage() {
                 )}
               </Tab>
               {isRegistry && !isManagement && (
-                <Tab eventKey={2} title={<TabTitleText>Hosts</TabTitleText>}>
+                <Tab eventKey="hosts" title={<TabTitleText>Hosts</TabTitleText>}>
                   <SiteHostsPanel siteName={name} />
                 </Tab>
               )}
               {isRegistry &&
                 !isManagement &&
                 provisionBinding?.provider === 'yaidap' && (
-                  <Tab eventKey={3} title={<TabTitleText>Provisioner inventory</TabTitleText>}>
+                  <Tab eventKey="provisioner" title={<TabTitleText>Provisioner inventory</TabTitleText>}>
                     <SiteProvisionerInventoryPanel siteName={name} />
                   </Tab>
                 )}
               {!isManagement && (site.clusters?.length ?? 0) > 0 && (
-                <Tab eventKey={4} title={<TabTitleText>KubeVirt machines</TabTitleText>}>
+                <Tab eventKey="kubevirt" title={<TabTitleText>KubeVirt machines</TabTitleText>}>
                   <SiteKubeVirtPanel site={site} />
                 </Tab>
               )}
               {!isRegistry && site.status?.validationErrors && site.status.validationErrors.length > 0 && (
-                <Tab eventKey={2} title={<TabTitleText>Validation</TabTitleText>}>
+                <Tab eventKey="validation" title={<TabTitleText>Validation</TabTitleText>}>
                   <List style={{ marginTop: '1rem' }}>
                     {site.status.validationErrors.map((e) => (
                       <ListItem key={e}>{e}</ListItem>

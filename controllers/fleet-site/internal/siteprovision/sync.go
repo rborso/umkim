@@ -226,30 +226,43 @@ func SyncHostInventory(ctx context.Context, c client.Client, ns, siteName string
 		return
 	}
 	st := yaidap.GuestStatus{LastProvisionID: rec.ID, Message: rec.Message}
+	// Only actions that create the host (or destroy it) may move the guest phase.
+	// plan_vm is a dry-run, and discover/status/prepare_* do not provision the
+	// guest, so they must leave its phase untouched (UpdateGuestStatus preserves an
+	// empty phase). Otherwise a placement plan reports the guest as Ready.
 	switch rec.Phase {
 	case fleetv1alpha1.ProvisionPhasePending, fleetv1alpha1.ProvisionPhaseRunning:
-		if rec.Action == fleetv1alpha1.ProvisionActionDestroy {
+		switch {
+		case rec.Action == fleetv1alpha1.ProvisionActionDestroy:
 			st.Phase = fleetv1alpha1.SiteHostPhaseDestroying
-		} else {
+		case actionProvisionsHost(rec.Action):
 			st.Phase = fleetv1alpha1.SiteHostPhaseProvisioning
 		}
 	case fleetv1alpha1.ProvisionPhaseSucceeded:
-		if rec.Action == fleetv1alpha1.ProvisionActionDestroy {
+		switch {
+		case rec.Action == fleetv1alpha1.ProvisionActionDestroy:
 			st.Phase = fleetv1alpha1.SiteHostPhaseDeclared
 			st.Message = yaidap.DestroySuccessMessage()
 			st.Cluster = &fleetv1alpha1.SiteHostClusterStatus{}
-		} else {
+		case actionProvisionsHost(rec.Action):
 			st.Phase = fleetv1alpha1.SiteHostPhaseReady
 			if rec.Host != nil && rec.Host.AnsibleHost != "" {
 				st.AnsibleHost = rec.Host.AnsibleHost
 			}
 		}
 	case fleetv1alpha1.ProvisionPhaseFailed:
-		st.Phase = fleetv1alpha1.SiteHostPhaseFailed
+		if rec.Action == fleetv1alpha1.ProvisionActionDestroy || actionProvisionsHost(rec.Action) {
+			st.Phase = fleetv1alpha1.SiteHostPhaseFailed
+		}
 	default:
 		return
 	}
 	_ = yaidap.UpdateGuestStatus(ctx, c, ns, siteName, hostName, st)
+}
+
+// actionProvisionsHost reports whether a provision action creates the host.
+func actionProvisionsHost(action string) bool {
+	return action == fleetv1alpha1.ProvisionActionCreateVM || action == fleetv1alpha1.ProvisionActionInstallBM
 }
 
 // RepairStaleGuestProvisioning clears hub guest rows left in Provisioning after their connector job succeeded.
