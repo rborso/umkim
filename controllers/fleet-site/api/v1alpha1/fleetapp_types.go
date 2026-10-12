@@ -22,6 +22,11 @@ const (
 	AppRouteModeNone = "none"
 	AppRouteModeHub  = "hub"
 	AppRouteModeSite = "site"
+
+	// AppRouteProtocolHTTP is the default route protocol (hostname + Ingress).
+	AppRouteProtocolHTTP = "http"
+	// AppRouteProtocolTCP publishes a raw L4 port forward (no hostname).
+	AppRouteProtocolTCP = "tcp"
 )
 
 // FleetAppRouteIntent is the operator-selected public route for a Helm release.
@@ -44,6 +49,15 @@ type FleetAppRouteIntent struct {
 	ServicePort      int32  `json:"servicePort,omitempty"`
 	ServiceNamespace string `json:"serviceNamespace,omitempty"`
 	HealthPath       string `json:"healthPath,omitempty"`
+	// Protocol selects how the route is published: http (default) or tcp. A tcp
+	// route is a plain L4 port forward for services that are not HTTP (for
+	// example git-over-SSH): UMKIM listens on ForwardPort on the hub and forwards
+	// to ServicePort on the target cluster's node over the WireGuard overlay. TCP
+	// routes have no hostname and are never Authelia-gated.
+	Protocol string `json:"protocol,omitempty"`
+	// ForwardPort is the hub-side TCP port for a tcp route. Required when
+	// Protocol is tcp, and it must be free on the hub.
+	ForwardPort int32 `json:"forwardPort,omitempty"`
 }
 
 type FleetAppSpec struct {
@@ -188,6 +202,8 @@ func routeDeclared(r FleetAppRouteIntent) bool {
 		r.ServicePort > 0 ||
 		strings.TrimSpace(r.ServiceNamespace) != "" ||
 		strings.TrimSpace(r.HealthPath) != "" ||
+		strings.TrimSpace(r.Protocol) != "" ||
+		r.ForwardPort > 0 ||
 		r.RequireAuth ||
 		len(r.RequireAuthGroups) > 0
 }
@@ -198,6 +214,20 @@ func (r FleetAppRouteIntent) EffectiveMode() string {
 		return AppRouteModeNone
 	}
 	return m
+}
+
+// EffectiveProtocol returns the route protocol: http (default) or tcp.
+func (r FleetAppRouteIntent) EffectiveProtocol() string {
+	p := strings.ToLower(strings.TrimSpace(r.Protocol))
+	if p == "" {
+		return AppRouteProtocolHTTP
+	}
+	return p
+}
+
+// IsTCP reports whether the route is a raw L4 port forward.
+func (r FleetAppRouteIntent) IsTCP() bool {
+	return r.EffectiveProtocol() == AppRouteProtocolTCP
 }
 
 func (r FleetAppRouteIntent) EffectiveServiceName(fallback string) string {

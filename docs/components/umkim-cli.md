@@ -108,6 +108,7 @@ umkim app create … --llama-profile qwen35-2b-ud-4g [--llm-backend true|false]
 umkim app create … --oidc-client '{"clientId":"app","redirectPaths":["/callback"]}'
 umkim app create … --route-mode hub|site --route-host H --require-auth [--require-auth-groups g1,g2]
 umkim app create … --route-mode hub|site --route-host H --service-name SVC --service-port PORT
+umkim app create … --route-protocol tcp --route-forward-port 2222 --service-port 32222   # hub L4 port forward (SSH, DBs)
 umkim app delete NAME [NAME...]
 
 umkim tenant list | create NAME | delete NAME

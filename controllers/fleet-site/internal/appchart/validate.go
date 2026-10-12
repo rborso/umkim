@@ -34,6 +34,17 @@ func ValidRouteMode(mode string) bool {
 	}
 }
 
+// ValidRouteProtocol reports whether a route protocol is supported. tcp routes
+// are hub-side L4 port forwards (no hostname).
+func ValidRouteProtocol(protocol string) bool {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "", "http", "tcp":
+		return true
+	default:
+		return false
+	}
+}
+
 // ExpandChart turns a short name (whoami) into oci://prefix/whoami using the first
 // non-wildcard prefix. Full oci:// URLs are returned trimmed.
 func ExpandChart(chart, defaultPrefix string) string {

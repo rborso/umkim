@@ -415,12 +415,20 @@ func (r *AppReconciler) ensureRoutes(ctx context.Context, app *fleetv1alpha1.Fle
 		if rt.EffectiveMode() == fleetv1alpha1.AppRouteModeNone {
 			continue
 		}
+		// tcp routes are L4 port forwards, not hostname routes: they are
+		// materialized by ensureTCPForwarders below.
+		if rt.IsTCP() {
+			continue
+		}
 		name := routeObjectName(app.Name, i, rt)
 		if err := r.ensureOneRoute(ctx, app, release, routeNS, name, rt); err != nil {
 			return err
 		}
 		desired[name] = struct{}{}
 		names = append(names, name)
+	}
+	if err := r.ensureTCPForwarders(ctx, app, release); err != nil {
+		return err
 	}
 	var existing fleetedge.FleetAppRouteList
 	if err := r.List(ctx, &existing, client.InNamespace(routeNS), client.MatchingLabels{"fleet.umkim.com/app": app.Name}); err == nil {
