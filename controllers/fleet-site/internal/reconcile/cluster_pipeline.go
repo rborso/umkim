@@ -44,8 +44,51 @@ func (r *ClusterJoinReconciler) reconcileClusterAutoProvision(ctx context.Contex
 			}
 			return ctrl.Result{Requeue: true}, true, nil
 		}
+	case fleetv1alpha1.JoinPhaseProvisioning:
+		// Surface the cluster provision Job in the site provision history too.
+		if err := r.ensurePipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionProvision, fcj.Status.ProvisionJobName, "Provision cluster (hub finalize)"); err != nil {
+			return ctrl.Result{}, true, err
+		}
 	}
 	return ctrl.Result{}, false, nil
+}
+
+// ensurePipelineAction records a cluster bring-up step (bootstrap/provision) in
+// the site provision history so its operation and logs are visible next to the
+// host create_vm runs. Deduped by JobName; best-effort (the step still runs).
+func (r *ClusterJoinReconciler) ensurePipelineAction(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, action, jobName, message string) error {
+	jobName = strings.TrimSpace(jobName)
+	if jobName == "" {
+		return nil
+	}
+	site, err := sites.FindFleetSite(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId)
+	if err != nil {
+		return nil
+	}
+	if site.Status.Provision != nil {
+		if cur := site.Status.Provision.Current; cur != nil && cur.JobName == jobName {
+			return nil
+		}
+		for _, h := range site.Status.Provision.History {
+			if h.JobName == jobName {
+				return nil
+			}
+		}
+	}
+	now := metav1.NewTime(time.Now().UTC())
+	rec := fleetv1alpha1.SiteProvisionActionRecord{
+		ID:        pipelineActionID(),
+		Action:    action,
+		Subject:   fcj.Spec.EffectiveClusterName(fcj.Name),
+		Provider:  site.Spec.EffectiveProvisionProvider(),
+		Phase:     fleetv1alpha1.ProvisionPhaseRunning,
+		ActorKind: "Controller",
+		ActorName: "cluster-pipeline",
+		JobName:   jobName,
+		Message:   message,
+		StartedAt: &now,
+	}
+	return siteprovision.CommitAction(ctx, r.Client, site, rec, false)
 }
 
 // ensurePipelineHosts creates any Declared VM guests that back the cluster nodes,
@@ -175,6 +218,11 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 		return ctrl.Result{Requeue: true}, true, nil
 	}
 	jobName := fcj.Status.BootstrapJobName
+	// Record the step in the site provision history (idempotent by JobName) so it
+	// survives controller restarts and shows the operation + logs next to create_vm.
+	if err := r.ensurePipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionBootstrap, jobName, "Bootstrap via jumphost"); err != nil {
+		return ctrl.Result{}, true, err
+	}
 	done, ok, msg := r.jobDone(ctx, fcj.Namespace, jobName)
 	if !done {
 		return ctrl.Result{RequeueAfter: 20 * time.Second}, true, nil

@@ -225,6 +225,12 @@ func SyncHostInventory(ctx context.Context, c client.Client, ns, siteName string
 	if hostName == "" {
 		return
 	}
+	// Cluster bring-up steps (bootstrap/provision) are recorded for the site
+	// provision history but are not site-host operations; never write guest status
+	// for them (their subject is a cluster name).
+	if rec.Action == fleetv1alpha1.ProvisionActionBootstrap || rec.Action == fleetv1alpha1.ProvisionActionProvision {
+		return
+	}
 	st := yaidap.GuestStatus{LastProvisionID: rec.ID, Message: rec.Message}
 	// Only actions that create the host (or destroy it) may move the guest phase.
 	// plan_vm is a dry-run, and discover/status/prepare_* do not provision the
