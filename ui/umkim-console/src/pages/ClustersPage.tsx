@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
+  Alert,
   Button,
   Checkbox,
   Form,
@@ -21,6 +22,7 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { PlusIcon, SyncIcon, TrashIcon } from '@patternfly/react-icons';
 import {
+  bootstrapFleetCluster,
   createFleetCluster,
   deleteFleetCluster,
   fleetClusterIsConsoleProvisioned,
@@ -30,7 +32,10 @@ import {
   fleetSiteEffectiveId,
   fleetSiteIsManagement,
   fleetSiteLabelForId,
+  getFleetCluster,
   listSiteHosts,
+  provisionFleetCluster,
+  provisionSiteHost,
 } from '../api/client';
 import type {
   FleetCluster,
@@ -153,6 +158,8 @@ export function ClustersPage() {
   const [topology, setTopology] = useState<FleetClusterTopology>('single_node');
   const [siteHosts, setSiteHosts] = useState<SiteHostRecord[]>([]);
   const [pendingNode, setPendingNode] = useState('');
+  const [provisionNow, setProvisionNow] = useState(false);
+  const [progress, setProgress] = useState<string[]>([]);
   const [filterGpu, setFilterGpu] = useState(false);
   const [filterKvm, setFilterKvm] = useState(false);
   const [filterKubevirt, setFilterKubevirt] = useState(false);
@@ -432,9 +439,39 @@ export function ClustersPage() {
     });
   };
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const waitForHostReady = async (site: string, host: string, timeoutMs: number) => {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const list = await listSiteHosts(site);
+      const rec = list.find((h) => h.name === host);
+      const phase = rec?.status?.phase;
+      if (phase === 'Ready') return;
+      if (phase === 'Failed') throw new Error(`host ${host} provisioning failed`);
+      if (Date.now() > deadline) throw new Error(`timed out waiting for ${host} to become Ready`);
+      await sleep(5000);
+    }
+  };
+
+  const waitForClusterPhase = async (name: string, want: string[], timeoutMs: number) => {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const c = await getFleetCluster(name);
+      const phase = fleetClusterPhase(c);
+      if (want.includes(phase)) return phase;
+      if (phase === 'Failed') throw new Error(`cluster ${name} failed`);
+      if (Date.now() > deadline) {
+        throw new Error(`timed out waiting for cluster ${name} (${want.join('/')})`);
+      }
+      await sleep(10000);
+    }
+  };
+
   const handleCreate = async () => {
     setSaving(true);
     setActionError(null);
+    setProgress([]);
     try {
       const caps: Record<string, boolean> = {};
       const prov = form.providers || {};
@@ -484,7 +521,27 @@ export function ClustersPage() {
         setSaving(false);
         return;
       }
-      await createFleetCluster({
+      const log = (m: string) => setProgress((p) => [...p, m]);
+      if (provisionNow && form.siteId) {
+        const hostNames = Array.from(
+          new Set((nodes || []).map((n) => (n.hostname || '').trim()).filter(Boolean)),
+        );
+        const list = await listSiteHosts(form.siteId);
+        const byName = new Map(list.map((h) => [h.name, h]));
+        for (const hn of hostNames) {
+          const rec = byName.get(hn);
+          if (!rec || rec.kind !== 'vm') continue;
+          if (rec.status?.phase === 'Ready') continue;
+          if (!hostAnsibleAddr(rec)) {
+            throw new Error(`host ${hn} has no address; set one before provisioning`);
+          }
+          log(`Provisioning VM ${hn}…`);
+          await provisionSiteHost(form.siteId, hn, { action: 'create_vm' });
+          await waitForHostReady(form.siteId, hn, 15 * 60 * 1000);
+          log(`VM ${hn} ready`);
+        }
+      }
+      const createBody = {
         ...form,
         topology,
         networkMode: 'wireguard',
@@ -525,7 +582,32 @@ export function ClustersPage() {
                   }
                 : { enabled: false },
             },
-      });
+      };
+      try {
+        await createFleetCluster(createBody as FleetClusterCreate);
+      } catch (e) {
+        // autoApply can already have created the intent from the cluster group;
+        // only fail when the cluster truly does not exist.
+        const exists = await getFleetCluster(form.clusterName)
+          .then(() => true)
+          .catch(() => false);
+        if (!exists) throw e;
+        log('Cluster intent already existed; continuing.');
+      }
+      if (provisionNow) {
+        log(`Bootstrapping ${form.clusterName}…`);
+        await waitForClusterPhase(
+          form.clusterName,
+          ['ScriptIssued', 'Enrolled', 'Validated'],
+          10 * 60 * 1000,
+        );
+        await bootstrapFleetCluster(form.clusterName);
+        await waitForClusterPhase(form.clusterName, ['Validated', 'Ready'], 45 * 60 * 1000);
+        log('Bootstrap complete; provisioning cluster…');
+        await provisionFleetCluster(form.clusterName);
+        await waitForClusterPhase(form.clusterName, ['Ready'], 90 * 60 * 1000);
+        log('Cluster is Ready');
+      }
       setModalOpen(false);
       await load();
     } catch (e) {
@@ -754,6 +836,38 @@ export function ClustersPage() {
         ]}
       >
         <Form>
+          <Checkbox
+            id="provisionNow"
+            isChecked={provisionNow}
+            isDisabled={saving}
+            onChange={(_e, c) => setProvisionNow(c)}
+            label="Provision now: create the VMs, run bootstrap, and bring the cluster up"
+          />
+          <p
+            style={{
+              fontSize: '0.8rem',
+              marginTop: '0.25rem',
+              marginBottom: '0.75rem',
+              color: 'var(--pf-v5-global--Color--200)',
+            }}
+          >
+            Declared VM nodes are created first. Bootstrap runs via the site jumphost; the whole flow can
+            take 30+ minutes. Leave unchecked to only create the cluster intent.
+          </p>
+          {progress.length > 0 && (
+            <Alert
+              isInline
+              variant={actionError ? 'danger' : 'info'}
+              title="Provisioning progress"
+              style={{ marginBottom: '0.75rem' }}
+            >
+              <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem' }}>
+                {progress.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            </Alert>
+          )}
           <LabeledField label="Parent site" isRequired fieldId="siteId" help={getFieldHelp('clusterJoin.siteId')}>
             <FormSelect
               id="siteId"
@@ -873,7 +987,7 @@ export function ClustersPage() {
                           <FormSelectOption
                             key={h.name}
                             value={h.name}
-                            label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                            label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}${h.status?.phase ? ` · ${h.status.phase}` : ''}`}
                           />
                         ))}
                       </FormSelect>
@@ -974,7 +1088,7 @@ export function ClustersPage() {
                           <FormSelectOption
                             key={h.name}
                             value={h.name}
-                            label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                            label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}${h.status?.phase ? ` · ${h.status.phase}` : ''}`}
                           />
                         ))}
                       </FormSelect>
@@ -1036,7 +1150,7 @@ export function ClustersPage() {
                       <FormSelectOption
                         key={h.name}
                         value={h.name}
-                        label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}`}
+                        label={`${h.name} — ${hostAddr(h)}${h.kind ? ` (${h.kind})` : ''}${h.status?.phase ? ` · ${h.status.phase}` : ''}`}
                       />
                     ))}
                   </FormSelect>

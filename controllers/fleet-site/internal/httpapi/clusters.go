@@ -167,6 +167,10 @@ func (s *Server) handleClusterByName(w http.ResponseWriter, r *http.Request, nam
 		s.triggerClusterAction(r.Context(), w, name, "provision")
 		return
 	}
+	if sub == "bootstrap" && r.Method == http.MethodPost {
+		s.handleBootstrapCluster(r.Context(), w, r, name)
+		return
+	}
 	if sub == "discover-capabilities" && r.Method == http.MethodPost {
 		s.handleDiscoverCapabilities(r.Context(), w, name)
 		return
