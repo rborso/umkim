@@ -294,9 +294,13 @@ spec:
                   type: string
                 bootstrapJobName:
                   type: string
+                bootstrapActionID:
+                  type: string
                 pipelineStep:
                   type: string
                 provisionJobName:
+                  type: string
+                provisionActionID:
                   type: string
                 deleteJobName:
                   type: string

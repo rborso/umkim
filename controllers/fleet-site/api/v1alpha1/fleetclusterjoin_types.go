@@ -260,8 +260,10 @@ type FleetClusterJoinStatus struct {
 	ValidationErrors        []string     `json:"validationErrors,omitempty"`
 	ValidateJobName         string       `json:"validateJobName,omitempty"`
 	BootstrapJobName        string       `json:"bootstrapJobName,omitempty"`
+	BootstrapActionID       string       `json:"bootstrapActionID,omitempty"`
 	PipelineStep            string       `json:"pipelineStep,omitempty"`
 	ProvisionJobName        string       `json:"provisionJobName,omitempty"`
+	ProvisionActionID       string       `json:"provisionActionID,omitempty"`
 	DeleteJobName           string       `json:"deleteJobName,omitempty"`
 	WgRemoveJobName         string       `json:"wgRemoveJobName,omitempty"`
 	DeletionStartedAt       *metav1.Time `json:"deletionStartedAt,omitempty"`

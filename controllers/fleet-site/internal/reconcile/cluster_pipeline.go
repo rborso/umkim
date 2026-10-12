@@ -46,17 +46,25 @@ func (r *ClusterJoinReconciler) reconcileClusterAutoProvision(ctx context.Contex
 		}
 	case fleetv1alpha1.JoinPhaseProvisioning:
 		// Surface the cluster provision Job in the site provision history too.
-		if err := r.ensurePipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionProvision, fcj.Status.ProvisionJobName, "Provision cluster (hub finalize)"); err != nil {
-			return ctrl.Result{}, true, err
+		if fcj.Status.ProvisionJobName != "" && fcj.Status.ProvisionActionID == "" {
+			id := pipelineActionID()
+			if err := r.commitPipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionProvision, fcj.Status.ProvisionJobName, id, "Provision cluster (hub finalize)"); err != nil {
+				return ctrl.Result{}, true, err
+			}
+			fcj.Status.ProvisionActionID = id
+			if err := r.Status().Update(ctx, fcj); err != nil {
+				return ctrl.Result{}, true, err
+			}
 		}
 	}
 	return ctrl.Result{}, false, nil
 }
 
-// ensurePipelineAction records a cluster bring-up step (bootstrap/provision) in
+// commitPipelineAction records a cluster bring-up step (bootstrap/provision) in
 // the site provision history so its operation and logs are visible next to the
-// host create_vm runs. Deduped by JobName; best-effort (the step still runs).
-func (r *ClusterJoinReconciler) ensurePipelineAction(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, action, jobName, message string) error {
+// host create_vm runs. Callers dedupe with a per-run action ID held on the FCJ
+// status; best-effort (the step still runs if the history write fails).
+func (r *ClusterJoinReconciler) commitPipelineAction(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, action, jobName, id, message string) error {
 	jobName = strings.TrimSpace(jobName)
 	if jobName == "" {
 		return nil
@@ -65,19 +73,9 @@ func (r *ClusterJoinReconciler) ensurePipelineAction(ctx context.Context, fcj *f
 	if err != nil {
 		return nil
 	}
-	if site.Status.Provision != nil {
-		if cur := site.Status.Provision.Current; cur != nil && cur.JobName == jobName {
-			return nil
-		}
-		for _, h := range site.Status.Provision.History {
-			if h.JobName == jobName {
-				return nil
-			}
-		}
-	}
 	now := metav1.NewTime(time.Now().UTC())
 	rec := fleetv1alpha1.SiteProvisionActionRecord{
-		ID:        pipelineActionID(),
+		ID:        id,
 		Action:    action,
 		Subject:   fcj.Spec.EffectiveClusterName(fcj.Name),
 		Provider:  site.Spec.EffectiveProvisionProvider(),
@@ -218,10 +216,18 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 		return ctrl.Result{Requeue: true}, true, nil
 	}
 	jobName := fcj.Status.BootstrapJobName
-	// Record the step in the site provision history (idempotent by JobName) so it
-	// survives controller restarts and shows the operation + logs next to create_vm.
-	if err := r.ensurePipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionBootstrap, jobName, "Bootstrap via jumphost"); err != nil {
-		return ctrl.Result{}, true, err
+	// Record the step in the site provision history (a fresh action per run, tracked
+	// by status.bootstrapActionID) so a re-run shows a new operation, not the previous
+	// run's, with logs next to the create_vm entries.
+	if fcj.Status.BootstrapActionID == "" {
+		id := pipelineActionID()
+		if err := r.commitPipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionBootstrap, jobName, id, "Bootstrap via jumphost"); err != nil {
+			return ctrl.Result{}, true, err
+		}
+		fcj.Status.BootstrapActionID = id
+		if err := r.Status().Update(ctx, fcj); err != nil {
+			return ctrl.Result{}, true, err
+		}
 	}
 	done, ok, msg := r.jobDone(ctx, fcj.Namespace, jobName)
 	if !done {
