@@ -840,7 +840,7 @@ while IFS= read -r peer; do
   [ -n "${peer}" ] || continue
   [ "${peer}" = "${TARGET_HOST}" ] && continue
   ssh -p "${JUMP_PORT}" "${OPTS[@]}" "${JUMP}" \
-    "ssh ${OPTS[*]} '${TARGET}' 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'" \
+    "ssh ${OPTS[*]} '${SSH_USER}@${peer}' 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'" \
     < /tmp/pub
   echo "seeded peer ${peer}"
 done < /tmp/peers
