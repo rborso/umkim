@@ -32,7 +32,11 @@ const (
 // cs is optional; when set, create_vm success may read resolved vm_location from job logs.
 // cfg is optional; when set, resolved vm_location triggers an inventory sync job.
 func RefreshRunningJob(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, cs kubernetes.Interface, cfg *config.Config) error {
-	if fs.Status.Provision == nil || fs.Status.Provision.Current == nil {
+	if fs.Status.Provision == nil {
+		return nil
+	}
+	finalizeSupersededHistory(ctx, c, cs, ns, fs)
+	if fs.Status.Provision.Current == nil {
 		return nil
 	}
 	cur := fs.Status.Provision.Current
@@ -113,6 +117,76 @@ func jobTerminalFailed(job *batchv1.Job) bool {
 		limit = *job.Spec.BackoffLimit
 	}
 	return job.Status.Failed > limit
+}
+
+// finalizeSupersededHistory resolves history entries whose Job has finished but
+// which were superseded as the site's current action before they could be
+// finalized - for example a cluster bootstrap step recorded by the controller
+// pipeline just before the provision step replaced it as current.
+func finalizeSupersededHistory(ctx context.Context, c client.Client, cs kubernetes.Interface, ns string, fs *fleetv1alpha1.FleetSite) {
+	if fs.Status.Provision == nil || len(fs.Status.Provision.History) == 0 {
+		return
+	}
+	changed := false
+	for i := range fs.Status.Provision.History {
+		h := &fs.Status.Provision.History[i]
+		if h.Phase != fleetv1alpha1.ProvisionPhaseRunning && h.Phase != fleetv1alpha1.ProvisionPhasePending {
+			continue
+		}
+		if strings.TrimSpace(h.JobName) == "" {
+			continue
+		}
+		var job batchv1.Job
+		if err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: h.JobName}, &job); err != nil {
+			continue
+		}
+		switch {
+		case job.Status.Succeeded > 0:
+			h.Phase = fleetv1alpha1.ProvisionPhaseSucceeded
+			h.Message = supersededSuccessMessage(h.Action)
+		case jobTerminalFailed(&job):
+			h.Phase = fleetv1alpha1.ProvisionPhaseFailed
+			h.Message = supersededFailureMessage(h.Action)
+		default:
+			continue
+		}
+		end := metav1.NewTime(time.Now().UTC())
+		h.EndedAt = &end
+		if cs != nil {
+			if logs, err := ansiblelogs.PodLogs(ctx, cs, ns, h.JobName); err == nil {
+				h.LogTail = ansiblelogs.Tail(logs, maxProvisionLogTail)
+			}
+		}
+		changed = true
+	}
+	if !changed {
+		return
+	}
+	if err := c.Status().Update(ctx, fs); err != nil {
+		log.FromContext(ctx).Error(err, "finalize superseded provision history", "site", fs.Name)
+	}
+}
+
+func supersededSuccessMessage(action string) string {
+	switch action {
+	case fleetv1alpha1.ProvisionActionBootstrap:
+		return "Bootstrap complete"
+	case fleetv1alpha1.ProvisionActionProvision:
+		return "Cluster provision succeeded"
+	default:
+		return "YAIDAP connector job succeeded"
+	}
+}
+
+func supersededFailureMessage(action string) string {
+	switch action {
+	case fleetv1alpha1.ProvisionActionBootstrap:
+		return "Bootstrap failed"
+	case fleetv1alpha1.ProvisionActionProvision:
+		return "Cluster provision failed"
+	default:
+		return "YAIDAP connector job failed"
+	}
 }
 
 func applyYaidapJobResult(ctx context.Context, c client.Client, ns string, fs *fleetv1alpha1.FleetSite, cur *fleetv1alpha1.SiteProvisionActionRecord, logs string, cfg *config.Config) {
