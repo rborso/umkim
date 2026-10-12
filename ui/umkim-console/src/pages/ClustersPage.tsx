@@ -22,7 +22,6 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { PlusIcon, SyncIcon, TrashIcon } from '@patternfly/react-icons';
 import {
-  bootstrapFleetCluster,
   createFleetCluster,
   deleteFleetCluster,
   fleetClusterIsConsoleProvisioned,
@@ -34,8 +33,6 @@ import {
   fleetSiteLabelForId,
   getFleetCluster,
   listSiteHosts,
-  provisionFleetCluster,
-  provisionSiteHost,
 } from '../api/client';
 import type {
   FleetCluster,
@@ -441,19 +438,6 @@ export function ClustersPage() {
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  const waitForHostReady = async (site: string, host: string, timeoutMs: number) => {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const list = await listSiteHosts(site);
-      const rec = list.find((h) => h.name === host);
-      const phase = rec?.status?.phase;
-      if (phase === 'Ready') return;
-      if (phase === 'Failed') throw new Error(`host ${host} provisioning failed`);
-      if (Date.now() > deadline) throw new Error(`timed out waiting for ${host} to become Ready`);
-      await sleep(5000);
-    }
-  };
-
   const waitForClusterPhase = async (name: string, want: string[], timeoutMs: number) => {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
@@ -522,25 +506,6 @@ export function ClustersPage() {
         return;
       }
       const log = (m: string) => setProgress((p) => [...p, m]);
-      if (provisionNow && form.siteId) {
-        const hostNames = Array.from(
-          new Set((nodes || []).map((n) => (n.hostname || '').trim()).filter(Boolean)),
-        );
-        const list = await listSiteHosts(form.siteId);
-        const byName = new Map(list.map((h) => [h.name, h]));
-        for (const hn of hostNames) {
-          const rec = byName.get(hn);
-          if (!rec || rec.kind !== 'vm') continue;
-          if (rec.status?.phase === 'Ready') continue;
-          if (!hostAnsibleAddr(rec)) {
-            throw new Error(`host ${hn} has no address; set one before provisioning`);
-          }
-          log(`Provisioning VM ${hn}…`);
-          await provisionSiteHost(form.siteId, hn, { action: 'create_vm' });
-          await waitForHostReady(form.siteId, hn, 15 * 60 * 1000);
-          log(`VM ${hn} ready`);
-        }
-      }
       const createBody = {
         ...form,
         topology,
@@ -550,6 +515,7 @@ export function ClustersPage() {
         nodes,
         clusterLabels,
         clusterCapabilities: caps,
+        autoProvision: provisionNow,
         storage: nfsLocalEnabled && !isHa
           ? {
               backend: 'nfs_local',
@@ -595,17 +561,8 @@ export function ClustersPage() {
         log('Cluster intent already existed; continuing.');
       }
       if (provisionNow) {
-        log(`Bootstrapping ${form.clusterName}…`);
-        await waitForClusterPhase(
-          form.clusterName,
-          ['ScriptIssued', 'Enrolled', 'Validated'],
-          10 * 60 * 1000,
-        );
-        await bootstrapFleetCluster(form.clusterName);
-        await waitForClusterPhase(form.clusterName, ['Validated', 'Ready'], 45 * 60 * 1000);
-        log('Bootstrap complete; provisioning cluster…');
-        await provisionFleetCluster(form.clusterName);
-        await waitForClusterPhase(form.clusterName, ['Ready'], 90 * 60 * 1000);
+        log('Controller is creating hosts, bootstrapping, and provisioning…');
+        await waitForClusterPhase(form.clusterName, ['Ready'], 120 * 60 * 1000);
         log('Cluster is Ready');
       }
       setModalOpen(false);
@@ -851,8 +808,9 @@ export function ClustersPage() {
               color: 'var(--pf-v5-global--Color--200)',
             }}
           >
-            Declared VM nodes are created first. Bootstrap runs via the site jumphost; the whole flow can
-            take 30+ minutes. Leave unchecked to only create the cluster intent.
+            The controller creates the Declared VM nodes, bootstraps via the site jumphost, and provisions
+            the cluster (each step runs in a pod). The whole flow can take 30+ minutes and runs server-side
+            even if you close this page. Leave unchecked to only create the cluster intent.
           </p>
           {progress.length > 0 && (
             <Alert

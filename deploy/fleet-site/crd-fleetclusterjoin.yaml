@@ -38,6 +38,11 @@ spec:
                   type: string
                 bootstrapHost:
                   type: string
+                autoProvision:
+                  type: boolean
+                  description: >-
+                    Controller-driven bring-up: create the Declared VM guests, run the
+                    bootstrap bundle via the jumphost, then provision the hub side.
                 jumphost:
                   type: string
                   description: Optional SSH bastion (user@host:port) for bootstrap and hub Ansible jobs (ProxyJump).
@@ -286,6 +291,10 @@ spec:
                   items:
                     type: string
                 validateJobName:
+                  type: string
+                bootstrapJobName:
+                  type: string
+                pipelineStep:
                   type: string
                 provisionJobName:
                   type: string

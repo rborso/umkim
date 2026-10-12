@@ -15,16 +15,11 @@ import (
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
-	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/provision"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/sitehosts"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/siteprovision"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -513,117 +508,14 @@ func stringParam(m map[string]interface{}, key string) string {
 }
 
 func (s *Server) startYaidapProvisionJob(ctx context.Context, fs *fleetv1alpha1.FleetSite, rec *fleetv1alpha1.SiteProvisionActionRecord, req siteProvisionActionBody, guestFound bool) (string, error) {
-	spec := fs.Spec.Provision
-	inv, err := provision.DefaultYaidapInvocation(rec.Action, req.Confirm)
-	if err != nil {
-		return "", err
-	}
-	if tags, ok := req.Params["tags"].([]interface{}); ok && len(tags) > 0 {
-		inv.Tags = nil
-		for _, t := range tags {
-			if s, ok := t.(string); ok && strings.TrimSpace(s) != "" {
-				inv.Tags = append(inv.Tags, strings.TrimSpace(s))
-			}
-		}
-	}
-	if pb, ok := req.Params["playbook"].(string); ok && strings.TrimSpace(pb) != "" {
-		inv.Playbook = strings.TrimSpace(pb)
-	}
-
-	cmName := fmt.Sprintf(siteProvisionInvCMFmt, fs.Name)
-	ini := jumphostInventoryINI(spec.Jumphost, s.Cfg.SSHUser)
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cmName,
-			Namespace: s.Cfg.Namespace,
-			Labels:    map[string]string{"app": "fleet-site-provision", "fleet-site": fs.Name},
-		},
-		Data: map[string]string{"inventory.ini": ini},
-	}
-	var existing corev1.ConfigMap
-	if err := s.Client.Get(ctx, types.NamespacedName{Namespace: s.Cfg.Namespace, Name: cmName}, &existing); err != nil {
-		if apierrors.IsNotFound(err) {
-			if err := s.Client.Create(ctx, cm); err != nil {
-				return "", err
-			}
-		} else {
-			return "", err
-		}
-	} else {
-		existing.Data = cm.Data
-		if err := s.Client.Update(ctx, &existing); err != nil {
-			return "", err
-		}
-	}
-
-	yaidapRoot := strings.TrimSpace(spec.YaidaPRoot)
-	if yaidapRoot == "" {
-		yaidapRoot = "~/yaidap"
-	}
-	extra := []string{
-		"-e", "fleet_provision_action=" + rec.Action,
-		"-e", "fleet_provision_subject=" + rec.Subject,
-		"-e", fmt.Sprintf("fleet_provision_confirm=%t", req.Confirm),
-		"-e", "fleet_provision_inventory_path=" + spec.InventoryPath,
-		"-e", "fleet_provision_yaidap_root=" + yaidapRoot,
-		"-e", "fleet_provision_playbook=" + inv.Playbook,
-		"-e", "fleet_provision_tags=" + strings.Join(inv.Tags, ","),
-	}
-	concreteVmLocation := false
-	if rec.Action == fleetv1alpha1.ProvisionActionCreateVM && guestFound {
-		invHost, _, guestErr := yaidap.LookupInventoryHost(ctx, s.Client, s.Cfg.Namespace, fs.Name, rec.Subject)
-		if guestErr == nil {
-			loc := strings.TrimSpace(invHost.VmLocation)
-			if loc == "" {
-				loc = strings.TrimSpace(invHost.Status.VmLocation)
-			}
-			concreteVmLocation = !sitehosts.VmLocationIsScheduleToken(loc)
-		}
-	}
-	// YAIDAP nested playbook extras (confirm_destroy, yaidap_emit_result, etc.) are resolved
-	// in site-provision-connector.yml from fleet_provision_action / fleet_provision_confirm.
-	if concreteVmLocation {
-		extra = append(extra, "-e", "fleet_provision_yaidap_recreate=true")
-	}
-	if provision.ActionUsesConnectionLocal(rec.Action) {
-		extra = append(extra, "-e", "fleet_provision_connection_local=true")
-	}
-	if rec.Action == fleetv1alpha1.ProvisionActionCreateVM || rec.Action == fleetv1alpha1.ProvisionActionInstallBM {
-		if pub := s.hubFleetSSHPublicKey(ctx); pub != "" {
-			extra = append(extra, "-e", fmt.Sprintf("fleet_provision_fleet_ansible_ssh_pubkey=%q", pub))
-		}
-	}
-	for k, v := range spec.DefaultExtraVars {
-		if strings.TrimSpace(k) == "" {
-			continue
-		}
-		extra = append(extra, "-e", k+"="+v)
-	}
-	if provision.ActionSyncsYaidapInventory(rec.Action) && (guestFound || rec.Action == fleetv1alpha1.ProvisionActionInstallBM) {
-		syncExtra, err := s.yaidapProvisionInventoryExtra(ctx, fs, rec.Subject, rec.ActorKind, rec.ActorName)
-		if err != nil {
-			return "", err
-		}
-		extra = append(extra, syncExtra...)
-	}
-
-	jobName := siteProvisionJobPrefix + rec.ID
-	// Delete finished job with same name if reusing ids (should not happen).
-	var old batchv1.Job
-	if err := s.Client.Get(ctx, types.NamespacedName{Namespace: s.Cfg.Namespace, Name: jobName}, &old); err == nil {
-		_ = s.Client.Delete(ctx, &old, client.PropagationPolicy(metav1.DeletePropagationBackground))
-	}
-
-	j := jobs.SiteProvisionConnectorJob(
-		s.Cfg.Namespace, jobName, fs.Name, fs.Spec.EffectiveSiteID(fs.Name),
-		s.Cfg.AnsibleRunnerImage, spec.SSHSecretRef, cmName, "", extra,
-	)
-	if err := s.Client.Create(ctx, j); err != nil {
-		return "", err
-	}
-	return jobName, nil
+	return siteprovision.StartYaidapAction(ctx, s.Client, s.Cfg, fs, rec, siteprovision.StartYaidapActionOptions{
+		Params:               req.Params,
+		GuestFound:           guestFound,
+		HubFleetSSHPublicKey: s.hubFleetSSHPublicKey(ctx),
+		ActorKind:            rec.ActorKind,
+		ActorName:            rec.ActorName,
+	})
 }
-
 func jumphostInventoryINI(jumphost, defaultUser string) string {
 	user, host, port := parseJumphost(jumphost, defaultUser)
 	var b strings.Builder
