@@ -394,3 +394,96 @@ func TestSyncHostInventoryCreateVMMarksReady(t *testing.T) {
 		t.Fatalf("create_vm phase=%q, want Ready", got)
 	}
 }
+
+func TestRefreshRunningJobKeepsRetryingJobRunning(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = fleetv1alpha1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	ns := "fleet-console"
+	limit := int32(1)
+	site := &fleetv1alpha1.FleetSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			SiteName:         "homelab",
+			SiteId:           "homelab",
+			ProvisioningMode: fleetv1alpha1.ProvisioningModeRegistry,
+		},
+		Status: fleetv1alpha1.FleetSiteStatus{
+			Provision: &fleetv1alpha1.SiteProvisionStatus{
+				Current: &fleetv1alpha1.SiteProvisionActionRecord{
+					ID:       "abc123",
+					Action:   fleetv1alpha1.ProvisionActionProvision,
+					Subject:  "lab-ha-0",
+					Phase:    fleetv1alpha1.ProvisionPhaseRunning,
+					JobName:  "fleet-cluster-provision-lab-ha-0",
+					Provider: fleetv1alpha1.ProvisionProviderYaidap,
+				},
+			},
+		},
+	}
+	// First attempt failed, a retry is still active: not a terminal failure.
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-provision-lab-ha-0", Namespace: ns},
+		Spec:       batchv1.JobSpec{BackoffLimit: &limit},
+		Status:     batchv1.JobStatus{Failed: 1, Active: 1},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, job).Build()
+
+	if err := RefreshRunningJob(context.Background(), c, ns, site, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if site.Status.Provision.Current == nil {
+		t.Fatal("retrying job was finalized early; expected it left Running")
+	}
+	if site.Status.Provision.Current.Phase != fleetv1alpha1.ProvisionPhaseRunning {
+		t.Fatalf("phase=%q, want Running", site.Status.Provision.Current.Phase)
+	}
+}
+
+func TestRefreshRunningJobTerminalFailure(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = fleetv1alpha1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	ns := "fleet-console"
+	limit := int32(1)
+	site := &fleetv1alpha1.FleetSite{
+		ObjectMeta: metav1.ObjectMeta{Name: "homelab", Namespace: ns},
+		Spec: fleetv1alpha1.FleetSiteSpec{
+			SiteName:         "homelab",
+			SiteId:           "homelab",
+			ProvisioningMode: fleetv1alpha1.ProvisioningModeRegistry,
+		},
+		Status: fleetv1alpha1.FleetSiteStatus{
+			Provision: &fleetv1alpha1.SiteProvisionStatus{
+				Current: &fleetv1alpha1.SiteProvisionActionRecord{
+					ID:       "abc123",
+					Action:   fleetv1alpha1.ProvisionActionProvision,
+					Subject:  "lab-ha-0",
+					Phase:    fleetv1alpha1.ProvisionPhaseRunning,
+					JobName:  "fleet-cluster-provision-lab-ha-0",
+					Provider: fleetv1alpha1.ProvisionProviderYaidap,
+				},
+			},
+		},
+	}
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-provision-lab-ha-0", Namespace: ns},
+		Spec:       batchv1.JobSpec{BackoffLimit: &limit},
+		Status:     batchv1.JobStatus{Failed: 2},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&fleetv1alpha1.FleetSite{}).WithObjects(site, job).Build()
+
+	if err := RefreshRunningJob(context.Background(), c, ns, site, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if site.Status.Provision.Current != nil {
+		t.Fatalf("expected current cleared, got %+v", site.Status.Provision.Current)
+	}
+	if len(site.Status.Provision.History) == 0 || site.Status.Provision.History[0].Phase != fleetv1alpha1.ProvisionPhaseFailed {
+		t.Fatalf("history=%+v, want a Failed entry", site.Status.Provision.History)
+	}
+}
