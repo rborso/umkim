@@ -119,14 +119,14 @@ export function LLMApiKeysPage() {
             const status = k.status ?? {};
             return (
               <Tr key={meta.name}>
-                <Td>{meta.name}</Td>
-                <Td>{spec.displayName ?? ''}</Td>
-                <Td>
+                <Td dataLabel="Name">{meta.name}</Td>
+                <Td dataLabel="Display">{spec.displayName ?? ''}</Td>
+                <Td dataLabel="Prefix">
                   <code>{status.keyPrefix ?? ''}</code>
                 </Td>
-                <Td>{status.active ? 'yes' : 'no'}</Td>
-                <Td>{(spec.models ?? []).join(', ') || 'all'}</Td>
-                <Td>
+                <Td dataLabel="Active">{status.active ? 'yes' : 'no'}</Td>
+                <Td dataLabel="Models">{(spec.models ?? []).join(', ') || 'all'}</Td>
+                <Td dataLabel="Actions">
                   <Button
                     variant="link"
                     onClick={() =>

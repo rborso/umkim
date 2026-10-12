@@ -605,15 +605,15 @@ export function AppsPage() {
               <Tbody>
                 {apps.map((app) => (
                   <Tr key={app.name}>
-                    <Td>{app.name}</Td>
-                    <Td>{app.clusterName}</Td>
-                    <Td>
+                    <Td dataLabel="Name">{app.name}</Td>
+                    <Td dataLabel="Cluster">{app.clusterName}</Td>
+                    <Td dataLabel="Chart">
                       <code style={{ fontSize: '0.8rem' }}>{app.chart}</code>
                     </Td>
-                    <Td>{app.releaseName}</Td>
-                    <Td>{app.namespace}</Td>
-                    <Td>{app.route?.mode || 'none'}</Td>
-                    <Td>
+                    <Td dataLabel="Release">{app.releaseName}</Td>
+                    <Td dataLabel="Namespace">{app.namespace}</Td>
+                    <Td dataLabel="Route">{app.route?.mode || 'none'}</Td>
+                    <Td dataLabel="Hostname">
                       {app.route?.mode && app.route.mode !== 'none' ? (
                         <code style={{ fontSize: '0.8rem' }}>
                           {appRouteHostname(app, defaults.hubEdgeDomain) || '—'}
@@ -622,13 +622,13 @@ export function AppsPage() {
                         '—'
                       )}
                     </Td>
-                    <Td>
+                    <Td dataLabel="Phase">
                       <Label color={phaseColor(app.phase)}>{app.phase || 'Pending'}</Label>
                       {app.message ? (
                         <div style={{ fontSize: '0.75rem', color: '#6a6e73', marginTop: '0.25rem' }}>{app.message}</div>
                       ) : null}
                     </Td>
-                    <Td>
+                    <Td dataLabel="Actions">
                       <Button variant="link" onClick={() => openEdit(app)} isDisabled={app.phase === 'Installing' || app.phase === 'Deleting'}>
                         Edit
                       </Button>
@@ -661,21 +661,21 @@ export function AppsPage() {
               <Tbody>
                 {charts.map((c) => (
                   <Tr key={c.name}>
-                    <Td>
+                    <Td dataLabel="Chart">
                       <code>{c.name}</code>
                     </Td>
-                    <Td>{c.version || (c.versions && c.versions[0]) || '—'}</Td>
-                    <Td>{c.source || '—'}</Td>
-                    <Td>
+                    <Td dataLabel="Version">{c.version || (c.versions && c.versions[0]) || '—'}</Td>
+                    <Td dataLabel="Source">{c.source || '—'}</Td>
+                    <Td dataLabel="Images">
                       <Label color={c.imagePolicy === 'copy' ? 'blue' : 'grey'}>{imagePolicyLabel(c.imagePolicy)}</Label>
                     </Td>
-                    <Td>
+                    <Td dataLabel="Phase">
                       <Label color={phaseColor(c.phase)}>{c.phase || 'Pending'}</Label>
                       {c.message ? (
                         <div style={{ fontSize: '0.75rem', color: '#6a6e73', marginTop: '0.25rem' }}>{c.message}</div>
                       ) : null}
                     </Td>
-                    <Td>
+                    <Td dataLabel="Actions">
                       {canPublish ? (
                         <Button variant="link" icon={<TrashIcon />} onClick={() => setDeleteChartTarget(c)} isDanger>
                           Remove

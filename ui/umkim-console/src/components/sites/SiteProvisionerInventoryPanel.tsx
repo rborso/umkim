@@ -650,7 +650,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         </Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '16rem 1fr', gap: '1rem' }}>
+      <div className="umkim-split">
         <div>
           <Title headingLevel="h4">Inventory tree</Title>
           <TreeList
@@ -1086,7 +1086,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
 
       <Modal title="Revision diff" isOpen={diffOpen} onClose={() => setDiffOpen(false)} variant="medium">
         {diffRev && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="umkim-split-even">
             <div>
               <Title headingLevel="h5">Before</Title>
               <pre style={{ fontSize: '0.75rem', maxHeight: '24rem', overflow: 'auto' }}>

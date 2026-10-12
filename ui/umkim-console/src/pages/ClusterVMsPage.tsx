@@ -117,7 +117,7 @@ export function ClusterVMsPage() {
                 const selectedRow = selected?.namespace === vm.namespace && selected?.name === vm.name;
                 return (
                   <Tr key={id}>
-                    <Td>
+                    <Td dataLabel="Namespace">
                       <Button
                         variant={ButtonVariant.link}
                         isInline
@@ -129,7 +129,7 @@ export function ClusterVMsPage() {
                         {vm.namespace}
                       </Button>
                     </Td>
-                    <Td>
+                    <Td dataLabel="Name">
                       <Button
                         variant={ButtonVariant.link}
                         isInline
@@ -142,11 +142,11 @@ export function ClusterVMsPage() {
                       </Button>
                       {selectedRow ? ' · selected' : ''}
                     </Td>
-                    <Td>{vm.phase || vm.printableStatus || '—'}</Td>
-                    <Td>{vm.ready ? 'yes' : 'no'}</Td>
-                    <Td>{vm.nodeName || '—'}</Td>
-                    <Td>{vm.ip || '—'}</Td>
-                    <Td>
+                    <Td dataLabel="Phase">{vm.phase || vm.printableStatus || '—'}</Td>
+                    <Td dataLabel="Ready">{vm.ready ? 'yes' : 'no'}</Td>
+                    <Td dataLabel="Node">{vm.nodeName || '—'}</Td>
+                    <Td dataLabel="IP">{vm.ip || '—'}</Td>
+                    <Td dataLabel="Actions">
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                         <Button
                           variant={ButtonVariant.secondary}

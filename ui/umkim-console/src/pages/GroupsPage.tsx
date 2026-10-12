@@ -23,9 +23,9 @@ export function GroupsPage() {
             const meta = (g.metadata ?? {}) as Record<string, string>;
             return (
               <Tr key={meta.name}>
-                <Td>{meta.name}</Td>
-                <Td>{String(spec.ldapGroupCN ?? '—')}</Td>
-                <Td>{String(spec.displayName ?? '')}</Td>
+                <Td dataLabel="Name">{meta.name}</Td>
+                <Td dataLabel="LDAP CN">{String(spec.ldapGroupCN ?? '—')}</Td>
+                <Td dataLabel="Display">{String(spec.displayName ?? '')}</Td>
               </Tr>
             );
           })}

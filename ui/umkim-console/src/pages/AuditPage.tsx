@@ -25,11 +25,11 @@ export function AuditPage() {
             const http = (spec.http ?? {}) as Record<string, string>;
             return (
               <Tr key={meta.name}>
-                <Td>{String(spec.timestamp ?? '')}</Td>
-                <Td>{actor.kind}:{actor.name}</Td>
-                <Td>{String(spec.action ?? '')}</Td>
-                <Td>{String(spec.result ?? '')}</Td>
-                <Td>{http.path ?? ''}</Td>
+                <Td dataLabel="Time">{String(spec.timestamp ?? '')}</Td>
+                <Td dataLabel="Actor">{actor.kind}:{actor.name}</Td>
+                <Td dataLabel="Action">{String(spec.action ?? '')}</Td>
+                <Td dataLabel="Result">{String(spec.result ?? '')}</Td>
+                <Td dataLabel="Path">{http.path ?? ''}</Td>
               </Tr>
             );
           })}

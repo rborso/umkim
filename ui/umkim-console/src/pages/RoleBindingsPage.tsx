@@ -26,10 +26,10 @@ export function RoleBindingsPage() {
             const scopes = (spec.scopes as { kind: string; name: string }[] | undefined) ?? [];
             return (
               <Tr key={meta.name}>
-                <Td>{meta.name}</Td>
-                <Td>{roleRef.name}</Td>
-                <Td>{subjects.map((s) => `${s.kind}:${s.name}`).join(', ')}</Td>
-                <Td>{scopes.map((s) => `${s.kind}/${s.name}`).join(', ') || '*'}</Td>
+                <Td dataLabel="Name">{meta.name}</Td>
+                <Td dataLabel="Role">{roleRef.name}</Td>
+                <Td dataLabel="Subjects">{subjects.map((s) => `${s.kind}:${s.name}`).join(', ')}</Td>
+                <Td dataLabel="Scopes">{scopes.map((s) => `${s.kind}/${s.name}`).join(', ') || '*'}</Td>
               </Tr>
             );
           })}

@@ -261,25 +261,25 @@ export function SitesPage() {
               const canDelete = fleetSiteCanDelete(s);
               return (
                 <Tr key={name}>
-                  <Td>
+                  <Td dataLabel="Name">
                     <Link to={`/sites/${name}`}>{fleetSiteDisplayName(s)}</Link>
                     <br />
                     <code>{fleetSiteEffectiveId(s)}</code>
                   </Td>
-                  <Td>
+                  <Td dataLabel="Type">
                     {management ? 'Management' : registry ? 'Registry' : 'Greenfield'}
                   </Td>
-                  <Td>
+                  <Td dataLabel="Phase">
                     <Label color={phaseColor(phase)}>{phase}</Label>
                   </Td>
-                  <Td style={{ maxWidth: '22rem', whiteSpace: 'normal' }}>
+                  <Td dataLabel="Ingress" style={{ maxWidth: '22rem', whiteSpace: 'normal' }}>
                     {management ? (
                       <span>Hub gateway (management)</span>
                     ) : (
                       <span style={{ fontSize: '0.9rem' }}>{fleetSiteIngressSummary(s)}</span>
                     )}
                   </Td>
-                  <Td>
+                  <Td dataLabel="Clusters">
                     {management ? (
                       <Link to="/infrastructure">Hub host</Link>
                     ) : clusterCount === 0 ? (
@@ -293,7 +293,7 @@ export function SitesPage() {
                       ))
                     )}
                   </Td>
-                  <Td>
+                  <Td dataLabel="Actions">
                     {!registry && !management && (
                       <>
                         {(phase === 'ScriptIssued' ||

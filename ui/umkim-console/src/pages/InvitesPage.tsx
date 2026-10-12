@@ -165,14 +165,14 @@ export function InvitesPage() {
         <Tbody>
           {rows.map((inv) => (
             <Tr key={inv.id}>
-              <Td>{inv.createdAt}</Td>
-              <Td>{(inv.groups ?? []).join(', ')}</Td>
-              <Td>{inv.expiresAt}</Td>
-              <Td>
+              <Td dataLabel="Created">{inv.createdAt}</Td>
+              <Td dataLabel="Groups">{(inv.groups ?? []).join(', ')}</Td>
+              <Td dataLabel="Expires">{inv.expiresAt}</Td>
+              <Td dataLabel="Status">
                 {inv.used ? `used by ${inv.redeemedBy ?? '?'}` : inv.expired ? 'expired' : 'active'}
               </Td>
-              <Td>{inv.createdBy ?? ''}</Td>
-              <Td>
+              <Td dataLabel="By">{inv.createdBy ?? ''}</Td>
+              <Td dataLabel="Actions">
                 <Button variant="link" isDanger onClick={() => void revoke(inv.id)}>
                   Revoke
                 </Button>
