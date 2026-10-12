@@ -9,6 +9,7 @@ import (
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ansiblelogs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/clusterbootstrap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors/yaidap"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/siteprovision"
@@ -234,6 +235,7 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 		return ctrl.Result{RequeueAfter: 20 * time.Second}, true, nil
 	}
 	if !ok {
+		r.finalizePipelineAction(ctx, fcj, fcj.Status.BootstrapActionID, fleetv1alpha1.ProvisionActionBootstrap, jobName, fleetv1alpha1.ProvisionPhaseFailed, "Bootstrap failed: "+msg)
 		fcj.Status.Phase = fleetv1alpha1.JoinPhaseFailed
 		fcj.Status.BootstrapJobName = ""
 		fcj.Status.PipelineStep = ""
@@ -243,6 +245,10 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 		}
 		return ctrl.Result{}, true, nil
 	}
+	// Finalize the history entry here: the pipeline replaces the site's current
+	// action with the provision step, so the FleetSite reconciler would otherwise
+	// leave this one showing Running.
+	r.finalizePipelineAction(ctx, fcj, fcj.Status.BootstrapActionID, fleetv1alpha1.ProvisionActionBootstrap, jobName, fleetv1alpha1.ProvisionPhaseSucceeded, "Bootstrap complete")
 	fcj.Status.BootstrapJobName = ""
 	fcj.Status.PipelineStep = "provision"
 	fcj.Status.Message = "Bootstrap complete; awaiting validation"
@@ -250,6 +256,40 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 		return ctrl.Result{}, true, err
 	}
 	return ctrl.Result{Requeue: true}, true, nil
+}
+
+// finalizePipelineAction marks a cluster bring-up history entry finished with the
+// captured job log tail.
+func (r *ClusterJoinReconciler) finalizePipelineAction(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, id, action, jobName, phase, message string) {
+	if strings.TrimSpace(id) == "" {
+		return
+	}
+	site, err := sites.FindFleetSite(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId)
+	if err != nil {
+		return
+	}
+	tail := ""
+	if r.Clientset != nil && strings.TrimSpace(jobName) != "" {
+		if logs, err := ansiblelogs.PodLogs(ctx, r.Clientset, fcj.Namespace, jobName); err == nil {
+			tail = ansiblelogs.Tail(logs, 65536)
+		}
+	}
+	now := metav1.NewTime(time.Now().UTC())
+	rec := fleetv1alpha1.SiteProvisionActionRecord{
+		ID:        id,
+		Action:    action,
+		Subject:   fcj.Spec.EffectiveClusterName(fcj.Name),
+		Provider:  site.Spec.EffectiveProvisionProvider(),
+		Phase:     phase,
+		ActorKind: "Controller",
+		ActorName: "cluster-pipeline",
+		JobName:   jobName,
+		Message:   message,
+		LogTail:   tail,
+		StartedAt: &now,
+		EndedAt:   &now,
+	}
+	_ = siteprovision.CommitAction(ctx, r.Client, site, rec, true)
 }
 
 func pipelineActionID() string {
