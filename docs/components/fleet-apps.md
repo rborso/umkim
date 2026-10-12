@@ -49,6 +49,10 @@ Use the console **Apps** page, authenticated `POST /fleet/api/v1alpha1/apps`,
 [playbooks/flows/app-install.yml](../../playbooks/flows/app-install.yml).
 The controller path is `/api/v1alpha1/apps`; `clusterName` is required.
 
+A worked console + CLI install of two real charts (Immich and Paperless-ngx,
+including their bootstrap and Authelia OIDC client) is in
+[app-install-immich-paperless.md](../app-install-immich-paperless.md).
+
 Required fields:
 
 | Field | Meaning |
@@ -192,6 +196,8 @@ installs whoami and probes the pod when `FLEET_APP_CLUSTER` is set.
 
 ## Related
 
+- [app-install-immich-paperless.md](../app-install-immich-paperless.md) — worked console + CLI install of Immich and Paperless-ngx
+- [hub-tenant-app-deploy.md](../hub-tenant-app-deploy.md) — directory tenant and tenant-gated hub routes
 - [fleet-site.md](fleet-site.md) — cluster join until Ready
 - [fleet-edge.md](fleet-edge.md) — site exposure and edge routing
 - [harbor.md](harbor.md) — chart publishing

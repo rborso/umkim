@@ -1,0 +1,25 @@
+{
+  "name": "paperless",
+  "clusterName": "<cluster>",
+  "chart": "paperless",
+  "version": "<chart-version>",
+  "releaseName": "paperless",
+  "namespace": "paperless",
+  "oidcClientId": "paperless",
+  "oidcClient": {
+    "clientId": "paperless",
+    "clientName": "Paperless",
+    "redirectPaths": [
+      "/accounts/oidc/authelia/login/callback/"
+    ],
+    "requirePkce": false
+  },
+  "route": {
+    "mode": "hub",
+    "hubHost": "paperless.<hub-domain>",
+    "requireAuth": true,
+    "serviceName": "paperless-web",
+    "servicePort": 8000
+  },
+  "valuesYaml": "externalUrl: https://${APP_HOST}\noidc:\n  enabled: true\n  issuerUrl: ${OIDC_ISSUER_URL}/.well-known/openid-configuration\n  clientId: ${OIDC_CLIENT_ID}\n  clientSecret: ${OIDC_CLIENT_SECRET}\n  tokenAuthMethod: client_secret_basic\ningress:\n  enabled: true\n  host: ${APP_HOST}\n  forwardAuth: ${FORWARD_AUTH}\n"
+}

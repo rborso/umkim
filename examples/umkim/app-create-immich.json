@@ -1,0 +1,28 @@
+{
+  "name": "immich",
+  "clusterName": "<cluster>",
+  "chart": "immich",
+  "version": "<chart-version>",
+  "releaseName": "immich",
+  "namespace": "immich",
+  "oidcClientId": "immich",
+  "oidcClient": {
+    "clientId": "immich",
+    "clientName": "Immich",
+    "redirectPaths": [
+      "/auth/login",
+      "/user-settings"
+    ],
+    "extraRedirectUris": [
+      "app.immich:///oauth-callback"
+    ]
+  },
+  "route": {
+    "mode": "hub",
+    "hubHost": "immich.<hub-domain>",
+    "requireAuth": true,
+    "serviceName": "immich-server",
+    "servicePort": 2283
+  },
+  "valuesYaml": "bootstrap:\n  oauth:\n    enabled: true\n    issuerUrl: ${OIDC_ISSUER_URL}\n    clientId: ${OIDC_CLIENT_ID}\n    clientSecret: ${OIDC_CLIENT_SECRET}\n    tokenEndpointAuthMethod: client_secret_basic\n    buttonText: \"Sign in with SSO\"\nimmich:\n  externalUrl: https://${APP_HOST}\ningress:\n  enabled: true\n  host: ${APP_HOST}\n  forwardAuth: ${FORWARD_AUTH}\n"
+}
