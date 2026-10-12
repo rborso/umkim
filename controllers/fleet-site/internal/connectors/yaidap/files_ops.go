@@ -93,6 +93,13 @@ func GetInventoryFileContent(ctx context.Context, c client.Client, ns, siteName,
 
 // MigrateLegacyStore converts legacy JSON/site-hosts inventory into native YAML tree.
 func MigrateLegacyStore(ctx context.Context, c client.Client, ns, siteName, actor string) error {
+	// Split external.hosts out of guests.yml in its own read-modify-write. Deriving
+	// this from the snapshot below and writing it later would clobber a concurrent
+	// write to guests.yml, such as a create_vm resolved vm_location (this runs on
+	// every provision action via EnsureReadyForProvision).
+	if err := migrateBareMetalsLayout(ctx, c, ns, siteName); err != nil {
+		return err
+	}
 	data, err := connectors.Load(ctx, c, ns, siteName, provider)
 	if err != nil {
 		return err
@@ -165,13 +172,6 @@ func MigrateLegacyStore(ctx context.Context, c client.Client, ns, siteName, acto
 			put[p] = content
 		}
 	}
-	if data != nil {
-		if layoutPut, layoutChanged := EnsureBareMetalsLayout(data); layoutChanged {
-			for p, content := range layoutPut {
-				put[p] = content
-			}
-		}
-	}
 	if len(put) == 0 && len(deletePaths) == 0 {
 		return nil
 	}
@@ -199,6 +199,26 @@ func MigrateLegacyStore(ctx context.Context, c client.Client, ns, siteName, acto
 			meta.SyncPhase = "dirty"
 		}
 		return connectors.InventoryPatch{Meta: &meta}, nil
+	})
+}
+
+// migrateBareMetalsLayout writes the bare_metals.yml/guests.yml layout split from the
+// current store inside a single read-modify-write. It must not compute the file bodies
+// from an earlier snapshot: guests.yml also carries create_vm resolved vm_location
+// values, and a stale snapshot would revert them.
+func migrateBareMetalsLayout(ctx context.Context, c client.Client, ns, siteName string) error {
+	return connectors.PatchInventory(ctx, c, ns, siteName, provider, func(raw map[string]string) (connectors.InventoryPatch, error) {
+		data := connectors.NormalizeMetaKeys(raw)
+		layoutPut, changed := EnsureBareMetalsLayout(data)
+		if !changed {
+			return connectors.InventoryPatch{}, nil
+		}
+		for p, content := range layoutPut {
+			if err := ValidateInventoryFile(p, content); err != nil {
+				return connectors.InventoryPatch{}, err
+			}
+		}
+		return connectors.InventoryPatch{FilePut: layoutPut}, nil
 	})
 }
 

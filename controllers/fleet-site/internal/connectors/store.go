@@ -96,8 +96,14 @@ func LoadMetaFromData(data map[string]string, provider string) (InventoryMeta, e
 }
 
 // PatchInventory applies a mutator with optimistic retry on the ConfigMap.
+//
+// The whole read-mutate-write sequence runs inside the retry so that a conflict
+// re-reads the latest store and re-runs the mutator. Retrying only the write with
+// the previous snapshot would drop concurrent changes (a lost update).
 func PatchInventory(ctx context.Context, c client.Client, ns, siteName, provider string, mutate inventoryMutator) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	return retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return apierrors.IsConflict(err) || apierrors.IsAlreadyExists(err)
+	}, func() error {
 		data, err := Load(ctx, c, ns, siteName, provider)
 		if err != nil {
 			return err
@@ -165,40 +171,39 @@ func PatchInventory(ctx context.Context, c client.Client, ns, siteName, provider
 	})
 }
 
+// writeInventoryOnce performs a single read-modify-write of the inventory ConfigMap.
+// Callers must retry via PatchInventory so the mutator re-runs on the latest store;
+// retrying the write here would reapply a stale snapshot and drop concurrent changes.
 func writeInventoryOnce(ctx context.Context, c client.Client, ns, siteName, provider string, data map[string]string) error {
 	name := InventoryCMName(siteName, provider)
-	return retry.OnError(retry.DefaultRetry, func(err error) bool {
-		return apierrors.IsConflict(err) || apierrors.IsAlreadyExists(err)
-	}, func() error {
-		var existing corev1.ConfigMap
-		err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, &existing)
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: ns,
-					Labels: map[string]string{
-						"app":        cmLabelApp,
-						"fleet-site": siteName,
-						"provider":   provider,
-					},
+	var existing corev1.ConfigMap
+	err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, &existing)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+				Labels: map[string]string{
+					"app":        cmLabelApp,
+					"fleet-site": siteName,
+					"provider":   provider,
 				},
-				Data: data,
-			}
-			return c.Create(ctx, cm)
+			},
+			Data: data,
 		}
-		existing.Data = data
-		if existing.Labels == nil {
-			existing.Labels = map[string]string{}
-		}
-		existing.Labels["app"] = cmLabelApp
-		existing.Labels["fleet-site"] = siteName
-		existing.Labels["provider"] = provider
-		return c.Update(ctx, &existing)
-	})
+		return c.Create(ctx, cm)
+	}
+	existing.Data = data
+	if existing.Labels == nil {
+		existing.Labels = map[string]string{}
+	}
+	existing.Labels["app"] = cmLabelApp
+	existing.Labels["fleet-site"] = siteName
+	existing.Labels["provider"] = provider
+	return c.Update(ctx, &existing)
 }
 
 // ListRevisions returns revision items newest-first.
