@@ -1,7 +1,7 @@
 # Homelab CLI rebuild runbook (otthol.hu maintainer lab)
 
 Full fresh install of site **`homelab`**, cluster **`lab-single-0`** (BM on virt03), and
-**`lab-ha-0`** (HA VMs on virt01/virt02) using **`umkim` CLI only**. Canonical values live in
+**`lab-ha-0`** (HA VMs on virt01/virt02/virt04) using **`umkim` CLI only**. Canonical values live in
 [`otthol-lab-reference.yml`](otthol-lab-reference.yml).
 
 **Out of scope:** `lab-jumphost` site, `lab-single-1` cluster.
@@ -14,9 +14,9 @@ Full fresh install of site **`homelab`**, cluster **`lab-single-0`** (BM on virt
 - Hub secret `fleet-site-homelab-provision-ssh` in namespace `fleet-console` (jumphost SSH key)
 - SSH from jumphost to lab LAN (`172.16.10.0/24`)
 - **virt03** (`172.16.10.4`) powered and reachable from jumphost before BM discover/install_bm
-- Base image **`/opt/local/rocky-10.qcow2`** on virt01/virt02 (YAIDAP `os: rocky-10` on guests)
+- Base image **`/opt/local/rocky-10.qcow2`** on virt01/virt02/virt04 (YAIDAP `os: rocky-10` on guests)
 - Inventory **`group_vars/all/all.yml`** includes `alphabet`, `local_ssd` storage, and `networks` (see `examples/homelab/inventory/`)
-- Hypervisors **virt01**, **virt02** in **`hypervisors.yml`**; **virt03** (`lab-single-0` BM) in **`bare_metals.yml`** (not `guests.hosts`); **`host_vars/virt01.yml`**, **`virt02.yml`**, **`virt03.yml`** with `os: rocky-10` on virt03 for BM discover/install_bm
+- Hypervisors **virt01**, **virt02**, **virt04** in **`hypervisors.yml`**; **virt03** (`lab-single-0` BM) in **`bare_metals.yml`** (not `guests.hosts`); **`host_vars/virt01.yml`**, **`virt02.yml`**, **`virt04.yml`**, **`virt03.yml`** with `os: rocky-10` on virt03 for BM discover/install_bm. Every guest hypervisor needs `host_vars` with `os`: YAIDAP validates guest `disks[].storage` against the target hypervisor `os`, and a missing one fails `create_vm` for any guest placed there.
 
 Optional API URLs (defaults target console NodePort on hub):
 
@@ -77,13 +77,13 @@ umkim cluster delete lab-single-0 --cleanup-kubernetes || true
 umkim cluster delete lab-ha-0 --cleanup-kubernetes || true
 ```
 
-### Phase 1 — Ad-hoc virsh cleanup (virt01 + virt02 only)
+### Phase 1 — Ad-hoc virsh cleanup (all guest hypervisors)
 
 **Do not** run on virt03 (`172.16.10.4`); it is reinstalled via TempXE later.
 
 ```bash
 JUMP="linux@jump.otthol.hu:30200"
-for hv in 172.16.10.2 172.16.10.3; do
+for hv in 172.16.10.2 172.16.10.3 172.16.10.6; do
   ssh -J "$JUMP" "linux@${hv}" 'bash -s' <<'EOF'
 set -euo pipefail
 virsh list --all --name | while read -r d; do

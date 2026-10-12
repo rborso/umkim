@@ -35,7 +35,7 @@ API="${UMKIM_API_URL:-http://127.0.0.1:30912/fleet/api/v1alpha1}"
 AUTH="${UMKIM_AUTH_URL:-http://127.0.0.1:30912/fleet/auth/v1alpha1}"
 DRY_RUN="${DRY_RUN:-0}"
 SKIP_PHASE="${SKIP_PHASE:-}"
-VIRSH_TARGETS="${VIRSH_TARGETS:-172.16.10.2 172.16.10.3}"
+VIRSH_TARGETS="${VIRSH_TARGETS:-172.16.10.2 172.16.10.3 172.16.10.6}"
 
 export UMKIM_API_URL="$API" UMKIM_AUTH_URL="$AUTH"
 
@@ -226,7 +226,10 @@ if ! skip_phase site; then
   step "inventory put group_vars/all/all.yml" put_inventory_file group_vars/all/all.yml
   step "inventory put lab-ha-0.yml" put_inventory_file lab-ha-0.yml
   step "inventory put group_vars/lab-ha-0.yml" put_inventory_file group_vars/lab-ha-0.yml
-  for g in "$HA_CP1" "$HA_CP2" "$HA_CP3" "$HA_W1" virt01 virt02 "$BM_HOST"; do
+  # Every hypervisor that can receive a guest needs host_vars (os, uplinks):
+  # YAIDAP validates guest disks[].storage against the target hypervisor os, and
+  # a missing hypervisor os fails create_vm for that guest.
+  for g in "$HA_CP1" "$HA_CP2" "$HA_CP3" "$HA_W1" virt01 virt02 virt04 "$BM_HOST"; do
     step "inventory put host_vars/${g}.yml" put_inventory_file "host_vars/${g}.yml"
   done
   step "site inventory sync" $UMKIM site inventory sync "$SITE" --wait
