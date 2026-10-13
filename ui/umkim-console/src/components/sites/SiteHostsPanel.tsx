@@ -672,7 +672,7 @@ export function SiteHostsPanel({ siteName }: Props) {
               {' '}
               Dry-run only: shows memory-based least-utilized placement without creating a VM or
               persisting inventory.
-        
+
       <Modal
         variant="small"
         title="Remove host from inventory"
