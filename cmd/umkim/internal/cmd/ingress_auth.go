@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -37,9 +38,10 @@ func ingressAuthGetCmd() *cobra.Command {
 
 func ingressAuthSetCmd() *cobra.Command {
 	var (
-		hubEnabled, hubLldapWebUI                       bool
-		portalHost, cookieDomain, accessDomains         string
-		hubEnabledSet, hubLldapWebUISet                   bool
+		hubEnabled, hubLldapWebUI               bool
+		portalHost, cookieDomain, accessDomains string
+		hubLldapWebUIExposure                   string
+		hubEnabledSet, hubLldapWebUISet         bool
 	)
 	c := &cobra.Command{
 		Use:   "set",
@@ -49,7 +51,16 @@ func ingressAuthSetCmd() *cobra.Command {
 			if hubEnabledSet {
 				body["hubEnabled"] = hubEnabled
 			}
-			if hubLldapWebUISet {
+			if cmd.Flags().Changed("hub-lldap-webui-exposure") {
+				mode := strings.ToLower(strings.TrimSpace(hubLldapWebUIExposure))
+				switch mode {
+				case "disabled", "wireguard", "authelia":
+				default:
+					return fmt.Errorf("--hub-lldap-webui-exposure must be disabled, wireguard, or authelia")
+				}
+				body["hubLldapWebUIExposure"] = mode
+			} else if hubLldapWebUISet {
+				// Legacy boolean: true == authelia.
 				body["hubExposeLldapWebUI"] = hubLldapWebUI
 			}
 			if cmd.Flags().Changed("portal-host") {
@@ -82,7 +93,8 @@ func ingressAuthSetCmd() *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&hubEnabled, "hub-enabled", false, "Enable hub ingress auth")
-	c.Flags().BoolVar(&hubLldapWebUI, "hub-lldap-webui", false, "Expose LLDAP Web UI on hub")
+	c.Flags().BoolVar(&hubLldapWebUI, "hub-lldap-webui", false, "Expose LLDAP Web UI on hub (legacy alias for --hub-lldap-webui-exposure authelia)")
+	c.Flags().StringVar(&hubLldapWebUIExposure, "hub-lldap-webui-exposure", "", "LLDAP Web UI exposure: disabled|wireguard|authelia")
 	c.Flags().StringVar(&portalHost, "portal-host", "", "Portal hostname")
 	c.Flags().StringVar(&cookieDomain, "cookie-domain", "", "Auth cookie domain")
 	c.Flags().StringVar(&accessDomains, "access-domains", "", "Comma-separated access domains")

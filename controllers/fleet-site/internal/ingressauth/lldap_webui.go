@@ -84,7 +84,10 @@ func AnsibleSpecChanged(fia *fleetv1alpha1.FleetIngressAuth, desired DesiredStat
 	return stored == "" || stored != current
 }
 
-// ReconcileHubLLDAPWebUI manages fleet-console/lldap-webui NodePort (http only; LDAP stays ClusterIP).
+// ReconcileHubLLDAPWebUI publishes the LLDAP web UI according to the configured
+// exposure mode: disabled, wireguard (NodePort reachable only over the overlay),
+// or authelia (hub gateway route behind Authelia). The LDAP service itself stays
+// ClusterIP.
 func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Config, fia *fleetv1alpha1.FleetIngressAuth) error {
 	consoleNS := cfg.ConsoleNamespace
 	if consoleNS == "" {
@@ -95,20 +98,22 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 		nodePort = 30917
 	}
 
-	want := fia.Spec.HubExposeLldapWebUI
+	mode := fia.Spec.EffectiveHubLldapWebUIExposure()
+	want := mode != fleetv1alpha1.LldapWebUIExposureDisabled
 	hub := fia.Status.Hub
 	host := lldapWebUIHostForFIA(fia)
+	hub.LLDAPWebUIExposure = mode
 
 	if want {
-		if !fia.Spec.HubEnabled {
+		if mode == fleetv1alpha1.LldapWebUIExposureAuthelia && !fia.Spec.HubEnabled {
 			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
-			hub.LLDAPWebUIMessage = "hub ingress auth (Authelia) must be enabled to expose the LLDAP web UI"
+			hub.LLDAPWebUIMessage = "hub ingress auth (Authelia) must be enabled, or use exposure wireguard"
 			hub.LLDAPWebUIEnabled = false
 			hub.LLDAPWebUIURL = ""
 			fia.Status.Hub = hub
 			return c.Status().Update(ctx, fia)
 		}
-		if host == "" {
+		if mode == fleetv1alpha1.LldapWebUIExposureAuthelia && host == "" {
 			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
 			hub.LLDAPWebUIMessage = "no access domain configured for the LLDAP web UI host"
 			hub.LLDAPWebUIEnabled = false
@@ -167,7 +172,7 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 		return c.Status().Update(ctx, fia)
 	}
 
-	desired := desiredLLDAPWebUIService(consoleNS, nodePort)
+	desired := desiredLLDAPWebUIService(consoleNS, mode, nodePort)
 	if apierrors.IsNotFound(err) {
 		hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseEnabling
 		fia.Status.Hub = hub
@@ -205,7 +210,7 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 		}
 	}
 
-	if err := ensureHubLLDAPWebUIRoute(ctx, c, cfg, host, true); err != nil {
+	if err := ensureHubLLDAPWebUIRoute(ctx, c, cfg, host, mode == fleetv1alpha1.LldapWebUIExposureAuthelia); err != nil {
 		hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
 		hub.LLDAPWebUIMessage = err.Error()
 		fia.Status.Hub = hub
@@ -216,7 +221,11 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 	hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseReady
 	hub.LLDAPWebUIMessage = ""
 	hub.LLDAPWebUIEnabled = true
-	hub.LLDAPWebUIURL = "https://" + host
+	if mode == fleetv1alpha1.LldapWebUIExposureAuthelia {
+		hub.LLDAPWebUIURL = "https://" + host
+	} else {
+		hub.LLDAPWebUIURL = fmt.Sprintf("http://%s:%d", cfg.HubWireguardIP, nodePort)
+	}
 	fia.Status.Hub = hub
 	return c.Status().Update(ctx, fia)
 }
@@ -368,11 +377,8 @@ func restorePrimaryLLDAPClusterIP(ctx context.Context, c client.Client, ns strin
 	return c.Patch(ctx, patch, client.MergeFrom(&svc))
 }
 
-func desiredLLDAPWebUIService(ns string, nodePort int32) *corev1.Service {
-	// ClusterIP only: the UI is reached through the hub gateway behind Authelia,
-	// never through a node port.
-	_ = nodePort
-	return &corev1.Service{
+func desiredLLDAPWebUIService(ns, mode string, nodePort int32) *corev1.Service {
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      lldapWebUIServiceName,
 			Namespace: ns,
@@ -397,6 +403,14 @@ func desiredLLDAPWebUIService(ns string, nodePort int32) *corev1.Service {
 			},
 		},
 	}
+	// wireguard mode: a NodePort the hub firewall keeps off the public NIC, so it
+	// is reachable only over the overlay. authelia mode stays ClusterIP and is
+	// reached through the hub gateway route.
+	if mode == fleetv1alpha1.LldapWebUIExposureWireguard {
+		svc.Spec.Type = corev1.ServiceTypeNodePort
+		svc.Spec.Ports[0].NodePort = nodePort
+	}
+	return svc
 }
 
 func lldapWebUIServiceEqual(a, b *corev1.Service) bool {

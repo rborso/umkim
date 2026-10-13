@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -17,6 +18,7 @@ import (
 type ingressAuthResponse struct {
 	HubEnabled            bool     `json:"hubEnabled"`
 	HubExposeLldapWebUI   bool     `json:"hubExposeLldapWebUI"`
+	HubLldapWebUIExposure string   `json:"hubLldapWebUIExposure,omitempty"`
 	ConsoleLldapDeployed  bool     `json:"consoleLldapDeployed"`
 	PortalHost            string   `json:"portalHost,omitempty"`
 	CookieDomain          string   `json:"cookieDomain,omitempty"`
@@ -29,6 +31,7 @@ type ingressAuthResponse struct {
 		AutheliaServiceURL string `json:"autheliaServiceURL,omitempty"`
 		LLDAPWebUIEnabled  bool   `json:"lldapWebUIEnabled,omitempty"`
 		LLDAPWebUIURL      string `json:"lldapWebUIURL,omitempty"`
+		LLDAPWebUIExposure string `json:"lldapWebUIExposure,omitempty"`
 		LLDAPWebUIPhase    string `json:"lldapWebUIPhase,omitempty"`
 		LLDAPWebUIMessage  string `json:"lldapWebUIMessage,omitempty"`
 	} `json:"hub,omitempty"`
@@ -37,11 +40,12 @@ type ingressAuthResponse struct {
 }
 
 type ingressAuthPatchBody struct {
-	HubEnabled          *bool    `json:"hubEnabled,omitempty"`
-	HubExposeLldapWebUI *bool    `json:"hubExposeLldapWebUI,omitempty"`
-	PortalHost          string   `json:"portalHost,omitempty"`
-	CookieDomain        string   `json:"cookieDomain,omitempty"`
-	AccessDomains       []string `json:"accessDomains,omitempty"`
+	HubEnabled            *bool    `json:"hubEnabled,omitempty"`
+	HubExposeLldapWebUI   *bool    `json:"hubExposeLldapWebUI,omitempty"`
+	HubLldapWebUIExposure string   `json:"hubLldapWebUIExposure,omitempty"`
+	PortalHost            string   `json:"portalHost,omitempty"`
+	CookieDomain          string   `json:"cookieDomain,omitempty"`
+	AccessDomains         []string `json:"accessDomains,omitempty"`
 }
 
 func (s *Server) handleIngressAuth(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +101,25 @@ func (s *Server) handlePatchIngressAuth(ctx context.Context, w http.ResponseWrit
 	if patch.HubEnabled != nil {
 		fia.Spec.HubEnabled = *patch.HubEnabled
 	}
-	if patch.HubExposeLldapWebUI != nil {
+	if mode := strings.ToLower(strings.TrimSpace(patch.HubLldapWebUIExposure)); mode != "" {
+		if !fleetv1alpha1.ValidLldapWebUIExposure(mode) {
+			http.Error(w, "hubLldapWebUIExposure must be disabled, wireguard, or authelia", http.StatusBadRequest)
+			return
+		}
+		if mode != fleetv1alpha1.LldapWebUIExposureDisabled {
+			deployed, err := ingressauth.ConsoleLLDAPDeployed(ctx, s.Client, s.Cfg.ConsoleNamespace)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if !deployed {
+				http.Error(w, "console LLDAP is not deployed (enable fleet_auth_lldap_enabled on the hub)", http.StatusConflict)
+				return
+			}
+		}
+		fia.Spec.HubLldapWebUIExposure = mode
+		fia.Spec.HubExposeLldapWebUI = mode == fleetv1alpha1.LldapWebUIExposureAuthelia
+	} else if patch.HubExposeLldapWebUI != nil {
 		if *patch.HubExposeLldapWebUI {
 			deployed, err := ingressauth.ConsoleLLDAPDeployed(ctx, s.Client, s.Cfg.ConsoleNamespace)
 			if err != nil {
@@ -110,6 +132,7 @@ func (s *Server) handlePatchIngressAuth(ctx context.Context, w http.ResponseWrit
 			}
 		}
 		fia.Spec.HubExposeLldapWebUI = *patch.HubExposeLldapWebUI
+		fia.Spec.HubLldapWebUIExposure = ""
 	}
 	if patch.PortalHost != "" {
 		fia.Spec.PortalHost = patch.PortalHost
@@ -153,22 +176,24 @@ func (s *Server) handleForceIngressAuthReconcile(ctx context.Context, w http.Res
 
 func ingressAuthToResponse(fia *fleetv1alpha1.FleetIngressAuth, consoleLldapDeployed bool) ingressAuthResponse {
 	out := ingressAuthResponse{
-		HubEnabled:           fia.Spec.HubEnabled,
-		HubExposeLldapWebUI:  fia.Spec.HubExposeLldapWebUI,
-		ConsoleLldapDeployed: consoleLldapDeployed,
-		PortalHost:           fia.Spec.PortalHost,
-		CookieDomain:         fia.Spec.CookieDomain,
-		AccessDomains:        fia.Spec.AccessDomains,
-		Phase:                fia.Status.Phase,
-		Message:              fia.Status.Message,
-		Clusters:             fia.Status.Clusters,
-		LastJobName:          fia.Status.LastJobName,
+		HubEnabled:            fia.Spec.HubEnabled,
+		HubExposeLldapWebUI:   fia.Spec.HubExposeLldapWebUI,
+		HubLldapWebUIExposure: fia.Spec.EffectiveHubLldapWebUIExposure(),
+		ConsoleLldapDeployed:  consoleLldapDeployed,
+		PortalHost:            fia.Spec.PortalHost,
+		CookieDomain:          fia.Spec.CookieDomain,
+		AccessDomains:         fia.Spec.AccessDomains,
+		Phase:                 fia.Status.Phase,
+		Message:               fia.Status.Message,
+		Clusters:              fia.Status.Clusters,
+		LastJobName:           fia.Status.LastJobName,
 	}
 	out.Hub.Phase = fia.Status.Hub.Phase
 	out.Hub.Message = fia.Status.Hub.Message
 	out.Hub.AutheliaServiceURL = fia.Status.Hub.AutheliaServiceURL
 	out.Hub.LLDAPWebUIEnabled = fia.Status.Hub.LLDAPWebUIEnabled
 	out.Hub.LLDAPWebUIURL = fia.Status.Hub.LLDAPWebUIURL
+	out.Hub.LLDAPWebUIExposure = fia.Status.Hub.LLDAPWebUIExposure
 	out.Hub.LLDAPWebUIPhase = fia.Status.Hub.LLDAPWebUIPhase
 	out.Hub.LLDAPWebUIMessage = fia.Status.Hub.LLDAPWebUIMessage
 	return out

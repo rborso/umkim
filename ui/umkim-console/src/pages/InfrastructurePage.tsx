@@ -26,6 +26,7 @@ import { useAuth } from '../auth/AuthContext';
 import { ClusterNodesPanel } from '../components/clusters/ClusterNodesPanel';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { LabeledField } from '../components/forms/LabeledField';
+import { FleetModalSelect } from '../components/forms/FleetModalSelect';
 import { getFieldHelp } from '../help/fieldHelp';
 import {
   useAcmeQuery,
@@ -57,7 +58,7 @@ export function InfrastructurePage() {
   const [hubLlmEnabled, setHubLlmEnabled] = useState(false);
   const [hubLlmPublicHost, setHubLlmPublicHost] = useState('');
   const [hubAuthEnabled, setHubAuthEnabled] = useState(false);
-  const [hubLldapWebUI, setHubLldapWebUI] = useState(false);
+  const [lldapWebUIExposure, setLldapWebUIExposure] = useState<'disabled' | 'wireguard' | 'authelia'>('disabled');
   const [savingAuth, setSavingAuth] = useState(false);
   const [savingAcme, setSavingAcme] = useState(false);
   const [savingLlm, setSavingLlm] = useState(false);
@@ -71,7 +72,9 @@ export function InfrastructurePage() {
   useEffect(() => {
     if (ingressAuth) {
       setHubAuthEnabled(!!ingressAuth.hubEnabled);
-      setHubLldapWebUI(!!ingressAuth.hubExposeLldapWebUI);
+      setLldapWebUIExposure(
+        ingressAuth.hubLldapWebUIExposure ?? (ingressAuth.hubExposeLldapWebUI ? 'authelia' : 'disabled'),
+      );
     }
   }, [ingressAuth]);
 
@@ -97,10 +100,12 @@ export function InfrastructurePage() {
     try {
       const updated = await patchIngressAuth({
         hubEnabled: hubAuthEnabled,
-        hubExposeLldapWebUI: hubLldapWebUI,
+        hubLldapWebUIExposure: lldapWebUIExposure,
       });
       setHubAuthEnabled(!!updated.hubEnabled);
-      setHubLldapWebUI(!!updated.hubExposeLldapWebUI);
+      setLldapWebUIExposure(
+        updated.hubLldapWebUIExposure ?? (updated.hubExposeLldapWebUI ? 'authelia' : 'disabled'),
+      );
       load();
     } catch (e) {
       setAuthError(e);
@@ -337,16 +342,20 @@ export function InfrastructurePage() {
                   />
                 </LabeledField>
                 <LabeledField
-                  label="Expose LLDAP Web UI"
+                  label="LLDAP Web UI exposure"
                   fieldId="hubLldapWebUI"
                   help={getFieldHelp('infra.hubLldapWebUI')}
                 >
-                  <Checkbox
+                  <FleetModalSelect
                     id="hubLldapWebUI"
-                    label="Expose LLDAP Web UI (WireGuard only)"
-                    isChecked={hubLldapWebUI}
+                    value={lldapWebUIExposure}
                     isDisabled={!consoleLldapDeployed}
-                    onChange={(_e, checked) => setHubLldapWebUI(checked)}
+                    onChange={(v) => setLldapWebUIExposure(v as 'disabled' | 'wireguard' | 'authelia')}
+                    options={[
+                      { value: 'disabled', label: 'disabled — not published' },
+                      { value: 'wireguard', label: 'wireguard — overlay only (NodePort, blocked publicly)' },
+                      { value: 'authelia', label: 'authelia — hub gateway, gated by Authelia' },
+                    ]}
                   />
                 </LabeledField>
                 <p style={{ marginTop: '0.35rem', fontSize: '0.875rem', color: 'var(--pf-v5-global--Color--200)' }}>

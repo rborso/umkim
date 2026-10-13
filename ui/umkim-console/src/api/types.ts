@@ -719,6 +719,7 @@ export interface FleetClusterPatch {
 export interface FleetIngressAuth {
   hubEnabled: boolean;
   hubExposeLldapWebUI?: boolean;
+  hubLldapWebUIExposure?: 'disabled' | 'wireguard' | 'authelia';
   consoleLldapDeployed?: boolean;
   portalHost?: string;
   cookieDomain?: string;
@@ -731,6 +732,7 @@ export interface FleetIngressAuth {
     autheliaServiceURL?: string;
     lldapWebUIEnabled?: boolean;
     lldapWebUIURL?: string;
+    lldapWebUIExposure?: 'disabled' | 'wireguard' | 'authelia';
     lldapWebUIPhase?: string;
     lldapWebUIMessage?: string;
   };
@@ -741,6 +743,7 @@ export interface FleetIngressAuth {
 export interface FleetIngressAuthPatch {
   hubEnabled?: boolean;
   hubExposeLldapWebUI?: boolean;
+  hubLldapWebUIExposure?: 'disabled' | 'wireguard' | 'authelia';
   portalHost?: string;
   cookieDomain?: string;
   accessDomains?: string[];
