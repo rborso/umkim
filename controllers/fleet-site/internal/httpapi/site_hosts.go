@@ -61,6 +61,12 @@ func (s *Server) handleSiteHostRoutes(ctx context.Context, w http.ResponseWriter
 				return
 			}
 			s.provisionSiteHost(ctx, w, r, siteName, hostName)
+		case "verify":
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			s.verifySiteHost(ctx, w, r, siteName, hostName)
 		case "cluster":
 			s.handleSiteHostCluster(ctx, w, r, siteName, hostName)
 		default:
