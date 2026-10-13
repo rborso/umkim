@@ -22,6 +22,7 @@ import {
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { PlusIcon, SyncIcon, TrashIcon } from '@patternfly/react-icons';
+import { parse as parseYaml } from 'yaml';
 import {
   createFleetCluster,
   deleteFleetCluster,
@@ -33,6 +34,7 @@ import {
   fleetSiteIsManagement,
   fleetSiteLabelForId,
   getFleetCluster,
+  getSiteInventoryFileOptional,
   listSiteHosts,
 } from '../api/client';
 import type {
@@ -159,6 +161,7 @@ export function ClustersPage() {
   const [provisionNow, setProvisionNow] = useState(false);
   const [progress, setProgress] = useState<string[]>([]);
   const [createdNotice, setCreatedNotice] = useState<{ name: string; provisioning: boolean } | null>(null);
+  const [lhDiskWarnings, setLhDiskWarnings] = useState<string[]>([]);
   const [filterGpu, setFilterGpu] = useState(false);
   const [filterKvm, setFilterKvm] = useState(false);
   const [filterKubevirt, setFilterKubevirt] = useState(false);
@@ -254,6 +257,47 @@ export function ClustersPage() {
       cancelled = true;
     };
   }, [modalOpen, form.siteId]);
+
+  // Longhorn wants a dedicated block device (/dev/vdb by default). Warn when the
+  // selected node guests only have a boot disk: the bootstrap validates the
+  // device and fails the cluster otherwise.
+  useEffect(() => {
+    if (!modalOpen || !longhornEnabled) {
+      setLhDiskWarnings([]);
+      return;
+    }
+    const declared = new Set(siteHosts.map((h) => h.name));
+    const names = [
+      ...new Set(
+        (form.nodes || [])
+          .filter((n) => (n.role || 'control') === 'control')
+          .map((n) => n.hostname)
+          .filter((h): h is string => !!h && declared.has(h)),
+      ),
+    ];
+    if (names.length === 0) {
+      setLhDiskWarnings([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const missing: string[] = [];
+      for (const h of names) {
+        try {
+          const res = await getSiteInventoryFileOptional(form.siteId, `host_vars/${h}.yml`);
+          const doc = res.missing ? null : (parseYaml(res.content) as { disks?: { bootdisk?: boolean }[] } | null);
+          const data = (doc?.disks || []).filter((d) => d?.bootdisk !== true);
+          if (data.length === 0) missing.push(h);
+        } catch {
+          // best-effort: an unreadable host_vars must not block the wizard
+        }
+      }
+      if (!cancelled) setLhDiskWarnings(missing);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modalOpen, longhornEnabled, form.nodes, form.siteId, siteHosts]);
 
   const applyHostToNode = (index: number, role: FleetClusterNodeInput['role'], hostName: string) => {
     const h = hostByName[hostName];
@@ -1012,6 +1056,20 @@ export function ClustersPage() {
                   }}
                 />
               </LabeledField>
+              {longhornEnabled && lhDiskWarnings.length > 0 && (
+                <Alert
+                  variant="warning"
+                  isInline
+                  title="Longhorn needs a data disk on every node"
+                  style={{ marginBottom: '0.75rem' }}
+                >
+                  <code>{lhDiskWarnings.join(', ')}</code>{' '}
+                  {lhDiskWarnings.length === 1 ? 'has' : 'have'} no second disk, but this cluster installs
+                  Longhorn on <code>{longhornDevice.trim() || '/dev/vdb'}</code>. The bootstrap validates
+                  that device and fails the cluster without it. Add a data disk to those guests
+                  (Sites → Hosts → Add VM guest → Additional disks) or turn Longhorn off.
+                </Alert>
+              )}
               {longhornEnabled && (
                 <LabeledField
                   label="Longhorn data disk"
