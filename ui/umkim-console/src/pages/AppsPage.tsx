@@ -487,7 +487,13 @@ export function AppsPage() {
       version: c?.version || f.version,
       releaseName: f.releaseName && f.releaseName !== f.chart ? f.releaseName : name,
       namespace: profile.defaultNamespace || f.namespace,
-      valuesYaml: rockyDefaults ? rockyValuesFromForm(rockyDefaults) : f.valuesYaml,
+      // Values are chart-specific: reset them when the chart actually changes so
+      // the previous chart's YAML (e.g. a llama profile) does not carry over.
+      valuesYaml: rockyDefaults
+        ? rockyValuesFromForm(rockyDefaults)
+        : f.chart !== name
+          ? ''
+          : f.valuesYaml,
       route: profile.supportsRoute ? f.route : { mode: 'none' },
       oidcClient: oidc,
       oidcClientId: oidc?.clientId,
