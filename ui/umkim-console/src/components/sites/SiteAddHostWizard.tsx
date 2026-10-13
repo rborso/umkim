@@ -366,6 +366,18 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                   placeholder="virt04 (empty = least-utilized)"
                 />
               </FormGroup>
+              <FormGroup label="ansible_host / static IP (optional)" fieldId="ah-ip">
+                <TextInput
+                  id="ah-ip"
+                  value={ip}
+                  onChange={(_e, v) => setIp(v)}
+                  placeholder="172.16.10.161"
+                />
+                <FormHelperText>
+                  Leave empty for DHCP in host_vars; set it if the address is already known. The uplink MAC
+                  is derived from the IP when set.
+                </FormHelperText>
+              </FormGroup>
               <FormGroup label="vCPU cores" fieldId="ah-cores">
                 <NumberInput
                   inputName="ah-cores"
