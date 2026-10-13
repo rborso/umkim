@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Alert,
+  AlertActionCloseButton,
   Button,
   Checkbox,
   Form,
@@ -157,6 +158,7 @@ export function ClustersPage() {
   const [pendingNode, setPendingNode] = useState('');
   const [provisionNow, setProvisionNow] = useState(false);
   const [progress, setProgress] = useState<string[]>([]);
+  const [createdNotice, setCreatedNotice] = useState<{ name: string; provisioning: boolean } | null>(null);
   const [filterGpu, setFilterGpu] = useState(false);
   const [filterKvm, setFilterKvm] = useState(false);
   const [filterKubevirt, setFilterKubevirt] = useState(false);
@@ -436,22 +438,6 @@ export function ClustersPage() {
     });
   };
 
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  const waitForClusterPhase = async (name: string, want: string[], timeoutMs: number) => {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const c = await getFleetCluster(name);
-      const phase = fleetClusterPhase(c);
-      if (want.includes(phase)) return phase;
-      if (phase === 'Failed') throw new Error(`cluster ${name} failed`);
-      if (Date.now() > deadline) {
-        throw new Error(`timed out waiting for cluster ${name} (${want.join('/')})`);
-      }
-      await sleep(10000);
-    }
-  };
-
   const handleCreate = async () => {
     setSaving(true);
     setActionError(null);
@@ -560,11 +546,11 @@ export function ClustersPage() {
         if (!exists) throw e;
         log('Cluster intent already existed; continuing.');
       }
-      if (provisionNow) {
-        log('Controller is creating hosts, bootstrapping, and provisioning…');
-        await waitForClusterPhase(form.clusterName, ['Ready'], 120 * 60 * 1000);
-        log('Cluster is Ready');
-      }
+      // Bring-up runs in the controller (spec.autoProvision) or in the bootstrap
+      // bundle the operator runs. Either way the create call is done here: close
+      // the wizard and let the list / cluster page track progress in the
+      // background instead of holding the modal open until the cluster is Ready.
+      setCreatedNotice({ name: form.clusterName, provisioning: provisionNow });
       setModalOpen(false);
       await load();
     } catch (e) {
@@ -644,6 +630,21 @@ export function ClustersPage() {
       <PageSection>
         <ErrorAlert error={error} />
         <ErrorAlert error={actionError} />
+        {createdNotice ? (
+          <Alert
+            variant="info"
+            isInline
+            title={`Created ${createdNotice.name}`}
+            actionClose={<AlertActionCloseButton onClose={() => setCreatedNotice(null)} />}
+            style={{ marginBottom: '0.75rem' }}
+          >
+            {createdNotice.provisioning
+              ? 'The controller is creating the nodes and provisioning in the background.'
+              : 'Download the bootstrap bundle from the cluster page to bring it up.'}{' '}
+            <Link to={`/clusters/${encodeURIComponent(createdNotice.name)}`}>Open the cluster</Link> to
+            track progress.
+          </Alert>
+        ) : null}
         <Table aria-label="Fleet clusters">
           <Thead>
             <Tr>
