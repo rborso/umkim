@@ -61,14 +61,18 @@ the target cluster).
 
 **Site connectivity:** registry sites expose jumphost, region, and failure domain
 on **Sites → detail → Edge and DNS** (and on create). **Sites → detail → Hosts**
-manages hub site host inventory, provision actions, and optional cluster automation
-(enroll single-node or HA group, add worker, replace control plane) for registry sites.
-**Sites → detail → Provisioner inventory** (YAIDAP sites) edits the native YAML tree;
-use **Add host** (guided, kind-aware: name + IP/MAC, catalog-driven network/storage)
-to add bare metal, VM, or hypervisor hosts and then Discover (SSH first, PXE
-fallback), or **Add VM guest** (name/placement, then CPU/memory/disk) to seed
-`guests.yml` + `host_vars/` templates, **Sync to jumphost**,
-then provision on **Site hosts**. See [yaidap-integration.md](../../docs/components/yaidap-integration.md). Cluster
+manages hub site host inventory in two sections: **Infrastructure** (hypervisors —
+placement targets that UMKIM prepares, not provisions) and **Workloads** (libvirt VM
+guests and bare-metal cluster members). Add and remove hosts there — **Add hypervisor**,
+**Add VM guest**, **Add bare metal node** open the guided, kind-aware wizard (name +
+IP/MAC, catalog-driven network/storage) and sync to the jumphost; each host row carries
+its provision actions and optional cluster automation (enroll single-node or HA group,
+add worker, replace control plane). **Remove from inventory** drops the inventory record
+only (destroy the VM first; a Ready/Provisioning record needs an explicit confirm).
+**Sites → detail → Provisioner inventory** (YAIDAP sites) edits the native YAML tree
+directly — **Add host**, **Sync to jumphost**, import preview, revisions, and per-file
+editing for anything the forms do not cover. See
+[yaidap-integration.md](../../docs/components/yaidap-integration.md). Cluster
 jumphost overrides are on **Clusters → detail → Edge and ingress**. CLI equivalents:
 `umkim site patch`, `umkim site host`, and `umkim cluster patch`
 ([umkim-cli.md](../../docs/components/umkim-cli.md)).
