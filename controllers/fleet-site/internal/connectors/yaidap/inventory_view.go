@@ -62,44 +62,48 @@ func LoadStatusDoc(ctx context.Context, c client.Client, ns, siteName string) (I
 	return loadStatusDoc(data), nil
 }
 
-// UpdateGuestStatus merges one guest status entry.
+// UpdateGuestStatus merges one guest status entry. The read-modify-write runs
+// inside the store patch so it merges against the latest document; reading the
+// whole status first and then writing it dropped concurrent updates (a destroy
+// could leave a guest stuck at Ready).
 func UpdateGuestStatus(ctx context.Context, c client.Client, ns, siteName string, guestName string, st GuestStatus) error {
-	doc, err := LoadStatusDoc(ctx, c, ns, siteName)
-	if err != nil {
-		return err
-	}
-	if doc.Guests == nil {
-		doc.Guests = map[string]GuestStatus{}
-	}
-	if existing, ok := doc.Guests[guestName]; ok {
-		if st.Phase == "" {
-			st.Phase = existing.Phase
+	return connectors.PatchInventory(ctx, c, ns, siteName, provider, func(data map[string]string) (connectors.InventoryPatch, error) {
+		doc := loadStatusDoc(data)
+		if doc.Guests == nil {
+			doc.Guests = map[string]GuestStatus{}
 		}
-		if st.Message == "" {
-			st.Message = existing.Message
+		if existing, ok := doc.Guests[guestName]; ok {
+			if st.Phase == "" {
+				st.Phase = existing.Phase
+			}
+			if st.Message == "" {
+				st.Message = existing.Message
+			}
+			if st.Cluster == nil {
+				st.Cluster = existing.Cluster
+			}
+			if st.VmLocation == "" {
+				st.VmLocation = existing.VmLocation
+			}
+			if st.LastProvisionID == "" {
+				st.LastProvisionID = existing.LastProvisionID
+			}
+			if st.AnsibleHost == "" {
+				st.AnsibleHost = existing.AnsibleHost
+			}
+			if st.Kind == "" {
+				st.Kind = existing.Kind
+			}
 		}
-		if st.Cluster == nil {
-			st.Cluster = existing.Cluster
+		doc.Guests[guestName] = st
+		raw, err := json.Marshal(doc)
+		if err != nil {
+			return connectors.InventoryPatch{}, err
 		}
-		if st.VmLocation == "" {
-			st.VmLocation = existing.VmLocation
-		}
-		if st.LastProvisionID == "" {
-			st.LastProvisionID = existing.LastProvisionID
-		}
-		if st.AnsibleHost == "" {
-			st.AnsibleHost = existing.AnsibleHost
-		}
-		if st.Kind == "" {
-			st.Kind = existing.Kind
-		}
-	}
-	doc.Guests[guestName] = st
-	raw, err := json.Marshal(doc)
-	if err != nil {
-		return err
-	}
-	return connectors.PutStatusJSON(ctx, c, ns, siteName, provider, string(raw))
+		return connectors.InventoryPatch{
+			FilePut: map[string]string{"_meta/status.json": string(raw)},
+		}, nil
+	})
 }
 
 // ListInventoryHosts builds derived host views from guests.yml + status + clusters.

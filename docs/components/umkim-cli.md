@@ -64,6 +64,7 @@ umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--w
 umkim site host prepare SITE NAME [--gpu-passthrough] [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME
 umkim site host verify SITE NAME    # read-only check (libvirt/virsh + host facts); Declared -> Ready
+umkim site host remove SITE NAME    # drop inventory records for a host whose VM is gone (--force if not Declared)
 
 umkim site delete NAME --confirm
 umkim site validate NAME
@@ -331,6 +332,7 @@ umkim site host cluster-apply SITE guest01
 umkim site host provision SITE guest01 --action plan_vm --wait
 umkim site host provision SITE guest01 --wait
 umkim site host verify SITE virt01   # read-only: libvirt/virsh + host facts; Declared -> Ready
+umkim site host remove SITE old-vm01 # remove guests.yml/host_vars/status for a destroyed VM
 umkim site host provision SITE bm01 --confirm --wait
 umkim site host destroy SITE guest01 --confirm --wait
 ```

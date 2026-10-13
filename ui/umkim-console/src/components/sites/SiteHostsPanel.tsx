@@ -17,6 +17,7 @@ import {
   listSiteHosts,
   previewSiteInventoryImport,
   provisionSiteHost,
+  removeSiteHost,
   verifySiteHost,
 } from '../../api/client';
 import type { SiteHostRecord, SiteInventoryImportChange } from '../../api/types';
@@ -80,6 +81,8 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [prepareGpuTarget, setPrepareGpuTarget] = useState<SiteHostRecord | null>(null);
   const [prepareGpuMode, setPrepareGpuMode] = useState<PrepareGpuMode>('prepare_gpu_passthrough');
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<SiteHostRecord | null>(null);
+  const [removing, setRemoving] = useState(false);
   const [prepareGpuConfirm, setPrepareGpuConfirm] = useState(false);
   const [preparingGpu, setPreparingGpu] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -148,6 +151,21 @@ export function SiteHostsPanel({ siteName }: Props) {
       setActionError(e);
     } finally {
       setProvisioning(false);
+    }
+  };
+
+  const runRemove = async () => {
+    if (!removeTarget) return;
+    setRemoving(true);
+    setActionError(null);
+    try {
+      await removeSiteHost(siteName, removeTarget.name);
+      setRemoveTarget(null);
+      load();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -489,6 +507,14 @@ export function SiteHostsPanel({ siteName }: Props) {
                         <Button
                           variant="link"
                           isInline
+                          isDanger
+                          onClick={() => setRemoveTarget(host)}
+                        >
+                          Remove from inventory
+                        </Button>
+                        <Button
+                          variant="link"
+                          isInline
                           isDisabled={!hostAnsibleAddr(host)}
                           onClick={() => openDiscover(host, 'discover')}
                         >
@@ -646,7 +672,24 @@ export function SiteHostsPanel({ siteName }: Props) {
               {' '}
               Dry-run only: shows memory-based least-utilized placement without creating a VM or
               persisting inventory.
-            </>
+        
+      <Modal
+        variant="small"
+        title="Remove host from inventory"
+        isOpen={!!removeTarget}
+        onClose={() => setRemoveTarget(null)}
+        actions={[
+          <Button key="rm" variant="danger" onClick={() => void runRemove()} isLoading={removing}>
+            Remove
+          </Button>,
+          <Button key="cancel" variant="link" onClick={() => setRemoveTarget(null)}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        Remove {removeTarget?.name} from the site inventory? Its guests/bare_metals entry, host_vars/group_vars and status record are deleted. The VM must already be gone.
+      </Modal>
+    </>
           )}
         </p>
         {provisionIsReprovision && (

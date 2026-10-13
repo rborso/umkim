@@ -50,11 +50,14 @@ func (s *Server) handleSiteHostRoutes(ctx context.Context, w http.ResponseWriter
 		}
 		switch hostSub {
 		case "":
-			if r.Method != http.MethodGet {
+			switch r.Method {
+			case http.MethodGet:
+				s.getSiteHost(ctx, w, siteName, hostName)
+			case http.MethodDelete:
+				s.removeSiteHost(ctx, w, r, siteName, hostName)
+			default:
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				return
 			}
-			s.getSiteHost(ctx, w, siteName, hostName)
 		case "provision":
 			if r.Method != http.MethodPost {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

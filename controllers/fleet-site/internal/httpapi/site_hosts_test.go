@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -62,7 +63,6 @@ func TestSiteHostCRUDRemoved(t *testing.T) {
 	}{
 		{http.MethodPost, "/api/v1alpha1/sites/homelab/hosts"},
 		{http.MethodPatch, "/api/v1alpha1/sites/homelab/hosts/vm01"},
-		{http.MethodDelete, "/api/v1alpha1/sites/homelab/hosts/vm01"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(body))
 		rec := httptest.NewRecorder()
@@ -99,6 +99,32 @@ func TestSiteHostCRUDRemoved(t *testing.T) {
 	}
 	if kinds["bm-hv01"] != fleetv1alpha1.SiteHostKindHypervisor {
 		t.Fatalf("bm-hv01 kind=%q", kinds["bm-hv01"])
+	}
+
+	// DELETE removes the host's inventory records (its VM must be gone already).
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1alpha1/sites/homelab/hosts/vm01", nil)
+	rec = httptest.NewRecorder()
+	s.handleSiteByName(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/v1alpha1/sites/homelab/hosts", nil)
+	rec = httptest.NewRecorder()
+	s.handleSiteByName(rec, req)
+	if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range listed.Items {
+		if item.Name == "vm01" {
+			t.Fatalf("vm01 still listed after remove: %+v", listed.Items)
+		}
+	}
+	var got corev1.ConfigMap
+	if err := s.Client.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: "fleet-site-homelab-yaidap-inventory"}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if guests := got.Data["file.guests.yml"]; strings.Contains(guests, "vm01") {
+		t.Fatalf("vm01 still in guests.yml: %s", guests)
 	}
 }
 
