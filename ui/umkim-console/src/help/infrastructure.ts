@@ -10,8 +10,8 @@ export const INFRASTRUCTURE_FIELD_HELP: Record<string, FieldHelpContent> = {
   },
   'infra.hubLldapWebUI': {
     description:
-      'Expose the fleet-console LLDAP user-management UI over WireGuard only (not on the public internet). Requires console LLDAP deployed (fleet_auth_lldap_enabled).',
-    example: 'false',
+      'How to publish the fleet-console LLDAP user-management UI: disabled (default), wireguard (NodePort reachable only over the overlay), or authelia (hub gateway route gated by Authelia). Requires console LLDAP deployed (fleet_auth_lldap_enabled).',
+    example: 'authelia',
     learnMoreUrl: DOCS.consoleAuth,
   },
   'infra.hubAcme': {

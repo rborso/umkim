@@ -1,6 +1,10 @@
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	FleetIngressAuthName = "fleet-ingress-auth"
@@ -21,16 +25,57 @@ const (
 	LldapWebUIPhaseReady    = "Ready"
 	LldapWebUIPhaseFailed   = "Failed"
 
+	// LLDAP web UI exposure modes.
+	//   disabled  - not published
+	//   wireguard - NodePort reachable only over the WireGuard overlay (the hub
+	//               firewall drops it on the public NIC); no Authelia in front
+	//   authelia  - published on the hub gateway (public) behind Authelia
+	LldapWebUIExposureDisabled  = "disabled"
+	LldapWebUIExposureWireguard = "wireguard"
+	LldapWebUIExposureAuthelia  = "authelia"
+
 	DefaultIngressAuthSecretsName = "fleet-ingress-auth-secrets"
 )
 
 type FleetIngressAuthSpec struct {
-	HubEnabled          bool     `json:"hubEnabled,omitempty"`
-	HubExposeLldapWebUI bool     `json:"hubExposeLldapWebUI,omitempty"`
-	PortalHost          string   `json:"portalHost,omitempty"`
-	CookieDomain string   `json:"cookieDomain,omitempty"`
-	AccessDomains []string `json:"accessDomains,omitempty"`
-	SecretsRef   string   `json:"secretsRef,omitempty"`
+	HubEnabled bool `json:"hubEnabled,omitempty"`
+	// HubExposeLldapWebUI is the legacy boolean form of HubLldapWebUIExposure
+	// (true == authelia). Prefer the explicit exposure field.
+	HubExposeLldapWebUI bool `json:"hubExposeLldapWebUI,omitempty"`
+	// HubLldapWebUIExposure selects how the LLDAP web UI is published:
+	// disabled (default), wireguard, or authelia. Empty falls back to the legacy
+	// HubExposeLldapWebUI boolean.
+	HubLldapWebUIExposure string   `json:"hubLldapWebUIExposure,omitempty"`
+	PortalHost            string   `json:"portalHost,omitempty"`
+	CookieDomain          string   `json:"cookieDomain,omitempty"`
+	AccessDomains         []string `json:"accessDomains,omitempty"`
+	SecretsRef            string   `json:"secretsRef,omitempty"`
+}
+
+// EffectiveHubLldapWebUIExposure resolves the exposure mode, honouring the
+// legacy boolean when the explicit field is empty.
+func (s *FleetIngressAuthSpec) EffectiveHubLldapWebUIExposure() string {
+	switch strings.ToLower(strings.TrimSpace(s.HubLldapWebUIExposure)) {
+	case LldapWebUIExposureWireguard:
+		return LldapWebUIExposureWireguard
+	case LldapWebUIExposureAuthelia:
+		return LldapWebUIExposureAuthelia
+	case LldapWebUIExposureDisabled:
+		return LldapWebUIExposureDisabled
+	}
+	if s.HubExposeLldapWebUI {
+		return LldapWebUIExposureAuthelia
+	}
+	return LldapWebUIExposureDisabled
+}
+
+// ValidLldapWebUIExposure reports whether a mode string is supported.
+func ValidLldapWebUIExposure(mode string) bool {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case LldapWebUIExposureDisabled, LldapWebUIExposureWireguard, LldapWebUIExposureAuthelia:
+		return true
+	}
+	return false
 }
 
 func (s *FleetIngressAuthSpec) EffectiveSecretsRef() string {
@@ -46,6 +91,7 @@ type FleetIngressAuthHubStatus struct {
 	AutheliaServiceURL string `json:"autheliaServiceURL,omitempty"`
 	LLDAPWebUIEnabled  bool   `json:"lldapWebUIEnabled,omitempty"`
 	LLDAPWebUIURL      string `json:"lldapWebUIURL,omitempty"`
+	LLDAPWebUIExposure string `json:"lldapWebUIExposure,omitempty"`
 	LLDAPWebUIPhase    string `json:"lldapWebUIPhase,omitempty"`
 	LLDAPWebUIMessage  string `json:"lldapWebUIMessage,omitempty"`
 }

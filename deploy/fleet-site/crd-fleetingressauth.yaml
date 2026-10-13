@@ -32,6 +32,12 @@ spec:
                 hubExposeLldapWebUI:
                   type: boolean
                   default: false
+                hubLldapWebUIExposure:
+                  type: string
+                  enum:
+                    - disabled
+                    - wireguard
+                    - authelia
                 portalHost:
                   type: string
                 cookieDomain:
@@ -68,6 +74,12 @@ spec:
                       type: boolean
                     lldapWebUIURL:
                       type: string
+                    lldapWebUIExposure:
+                      type: string
+                      enum:
+                        - disabled
+                        - wireguard
+                        - authelia
                     lldapWebUIPhase:
                       type: string
                       enum:
