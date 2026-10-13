@@ -672,6 +672,7 @@ fi
 helm upgrade --install "${FLEET_APP_RELEASE}" "${FLEET_APP_CHART}" "${VER[@]}" \
   --namespace "${FLEET_APP_NAMESPACE}" --create-namespace \
   --kubeconfig "$KC" --kube-insecure-skip-tls-verify --insecure-skip-tls-verify \
+  --timeout "${FLEET_APP_HELM_TIMEOUT:-20m}" \
   "${VAL[@]}" "${POST[@]}"
 echo installed
 `
@@ -698,7 +699,9 @@ func HelmAppJob(opts HelmAppJobOpts) *batchv1.Job {
 		action = "install"
 	}
 	backoff := int32(1)
-	deadline := int64(900)
+	// The helm --timeout covers post-install hooks (bootstrap Jobs), so the Job
+	// deadline must exceed it: Nextcloud's first install runs ~12 minutes.
+	deadline := int64(1800)
 	ttl := int32(86400)
 	env := []corev1.EnvVar{
 		{Name: "KUBECONFIG", Value: "/etc/kube/config"},
