@@ -938,6 +938,19 @@ export async function listSiteHosts(site: string): Promise<SiteHostRecord[]> {
   return data.items ?? [];
 }
 
+/** Remove a host's inventory records (after its VM is gone). */
+export async function removeSiteHost(
+  site: string,
+  name: string,
+  force = false,
+): Promise<Record<string, unknown>> {
+  const q = force ? '?force=true' : '';
+  return fleetSiteRequest<Record<string, unknown>>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name) + q,
+    { method: 'DELETE' },
+  );
+}
+
 /** Read-only host check (libvirt/virsh + host facts) via the site jumphost. */
 export async function verifySiteHost(
   site: string,

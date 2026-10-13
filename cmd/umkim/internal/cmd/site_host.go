@@ -20,6 +20,7 @@ func siteHostCmd() *cobra.Command {
 	cmd.AddCommand(siteHostProvisionCmd())
 	cmd.AddCommand(siteHostDestroyCmd())
 	cmd.AddCommand(siteHostVerifyCmd())
+	cmd.AddCommand(siteHostRemoveCmd())
 	cmd.AddCommand(siteHostPrepareCmd())
 	cmd.AddCommand(siteHostClusterApplyCmd())
 	return cmd
@@ -324,4 +325,34 @@ moves from Declared to Ready.`,
 			return nil
 		},
 	}
+}
+
+func siteHostRemoveCmd() *cobra.Command {
+	var force bool
+	c := &cobra.Command{
+		Use:   "remove [site] [name]",
+		Short: "Remove a host from the site inventory (after its VM is gone)",
+		Long: `Drop a host's inventory records: its entry in guests.yml / bare_metals.yml, its
+host_vars / group_vars files and its status record. Use this for hosts whose VM has
+already been destroyed. A host that is still Ready/Provisioning is refused unless
+--force is given.`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path := "/sites/" + args[0] + "/hosts/" + args[1]
+			if force {
+				path += "?force=true"
+			}
+			raw, code, err := api.Delete(path)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200); err != nil {
+				return err
+			}
+			printJSON(raw)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&force, "force", false, "Remove even when the host is Ready/Provisioning")
+	return c
 }
