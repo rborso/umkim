@@ -309,9 +309,11 @@ func siteHostVerifyCmd() *cobra.Command {
 		Use:   "verify [site] [name]",
 		Short: "Read-only check that a hypervisor / bare-metal host is configured and working",
 		Long: `Run read-only checks against a site host through the site jumphost and record
-the outcome on the host: libvirt service state, virsh version, domain/pool/network
-counts and basic host facts. Nothing is changed on the target. A host that answers
-moves from Declared to Ready.`,
+the outcome on the host. Hypervisors are checked for libvirt (service state, virsh
+version, domain/pool/network counts); bare-metal workload nodes run no libvirt, so
+they are checked for the K3s supervisor and their cluster membership via kubectl.
+Basic host facts are reported in both cases. Nothing is changed on the target. A
+host that answers moves from Declared to Ready.`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			raw, code, err := api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/verify", map[string]interface{}{})

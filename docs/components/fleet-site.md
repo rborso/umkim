@@ -90,12 +90,13 @@ inventory path. On success the action returns a handoff host fragment
 | `GET /sites/{name}/provision/inventory/revisions[/{id}]` | Timestamped revision log + diff |
 | `POST /sites/{name}/provision/inventory/sync` | Push synced YAML files to jumphost (`confirm=true` when the hub store has fewer than two synced files, to block accidental wipe) |
 | `POST /sites/{name}/provision/yaidap/sync` | Clone or update YAIDAP git checkout on jumphost (`yaidapRepo`, `yaidapRoot`, optional deploy-key Secret) |
-| `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `discover_pxe`, `status` |
+| `POST /sites/{name}/provision/actions` | `install_bm`, `create_vm`, `plan_vm`, `destroy`, `discover`, `discover_pxe`, `verify`, `status` |
 | `GET /sites/{name}/provision/actions[/{id}]` | History / poll |
 | `GET /sites/{name}/hosts` | Derived host list (same source as `/provision/inventory/hosts`) |
 | `POST/PATCH/DELETE /sites/{name}/hosts/{host}` | **Removed in v0.2** — use inventory file API (`PUT/PATCH …/provision/inventory/files/…`) |
 | `POST /sites/{name}/hosts/{host}/provision` | Provision by guest name |
 | `GET/POST /sites/{name}/hosts/{host}/cluster` | Cluster status / manual apply from cluster group files |
+| `POST /sites/{name}/hosts/{host}/verify` | Read-only, kind-aware host check (libvirt for hypervisors; K3s + cluster membership for workload nodes) |
 
 Hub inventory is stored in ConfigMap `fleet-site-{name}-yaidap-inventory`, where
 `{name}` is the FleetSite `metadata.name`, as `file.*` YAML keys plus hub-only
@@ -125,8 +126,8 @@ Provision status and cluster-apply progress are recorded in `_meta/status.json` 
 | Kind | Inventory source | Role |
 |------|------------------|------|
 | `vm` | `guests.yml` → `guests.hosts` | Libvirt workloads (`create_vm`, `destroy`, `plan_vm`) |
-| `bare_metal` | `bare_metals.yml` | Cluster members that are not libvirt guests (`install_bm`, `discover`, `discover_pxe`) |
-| `hypervisor` | `hypervisors.yml` | Placement / discovery / TempXE targets (`discover`, `discover_pxe`; optional `install_bm`) |
+| `bare_metal` | `bare_metals.yml` | Cluster members that are not libvirt guests (`verify`, `install_bm`, `discover`, `discover_pxe`) |
+| `hypervisor` | `hypervisors.yml` | Placement / discovery / TempXE targets (`verify`, `discover`, `discover_pxe`; optional `install_bm`) |
 
 **Site host phases** (per-guest `status.phase` in `_meta/status.json`):
 
@@ -196,6 +197,17 @@ never sets `install_os`; PXE discovery is armed via `tempxe_discovery.enabled`
 only. Greenfield
 `POST /sites/{name}/provision` (site bootstrap) is unchanged and separate from
 the connector binding GET/PUT paths.
+
+**Read-only verification (`verify`)** checks that a host is configured and
+working, over the site jumphost, and records the outcome as the host phase
+(`Declared` → `Ready`, or `Failed`). Nothing is changed on the target, and the
+check is kind-aware: a `hypervisor` is checked for its libvirt service
+(`libvirtd` / `virtqemud`), `virsh` version, and domain/pool/network counts; a
+`bare_metal` workload runs no libvirt, so it is checked for the K3s supervisor
+(`k3s` / `k3s-agent`), the `k3s` version, and this node's cluster membership and
+readiness via `kubectl`. Both report basic host facts. The check retries once so
+the jumphost can learn a new host key. `POST /sites/{name}/hosts/{host}/verify`,
+`umkim site host verify`, or the console **Verify (read-only)** action.
 
 **Hardware discovery (`discover`, `discover_pxe`)** collects NIC/disk drafts via
 YAIDAP on the jumphost. Both actions auto-sync hub inventory before running.
