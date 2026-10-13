@@ -90,27 +90,36 @@ func (s *Server) removeSiteHost(ctx context.Context, w http.ResponseWriter, r *h
 }
 
 // removeHostBlock drops a top-level host entry (and its indented fields) from a
-// guests/bare_metals document, preserving the rest of the file verbatim. Only
-// lines indented deeper than the entry itself are consumed, so the following
-// hosts survive.
+// guests/bare_metals document, preserving the rest of the file verbatim. The
+// entry indent is taken from the surrounding `hosts:` key rather than assumed,
+// so both the 2-space templates and the 4-space files written by earlier
+// yaml.Marshal calls are handled; only lines indented deeper than the entry
+// itself are consumed, so the following hosts survive.
 func removeHostBlock(content, host string) (string, bool) {
 	lines := strings.Split(content, "\n")
 	out := make([]string, 0, len(lines))
 	removed := false
-	skipping := false
+	hostsIndent := -1
+	skipIndent := -1
 	for _, line := range lines {
-		if skipping {
-			if strings.TrimSpace(line) == "" {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		if skipIndent >= 0 {
+			if trimmed == "" {
 				continue
 			}
-			// The entry's fields are indented deeper than the host line itself.
-			if strings.HasPrefix(line, "      ") {
+			if indent > skipIndent {
 				continue
 			}
-			skipping = false
+			skipIndent = -1
 		}
-		if strings.TrimSpace(line) == host+":" && strings.HasPrefix(line, "    ") && !strings.HasPrefix(line, "     ") {
-			skipping = true
+		if trimmed == "hosts:" {
+			hostsIndent = indent
+			out = append(out, line)
+			continue
+		}
+		if hostsIndent >= 0 && indent > hostsIndent && trimmed == host+":" {
+			skipIndent = indent
 			removed = true
 			continue
 		}
