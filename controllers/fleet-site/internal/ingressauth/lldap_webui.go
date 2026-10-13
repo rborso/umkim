@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/config"
@@ -96,8 +97,25 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 
 	want := fia.Spec.HubExposeLldapWebUI
 	hub := fia.Status.Hub
+	host := lldapWebUIHostForFIA(fia)
 
 	if want {
+		if !fia.Spec.HubEnabled {
+			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
+			hub.LLDAPWebUIMessage = "hub ingress auth (Authelia) must be enabled to expose the LLDAP web UI"
+			hub.LLDAPWebUIEnabled = false
+			hub.LLDAPWebUIURL = ""
+			fia.Status.Hub = hub
+			return c.Status().Update(ctx, fia)
+		}
+		if host == "" {
+			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
+			hub.LLDAPWebUIMessage = "no access domain configured for the LLDAP web UI host"
+			hub.LLDAPWebUIEnabled = false
+			hub.LLDAPWebUIURL = ""
+			fia.Status.Hub = hub
+			return c.Status().Update(ctx, fia)
+		}
 		deployed, err := ConsoleLLDAPDeployed(ctx, c, consoleNS)
 		if err != nil {
 			return err
@@ -123,6 +141,9 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 	}
 
 	if !want {
+		if err := ensureHubLLDAPWebUIRoute(ctx, c, cfg, host, false); err != nil {
+			return err
+		}
 		if apierrors.IsNotFound(err) {
 			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseDisabled
 			hub.LLDAPWebUIMessage = ""
@@ -166,9 +187,16 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 		if err := c.Status().Update(ctx, fia); err != nil {
 			return err
 		}
-		patch := desired.DeepCopy()
-		patch.ResourceVersion = webUI.ResourceVersion
-		if err := c.Patch(ctx, patch, client.MergeFrom(&webUI)); err != nil {
+		// Service type cannot be patched in place (NodePort -> ClusterIP), so
+		// replace it. A ClusterIP is reallocated on create, which is fine here.
+		if err := c.Delete(ctx, &webUI); err != nil && !apierrors.IsNotFound(err) {
+			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
+			hub.LLDAPWebUIMessage = err.Error()
+			fia.Status.Hub = hub
+			_ = c.Status().Update(ctx, fia)
+			return err
+		}
+		if err := c.Create(ctx, desired); err != nil {
 			hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
 			hub.LLDAPWebUIMessage = err.Error()
 			fia.Status.Hub = hub
@@ -177,12 +205,146 @@ func ReconcileHubLLDAPWebUI(ctx context.Context, c client.Client, cfg config.Con
 		}
 	}
 
+	if err := ensureHubLLDAPWebUIRoute(ctx, c, cfg, host, true); err != nil {
+		hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseFailed
+		hub.LLDAPWebUIMessage = err.Error()
+		fia.Status.Hub = hub
+		_ = c.Status().Update(ctx, fia)
+		return err
+	}
+
 	hub.LLDAPWebUIPhase = fleetv1alpha1.LldapWebUIPhaseReady
 	hub.LLDAPWebUIMessage = ""
 	hub.LLDAPWebUIEnabled = true
-	hub.LLDAPWebUIURL = fmt.Sprintf("http://%s:%d", cfg.HubWireguardIP, nodePort)
+	hub.LLDAPWebUIURL = "https://" + host
 	fia.Status.Hub = hub
 	return c.Status().Update(ctx, fia)
+}
+
+// lldapWebUIHostForFIA derives the LLDAP web UI host from the configured zone
+// (lldap.<zone>), preferring the cookie domain.
+func lldapWebUIHostForFIA(fia *fleetv1alpha1.FleetIngressAuth) string {
+	zone := strings.TrimSpace(fia.Spec.CookieDomain)
+	if zone == "" {
+		for _, ad := range fia.Spec.AccessDomains {
+			if d := strings.TrimPrefix(strings.TrimSpace(ad), "*."); d != "" {
+				zone = d
+				break
+			}
+		}
+	}
+	if zone == "" {
+		return ""
+	}
+	return LLDAPWebUIHost(zone)
+}
+
+// hubDynamicCMPlaceholder is the hub's own dynamic-routes file when it carries
+// nothing but the placeholder comment.
+const hubDynamicCMPlaceholder = "# Hub ingress placeholder dynamic routes (fleet-edge updates fleet-traefik-fleet-routes).\n" +
+	"# Traefik v3 rejects empty http/middlewares-only fragments; fleet routes live in fleet-routes.yml.\n"
+
+const (
+	hubDynamicCMKey       = "routes.yml"
+	hubGatewayReloadAnnot = "fleet.umkim.com/lldap-webui-routes"
+	lldapWebUIRouteMarker = "# Managed by fleet-site-controller: LLDAP web UI behind Authelia."
+)
+
+// ensureHubLLDAPWebUIRoute publishes (or withdraws) the LLDAP web UI on the hub
+// gateway. The TLS router chains the fleet-edge Authelia forward-auth
+// middleware, so only authenticated directory users reach the UI.
+func ensureHubLLDAPWebUIRoute(ctx context.Context, c client.Client, cfg config.Config, host string, enabled bool) error {
+	ns := cfg.HubGatewayNamespace
+	if ns == "" {
+		ns = "fleet-ingress"
+	}
+	name := cfg.HubDynamicCMName
+	if name == "" {
+		name = "fleet-traefik-dynamic"
+	}
+	var cm corev1.ConfigMap
+	err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &cm)
+	if apierrors.IsNotFound(err) {
+		return nil // no hub gateway (spoke-only deployment)
+	}
+	if err != nil {
+		return err
+	}
+	if cm.Data == nil {
+		cm.Data = map[string]string{}
+	}
+	current := cm.Data[hubDynamicCMKey]
+	want := current
+	if enabled && host != "" {
+		want = hubLLDAPWebUIRoutesYAML(host, cfg.ConsoleNamespace)
+	} else if strings.Contains(current, lldapWebUIRouteMarker) {
+		want = hubDynamicCMPlaceholder
+	}
+	if want == current {
+		return nil
+	}
+	cm.Data[hubDynamicCMKey] = want
+	if err := c.Update(ctx, &cm); err != nil {
+		return err
+	}
+	return reloadHubGateway(ctx, c, cfg)
+}
+
+func hubLLDAPWebUIRoutesYAML(host, consoleNS string) string {
+	if consoleNS == "" {
+		consoleNS = "fleet-console"
+	}
+	return fmt.Sprintf(`%s
+http:
+  routers:
+    fleet-lldap-webui:
+      rule: Host(`+"`%s`"+`) && !PathPrefix(`+"`/.well-known/acme-challenge/`"+`)
+      service: fleet-lldap-webui
+      entryPoints:
+        - web
+      middlewares:
+        - fleet-edge-redirect-https
+    fleet-lldap-webui-tls:
+      rule: Host(`+"`%s`"+`)
+      service: fleet-lldap-webui
+      entryPoints:
+        - websecure
+      middlewares:
+        - fleet-edge-forward-headers-https
+        - fleet-edge-authelia
+      tls:
+        certResolver: letsencrypt
+  services:
+    fleet-lldap-webui:
+      loadBalancer:
+        servers:
+          - url: http://%s.%s.svc.cluster.local:17170
+`, lldapWebUIRouteMarker, host, host, lldapWebUIServiceName, consoleNS)
+}
+
+// reloadHubGateway bumps a pod-template annotation so the gateway picks up the
+// changed file-provider config (the hub Traefik runs with file watch disabled).
+func reloadHubGateway(ctx context.Context, c client.Client, cfg config.Config) error {
+	ns := cfg.HubGatewayNamespace
+	if ns == "" {
+		ns = "fleet-ingress"
+	}
+	name := cfg.HubGatewayDeployment
+	if name == "" {
+		name = "gateway"
+	}
+	var dep appsv1.Deployment
+	if err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &dep); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if dep.Spec.Template.Annotations == nil {
+		dep.Spec.Template.Annotations = map[string]string{}
+	}
+	dep.Spec.Template.Annotations[hubGatewayReloadAnnot] = time.Now().UTC().Format(time.RFC3339Nano)
+	return c.Update(ctx, &dep)
 }
 
 func restorePrimaryLLDAPClusterIP(ctx context.Context, c client.Client, ns string) error {
@@ -207,18 +369,21 @@ func restorePrimaryLLDAPClusterIP(ctx context.Context, c client.Client, ns strin
 }
 
 func desiredLLDAPWebUIService(ns string, nodePort int32) *corev1.Service {
+	// ClusterIP only: the UI is reached through the hub gateway behind Authelia,
+	// never through a node port.
+	_ = nodePort
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      lldapWebUIServiceName,
 			Namespace: ns,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "fleet-console",
-				"app.kubernetes.io/component":  "lldap-webui",
-				"fleet.umkim.com/managed-by": "fleet-site-controller",
+				"app.kubernetes.io/name":      "fleet-console",
+				"app.kubernetes.io/component": "lldap-webui",
+				"fleet.umkim.com/managed-by":  "fleet-site-controller",
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
+			Type: corev1.ServiceTypeClusterIP,
 			Selector: map[string]string{
 				"app": lldapAppLabel,
 			},
@@ -227,7 +392,6 @@ func desiredLLDAPWebUIService(ns string, nodePort int32) *corev1.Service {
 					Name:       lldapHTTPPortName,
 					Port:       17170,
 					TargetPort: intstr.FromString(lldapHTTPPortName),
-					NodePort:   nodePort,
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
