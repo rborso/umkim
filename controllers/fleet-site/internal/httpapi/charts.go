@@ -211,7 +211,10 @@ func (s *Server) createChartUpload(w http.ResponseWriter, r *http.Request) {
 		ValuesYAML:  r.FormValue("valuesYaml"),
 	}
 	force := strings.EqualFold(strings.TrimSpace(r.FormValue("force")), "true")
-	s.putChart(w, r, name, spec, force)
+	if !s.putChart(w, r, name, spec, force) {
+		// The tarball was staged before validation; drop it when the write is rejected.
+		s.removeInboxFile(base, "")
+	}
 }
 
 func chartUpdateNeedsForce(existing *fleetv1alpha1.FleetChart, spec fleetv1alpha1.FleetChartSpec) bool {
@@ -226,46 +229,48 @@ func chartUpdateNeedsForce(existing *fleetv1alpha1.FleetChart, spec fleetv1alpha
 	return false
 }
 
-func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, spec fleetv1alpha1.FleetChartSpec, force bool) {
+// putChart writes or replaces a library chart. It reports whether the write
+// succeeded so the upload handler can drop a tarball the request rejected.
+func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, spec fleetv1alpha1.FleetChartSpec, force bool) bool {
 	if !appchart.ValidDNS1123(name) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name must be a DNS-1123 label (lowercase)"})
-		return
+		return false
 	}
 	if !appchart.ValidChartSource(spec.Source) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "source must be oci, http, upload, or harbor"})
-		return
+		return false
 	}
 	if !appchart.ValidImagePolicy(spec.ImagePolicy) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "imagePolicy must be external, proxy, or copy"})
-		return
+		return false
 	}
 	if spec.ImagePolicy == "" {
 		spec.ImagePolicy = fleetv1alpha1.ChartImageExternal
 	}
 	if !appchart.ValidVersion(spec.Version) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid chart version"})
-		return
+		return false
 	}
 	switch spec.Source {
 	case fleetv1alpha1.ChartSourceOCI:
 		origin := spec.Origin
 		if !strings.HasPrefix(origin, "oci://") {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "origin must be an oci:// URL"})
-			return
+			return false
 		}
 		if err := appchart.ChartAllowed(origin, s.Cfg.ChartOCIPrefixes()); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
+			return false
 		}
 	case fleetv1alpha1.ChartSourceHTTP:
 		if err := appchart.ValidHTTPOrigin(spec.Origin); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
+			return false
 		}
 	case fleetv1alpha1.ChartSourceUpload:
 		if spec.InboxFile == "" || appchart.SafeInboxBase(spec.InboxFile) != spec.InboxFile {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "upload is missing a chart file"})
-			return
+			return false
 		}
 	}
 	var existing fleetv1alpha1.FleetChart
@@ -275,19 +280,21 @@ func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, s
 			writeJSON(w, http.StatusConflict, map[string]string{
 				"error": "chart " + name + " is Ready with a different source/origin; set force=true to replace",
 			})
-			return
+			return false
 		}
+		superseded := existing.Spec.InboxFile
 		existing.Spec = spec
 		if err := s.Client.Update(r.Context(), &existing); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return false
 		}
+		s.removeInboxFile(superseded, spec.InboxFile)
 		writeJSON(w, http.StatusOK, chartToResponse(&existing))
-		return
+		return true
 	}
 	if !apierrors.IsNotFound(err) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return false
 	}
 	ch := &fleetv1alpha1.FleetChart{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: s.Cfg.Namespace},
@@ -296,12 +303,27 @@ func (s *Server) putChart(w http.ResponseWriter, r *http.Request, name string, s
 	if err := s.Client.Create(r.Context(), ch); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "chart " + name + " already exists"})
-			return
+			return false
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return false
 	}
 	writeJSON(w, http.StatusCreated, chartToResponse(ch))
+	return true
+}
+
+// removeInboxFile drops a staged chart tarball that is no longer referenced by
+// any FleetChart. The upload handler stages the file before the request is
+// validated, so rejected and force-replaced uploads would otherwise leak it.
+func (s *Server) removeInboxFile(base, keep string) {
+	if base == "" || base == keep {
+		return
+	}
+	safe := appchart.SafeInboxBase(base)
+	if safe == "" {
+		return
+	}
+	_ = os.Remove(filepath.Join(s.Cfg.InboxDir(), safe))
 }
 
 func (s *Server) deleteChart(w http.ResponseWriter, r *http.Request, name string) {
@@ -321,9 +343,7 @@ func (s *Server) deleteChart(w http.ResponseWriter, r *http.Request, name string
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if base := appchart.SafeInboxBase(ch.Spec.InboxFile); base != "" {
-		_ = os.Remove(filepath.Join(s.Cfg.InboxDir(), base))
-	}
+	s.removeInboxFile(ch.Spec.InboxFile, "")
 	writeJSON(w, http.StatusAccepted, map[string]string{"name": name})
 }
 
