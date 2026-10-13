@@ -50,3 +50,30 @@ func TestRemoveHostBlockAbsent(t *testing.T) {
 		t.Fatalf("absent host changed the document (ok=%v)", ok)
 	}
 }
+
+// guests.yml written by an older yaml.Marshal call nests with 4 spaces; removal
+// must not depend on a fixed indent width.
+const guestsSampleFourSpace = `guests:
+    hosts:
+        vm-a:
+            ansible_host: 10.0.0.1
+            vm_location: virt01
+        vm-b:
+            ansible_host: 10.0.0.2
+            vm_location: virt02
+`
+
+func TestRemoveHostBlockFourSpaceIndent(t *testing.T) {
+	out, ok := removeHostBlock(guestsSampleFourSpace, "vm-a")
+	if !ok {
+		t.Fatal("expected the host to be removed")
+	}
+	if strings.Contains(out, "vm-a") || strings.Contains(out, "10.0.0.1") {
+		t.Fatalf("vm-a survived:\n%s", out)
+	}
+	for _, keep := range []string{"guests:", "    hosts:", "vm-b", "10.0.0.2", "vm_location: virt02"} {
+		if !strings.Contains(out, keep) {
+			t.Fatalf("removal dropped %q:\n%s", keep, out)
+		}
+	}
+}
