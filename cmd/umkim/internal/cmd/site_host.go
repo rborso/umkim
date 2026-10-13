@@ -19,6 +19,7 @@ func siteHostCmd() *cobra.Command {
 	cmd.AddCommand(siteHostAddCmd())
 	cmd.AddCommand(siteHostProvisionCmd())
 	cmd.AddCommand(siteHostDestroyCmd())
+	cmd.AddCommand(siteHostVerifyCmd())
 	cmd.AddCommand(siteHostPrepareCmd())
 	cmd.AddCommand(siteHostClusterApplyCmd())
 	return cmd
@@ -294,6 +295,29 @@ func siteHostClusterApplyCmd() *cobra.Command {
 				return err
 			}
 			if err := mustOK(raw, code, 202); err != nil {
+				return err
+			}
+			printJSON(raw)
+			return nil
+		},
+	}
+}
+
+func siteHostVerifyCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "verify [site] [name]",
+		Short: "Read-only check that a hypervisor / bare-metal host is configured and working",
+		Long: `Run read-only checks against a site host through the site jumphost and record
+the outcome on the host: libvirt service state, virsh version, domain/pool/network
+counts and basic host facts. Nothing is changed on the target. A host that answers
+moves from Declared to Ready.`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, code, err := api.Post("/sites/"+args[0]+"/hosts/"+args[1]+"/verify", map[string]interface{}{})
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200); err != nil {
 				return err
 			}
 			printJSON(raw)

@@ -63,6 +63,7 @@ umkim site ingress delete SITE ID
 umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--wait]
 umkim site host prepare SITE NAME [--gpu-passthrough] [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME
+umkim site host verify SITE NAME    # read-only check (libvirt/virsh + host facts); Declared -> Ready
 
 umkim site delete NAME --confirm
 umkim site validate NAME
@@ -329,6 +330,7 @@ umkim site host add SITE --kind vm --name vm01 --hypervisor virt04 --cluster lab
 umkim site host cluster-apply SITE guest01
 umkim site host provision SITE guest01 --action plan_vm --wait
 umkim site host provision SITE guest01 --wait
+umkim site host verify SITE virt01   # read-only: libvirt/virsh + host facts; Declared -> Ready
 umkim site host provision SITE bm01 --confirm --wait
 umkim site host destroy SITE guest01 --confirm --wait
 ```

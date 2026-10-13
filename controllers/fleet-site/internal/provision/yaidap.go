@@ -28,6 +28,7 @@ func ValidateAction(action string) error {
 		fleetv1alpha1.ProvisionActionDiscover,
 		fleetv1alpha1.ProvisionActionDiscoverPXE,
 		fleetv1alpha1.ProvisionActionStatus,
+		fleetv1alpha1.ProvisionActionVerify,
 		fleetv1alpha1.ProvisionActionPrepareHypervisor,
 		fleetv1alpha1.ProvisionActionPrepareGPUPassthrough,
 		fleetv1alpha1.ProvisionActionPrepareHypervisorGPU:

@@ -71,6 +71,8 @@ const (
 	ProvisionActionDiscover    = "discover"
 	ProvisionActionDiscoverPXE = "discover_pxe"
 	ProvisionActionStatus      = "status"
+	// ProvisionActionVerify is a read-only host check (no changes on the target).
+	ProvisionActionVerify = "verify"
 	ProvisionActionPrepareHypervisor       = "prepare_hypervisor"
 	ProvisionActionPrepareGPUPassthrough   = "prepare_gpu_passthrough"
 	ProvisionActionPrepareHypervisorGPU    = "prepare_hypervisor_gpu"

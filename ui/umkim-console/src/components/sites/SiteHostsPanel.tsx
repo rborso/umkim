@@ -17,6 +17,7 @@ import {
   listSiteHosts,
   previewSiteInventoryImport,
   provisionSiteHost,
+  verifySiteHost,
 } from '../../api/client';
 import type { SiteHostRecord, SiteInventoryImportChange } from '../../api/types';
 import { vmLocationIsScheduleToken } from '../../utils/vmLocation';
@@ -78,6 +79,7 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [prepareGpuOpen, setPrepareGpuOpen] = useState(false);
   const [prepareGpuTarget, setPrepareGpuTarget] = useState<SiteHostRecord | null>(null);
   const [prepareGpuMode, setPrepareGpuMode] = useState<PrepareGpuMode>('prepare_gpu_passthrough');
+  const [verifying, setVerifying] = useState<string | null>(null);
   const [prepareGpuConfirm, setPrepareGpuConfirm] = useState(false);
   const [preparingGpu, setPreparingGpu] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -146,6 +148,19 @@ export function SiteHostsPanel({ siteName }: Props) {
       setActionError(e);
     } finally {
       setProvisioning(false);
+    }
+  };
+
+  const runVerify = async (host: SiteHostRecord) => {
+    setVerifying(host.name);
+    setActionError(null);
+    try {
+      await verifySiteHost(siteName, host.name);
+      load();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setVerifying(null);
     }
   };
 
@@ -462,6 +477,15 @@ export function SiteHostsPanel({ siteName }: Props) {
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {(host.kind === 'hypervisor' || host.kind === 'bare_metal') && (
                       <>
+                        <Button
+                          variant="link"
+                          isInline
+                          isDisabled={!hostAnsibleAddr(host) || verifying === host.name}
+                          isLoading={verifying === host.name}
+                          onClick={() => void runVerify(host)}
+                        >
+                          Verify (read-only)
+                        </Button>
                         <Button
                           variant="link"
                           isInline

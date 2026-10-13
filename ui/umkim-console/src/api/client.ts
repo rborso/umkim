@@ -938,6 +938,17 @@ export async function listSiteHosts(site: string): Promise<SiteHostRecord[]> {
   return data.items ?? [];
 }
 
+/** Read-only host check (libvirt/virsh + host facts) via the site jumphost. */
+export async function verifySiteHost(
+  site: string,
+  name: string,
+): Promise<Record<string, unknown>> {
+  return fleetSiteRequest<Record<string, unknown>>(
+    '/sites/' + encodeURIComponent(site) + '/hosts/' + encodeURIComponent(name) + '/verify',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+}
+
 export async function provisionSiteHost(
   site: string,
   name: string,
