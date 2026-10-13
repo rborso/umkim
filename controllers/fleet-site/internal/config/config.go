@@ -43,6 +43,11 @@ type Config struct {
 	DefaultRockyMajor                 string
 	ConsoleNamespace                  string
 	LldapWebUINodePort                int
+	// Hub ingress gateway that serves hub routes (hostNetwork Traefik). The
+	// LLDAP web UI is published through it behind Authelia.
+	HubGatewayNamespace  string
+	HubGatewayDeployment string
+	HubDynamicCMName     string
 	// LldapURL is the in-cluster LLDAP HTTP API used for directory operations.
 	LldapURL                   string
 	LldapImage                 string
@@ -100,6 +105,9 @@ func FromEnv() Config {
 		DefaultRockyMajor:                 env("FLEET_SITE_ROCKY_MAJOR", "10"),
 		ConsoleNamespace:                  env("FLEET_CONSOLE_NAMESPACE", "fleet-console"),
 		LldapWebUINodePort:                envInt("FLEET_LLAP_WEBUI_NODEPORT", 30917),
+		HubGatewayNamespace:               env("FLEET_HUB_GATEWAY_NAMESPACE", "fleet-ingress"),
+		HubGatewayDeployment:              env("FLEET_HUB_GATEWAY_DEPLOYMENT", "gateway"),
+		HubDynamicCMName:                  env("FLEET_HUB_DYNAMIC_CM", "fleet-traefik-dynamic"),
 		LldapURL:                          env("FLEET_LLDAP_URL", "http://lldap.fleet-console.svc.cluster.local:17170"),
 		LldapImage:                        env("FLEET_LLDAP_IMAGE", "ghcr.io/lldap/lldap:stable@sha256:2a8454b668c1aba7157e832eab0e242e1e7eb5fb7591d7e7774ba05286511ca8"),
 		LldapServiceAccountsSecret:        env("FLEET_LLDAP_SERVICE_ACCOUNTS_SECRET", "lldap-service-accounts"),

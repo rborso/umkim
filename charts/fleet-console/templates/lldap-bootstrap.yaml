@@ -13,6 +13,18 @@ data:
     {"name": {{ . | quote }}}
 {{- end }}
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lldap-bootstrap-user-schemas
+  namespace: {{ include "fleet-console.namespace" . }}
+  labels:
+    app: lldap
+    app.kubernetes.io/component: bootstrap
+data:
+  user-schemas.json: |
+{{ .Values.lldap.bootstrap.userSchemas | default list | toJson | indent 4 }}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -49,14 +61,22 @@ spec:
                   key: LLDAP_LDAP_USER_PASS
             - name: GROUP_CONFIGS_DIR
               value: /bootstrap/group-configs
+            - name: USER_SCHEMAS_DIR
+              value: /bootstrap/user-schemas
             - name: DO_CLEANUP
               value: "false"
           volumeMounts:
             - name: group-configs
               mountPath: /bootstrap/group-configs
               readOnly: true
+            - name: user-schemas
+              mountPath: /bootstrap/user-schemas
+              readOnly: true
       volumes:
         - name: group-configs
           configMap:
             name: lldap-bootstrap-groups
+        - name: user-schemas
+          configMap:
+            name: lldap-bootstrap-user-schemas
 {{- end }}

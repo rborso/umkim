@@ -69,6 +69,15 @@ lldap:
       - fleet-site-admins
       - fleet-cluster-admins
       - fleet-viewers
+    # Custom user attributes created in the directory. sshPublicKey is the
+    # standard OpenSSH attribute (ldapPublicKey), so any LDAP-aware client can
+    # read it — Gitea syncs it into user SSH keys at login.
+    userSchemas:
+      - name: sshPublicKey
+        attributeType: STRING
+        isEditable: true
+        isList: true
+        isVisible: true
   # Directory service accounts for the shared (hub) directory:
   #   bind  -> read-only account Authelia + apps use (lldap_strict_readonly)
   #   admin -> dedicated privileged account for tenant/invite operations
