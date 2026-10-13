@@ -244,3 +244,80 @@ func chartTGZ(t *testing.T, name, version string) []byte {
 	}
 	return buf.Bytes()
 }
+
+// uploadChart posts a multipart chart package; force is omitted when empty.
+func uploadChart(t *testing.T, s *Server, name, version, force string) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, err := mw.CreateFormFile("chart", name+"-"+version+".tgz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fw.Write(chartTGZ(t, name, version)); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	target := "/api/v1alpha1/charts"
+	if force != "" {
+		target += "?force=" + force
+	}
+	req := httptest.NewRequest(http.MethodPost, target, &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+	s.handleCharts(rec, req)
+	return rec
+}
+
+func readyUploadChart(name, inboxFile string) *fleetv1alpha1.FleetChart {
+	return &fleetv1alpha1.FleetChart{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "fleet-console"},
+		Spec: fleetv1alpha1.FleetChartSpec{
+			Source:    fleetv1alpha1.ChartSourceUpload,
+			Origin:    "upload:" + inboxFile,
+			InboxFile: inboxFile,
+			Version:   "0.1.0",
+		},
+		Status: fleetv1alpha1.FleetChartStatus{Phase: fleetv1alpha1.ChartPhaseReady},
+	}
+}
+
+// A rejected upload must not leave its staged tarball in the inbox.
+func TestUploadChartRejectedDropsStagedFile(t *testing.T) {
+	s := testChartServer(t, readyUploadChart("whoami", "whoami-aaaaaa.tgz"))
+	s.Cfg.ChartInboxDir = t.TempDir()
+
+	rec := uploadChart(t, s, "whoami", "0.2.0", "")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	matches, _ := filepath.Glob(filepath.Join(s.Cfg.ChartInboxDir, "*.tgz"))
+	if len(matches) != 0 {
+		t.Fatalf("rejected upload left files in the inbox: %v", matches)
+	}
+}
+
+// A force-replace must drop the tarball the new spec no longer references.
+func TestForceReplaceDropsSupersededInboxFile(t *testing.T) {
+	dir := t.TempDir()
+	superseded := filepath.Join(dir, "whoami-aaaaaa.tgz")
+	if err := os.WriteFile(superseded, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := testChartServer(t, readyUploadChart("whoami", "whoami-aaaaaa.tgz"))
+	s.Cfg.ChartInboxDir = dir
+
+	rec := uploadChart(t, s, "whoami", "0.2.0", "true")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(superseded); !os.IsNotExist(err) {
+		t.Fatalf("superseded inbox file still present: %v", err)
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, "*.tgz"))
+	if len(matches) != 1 {
+		t.Fatalf("want only the new upload in the inbox, got %v", matches)
+	}
+}
