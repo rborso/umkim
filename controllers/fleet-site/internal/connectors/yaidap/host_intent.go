@@ -20,22 +20,37 @@ const (
 // HostIntent is the minimal, kind-aware description of a host to add to a site's
 // YAIDAP inventory. Everything not set is filled from the site catalog.
 type HostIntent struct {
-	Kind           string `json:"kind"`
-	Name           string `json:"name"`
-	AnsibleHost    string `json:"ansibleHost,omitempty"`
-	MACAddress     string `json:"macAddress,omitempty"`
-	Hypervisor     string `json:"hypervisor,omitempty"`
-	Cores          int    `json:"cores,omitempty"`
-	Memory         int    `json:"memory,omitempty"`
-	DiskSizeGi     int    `json:"diskSizeGi,omitempty"`
-	NetworkName    string `json:"networkName,omitempty"`
-	Zone           string `json:"zone,omitempty"`
-	Storage        string `json:"storage,omitempty"`
-	OS             string `json:"os,omitempty"`
-	Cluster        string `json:"cluster,omitempty"`
-	GPUPassthrough bool   `json:"gpuPassthrough,omitempty"`
-	PXE            bool   `json:"pxe,omitempty"`
+	Kind           string           `json:"kind"`
+	Name           string           `json:"name"`
+	AnsibleHost    string           `json:"ansibleHost,omitempty"`
+	MACAddress     string           `json:"macAddress,omitempty"`
+	Hypervisor     string           `json:"hypervisor,omitempty"`
+	Cores          int              `json:"cores,omitempty"`
+	Memory         int              `json:"memory,omitempty"`
+	DiskSizeGi     int              `json:"diskSizeGi,omitempty"`
+	Disks          []HostDiskIntent `json:"disks,omitempty"`
+	NetworkName    string           `json:"networkName,omitempty"`
+	Zone           string           `json:"zone,omitempty"`
+	Storage        string           `json:"storage,omitempty"`
+	OS             string           `json:"os,omitempty"`
+	Cluster        string           `json:"cluster,omitempty"`
+	GPUPassthrough bool             `json:"gpuPassthrough,omitempty"`
+	PXE            bool             `json:"pxe,omitempty"`
 }
+
+// HostDiskIntent is an additional (data) disk for a VM guest. The boot disk is
+// `diskSizeGi`; these follow it in the rendered `disks:` list, which matters
+// because YAIDAP takes `disks[0]` as the boot device.
+type HostDiskIntent struct {
+	Name    string `json:"name,omitempty"`
+	SizeGi  int    `json:"sizeGi,omitempty"`
+	Storage string `json:"storage,omitempty"`
+	Format  string `json:"format,omitempty"`
+}
+
+// maxGuestDisks caps additional disks so the virtio device letters stay sane
+// (vdb..vdi).
+const maxGuestDisks = 8
 
 func (h *HostIntent) Normalize() {
 	h.Kind = strings.ToLower(strings.TrimSpace(h.Kind))
@@ -48,6 +63,14 @@ func (h *HostIntent) Normalize() {
 	h.Storage = strings.TrimSpace(h.Storage)
 	h.OS = strings.TrimSpace(h.OS)
 	h.Cluster = strings.TrimSpace(h.Cluster)
+	kept := make([]HostDiskIntent, 0, len(h.Disks))
+	for _, d := range h.Disks {
+		d.Name = strings.TrimSpace(d.Name)
+		d.Storage = strings.TrimSpace(d.Storage)
+		d.Format = strings.TrimSpace(d.Format)
+		kept = append(kept, d)
+	}
+	h.Disks = kept
 }
 
 func (h HostIntent) Validate() error {
@@ -62,6 +85,19 @@ func (h HostIntent) Validate() error {
 	if h.Kind == "bare_metal" || h.Kind == "hypervisor" {
 		if h.AnsibleHost == "" && h.MACAddress == "" {
 			return fmt.Errorf("%s requires ansibleHost (SSH) or macAddress (PXE)", h.Kind)
+		}
+	}
+	if len(h.Disks) > 0 {
+		if h.Kind != "vm" {
+			return fmt.Errorf("additional disks are only supported for vm guests")
+		}
+		if len(h.Disks) > maxGuestDisks {
+			return fmt.Errorf("at most %d additional disks are supported", maxGuestDisks)
+		}
+		for i, d := range h.Disks {
+			if d.SizeGi <= 0 {
+				return fmt.Errorf("additional disk %d needs a size greater than 0", i+1)
+			}
 		}
 	}
 	return nil
@@ -87,6 +123,13 @@ func applyCatalogDefaults(h *HostIntent, catalog Catalog) {
 	h.Zone = firstNonEmpty(h.Zone, d.Zone, "lab")
 	if h.Hypervisor == "" && h.Kind == "vm" {
 		h.Hypervisor = "least-utilized"
+	}
+	for i := range h.Disks {
+		h.Disks[i].Storage = firstNonEmpty(h.Disks[i].Storage, h.Storage, "local")
+		h.Disks[i].Format = firstNonEmpty(h.Disks[i].Format, "qcow2")
+		if h.Disks[i].Name == "" {
+			h.Disks[i].Name = fmt.Sprintf("disk%d", i+1)
+		}
 	}
 }
 
@@ -204,6 +247,21 @@ func BuildHostFiles(current map[string]string, intent HostIntent, catalog Catalo
 	return out, nil
 }
 
+// marshalInventoryYAML renders inventory YAML with the repo's 2-space indent so
+// generated files match the hand-written templates and examples.
+func marshalInventoryYAML(doc interface{}) (string, error) {
+	var b strings.Builder
+	enc := yaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(doc); err != nil {
+		return "", err
+	}
+	if err := enc.Close(); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
 func mergeHostsYAML(current, topKey, name string, entry map[string]interface{}) (string, error) {
 	doc := map[string]interface{}{}
 	if strings.TrimSpace(current) != "" {
@@ -231,11 +289,7 @@ func mergeHostsYAML(current, topKey, name string, entry map[string]interface{}) 
 		}
 	}
 	hosts[name] = prev
-	raw, err := yaml.Marshal(doc)
-	if err != nil {
-		return "", err
-	}
-	return string(raw), nil
+	return marshalInventoryYAML(doc)
 }
 
 // mergeClusterGroup adds a host to a root group file `<cluster>.yml` hosts list.
@@ -261,11 +315,7 @@ func mergeClusterGroup(current, cluster, host string) (string, error) {
 	if !seen {
 		group["hosts"] = append(rawHosts, host)
 	}
-	out, err := yaml.Marshal(doc)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return marshalInventoryYAML(doc)
 }
 
 func renderGuestHostVars(h HostIntent, catalog Catalog) string {
@@ -291,6 +341,16 @@ func renderGuestHostVars(h HostIntent, catalog Catalog) string {
 	b.WriteString("  - name: bootdisk\n    disk: vda\n    bootdisk: true\n    device: 0\n    format: qcow2\n")
 	fmt.Fprintf(&b, "    size: %d\n", h.DiskSizeGi)
 	fmt.Fprintf(&b, "    storage: %s\n", h.Storage)
+	// Additional disks follow the boot disk: YAIDAP derives the target device
+	// from the list position (disks[0] is boot), so order is significant.
+	for i, d := range h.Disks {
+		fmt.Fprintf(&b, "  - name: %s\n", yamlScalar(d.Name))
+		fmt.Fprintf(&b, "    disk: vd%c\n", 'b'+rune(i))
+		fmt.Fprintf(&b, "    device: %d\n", i+1)
+		fmt.Fprintf(&b, "    format: %s\n", yamlScalar(d.Format))
+		fmt.Fprintf(&b, "    size: %d\n", d.SizeGi)
+		fmt.Fprintf(&b, "    storage: %s\n", yamlScalar(d.Storage))
+	}
 	b.WriteString("uplinks:\n")
 	b.WriteString("  - name: n0p0\n")
 	fmt.Fprintf(&b, "    physical_network: %s\n", yamlScalar(physical))

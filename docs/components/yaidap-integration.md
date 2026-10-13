@@ -176,9 +176,14 @@ host kind, give a name plus an address (IP for SSH, or MAC for PXE), and choose
 network/storage/zone from the site catalog. It calls
 `POST /sites/{name}/provision/inventory/hosts` (kind-aware intent), which composes
 `guests.yml` / `bare_metals.yml` / `hypervisors.yml` and `host_vars/{name}.yml`
-server-side. Discovery (SSH first, PXE fallback) is offered as the next step; the
+server-side. VM guests take `cores`, `memory`, and `diskSizeGi` for the boot disk,
+plus an optional `disks` list (`{name, sizeGi, storage, format}`) of additional
+data disks — rendered after the boot disk, which is significant because YAIDAP
+derives each target device from the list position (`disks[0]` is boot). Discovery
+(SSH first, PXE fallback) is offered as the next step; the
 raw YAML editor stays available for advanced edits. The same intent is exposed on
-the CLI as `umkim site host add`.
+the CLI as `umkim site host add` (`--disk` for the boot disk, repeatable
+`--extra-disk` for data disks).
 
 **Host kinds** on `GET /sites/{name}/hosts`: `vm` (`guests.hosts`), `bare_metal`
 (`bare_metals.yml`), `hypervisor` (`hypervisors.yml`). On jumphost sync, hub

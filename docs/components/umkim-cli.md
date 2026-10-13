@@ -328,10 +328,11 @@ umkim site host get SITE guest01
 umkim site host add SITE --kind bare_metal --name bm01 --ip 172.16.10.50 --discover
 umkim site host add SITE --kind bare_metal --name bm02 --mac aa:bb:cc:dd:ee:ff --pxe
 umkim site host add SITE --kind vm --name vm01 --hypervisor virt04 --cluster lab-ha-0
+umkim site host add SITE --kind vm --name vm02 --hypervisor virt04 --disk 40 --extra-disk 100 --extra-disk 200
 umkim site host cluster-apply SITE guest01
 umkim site host provision SITE guest01 --action plan_vm --wait
 umkim site host provision SITE guest01 --wait
-umkim site host verify SITE virt01   # read-only: libvirt/virsh + host facts; Declared -> Ready
+umkim site host verify SITE virt01   # read-only: libvirt for hypervisors, K3s + node readiness for workload nodes; Declared -> Ready
 umkim site host remove SITE old-vm01 # remove guests.yml/host_vars/status for a destroyed VM
 umkim site host provision SITE bm01 --confirm --wait
 umkim site host destroy SITE guest01 --confirm --wait
