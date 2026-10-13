@@ -39,6 +39,29 @@ echo "domains=$(sudo -n virsh list --all --name 2>/dev/null | grep -c .)"
 echo "pools=$(sudo -n virsh pool-list --all --name 2>/dev/null | grep -c .)"
 echo "networks=$(sudo -n virsh net-list --all --name 2>/dev/null | grep -c .)"`
 
+// verifyWorkloadProbe is the read-only check for a workload node (a bare-metal
+// cluster member). A workload runs no libvirt, so it reports systemd state and
+// asks the local K3s supervisor what it knows about this node. Nothing is
+// changed on the host. k3s is called by absolute path because sudo resets PATH.
+const verifyWorkloadProbe = `set -u
+echo "host=$(hostname 2>/dev/null)"
+echo "kernel=$(uname -r 2>/dev/null)"
+echo "cpus=$(nproc 2>/dev/null)"
+echo "mem_mb=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo 2>/dev/null)"
+svc=""
+for s in k3s k3s-agent; do
+  if systemctl is-active --quiet "$s" 2>/dev/null; then svc="$s"; break; fi
+done
+echo "k3s_service=$svc"
+kc="/usr/local/bin/k3s kubectl"
+if [ ! -x /usr/local/bin/k3s ]; then kc="/usr/bin/kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml"; fi
+node="$(hostname 2>/dev/null)"
+echo "k3s_version=$(sudo -n /usr/local/bin/k3s --version 2>/dev/null | awk '/^k3s version/{print $3}' | head -1)"
+echo "node_ready=$(sudo -n $kc get node "$node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
+echo "node_ip=$(sudo -n $kc get node "$node" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null)"
+echo "node_version=$(sudo -n $kc get node "$node" -o jsonpath='{.status.nodeInfo.kubeletVersion}' 2>/dev/null)"
+echo "nodes=$(sudo -n $kc get nodes --no-headers 2>/dev/null | grep -c .)"`
+
 // verifyHostResult is the parsed read-only probe output.
 type verifyHostResult struct {
 	Host           string `json:"host,omitempty"`
@@ -50,20 +73,50 @@ type verifyHostResult struct {
 	Domains        string `json:"domains,omitempty"`
 	Pools          string `json:"pools,omitempty"`
 	Networks       string `json:"networks,omitempty"`
+	K3sService     string `json:"k3sService,omitempty"`
+	K3sVersion     string `json:"k3sVersion,omitempty"`
+	NodeReady      string `json:"nodeReady,omitempty"`
+	NodeIP         string `json:"nodeIp,omitempty"`
+	NodeVersion    string `json:"nodeVersion,omitempty"`
+	Nodes          string `json:"nodes,omitempty"`
 	Raw            string `json:"raw,omitempty"`
 }
 
-func (v verifyHostResult) ok() bool {
+// ok reports whether the probe found the control plane the host's role needs:
+// libvirt for a hypervisor, the K3s supervisor for a workload node.
+func (v verifyHostResult) ok(kind string) bool {
+	if isWorkloadKind(kind) {
+		return strings.TrimSpace(v.K3sService) != "" &&
+			strings.EqualFold(strings.TrimSpace(v.NodeReady), "True")
+	}
 	return strings.TrimSpace(v.LibvirtService) != "" && strings.TrimSpace(v.VirshVersion) != ""
 }
 
-func (v verifyHostResult) summary() string {
-	if !v.ok() {
+func (v verifyHostResult) summary(kind string) string {
+	workload := isWorkloadKind(kind)
+	if !v.ok(kind) {
+		if workload {
+			return "read-only check: k3s not responding"
+		}
 		return "read-only check: libvirt not responding"
 	}
-	parts := []string{fmt.Sprintf("libvirt %s (%s)", v.VirshVersion, v.LibvirtService)}
-	if v.Domains != "" {
-		parts = append(parts, fmt.Sprintf("%s domain(s)", v.Domains))
+	var parts []string
+	if workload {
+		parts = append(parts, fmt.Sprintf("k3s %s (%s)", v.K3sVersion, v.K3sService))
+		if v.NodeReady != "" {
+			parts = append(parts, "node Ready="+v.NodeReady)
+		}
+		if v.NodeIP != "" {
+			parts = append(parts, v.NodeIP)
+		}
+		if v.Nodes != "" {
+			parts = append(parts, fmt.Sprintf("%s node(s)", v.Nodes))
+		}
+	} else {
+		parts = append(parts, fmt.Sprintf("libvirt %s (%s)", v.VirshVersion, v.LibvirtService))
+		if v.Domains != "" {
+			parts = append(parts, fmt.Sprintf("%s domain(s)", v.Domains))
+		}
 	}
 	if v.CPUs != "" {
 		parts = append(parts, fmt.Sprintf("%s vCPU", v.CPUs))
@@ -74,6 +127,12 @@ func (v verifyHostResult) summary() string {
 		}
 	}
 	return "verified (read-only): " + strings.Join(parts, ", ")
+}
+
+// isWorkloadKind reports whether a host kind is a workload (no libvirt) rather
+// than a virtualization host.
+func isWorkloadKind(kind string) bool {
+	return strings.TrimSpace(kind) == fleetv1alpha1.SiteHostKindBareMetal
 }
 
 // verifySiteHost runs a read-only check against a hypervisor/bare-metal host
@@ -121,13 +180,21 @@ func (s *Server) verifySiteHost(ctx context.Context, w http.ResponseWriter, r *h
 		return
 	}
 
-	out, err := runReadOnlyProbe(ctx, jh, key, target, verifyProbe, 90*time.Second)
+	// A hypervisor is checked for libvirt; a workload node has no libvirt, so it
+	// is checked for the K3s supervisor and its cluster membership instead.
+	kind := strings.TrimSpace(host.Kind)
+	probe := verifyProbe
+	if isWorkloadKind(kind) {
+		probe = verifyWorkloadProbe
+	}
+
+	out, err := runReadOnlyProbe(ctx, jh, key, target, probe, 90*time.Second)
 	res := parseVerifyOutput(out)
 	// The first hop from the jumphost may still be learning the host key; retry
 	// once before calling a host unhealthy.
-	if !res.ok() {
-		if out2, err2 := runReadOnlyProbe(ctx, jh, key, target, verifyProbe, 90*time.Second); err2 == nil || strings.TrimSpace(out2) != "" {
-			if r2 := parseVerifyOutput(out2); r2.ok() {
+	if !res.ok(kind) {
+		if out2, err2 := runReadOnlyProbe(ctx, jh, key, target, probe, 90*time.Second); err2 == nil || strings.TrimSpace(out2) != "" {
+			if r2 := parseVerifyOutput(out2); r2.ok(kind) {
 				out, err, res = out2, err2, r2
 			}
 		}
@@ -140,10 +207,10 @@ func (s *Server) verifySiteHost(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	phase := fleetv1alpha1.SiteHostPhaseFailed
-	if res.ok() {
+	if res.ok(kind) {
 		phase = fleetv1alpha1.SiteHostPhaseReady
 	}
-	msg := res.summary()
+	msg := res.summary(kind)
 	if err != nil {
 		msg = msg + " (" + err.Error() + ")"
 	}
@@ -207,6 +274,18 @@ func parseVerifyOutput(out string) verifyHostResult {
 			res.Pools = v
 		case "networks":
 			res.Networks = v
+		case "k3s_service":
+			res.K3sService = v
+		case "k3s_version":
+			res.K3sVersion = v
+		case "node_ready":
+			res.NodeReady = v
+		case "node_ip":
+			res.NodeIP = v
+		case "node_version":
+			res.NodeVersion = v
+		case "nodes":
+			res.Nodes = v
 		}
 	}
 	return res
