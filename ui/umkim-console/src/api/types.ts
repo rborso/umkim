@@ -208,6 +208,13 @@ export interface SiteInventoryCatalog {
   defaults?: SiteInventoryDefaults;
 }
 
+export interface SiteHostDiskIntent {
+  name?: string;
+  sizeGi?: number;
+  storage?: string;
+  format?: string;
+}
+
 export interface SiteHostIntent {
   kind: SiteHostKind;
   name: string;
@@ -217,6 +224,8 @@ export interface SiteHostIntent {
   cores?: number;
   memory?: number;
   diskSizeGi?: number;
+  /** Additional (data) disks, added after the boot disk. */
+  disks?: SiteHostDiskIntent[];
   networkName?: string;
   zone?: string;
   storage?: string;
