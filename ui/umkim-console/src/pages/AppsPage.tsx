@@ -250,6 +250,7 @@ export function AppsPage() {
   const [chartVersion, setChartVersion] = useState('');
   const [chartPolicy, setChartPolicy] = useState<FleetChartImagePolicy>('external');
   const [chartFile, setChartFile] = useState<File | null>(null);
+  const [chartForce, setChartForce] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const [deleteTarget, setDeleteTarget] = useState<FleetApp | null>(null);
@@ -359,6 +360,7 @@ export function AppsPage() {
     setChartVersion('');
     setChartPolicy('external');
     setChartFile(null);
+    setChartForce(false);
     setAddChartOpen(true);
   };
 
@@ -416,6 +418,7 @@ export function AppsPage() {
         fd.append('chart', chartFile);
         fd.append('imagePolicy', chartPolicy || 'external');
         if (chartVersion) fd.append('version', chartVersion);
+        if (chartForce) fd.append('force', 'true');
         await uploadFleetChart(fd);
       } else {
         const origin =
@@ -428,6 +431,7 @@ export function AppsPage() {
           origin,
           version: chartVersion || undefined,
           imagePolicy: chartPolicy,
+          force: chartForce || undefined,
         });
       }
       setAddChartOpen(false);
@@ -1456,6 +1460,13 @@ export function AppsPage() {
               ]}
             />
           </LabeledField>
+          <Checkbox
+            id="chart-force"
+            isChecked={chartForce}
+            onChange={(_e, c) => setChartForce(c)}
+            label="Replace an existing library chart with this source"
+            description="Required when the name is already in the library as Ready with a different source or origin; without it the publish returns 409."
+          />
         </Form>
       </Modal>
 

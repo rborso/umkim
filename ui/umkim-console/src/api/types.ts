@@ -567,6 +567,8 @@ export interface FleetChartCreate {
   imagePolicy?: FleetChartImagePolicy | string;
   source?: FleetChartSource | string;
   valuesYaml?: string;
+  /** Replace a Ready chart that has a different source/origin. */
+  force?: boolean;
 }
 
 export type ClusterNodeOperationType = 'addWorker' | 'removeWorker' | 'replaceControlPlane';
