@@ -160,6 +160,14 @@ disks:
     format: qcow2
     size: ${diskSize}
     storage: local
+# Additional data disks follow the boot disk (YAIDAP derives the target device
+# from the list position). Uncomment and adjust to add capacity:
+#  - name: data1
+#    disk: vdb
+#    device: 1
+#    format: qcow2
+#    size: 100
+#    storage: local
 uplinks:
   - name: n0p0
     physical_network: lab_access_l1

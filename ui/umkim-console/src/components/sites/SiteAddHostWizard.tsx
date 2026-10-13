@@ -52,6 +52,7 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
   const [cores, setCores] = useState(2);
   const [memory, setMemory] = useState(4096);
   const [disk, setDisk] = useState(40);
+  const [extraDisks, setExtraDisks] = useState<{ name: string; size: number }[]>([]);
   const [gpu, setGpu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -75,6 +76,7 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
     setCores(2);
     setMemory(4096);
     setDisk(40);
+    setExtraDisks([]);
     setGpu(false);
     setError(null);
     setResult(null);
@@ -134,6 +136,14 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
         ...(os.trim() ? { os: os.trim() } : {}),
         ...(cluster.trim() ? { cluster: cluster.trim() } : {}),
         ...(isVM ? { cores, memory, diskSizeGi: disk } : {}),
+        ...(isVM && extraDisks.length > 0
+          ? {
+              disks: extraDisks.map((d) => ({
+                sizeGi: d.size,
+                ...(d.name.trim() ? { name: d.name.trim() } : {}),
+              })),
+            }
+          : {}),
         ...(isVM && gpu ? { gpuPassthrough: true } : {}),
         ...(needsMac && pxe ? { pxe: true } : {}),
       };
@@ -341,6 +351,66 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                   }}
                   style={{ maxWidth: '10rem' }}
                 />
+              </FormGroup>
+              <FormGroup label="Additional disks" fieldId="ah-extra-disks">
+                {extraDisks.map((d, i) => (
+                  <div
+                    key={i}
+                    style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}
+                  >
+                    <NumberInput
+                      inputName={`ah-disk-${i}`}
+                      inputAriaLabel={`additional disk ${i + 1} size in GiB`}
+                      value={d.size}
+                      min={1}
+                      step={10}
+                      onMinus={() =>
+                        setExtraDisks((list) =>
+                          list.map((x, j) => (j === i ? { ...x, size: Math.max(1, x.size - 10) } : x)),
+                        )
+                      }
+                      onPlus={() =>
+                        setExtraDisks((list) => list.map((x, j) => (j === i ? { ...x, size: x.size + 10 } : x)))
+                      }
+                      onChange={(e) => {
+                        const n = Number((e.target as HTMLInputElement).value);
+                        if (!Number.isNaN(n)) {
+                          setExtraDisks((list) =>
+                            list.map((x, j) => (j === i ? { ...x, size: Math.max(1, n) } : x)),
+                          );
+                        }
+                      }}
+                      style={{ maxWidth: '9rem' }}
+                    />
+                    <TextInput
+                      id={`ah-disk-name-${i}`}
+                      value={d.name}
+                      onChange={(_e, v) =>
+                        setExtraDisks((list) => list.map((x, j) => (j === i ? { ...x, name: v } : x)))
+                      }
+                      placeholder={`disk${i + 1} (optional name)`}
+                      style={{ maxWidth: '14rem' }}
+                    />
+                    <Button
+                      variant="link"
+                      isInline
+                      isDanger
+                      onClick={() => setExtraDisks((list) => list.filter((_x, j) => j !== i))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="secondary"
+                  isDisabled={extraDisks.length >= 8}
+                  onClick={() => setExtraDisks((list) => [...list, { name: '', size: 100 }])}
+                >
+                  Add disk
+                </Button>
+                <FormHelperText>
+                  Data disks follow the boot disk (vdb, vdc, …) and use the site storage pool. Up to 8.
+                </FormHelperText>
               </FormGroup>
               <FormGroup fieldId="ah-gpu">
                 <Checkbox id="ah-gpu" isChecked={gpu} onChange={(_e, c) => setGpu(c)} label="GPU passthrough guest" />
