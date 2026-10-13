@@ -22,6 +22,8 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onCreated?: (name: string) => void;
+  /** Preselect the host kind when opened from a kind-specific action. */
+  defaultKind?: SiteHostKind;
 };
 
 const KINDS: { value: SiteHostKind; label: string }[] = [
@@ -34,7 +36,7 @@ const KINDS: { value: SiteHostKind; label: string }[] = [
  * Guided, kind-aware "add host" wizard: minimal required fields, catalog-driven
  * selects, and discovery (SSH first, PXE fallback) as the next step.
  */
-export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated }: Props) {
+export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaultKind }: Props) {
   const [catalog, setCatalog] = useState<SiteInventoryCatalog>({});
   const [kind, setKind] = useState<SiteHostKind>('bare_metal');
   const [name, setName] = useState('');
@@ -56,6 +58,7 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated }: Prop
   const [result, setResult] = useState<{ paths: string[]; warnings: string[] } | null>(null);
   const [nextBusy, setNextBusy] = useState<string | null>(null);
   const [nextMessage, setNextMessage] = useState('');
+  const [syncNote, setSyncNote] = useState('');
 
   const reset = useCallback(() => {
     setKind('bare_metal');
@@ -77,15 +80,19 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated }: Prop
     setResult(null);
     setNextBusy(null);
     setNextMessage('');
+    setSyncNote('');
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     reset();
+    if (defaultKind) {
+      setKind(defaultKind);
+    }
     void getSiteInventoryCatalog(siteName)
       .then(setCatalog)
       .catch(() => setCatalog({}));
-  }, [isOpen, siteName, reset]);
+  }, [isOpen, siteName, reset, defaultKind]);
 
   const isVM = kind === 'vm';
   const needsMac = kind !== 'vm';
@@ -133,6 +140,14 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated }: Prop
       const res = await createSiteHost(siteName, intent);
       setResult({ paths: res.paths ?? [], warnings: res.warnings ?? [] });
       onCreated?.(intent.name);
+      // Push the new files so YAIDAP actions on the host work without an extra
+      // manual sync step (same behaviour as the other console add flows).
+      try {
+        await syncSiteInventory(siteName);
+        setSyncNote('Synced to the jumphost.');
+      } catch {
+        setSyncNote('Inventory saved, but the sync to the jumphost failed — use Sync to jumphost.');
+      }
     } catch (e) {
       setError(e);
     } finally {
@@ -181,6 +196,9 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated }: Prop
             <Alert variant="warning" isInline title="Placeholders detected" style={{ marginBottom: '0.75rem' }}>
               {result.warnings.join('; ')}
             </Alert>
+          ) : null}
+          {syncNote ? (
+            <p style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>{syncNote}</p>
           ) : null}
           <Title headingLevel="h4" size="md">
             Next step

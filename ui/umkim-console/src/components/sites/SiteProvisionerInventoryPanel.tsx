@@ -4,11 +4,8 @@ import {
   Button,
   Checkbox,
   Form,
-  FormGroup,
-  FormHelperText,
   Label,
   Modal,
-  NumberInput,
   TextArea,
   TextInput,
   Title,
@@ -31,14 +28,8 @@ import type { SiteInventoryFileInfo, SiteInventoryImportChange, SiteInventoryRev
 import { ErrorAlert } from '../ErrorAlert';
 import { SiteAddHostWizard } from './SiteAddHostWizard';
 import {
-  gpuPassthroughGuestHostVarsTemplate,
   guestHostVarsTemplate,
   guestNameFromHostVarsPath,
-  bareMetalNodeHostVarsTemplate,
-  hypervisorDiscoveryStubTemplate,
-  mergeGuestIntoBareMetalsYaml,
-  mergeGuestIntoGuestsYaml,
-  mergeHypervisorIntoHypervisorsYaml,
   templateForNewInventoryFile,
 } from './inventoryVmTemplates';
 
@@ -180,67 +171,7 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
   const [busy, setBusy] = useState(false);
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
-  const [addVmOpen, setAddVmOpen] = useState(false);
   const [addHostOpen, setAddHostOpen] = useState(false);
-  const [addVmStep, setAddVmStep] = useState(1);
-  const [vmGuestName, setVmGuestName] = useState('');
-  const [vmLocation, setVmLocation] = useState('least-utilized');
-  const [vmIp, setVmIp] = useState('');
-  const [vmCores, setVmCores] = useState(2);
-  const [vmMemory, setVmMemory] = useState(4096);
-  const [vmDiskSize, setVmDiskSize] = useState(40);
-  const [vmGpuPassthrough, setVmGpuPassthrough] = useState(false);
-  const [vmMessage, setVmMessage] = useState('');
-  const [addDiscOpen, setAddDiscOpen] = useState(false);
-  const [discHostName, setDiscHostName] = useState('');
-  const [discAnsibleHost, setDiscAnsibleHost] = useState('');
-  const [discMac, setDiscMac] = useState('');
-  const [discPxeEnabled, setDiscPxeEnabled] = useState(true);
-  const [addBmOpen, setAddBmOpen] = useState(false);
-  const [bmHostName, setBmHostName] = useState('');
-  const [bmAnsibleHost, setBmAnsibleHost] = useState('');
-  const [bmMac, setBmMac] = useState('');
-  const [bmPxeEnabled, setBmPxeEnabled] = useState(true);
-
-  const resetAddVmForm = () => {
-    setAddVmStep(1);
-    setVmGuestName('');
-    setVmLocation('least-utilized');
-    setVmIp('');
-    setVmCores(2);
-    setVmMemory(4096);
-    setVmDiskSize(40);
-    setVmGpuPassthrough(false);
-  };
-
-  const openAddVmModal = () => {
-    resetAddVmForm();
-    setAddVmOpen(true);
-  };
-
-  const resetAddDiscForm = () => {
-    setDiscHostName('');
-    setDiscAnsibleHost('');
-    setDiscMac('');
-    setDiscPxeEnabled(true);
-  };
-
-  const openAddDiscModal = () => {
-    resetAddDiscForm();
-    setAddDiscOpen(true);
-  };
-
-  const resetAddBmForm = () => {
-    setBmHostName('');
-    setBmAnsibleHost('');
-    setBmMac('');
-    setBmPxeEnabled(true);
-  };
-
-  const openAddBmModal = () => {
-    resetAddBmForm();
-    setAddBmOpen(true);
-  };
 
   const filePaths = useMemo(() => {
     const seen = new Set<string>();
@@ -361,62 +292,6 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
     setEditorDirty(true);
   };
 
-  const addVmGuest = async () => {
-    const name = vmGuestName.trim();
-    if (!name) {
-      setError(new Error('Guest name is required'));
-      return;
-    }
-    const loc = vmLocation.trim() || 'least-utilized';
-    if (vmGpuPassthrough && (loc === 'least-utilized' || loc === 'auto' || !loc)) {
-      setError(new Error('GPU passthrough guests require a concrete hypervisor name in VM location'));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setVmMessage('');
-    try {
-      const guestsResult = await getSiteInventoryFileOptional(siteName, 'guests.yml');
-      const guestsYaml = mergeGuestIntoGuestsYaml(guestsResult.content, name, {
-        vm_location: loc,
-        ansible_host: vmIp.trim() || undefined,
-      });
-      const hostVarsPath = `host_vars/${name}.yml`;
-      const hostVarsYaml = vmGpuPassthrough
-        ? gpuPassthroughGuestHostVarsTemplate({
-            guestName: name,
-            hypervisorName: loc,
-            ip: vmIp.trim() || undefined,
-            cores: vmCores,
-            memory: vmMemory,
-            diskSizeGi: vmDiskSize,
-          })
-        : guestHostVarsTemplate({
-            guestName: name,
-            vmLocation: loc,
-            ip: vmIp.trim() || undefined,
-            cores: vmCores,
-            memory: vmMemory,
-            diskSizeGi: vmDiskSize,
-          });
-      await putSiteInventoryFile(siteName, 'guests.yml', guestsYaml);
-      await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
-      setAddVmOpen(false);
-      resetAddVmForm();
-      await syncToJumphost();
-      setVmMessage(`Saved guests.yml and ${hostVarsPath} and synced to the jumphost. Provision on the Site hosts tab.`);
-      await load();
-      setSelectedPath(hostVarsPath);
-      setEditorContent(hostVarsYaml);
-      setFileMissing(false);
-      setEditorDirty(false);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const runSync = async () => {
     setBusy(true);
     setError(null);
@@ -437,96 +312,6 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
       await syncSiteInventory(siteName);
     } catch (e) {
       setError(e);
-    }
-  };
-
-  const addBareMetalNode = async () => {
-    const name = bmHostName.trim();
-    if (!name) {
-      setError(new Error('Host name is required'));
-      return;
-    }
-    if (bmPxeEnabled && !bmMac.trim()) {
-      setError(new Error('MAC address is required for PXE discovery profile'));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setVmMessage('');
-    try {
-      const bmResult = await getSiteInventoryFileOptional(siteName, 'bare_metals.yml');
-      const bareMetalsYaml = mergeGuestIntoBareMetalsYaml(bmResult.content, name, {
-        ansible_host: bmAnsibleHost.trim() || undefined,
-      });
-      const hostVarsPath = `host_vars/${name}.yml`;
-      const hostVarsYaml = bareMetalNodeHostVarsTemplate({
-        name,
-        ansibleHost: bmAnsibleHost.trim() || undefined,
-        macAddress: bmMac.trim() || undefined,
-        pxeDiscovery: bmPxeEnabled,
-      });
-      await putSiteInventoryFile(siteName, 'bare_metals.yml', bareMetalsYaml);
-      await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
-      setAddBmOpen(false);
-      resetAddBmForm();
-      await syncToJumphost();
-      setVmMessage(
-        `Saved bare_metals.yml and ${hostVarsPath} and synced to the jumphost. Discover (SSH/PXE) or Install bare metal on the Site hosts tab.`,
-      );
-      await load();
-      setSelectedPath(hostVarsPath);
-      setEditorContent(hostVarsYaml);
-      setFileMissing(false);
-      setEditorDirty(false);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const addDiscoveryStub = async () => {
-    const name = discHostName.trim();
-    if (!name) {
-      setError(new Error('Host name is required'));
-      return;
-    }
-    if (discPxeEnabled && !discMac.trim()) {
-      setError(new Error('MAC address is required for PXE discovery profile'));
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setVmMessage('');
-    try {
-      const hvResult = await getSiteInventoryFileOptional(siteName, 'hypervisors.yml');
-      const hypervisorsYaml = mergeHypervisorIntoHypervisorsYaml(hvResult.content, name, {
-        ansible_host: discAnsibleHost.trim() || undefined,
-      });
-      const hostVarsPath = `host_vars/${name}.yml`;
-      const hostVarsYaml = hypervisorDiscoveryStubTemplate({
-        name,
-        ansibleHost: discAnsibleHost.trim() || undefined,
-        macAddress: discMac.trim() || undefined,
-        pxeDiscovery: discPxeEnabled,
-      });
-      await putSiteInventoryFile(siteName, 'hypervisors.yml', hypervisorsYaml);
-      await putSiteInventoryFile(siteName, hostVarsPath, hostVarsYaml);
-      setAddDiscOpen(false);
-      resetAddDiscForm();
-      await syncToJumphost();
-      setVmMessage(
-        `Saved hypervisors.yml and ${hostVarsPath} and synced to the jumphost. Run Discover on the Site hosts tab.`,
-      );
-      await load();
-      setSelectedPath(hostVarsPath);
-      setEditorContent(hostVarsYaml);
-      setFileMissing(false);
-      setEditorDirty(false);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -612,7 +397,8 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
         Native Ansible/YAIDAP tree on the hub. Root group files (<code>guests.yml</code>,{' '}
         <code>hypervisors.yml</code>, cluster groups like <code>lab-ha01.yml</code>),{' '}
         <code>group_vars/</code> (one file per group name), and <code>host_vars/</code> sync to the
-        jumphost. Hub-only <code>_meta/*</code> is never synced.
+        jumphost. Hub-only <code>_meta/*</code> is never synced. Add and remove hosts from the Hosts
+        tab; edit the YAML here.
       </p>
       <p>
         Sync phase:{' '}
@@ -620,24 +406,12 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
           {metaPhase || 'pending'}
         </Label>
       </p>
-      {vmMessage ? (
-        <p style={{ fontSize: '0.9rem', color: 'var(--pf-v6-global--Color--200)' }}>{vmMessage}</p>
-      ) : null}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <Button variant="primary" onClick={() => setAddHostOpen(true)}>
           Add host
         </Button>
         <Button variant="secondary" isLoading={busy} onClick={() => void runSync()}>
           Sync to jumphost
-        </Button>
-        <Button variant="secondary" onClick={openAddVmModal}>
-          Add VM guest
-        </Button>
-        <Button variant="secondary" onClick={openAddDiscModal}>
-          Add hypervisor
-        </Button>
-        <Button variant="secondary" onClick={openAddBmModal}>
-          Add bare metal node
         </Button>
         <Button variant="secondary" isLoading={busy} onClick={() => void runImportPreview()}>
           Import preview
@@ -752,268 +526,6 @@ export function SiteProvisionerInventoryPanel({ siteName }: Props) {
             Create
           </Button>
           <Button variant="link" onClick={() => setNewFileOpen(false)}>
-            Cancel
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        title={`Add VM guest — step ${addVmStep} of 2`}
-        isOpen={addVmOpen}
-        onClose={() => {
-          setAddVmOpen(false);
-          resetAddVmForm();
-        }}
-      >
-        {addVmStep === 1 ? (
-          <>
-            <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Guest identity and placement. VM sizing is on the next step.
-            </p>
-            <Form>
-              <FormGroup label="Guest name" isRequired fieldId="vmGuestName">
-                <TextInput
-                  id="vmGuestName"
-                  value={vmGuestName}
-                  onChange={(_e, v) => setVmGuestName(v)}
-                  placeholder="e.g. lab-single-1-0"
-                />
-              </FormGroup>
-              <FormGroup label="VM location (hypervisor)" fieldId="vmLocation">
-                <TextInput
-                  id="vmLocation"
-                  value={vmLocation}
-                  onChange={(_e, v) => setVmLocation(v)}
-                  placeholder="least-utilized or virt01"
-                />
-              </FormGroup>
-              <FormGroup label="ansible_host / static IP (optional)" fieldId="vmIp">
-                <TextInput
-                  id="vmIp"
-                  value={vmIp}
-                  onChange={(_e, v) => setVmIp(v)}
-                  placeholder="172.16.10.161"
-                />
-                <FormHelperText>
-                  Leave empty for DHCP in host_vars; set if the address is already known.
-                </FormHelperText>
-              </FormGroup>
-            </Form>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  if (!vmGuestName.trim()) {
-                    setError(new Error('Guest name is required'));
-                    return;
-                  }
-                  setError(null);
-                  setAddVmStep(2);
-                }}
-              >
-                Next
-              </Button>
-              <Button
-                variant="link"
-                onClick={() => {
-                  setAddVmOpen(false);
-                  resetAddVmForm();
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Common VM settings for <code>{vmGuestName.trim()}</code>. Uplink network defaults stay in the
-              generated <code>host_vars</code> file — edit there if your site uses different zones or bridges.
-            </p>
-            <Form>
-              <FormGroup label="CPU cores" fieldId="vmCores">
-                <NumberInput
-                  inputName="vmCores"
-                  inputAriaLabel="CPU cores"
-                  value={vmCores}
-                  min={1}
-                  max={64}
-                  onChange={(event) => {
-                    const n = Number((event.target as HTMLInputElement).value);
-                    if (!Number.isNaN(n)) {
-                      setVmCores(Math.max(1, Math.min(64, n)));
-                    }
-                  }}
-                  onMinus={() => setVmCores((v) => Math.max(1, v - 1))}
-                  onPlus={() => setVmCores((v) => Math.min(64, v + 1))}
-                  style={{ maxWidth: '10rem' }}
-                />
-              </FormGroup>
-              <FormGroup label="Memory (MiB)" fieldId="vmMemory">
-                <NumberInput
-                  inputName="vmMemory"
-                  inputAriaLabel="Memory in MiB"
-                  value={vmMemory}
-                  min={512}
-                  step={512}
-                  onChange={(event) => {
-                    const n = Number((event.target as HTMLInputElement).value);
-                    if (!Number.isNaN(n)) {
-                      setVmMemory(Math.max(512, n));
-                    }
-                  }}
-                  onMinus={() => setVmMemory((v) => Math.max(512, v - 512))}
-                  onPlus={() => setVmMemory((v) => v + 512)}
-                  style={{ maxWidth: '10rem' }}
-                />
-                <FormHelperText>4096 MiB ≈ 4 GiB.</FormHelperText>
-              </FormGroup>
-              <FormGroup label="Boot disk size (GiB)" fieldId="vmDiskSize">
-                <NumberInput
-                  inputName="vmDiskSize"
-                  inputAriaLabel="Boot disk size in GiB"
-                  value={vmDiskSize}
-                  min={10}
-                  step={10}
-                  onChange={(event) => {
-                    const n = Number((event.target as HTMLInputElement).value);
-                    if (!Number.isNaN(n)) {
-                      setVmDiskSize(Math.max(10, n));
-                    }
-                  }}
-                  onMinus={() => setVmDiskSize((v) => Math.max(10, v - 10))}
-                  onPlus={() => setVmDiskSize((v) => v + 10)}
-                  style={{ maxWidth: '10rem' }}
-                />
-              </FormGroup>
-              <FormGroup fieldId="vmGpuPassthrough">
-                <Checkbox
-                  id="vmGpuPassthrough"
-                  isChecked={vmGpuPassthrough}
-                  onChange={(_e, c) => setVmGpuPassthrough(c)}
-                  label="GPU passthrough guest"
-                />
-                <FormHelperText>
-                  Sets vm_location to the hypervisor and adds gpu_passthrough PCI placeholders — copy
-                  addresses from discover notes after host prep.
-                </FormHelperText>
-              </FormGroup>
-            </Form>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <Button variant="primary" isLoading={busy} onClick={() => void addVmGuest()}>
-                Save guest files
-              </Button>
-              <Button variant="secondary" onClick={() => setAddVmStep(1)}>
-                Back
-              </Button>
-              <Button
-                variant="link"
-                onClick={() => {
-                  setAddVmOpen(false);
-                  resetAddVmForm();
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </>
-        )}
-      </Modal>
-
-      <Modal title="Add hypervisor" isOpen={addDiscOpen} onClose={() => setAddDiscOpen(false)}>
-        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-          Adds <code>hypervisors.yml</code> + discovery <code>host_vars</code> for VM placement and TempXE discovery.
-        </p>
-        <Form>
-          <FormGroup label="Host name" isRequired fieldId="discHostName">
-            <TextInput
-              id="discHostName"
-              value={discHostName}
-              onChange={(_e, v) => setDiscHostName(v)}
-              placeholder="e.g. new-hv01"
-            />
-          </FormGroup>
-          <FormGroup label="ansible_host (optional for PXE-only)" fieldId="discAnsibleHost">
-            <TextInput
-              id="discAnsibleHost"
-              value={discAnsibleHost}
-              onChange={(_e, v) => setDiscAnsibleHost(v)}
-              placeholder="172.16.10.99"
-            />
-            <FormHelperText>Required for SSH discovery; optional when using PXE-only workflow.</FormHelperText>
-          </FormGroup>
-          <FormGroup label="MAC address" fieldId="discMac">
-            <TextInput
-              id="discMac"
-              value={discMac}
-              onChange={(_e, v) => setDiscMac(v)}
-              placeholder="aa:bb:cc:dd:ee:ff"
-            />
-            <FormHelperText>Required for PXE discovery archive matching.</FormHelperText>
-          </FormGroup>
-          <FormGroup label="PXE discovery profile" fieldId="discPxeEnabled">
-            <Checkbox
-              id="discPxeEnabled"
-              isChecked={discPxeEnabled}
-              onChange={(_e, c) => setDiscPxeEnabled(c)}
-              label="Enable tempxe_discovery in host_vars (required for Discover PXE)"
-            />
-          </FormGroup>
-        </Form>
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-          <Button variant="primary" isLoading={busy} onClick={() => void addDiscoveryStub()}>
-            Save stub files
-          </Button>
-          <Button variant="link" onClick={() => setAddDiscOpen(false)}>
-            Cancel
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal title="Add bare metal node" isOpen={addBmOpen} onClose={() => setAddBmOpen(false)}>
-        <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-          Adds <code>bare_metals.yml</code> for cluster members that are not libvirt VM guests.
-        </p>
-        <Form>
-          <FormGroup label="Host name" isRequired fieldId="bmHostName">
-            <TextInput
-              id="bmHostName"
-              value={bmHostName}
-              onChange={(_e, v) => setBmHostName(v)}
-              placeholder="e.g. bm-worker-01"
-            />
-          </FormGroup>
-          <FormGroup label="ansible_host" fieldId="bmAnsibleHost">
-            <TextInput
-              id="bmAnsibleHost"
-              value={bmAnsibleHost}
-              onChange={(_e, v) => setBmAnsibleHost(v)}
-              placeholder="172.16.10.50"
-            />
-          </FormGroup>
-          <FormGroup label="MAC address" fieldId="bmMac">
-            <TextInput
-              id="bmMac"
-              value={bmMac}
-              onChange={(_e, v) => setBmMac(v)}
-              placeholder="aa:bb:cc:dd:ee:ff"
-            />
-            <FormHelperText>Required for Discover (PXE).</FormHelperText>
-          </FormGroup>
-          <FormGroup label="PXE discovery profile" fieldId="bmPxeEnabled">
-            <Checkbox
-              id="bmPxeEnabled"
-              isChecked={bmPxeEnabled}
-              onChange={(_e, c) => setBmPxeEnabled(c)}
-              label="Enable tempxe_discovery in host_vars (required for Discover PXE)"
-            />
-          </FormGroup>
-        </Form>
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-          <Button variant="primary" isLoading={busy} onClick={() => void addBareMetalNode()}>
-            Save node files
-          </Button>
-          <Button variant="link" onClick={() => setAddBmOpen(false)}>
             Cancel
           </Button>
         </div>

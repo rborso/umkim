@@ -13,16 +13,19 @@ import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import {
   applySiteHostCluster,
   applySiteInventoryImport,
+  getSiteInventory,
   getSiteInventoryImportPreview,
   listSiteHosts,
   previewSiteInventoryImport,
   provisionSiteHost,
   removeSiteHost,
+  syncSiteInventory,
   verifySiteHost,
 } from '../../api/client';
-import type { SiteHostRecord, SiteInventoryImportChange } from '../../api/types';
+import type { SiteHostKind, SiteHostRecord, SiteInventoryImportChange } from '../../api/types';
 import { vmLocationIsScheduleToken } from '../../utils/vmLocation';
 import { ErrorAlert } from '../ErrorAlert';
+import { SiteAddHostWizard } from './SiteAddHostWizard';
 import { SiteProvisionHistory } from './SiteProvisionHistory';
 
 type Props = {
@@ -50,12 +53,36 @@ function phaseColor(phase?: string): 'green' | 'blue' | 'orange' | 'red' | 'grey
   }
 }
 
+const PHASE_ORDER = ['Ready', 'Provisioning', 'Destroying', 'Declared', 'Failed'];
+
+/** Compact per-section roll-up so a stale Declared/Failed record is obvious at a glance. */
+function HostSectionSummary({ rows }: { rows: SiteHostRecord[] }) {
+  const counts = rows.reduce<Record<string, number>>((acc, h) => {
+    const phase = h.status?.phase || 'Unknown';
+    acc[phase] = (acc[phase] || 0) + 1;
+    return acc;
+  }, {});
+  return (
+    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center', margin: '0.25rem 0 0.75rem' }}>
+      <Label>{rows.length} host{rows.length === 1 ? '' : 's'}</Label>
+      {PHASE_ORDER.filter((p) => counts[p]).map((p) => (
+        <Label key={p} color={phaseColor(p)}>
+          {p} {counts[p]}
+        </Label>
+      ))}
+    </div>
+  );
+}
+
 export function SiteHostsPanel({ siteName }: Props) {
   const navigate = useNavigate();
   const [hosts, setHosts] = useState<SiteHostRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [actionError, setActionError] = useState<unknown>(null);
+  const [metaPhase, setMetaPhase] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [wizardKind, setWizardKind] = useState<SiteHostKind | null>(null);
   const [provisionOpen, setProvisionOpen] = useState(false);
   const [provisionTarget, setProvisionTarget] = useState<SiteHostRecord | null>(null);
   const [provisionAction, setProvisionAction] = useState<'create_vm' | 'plan_vm'>('create_vm');
@@ -82,6 +109,7 @@ export function SiteHostsPanel({ siteName }: Props) {
   const [prepareGpuMode, setPrepareGpuMode] = useState<PrepareGpuMode>('prepare_gpu_passthrough');
   const [verifying, setVerifying] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<SiteHostRecord | null>(null);
+  const [removeForce, setRemoveForce] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [prepareGpuConfirm, setPrepareGpuConfirm] = useState(false);
   const [preparingGpu, setPreparingGpu] = useState(false);
@@ -103,6 +131,13 @@ export function SiteHostsPanel({ siteName }: Props) {
     try {
       const hostList = await listSiteHosts(siteName);
       setHosts(hostList);
+      // Best-effort: the sync indicator should never block the host list.
+      try {
+        const env = await getSiteInventory(siteName);
+        setMetaPhase(env.meta?.syncPhase || 'pending');
+      } catch {
+        // ignore
+      }
       if (opts?.refreshHistory) {
         setHistoryRefreshKey(String(Date.now()));
       }
@@ -133,6 +168,27 @@ export function SiteHostsPanel({ siteName }: Props) {
     return () => clearInterval(t);
   }, [hosts, load]);
 
+  const syncToJumphost = async () => {
+    try {
+      await syncSiteInventory(siteName);
+    } catch (e) {
+      setActionError(e);
+    }
+  };
+
+  const runSync = async () => {
+    setSyncBusy(true);
+    setActionError(null);
+    try {
+      await syncSiteInventory(siteName);
+      await load();
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
   const runProvision = async () => {
     if (!provisionTarget) return;
     setProvisioning(true);
@@ -159,9 +215,11 @@ export function SiteHostsPanel({ siteName }: Props) {
     setRemoving(true);
     setActionError(null);
     try {
-      await removeSiteHost(siteName, removeTarget.name);
+      await removeSiteHost(siteName, removeTarget.name, removeForce);
       setRemoveTarget(null);
-      load();
+      setRemoveForce(false);
+      await syncToJumphost();
+      await load({ refreshHistory: true });
     } catch (e) {
       setActionError(e);
     } finally {
@@ -409,224 +467,345 @@ export function SiteHostsPanel({ siteName }: Props) {
   const hostAnsibleAddr = (host: SiteHostRecord) =>
     (host.ansible_host || host.status?.ansible_host || '').trim();
 
+  const openRemove = (host: SiteHostRecord) => {
+    setRemoveTarget(host);
+    setRemoveForce(false);
+  };
+
+  const closeRemove = () => {
+    setRemoveTarget(null);
+    setRemoveForce(false);
+  };
+
+  // Mirrors the API guard: Ready/Provisioning/Destroying records need force=true.
+  const removeNeedsForce =
+    removeTarget?.status?.phase === 'Ready' ||
+    removeTarget?.status?.phase === 'Provisioning' ||
+    removeTarget?.status?.phase === 'Destroying';
+
+  const infraHosts = hosts.filter((h) => h.kind === 'hypervisor');
+  const workloadHosts = hosts.filter((h) => h.kind !== 'hypervisor');
+
+  const renderHostsTable = (rows: SiteHostRecord[], ariaLabel: string) => (
+    <Table aria-label={ariaLabel} variant="compact">
+      <Thead>
+        <Tr>
+          <Th>Name</Th>
+          <Th>Kind</Th>
+          <Th>Phase</Th>
+          <Th>Cluster</Th>
+          <Th>ansible_host</Th>
+          <Th>Location</Th>
+          <Th>Actions</Th>
+        </Tr>
+      </Thead>
+      <Tbody>
+        {rows.map((host) => (
+          <Tr key={host.name}>
+            <Td>
+              <code>{host.name}</code>
+            </Td>
+            <Td>
+              {host.kind || '—'}
+              {host.kind === 'hypervisor' && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                  placement target
+                </div>
+              )}
+              {host.kind === 'bare_metal' && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                  cluster node
+                </div>
+              )}
+            </Td>
+            <Td>
+              <Label color={phaseColor(host.status?.phase)}>{host.status?.phase || '—'}</Label>
+              {host.kind === 'vm' && host.status?.phase === 'Declared' && (
+                <div style={{ fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--pf-v5-global--Color--200)' }}>
+                  No VM running — use Provision to create
+                </div>
+              )}
+            </Td>
+            <Td>
+              {host.clusters?.length ? (
+                <code>{host.clusters.join(', ')}</code>
+              ) : host.status?.cluster?.clusterName ? (
+                <div>
+                  <code>{host.status.cluster.clusterName}</code>{' '}
+                  <Label color={phaseColor(host.status.cluster.phase)}>
+                    {host.status.cluster.phase || '—'}
+                  </Label>
+                  {host.status?.cluster?.phase === 'Ready' && host.status.cluster.clusterName && (
+                    <>
+                      {' '}
+                      <Link to={`/clusters/${encodeURIComponent(host.status.cluster.clusterName)}`}>View</Link>
+                    </>
+                  )}
+                </div>
+              ) : (
+                '—'
+              )}
+            </Td>
+            <Td>
+              <code>{hostAnsibleAddr(host) || '—'}</code>
+            </Td>
+            <Td>{host.vm_location || '—'}</Td>
+            <Td>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {(host.kind === 'hypervisor' || host.kind === 'bare_metal') && (
+                  <>
+                    <Button
+                      variant="link"
+                      isInline
+                      isDisabled={!hostAnsibleAddr(host) || verifying === host.name}
+                      isLoading={verifying === host.name}
+                      onClick={() => void runVerify(host)}
+                    >
+                      Verify (read-only)
+                    </Button>
+                    <Button
+                      variant="link"
+                      isInline
+                      isDisabled={!hostAnsibleAddr(host)}
+                      onClick={() => openDiscover(host, 'discover')}
+                    >
+                      Discover (SSH)
+                    </Button>
+                    <Button variant="link" isInline onClick={() => openDiscover(host, 'discover_pxe')}>
+                      Discover (PXE)
+                    </Button>
+                  </>
+                )}
+                {host.kind === 'hypervisor' && (
+                  <>
+                    <Button
+                      variant="link"
+                      isInline
+                      isLoading={preparingHv === host.name}
+                      onClick={() => void runPrepareHypervisor(host)}
+                    >
+                      Prepare hypervisor
+                    </Button>
+                    <Button
+                      variant="link"
+                      isInline
+                      onClick={() => openPrepareGpu(host, 'prepare_gpu_passthrough')}
+                    >
+                      Prepare GPU passthrough
+                    </Button>
+                    <Button
+                      variant="link"
+                      isInline
+                      onClick={() => openPrepareGpu(host, 'prepare_hypervisor_gpu')}
+                    >
+                      Prepare libvirt + GPU
+                    </Button>
+                  </>
+                )}
+                {host.kind === 'bare_metal' && (
+                  <Button variant="link" isInline onClick={() => openInstallBm(host)}>
+                    Install bare metal
+                  </Button>
+                )}
+                {host.kind === 'vm' && (
+                  <>
+                    {host.status?.phase === 'Ready' ? (
+                      <Button
+                        variant="link"
+                        isInline
+                        isDanger
+                        onClick={() => openProvision(host, 'create_vm')}
+                      >
+                        Reprovision
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="link"
+                        isInline
+                        onClick={() => openProvision(host, 'create_vm')}
+                      >
+                        Provision
+                      </Button>
+                    )}
+                    {canPlanPlacement(host) && (
+                      <Button variant="link" isInline onClick={() => openProvision(host, 'plan_vm')}>
+                        Plan placement
+                      </Button>
+                    )}
+                    {canDestroyVM(host) && (
+                      <Button variant="link" isInline isDanger onClick={() => openDestroy(host)}>
+                        Destroy VM
+                      </Button>
+                    )}
+                  </>
+                )}
+                {canEnrollNow(host) && (host.clusters?.length || host.clusterIntent) && (
+                  <Button
+                    variant="link"
+                    isInline
+                    isLoading={applyingCluster === host.name}
+                    onClick={() => void runClusterApply(host)}
+                  >
+                    Apply cluster
+                  </Button>
+                )}
+                {(host.status?.phase === 'Ready' || host.status?.phase === 'Declared') &&
+                  host.kind !== 'hypervisor' &&
+                  !(host.clusters?.length) &&
+                  !host.clusterIntent &&
+                  hostAnsibleAddr(host) && (
+                    <Button
+                      variant="link"
+                      isInline
+                      onClick={() =>
+                        navigate(
+                          `/clusters?site=${encodeURIComponent(siteName)}&create=1&node=${encodeURIComponent(host.name)}`,
+                        )
+                      }
+                    >
+                      Make new cluster
+                    </Button>
+                  )}
+                <Button variant="link" isInline isDanger onClick={() => openRemove(host)}>
+                  Remove from inventory
+                </Button>
+              </div>
+            </Td>
+          </Tr>
+        ))}
+      </Tbody>
+    </Table>
+  );
+
   return (
     <div style={{ marginTop: '1rem' }}>
       <ErrorAlert error={error} />
       <ErrorAlert error={actionError} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '0.5rem',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+        }}
+      >
         <Title headingLevel="h3" style={{ margin: 0 }}>
           Site hosts (from inventory)
         </Title>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Label
+            color={
+              metaPhase === 'synced'
+                ? 'green'
+                : metaPhase === 'dirty'
+                  ? 'orange'
+                  : metaPhase === 'syncing'
+                    ? 'blue'
+                    : 'grey'
+            }
+          >
+            inventory: {metaPhase || 'pending'}
+          </Label>
+          <Button
+            variant="secondary"
+            isLoading={syncBusy}
+            isDisabled={syncBusy}
+            onClick={() => void runSync()}
+          >
+            Sync to jumphost
+          </Button>
+        </div>
       </div>
-      <p style={{ fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+      <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>
         Derived from <code>guests.yml</code> (VM guests), <code>bare_metals.yml</code>, <code>hypervisors.yml</code>,{' '}
-        <code>host_vars/*.yml</code>, and root cluster groups. Use the Provisioner inventory tab to add hosts; sync
-        before running actions.
+        <code>host_vars/*.yml</code>, and root cluster groups. Add and remove hosts here; edit raw YAML in
+        the Provisioner inventory tab.
       </p>
       {loading ? (
         <p>Loading hosts…</p>
-      ) : hosts.length === 0 ? (
-        <p>No hosts in inventory yet. Add guests or discovery stubs under Provisioner inventory.</p>
       ) : (
-        <Table aria-label="Site hosts" variant="compact">
-          <Thead>
-            <Tr>
-              <Th>Name</Th>
-              <Th>Kind</Th>
-              <Th>Phase</Th>
-              <Th>Cluster</Th>
-              <Th>ansible_host</Th>
-              <Th>Location</Th>
-              <Th>Actions</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {hosts.map((host) => (
-              <Tr key={host.name}>
-                <Td>
-                  <code>{host.name}</code>
-                </Td>
-                <Td>
-                  {host.kind || '—'}
-                  {host.kind === 'hypervisor' && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                      placement target
-                    </div>
-                  )}
-                  {host.kind === 'bare_metal' && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                      cluster node
-                    </div>
-                  )}
-                </Td>
-                <Td>
-                  <Label color={phaseColor(host.status?.phase)}>{host.status?.phase || '—'}</Label>
-                  {host.kind === 'vm' && host.status?.phase === 'Declared' && (
-                    <div style={{ fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--pf-v5-global--Color--200)' }}>
-                      No VM running — use Provision to create
-                    </div>
-                  )}
-                </Td>
-                <Td>
-                  {host.clusters?.length ? (
-                    <code>{host.clusters.join(', ')}</code>
-                  ) : host.status?.cluster?.clusterName ? (
-                    <div>
-                      <code>{host.status.cluster.clusterName}</code>{' '}
-                      <Label color={phaseColor(host.status.cluster.phase)}>
-                        {host.status.cluster.phase || '—'}
-                      </Label>
-                      {host.status?.cluster?.phase === 'Ready' && host.status.cluster.clusterName && (
-                        <>
-                          {' '}
-                          <Link to={`/clusters/${encodeURIComponent(host.status.cluster.clusterName)}`}>View</Link>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </Td>
-                <Td>
-                  <code>{hostAnsibleAddr(host) || '—'}</code>
-                </Td>
-                <Td>{host.vm_location || '—'}</Td>
-                <Td>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {(host.kind === 'hypervisor' || host.kind === 'bare_metal') && (
-                      <>
-                        <Button
-                          variant="link"
-                          isInline
-                          isDisabled={!hostAnsibleAddr(host) || verifying === host.name}
-                          isLoading={verifying === host.name}
-                          onClick={() => void runVerify(host)}
-                        >
-                          Verify (read-only)
-                        </Button>
-                        <Button
-                          variant="link"
-                          isInline
-                          isDanger
-                          onClick={() => setRemoveTarget(host)}
-                        >
-                          Remove from inventory
-                        </Button>
-                        <Button
-                          variant="link"
-                          isInline
-                          isDisabled={!hostAnsibleAddr(host)}
-                          onClick={() => openDiscover(host, 'discover')}
-                        >
-                          Discover (SSH)
-                        </Button>
-                        <Button variant="link" isInline onClick={() => openDiscover(host, 'discover_pxe')}>
-                          Discover (PXE)
-                        </Button>
-                      </>
-                    )}
-                    {host.kind === 'hypervisor' && (
-                      <>
-                        <Button
-                          variant="link"
-                          isInline
-                          isLoading={preparingHv === host.name}
-                          onClick={() => void runPrepareHypervisor(host)}
-                        >
-                          Prepare hypervisor
-                        </Button>
-                        <Button
-                          variant="link"
-                          isInline
-                          onClick={() => openPrepareGpu(host, 'prepare_gpu_passthrough')}
-                        >
-                          Prepare GPU passthrough
-                        </Button>
-                        <Button
-                          variant="link"
-                          isInline
-                          onClick={() => openPrepareGpu(host, 'prepare_hypervisor_gpu')}
-                        >
-                          Prepare libvirt + GPU
-                        </Button>
-                      </>
-                    )}
-                    {host.kind === 'bare_metal' && (
-                      <Button variant="link" isInline onClick={() => openInstallBm(host)}>
-                        Install bare metal
-                      </Button>
-                    )}
-                    {host.kind === 'vm' && (
-                      <>
-                        {host.status?.phase === 'Ready' ? (
-                          <Button
-                            variant="link"
-                            isInline
-                            isDanger
-                            onClick={() => openProvision(host, 'create_vm')}
-                          >
-                            Reprovision
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="link"
-                            isInline
-                            onClick={() => openProvision(host, 'create_vm')}
-                          >
-                            Provision
-                          </Button>
-                        )}
-                        {canPlanPlacement(host) && (
-                          <Button variant="link" isInline onClick={() => openProvision(host, 'plan_vm')}>
-                            Plan placement
-                          </Button>
-                        )}
-                        {canDestroyVM(host) && (
-                          <Button variant="link" isInline isDanger onClick={() => openDestroy(host)}>
-                            Destroy VM
-                          </Button>
-                        )}
-                      </>
-                    )}
-                    {canEnrollNow(host) && (host.clusters?.length || host.clusterIntent) && (
-                      <Button
-                        variant="link"
-                        isInline
-                        isLoading={applyingCluster === host.name}
-                        onClick={() => void runClusterApply(host)}
-                      >
-                        Apply cluster
-                      </Button>
-                    )}
-                    {(host.status?.phase === 'Ready' || host.status?.phase === 'Declared') &&
-                      host.kind !== 'hypervisor' &&
-                      !(host.clusters?.length) &&
-                      !host.clusterIntent &&
-                      hostAnsibleAddr(host) && (
-                        <Button
-                          variant="link"
-                          isInline
-                          onClick={() =>
-                            navigate(
-                              `/clusters?site=${encodeURIComponent(siteName)}&create=1&node=${encodeURIComponent(host.name)}`,
-                            )
-                          }
-                        >
-                          Make new cluster
-                        </Button>
-                      )}
-                  </div>
-                </Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Table>
+        <>
+          <section>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Title headingLevel="h4" style={{ margin: 0 }}>
+                Infrastructure (hypervisors)
+              </Title>
+              <Button variant="secondary" onClick={() => setWizardKind('hypervisor')}>
+                Add hypervisor
+              </Button>
+            </div>
+            <p style={{ fontSize: '0.8rem', margin: '0.25rem 0 0', color: 'var(--pf-v5-global--Color--200)' }}>
+              Placement targets — prepared, not provisioned by UMKIM.
+            </p>
+            <div style={{ marginTop: '0.5rem' }}>
+              <HostSectionSummary rows={infraHosts} />
+            </div>
+            {infraHosts.length ? (
+              renderHostsTable(infraHosts, 'Infrastructure hosts')
+            ) : (
+              <p>No hypervisors in inventory yet. Add one, then run Discover.</p>
+            )}
+          </section>
+
+          <section style={{ marginTop: '1.75rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Title headingLevel="h4" style={{ margin: 0 }}>
+                Workloads (VMs and bare metal)
+              </Title>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Button variant="secondary" onClick={() => setWizardKind('vm')}>
+                  Add VM guest
+                </Button>
+                <Button variant="secondary" onClick={() => setWizardKind('bare_metal')}>
+                  Add bare metal node
+                </Button>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.8rem', margin: '0.25rem 0 0', color: 'var(--pf-v5-global--Color--200)' }}>
+              Provisioned workloads: libvirt VM guests and cluster members.
+            </p>
+            <div style={{ marginTop: '0.5rem' }}>
+              <HostSectionSummary rows={workloadHosts} />
+            </div>
+            {workloadHosts.length ? (
+              renderHostsTable(workloadHosts, 'Workload hosts')
+            ) : (
+              <p>No VMs or bare-metal nodes in inventory yet. Add a VM guest or a bare metal node.</p>
+            )}
+          </section>
+        </>
       )}
 
       <SiteProvisionHistory
         siteName={siteName}
         refreshKey={historyRefreshKey}
         onReviewDiscovery={(hostName) => void runImportPreviewForHost(hostName)}
+      />
+
+      <SiteAddHostWizard
+        siteName={siteName}
+        isOpen={wizardKind !== null}
+        defaultKind={wizardKind ?? undefined}
+        onClose={() => setWizardKind(null)}
+        onCreated={() => void load({ refreshHistory: true })}
       />
 
       <Modal
@@ -672,24 +851,7 @@ export function SiteHostsPanel({ siteName }: Props) {
               {' '}
               Dry-run only: shows memory-based least-utilized placement without creating a VM or
               persisting inventory.
-
-      <Modal
-        variant="small"
-        title="Remove host from inventory"
-        isOpen={!!removeTarget}
-        onClose={() => setRemoveTarget(null)}
-        actions={[
-          <Button key="rm" variant="danger" onClick={() => void runRemove()} isLoading={removing}>
-            Remove
-          </Button>,
-          <Button key="cancel" variant="link" onClick={() => setRemoveTarget(null)}>
-            Cancel
-          </Button>,
-        ]}
-      >
-        Remove {removeTarget?.name} from the site inventory? Its guests/bare_metals entry, host_vars/group_vars and status record are deleted. The VM must already be gone.
-      </Modal>
-    </>
+            </>
           )}
         </p>
         {provisionIsReprovision && (
@@ -710,6 +872,57 @@ export function SiteHostsPanel({ siteName }: Props) {
                 : 'I confirm this destructive or bare-metal install action'
             }
           />
+        )}
+      </Modal>
+
+      <Modal
+        variant="small"
+        title="Remove host from inventory"
+        isOpen={!!removeTarget}
+        onClose={closeRemove}
+        actions={[
+          <Button
+            key="rm"
+            variant="danger"
+            onClick={() => void runRemove()}
+            isLoading={removing}
+            isDisabled={removeNeedsForce && !removeForce}
+          >
+            Remove
+          </Button>,
+          <Button key="cancel" variant="link" onClick={closeRemove}>
+            Cancel
+          </Button>,
+        ]}
+      >
+        <p>
+          Remove <code>{removeTarget?.name}</code> from the site inventory? Its{' '}
+          <code>guests.yml</code>/<code>bare_metals.yml</code> entry, <code>host_vars</code>/
+          <code>group_vars</code> and status record are deleted. The host itself is not touched.
+        </p>
+        {removeTarget?.kind === 'vm' && (
+          <p style={{ marginTop: '0.5rem' }}>
+            Destroy the VM first — removal only drops the inventory bookkeeping.
+          </p>
+        )}
+        {removeNeedsForce && (
+          <>
+            <Alert
+              variant="warning"
+              isInline
+              title={`Host is ${removeTarget?.status?.phase}`}
+              style={{ marginTop: '0.5rem' }}
+            >
+              This record is in use or its host may still exist. Removing now drops the inventory
+              without destroying anything.
+            </Alert>
+            <Checkbox
+              id="removeForce"
+              isChecked={removeForce}
+              onChange={(_e, c) => setRemoveForce(c)}
+              label="I understand — remove the inventory record anyway"
+            />
+          </>
         )}
       </Modal>
 
