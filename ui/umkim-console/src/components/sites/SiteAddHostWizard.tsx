@@ -32,6 +32,19 @@ const KINDS: { value: SiteHostKind; label: string }[] = [
   { value: 'hypervisor', label: 'Hypervisor' },
 ];
 
+/** Number inputs keep the raw value so typing is never clamped; '' is empty. */
+function numValue(raw: number | ''): number {
+  return raw === '' ? 0 : raw;
+}
+
+/** Parse a NumberInput change; blank stays blank so the field can be cleared. */
+function parseNumInput(raw: string): number | '' {
+  const t = raw.trim();
+  if (t === '') return '';
+  const n = Number(t);
+  return Number.isFinite(n) ? n : '';
+}
+
 /**
  * Guided, kind-aware "add host" wizard: minimal required fields, catalog-driven
  * selects, and discovery (SSH first, PXE fallback) as the next step.
@@ -49,10 +62,10 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
   const [storage, setStorage] = useState('');
   const [os, setOs] = useState('');
   const [cluster, setCluster] = useState('');
-  const [cores, setCores] = useState(2);
-  const [memory, setMemory] = useState(4096);
-  const [disk, setDisk] = useState(40);
-  const [extraDisks, setExtraDisks] = useState<{ name: string; size: number }[]>([]);
+  const [cores, setCores] = useState<number | ''>(2);
+  const [memory, setMemory] = useState<number | ''>(4096);
+  const [disk, setDisk] = useState<number | ''>(40);
+  const [extraDisks, setExtraDisks] = useState<{ name: string; size: number | '' }[]>([]);
   const [gpu, setGpu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -98,7 +111,21 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
 
   const isVM = kind === 'vm';
   const needsMac = kind !== 'vm';
-  const canSubmit = name.trim().length > 0 && (isVM || ip.trim().length > 0 || mac.trim().length > 0) && !saving;
+  // Sizes are validated here rather than clamped while typing, so any number can
+  // be entered (and an intermediate empty value is allowed).
+  const coresNum = numValue(cores);
+  const memoryNum = numValue(memory);
+  const diskNum = numValue(disk);
+  const coresInvalid = coresNum < 1;
+  const memoryInvalid = memoryNum < 512;
+  const diskInvalid = diskNum < 10;
+  const extraDiskInvalid = extraDisks.some((d) => numValue(d.size) < 1);
+  const sizesValid = !isVM || (!coresInvalid && !memoryInvalid && !diskInvalid && !extraDiskInvalid);
+  const canSubmit =
+    name.trim().length > 0 &&
+    (isVM || ip.trim().length > 0 || mac.trim().length > 0) &&
+    sizesValid &&
+    !saving;
 
   const defaults = catalog.defaults ?? {};
   const networkOptions = useMemo(
@@ -135,11 +162,11 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
         ...(storage ? { storage } : {}),
         ...(os.trim() ? { os: os.trim() } : {}),
         ...(cluster.trim() ? { cluster: cluster.trim() } : {}),
-        ...(isVM ? { cores, memory, diskSizeGi: disk } : {}),
+        ...(isVM ? { cores: coresNum, memory: memoryNum, diskSizeGi: diskNum } : {}),
         ...(isVM && extraDisks.length > 0
           ? {
               disks: extraDisks.map((d) => ({
-                sizeGi: d.size,
+                sizeGi: numValue(d.size),
                 ...(d.name.trim() ? { name: d.name.trim() } : {}),
               })),
             }
@@ -345,14 +372,16 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                   inputAriaLabel="vCPU cores"
                   value={cores}
                   min={1}
-                  onMinus={() => setCores((v) => Math.max(1, v - 1))}
-                  onPlus={() => setCores((v) => v + 1)}
-                  onChange={(e) => {
-                    const n = Number((e.target as HTMLInputElement).value);
-                    if (!Number.isNaN(n)) setCores(Math.max(1, n));
-                  }}
+                  onMinus={() => setCores(Math.max(1, coresNum - 1))}
+                  onPlus={() => setCores(coresNum + 1)}
+                  onChange={(e) => setCores(parseNumInput((e.target as HTMLInputElement).value))}
                   style={{ maxWidth: '10rem' }}
                 />
+                {coresInvalid ? (
+                  <FormHelperText>
+                    <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>At least 1 vCPU.</span>
+                  </FormHelperText>
+                ) : null}
               </FormGroup>
               <FormGroup label="Memory (MiB)" fieldId="ah-memory">
                 <NumberInput
@@ -361,14 +390,19 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                   value={memory}
                   min={512}
                   step={512}
-                  onMinus={() => setMemory((v) => Math.max(512, v - 512))}
-                  onPlus={() => setMemory((v) => v + 512)}
-                  onChange={(e) => {
-                    const n = Number((e.target as HTMLInputElement).value);
-                    if (!Number.isNaN(n)) setMemory(Math.max(512, n));
-                  }}
+                  onMinus={() => setMemory(Math.max(512, memoryNum - 512))}
+                  onPlus={() => setMemory(memoryNum + 512)}
+                  onChange={(e) => setMemory(parseNumInput((e.target as HTMLInputElement).value))}
                   style={{ maxWidth: '10rem' }}
                 />
+                <FormHelperText>
+                  {memoryInvalid ? (
+                    <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>
+                      Enter at least 512 MiB.{' '}
+                    </span>
+                  ) : null}
+                  4096 MiB ≈ 4 GiB.
+                </FormHelperText>
               </FormGroup>
               <FormGroup label="Boot disk (GiB)" fieldId="ah-disk">
                 <NumberInput
@@ -377,14 +411,16 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                   value={disk}
                   min={10}
                   step={10}
-                  onMinus={() => setDisk((v) => Math.max(10, v - 10))}
-                  onPlus={() => setDisk((v) => v + 10)}
-                  onChange={(e) => {
-                    const n = Number((e.target as HTMLInputElement).value);
-                    if (!Number.isNaN(n)) setDisk(Math.max(10, n));
-                  }}
+                  onMinus={() => setDisk(Math.max(10, diskNum - 10))}
+                  onPlus={() => setDisk(diskNum + 10)}
+                  onChange={(e) => setDisk(parseNumInput((e.target as HTMLInputElement).value))}
                   style={{ maxWidth: '10rem' }}
                 />
+                {diskInvalid ? (
+                  <FormHelperText>
+                    <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>At least 10 GiB.</span>
+                  </FormHelperText>
+                ) : null}
               </FormGroup>
               <FormGroup label="Additional disks" fieldId="ah-extra-disks">
                 {extraDisks.map((d, i) => (
@@ -400,19 +436,19 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                       step={10}
                       onMinus={() =>
                         setExtraDisks((list) =>
-                          list.map((x, j) => (j === i ? { ...x, size: Math.max(1, x.size - 10) } : x)),
+                          list.map((x, j) =>
+                            j === i ? { ...x, size: Math.max(1, numValue(x.size) - 10) } : x,
+                          ),
                         )
                       }
                       onPlus={() =>
-                        setExtraDisks((list) => list.map((x, j) => (j === i ? { ...x, size: x.size + 10 } : x)))
+                        setExtraDisks((list) =>
+                          list.map((x, j) => (j === i ? { ...x, size: numValue(x.size) + 10 } : x)),
+                        )
                       }
                       onChange={(e) => {
-                        const n = Number((e.target as HTMLInputElement).value);
-                        if (!Number.isNaN(n)) {
-                          setExtraDisks((list) =>
-                            list.map((x, j) => (j === i ? { ...x, size: Math.max(1, n) } : x)),
-                          );
-                        }
+                        const v = parseNumInput((e.target as HTMLInputElement).value);
+                        setExtraDisks((list) => list.map((x, j) => (j === i ? { ...x, size: v } : x)));
                       }}
                       style={{ maxWidth: '9rem' }}
                     />
@@ -443,6 +479,11 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
                   Add disk
                 </Button>
                 <FormHelperText>
+                  {extraDiskInvalid ? (
+                    <span style={{ color: 'var(--pf-v5-global--danger-color--100)' }}>
+                      Each data disk needs at least 1 GiB.{' '}
+                    </span>
+                  ) : null}
                   Data disks follow the boot disk (vdb, vdc, …) and use the site storage pool. Up to 8.
                 </FormHelperText>
               </FormGroup>
