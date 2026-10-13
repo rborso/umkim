@@ -666,6 +666,7 @@ export async function createFleetCluster(body: FleetClusterCreate): Promise<Flee
       nodes: body.nodes,
       hubLanApi: body.hubLanApi,
       controlPlaneVip: body.controlPlaneVip,
+      autoProvision: body.autoProvision,
       providers: install
         ? {
             install,
