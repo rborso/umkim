@@ -647,26 +647,17 @@ export async function createFleetCluster(body: FleetClusterCreate): Promise<Flee
           keepIp: prov.kubevirtBridge.keepIp !== false,
         }
       : undefined;
+  // Spread the typed body so every API field the caller set is sent — listing
+  // fields by hand is how autoProvision went missing. The entries after it are
+  // the derived/defaulted values the API expects.
   return fleetSiteRequest<FleetCluster>('/clusters', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      clusterName: body.clusterName,
-      siteId: body.siteId,
-      bootstrapHost: body.bootstrapHost,
-      jumphost: body.jumphost,
+      ...body,
       minRootDiskGi: body.minRootDiskGi ?? 40,
       clusterRegion: body.clusterRegion || 'fleet',
-      clusterLabels: body.clusterLabels,
       clusterCapabilities: caps,
-      storage: body.storage,
-      edge: body.edge,
-      topology: body.topology,
-      networkMode: body.networkMode,
-      nodes: body.nodes,
-      hubLanApi: body.hubLanApi,
-      controlPlaneVip: body.controlPlaneVip,
-      autoProvision: body.autoProvision,
       providers: install
         ? {
             install,
