@@ -110,3 +110,68 @@ func TestBuildHostFilesMergePreservesExisting(t *testing.T) {
 		t.Fatal("new guest vm01 missing")
 	}
 }
+
+func TestBuildHostFilesVMWithDisks(t *testing.T) {
+	catalog := Catalog{
+		Storages: []StorageRef{{Name: "local_ssd"}},
+		Defaults: GuestDefaults{DiskGi: 40, Storage: "local_ssd"},
+	}
+	intent := HostIntent{
+		Kind: "vm", Name: "vm02", AnsibleHost: "172.16.10.61", Hypervisor: "virt04",
+		Disks: []HostDiskIntent{{SizeGi: 100}, {Name: "fast", SizeGi: 200, Storage: "local_ssd"}},
+	}
+	files, err := BuildHostFiles(map[string]string{}, intent, catalog)
+	if err != nil {
+		t.Fatalf("BuildHostFiles: %v", err)
+	}
+	hv := files["host_vars/vm02.yml"]
+	for _, want := range []string{
+		"  - name: bootdisk\n    disk: vda\n    bootdisk: true\n    device: 0\n",
+		"    size: 40\n",
+		"  - name: disk1\n    disk: vdb\n    device: 1\n",
+		"    size: 100\n",
+		"  - name: fast\n    disk: vdc\n    device: 2\n",
+		"    size: 200\n",
+	} {
+		if !strings.Contains(hv, want) {
+			t.Errorf("host_vars missing %q:\n%s", want, hv)
+		}
+	}
+	// YAIDAP takes disks[0] as the boot device, so the boot disk must come first.
+	if strings.Index(hv, "name: bootdisk") > strings.Index(hv, "name: disk1") {
+		t.Errorf("boot disk must precede data disks:\n%s", hv)
+	}
+	// Data disks must not claim bootdisk.
+	if strings.Contains(hv, "name: disk1\n    disk: vdb\n    bootdisk") {
+		t.Errorf("data disk marked as boot:\n%s", hv)
+	}
+}
+
+func TestBuildHostFilesRejectsBadDisks(t *testing.T) {
+	if _, err := BuildHostFiles(map[string]string{}, HostIntent{Kind: "vm", Name: "x", Disks: []HostDiskIntent{{}}}, Catalog{}); err == nil {
+		t.Fatal("want error for a disk with no size")
+	}
+	if _, err := BuildHostFiles(map[string]string{}, HostIntent{
+		Kind: "bare_metal", Name: "x", AnsibleHost: "172.16.10.9", Disks: []HostDiskIntent{{SizeGi: 10}},
+	}, Catalog{}); err == nil {
+		t.Fatal("want error for disks on a non-vm kind")
+	}
+	many := make([]HostDiskIntent, maxGuestDisks+1)
+	for i := range many {
+		many[i] = HostDiskIntent{SizeGi: 10}
+	}
+	if _, err := BuildHostFiles(map[string]string{}, HostIntent{Kind: "vm", Name: "x", Disks: many}, Catalog{}); err == nil {
+		t.Fatal("want error for too many disks")
+	}
+}
+
+// Generated inventory must match the repo's 2-space YAML convention.
+func TestBuildHostFilesUsesTwoSpaceIndent(t *testing.T) {
+	files, err := BuildHostFiles(map[string]string{}, HostIntent{Kind: "vm", Name: "vm03", Hypervisor: "virt01"}, Catalog{})
+	if err != nil {
+		t.Fatalf("BuildHostFiles: %v", err)
+	}
+	if !strings.Contains(files["guests.yml"], "guests:\n  hosts:\n    vm03:") {
+		t.Fatalf("guests.yml should nest with 2 spaces:\n%s", files["guests.yml"])
+	}
+}

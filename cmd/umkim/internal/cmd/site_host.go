@@ -70,6 +70,7 @@ func siteHostGetCmd() *cobra.Command {
 func siteHostAddCmd() *cobra.Command {
 	var kind, name, ip, mac, hypervisor, network, zone, storage, osFamily, cluster string
 	var cores, memory, disk int
+	var extraDisks []int
 	var gpu, pxe, discover bool
 	c := &cobra.Command{
 		Use:   "add [site]",
@@ -81,7 +82,8 @@ else is filled from the site catalog. Use --discover to chain discovery (SSH by
 default, PXE with --pxe).`,
 		Example: `  umkim site host add homelab --kind bare_metal --name bm01 --ip 172.16.10.50 --discover
   umkim site host add homelab --kind bare_metal --name bm02 --mac aa:bb:cc:dd:ee:ff --pxe
-  umkim site host add homelab --kind vm --name vm01 --hypervisor virt04 --cluster lab-ha-0`,
+  umkim site host add homelab --kind vm --name vm01 --hypervisor virt04 --cluster lab-ha-0
+  umkim site host add homelab --kind vm --name vm02 --hypervisor virt04 --disk 40 --extra-disk 100 --extra-disk 200`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			site := args[0]
@@ -107,6 +109,17 @@ default, PXE with --pxe).`,
 			}
 			if disk > 0 {
 				body["diskSizeGi"] = disk
+			}
+			if len(extraDisks) > 0 {
+				disks := make([]map[string]interface{}, 0, len(extraDisks))
+				for _, sz := range extraDisks {
+					if sz > 0 {
+						disks = append(disks, map[string]interface{}{"sizeGi": sz})
+					}
+				}
+				if len(disks) > 0 {
+					body["disks"] = disks
+				}
 			}
 			if gpu {
 				body["gpuPassthrough"] = true
@@ -157,6 +170,7 @@ default, PXE with --pxe).`,
 	c.Flags().IntVar(&cores, "cores", 0, "vCPU cores (VM)")
 	c.Flags().IntVar(&memory, "memory", 0, "memory in MiB (VM)")
 	c.Flags().IntVar(&disk, "disk", 0, "boot disk in GiB (VM)")
+	c.Flags().IntSliceVar(&extraDisks, "extra-disk", nil, "additional VM data disk in GiB, after the boot disk (repeatable)")
 	c.Flags().BoolVar(&gpu, "gpu", false, "GPU passthrough guest (VM)")
 	c.Flags().BoolVar(&pxe, "pxe", false, "PXE host (sets tempxe_discovery; discover_pxe with --discover)")
 	c.Flags().BoolVar(&discover, "discover", false, "chain discovery after adding (SSH, or PXE with --pxe)")
