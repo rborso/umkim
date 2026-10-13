@@ -197,7 +197,12 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
       <ErrorAlert error={error} />
       {result ? (
         <>
-          <Alert variant="success" isInline title={`Added ${name} to inventory`} style={{ marginBottom: '0.75rem' }}>
+          <Alert
+            variant="success"
+            isInline
+            title={isVM ? `Declared ${name} in inventory` : `Added ${name} to inventory`}
+            style={{ marginBottom: '0.75rem' }}
+          >
             <div style={{ fontSize: '0.85rem' }}>
               Wrote: <code>{result.paths.join(', ')}</code>
             </div>
@@ -214,34 +219,63 @@ export function SiteAddHostWizard({ siteName, isOpen, onClose, onCreated, defaul
             Next step
           </Title>
           <p style={{ fontSize: '0.9rem', margin: '0.25rem 0 0.5rem' }}>
-            Discover the host to populate host_vars, then promote the drafts via import preview on the
-            Provisioner inventory tab. SSH is non-destructive; PXE reimages the host.
+            {isVM ? (
+              <>
+                The guest is declared only — no VM exists yet. Review <code>host_vars/{name.trim()}.yml</code>{' '}
+                on the Provisioner inventory tab, then <strong>Provision</strong> to create the libvirt
+                domain.
+              </>
+            ) : (
+              <>
+                Discover the host to populate host_vars, then promote the drafts via import preview on the
+                Provisioner inventory tab. SSH is non-destructive; PXE reimages the host.{' '}
+                {kind === 'hypervisor'
+                  ? 'Prepare hypervisor runs on the Site hosts tab.'
+                  : 'Install bare metal runs on the Site hosts tab.'}
+              </>
+            )}
           </p>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <Button
-              variant="primary"
-              isLoading={nextBusy === 'Discover (SSH)'}
-              onClick={() =>
-                void runNext('Discover (SSH)', () =>
-                  provisionSiteHost(siteName, name.trim(), { action: 'discover' }),
-                )
-              }
-            >
-              Discover (SSH)
-            </Button>
-            {needsMac ? (
+            {isVM ? (
               <Button
-                variant="secondary"
-                isLoading={nextBusy === 'Discover (PXE)'}
+                variant="primary"
+                isLoading={nextBusy === 'Provision'}
                 onClick={() =>
-                  void runNext('Discover (PXE)', () =>
-                    provisionSiteHost(siteName, name.trim(), { action: 'discover_pxe', confirm: true }),
+                  void runNext('Provision', () =>
+                    provisionSiteHost(siteName, name.trim(), { action: 'create_vm' }),
                   )
                 }
               >
-                Discover (PXE)
+                Provision VM now
               </Button>
-            ) : null}
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  isLoading={nextBusy === 'Discover (SSH)'}
+                  onClick={() =>
+                    void runNext('Discover (SSH)', () =>
+                      provisionSiteHost(siteName, name.trim(), { action: 'discover' }),
+                    )
+                  }
+                >
+                  Discover (SSH)
+                </Button>
+                {needsMac ? (
+                  <Button
+                    variant="secondary"
+                    isLoading={nextBusy === 'Discover (PXE)'}
+                    onClick={() =>
+                      void runNext('Discover (PXE)', () =>
+                        provisionSiteHost(siteName, name.trim(), { action: 'discover_pxe', confirm: true }),
+                      )
+                    }
+                  >
+                    Discover (PXE)
+                  </Button>
+                ) : null}
+              </>
+            )}
             <Button
               variant="secondary"
               isLoading={nextBusy === 'Sync'}
