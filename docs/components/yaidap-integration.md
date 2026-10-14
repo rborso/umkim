@@ -393,17 +393,20 @@ progress (`Pending`, `WaitingGroup`, `Applying`, `Ready`, `Failed`).
 ### E. Cluster delete → application and VM cleanup (optional)
 
 ```text
-1. DELETE /clusters/{name}?cleanupApps=true&cleanupVms=true&cleanupVmDeclarations=true
+1. DELETE /clusters/{name}?cleanupApps=true&cleanupStorage=true&cleanupVms=true
 2. Uninstall each FleetApp on the cluster (Helm release + route + OIDC client)
-3. Hub teardown: OCM unjoin, ManifestWorks, WireGuard peers, edge/DNS entries
-4. For each cluster node that is a VM guest (one at a time):
+3. Delete job: remove the cluster's NFS export directory (cleanupStorage), then
+   the node detach or K3s reset
+4. Hub teardown: OCM unjoin, ManifestWorks, WireGuard peers, edge/DNS entries
+5. For each cluster node that is a VM guest (one at a time):
      destroy action → connector Job → guest Declared
-5. With cleanupVmDeclarations: drop guests.yml / host_vars / status entries
-6. FleetClusterJoin finalizer removed; cluster entry disappears from the API
+6. With cleanupVmDeclarations: drop guests.yml / host_vars / status entries
+7. FleetClusterJoin finalizer removed; cluster entry disappears from the API
 ```
 
 `cleanupApps` runs before the Kubernetes reset because the Helm uninstalls need
-the spoke reachable; it is independent of the Kubernetes/VM flags. VM cleanup
+the spoke reachable; the storage export is removed by the delete job while the
+nodes are still up. Both are independent of the Kubernetes/VM flags. VM cleanup
 needs `provider: yaidap` on the site — other providers record
 `vmCleanup.phase: Skipped`. The same intent is on the CLI
 (`umkim cluster delete --cleanup-apps --cleanup-vms [--cleanup-vm-declarations]`),
@@ -493,6 +496,7 @@ configured independently (`FleetSite.spec.jumphost`).
 | Confirm gate | `install_bm`, `discover_pxe`, `destroy`, `prepare_gpu_passthrough`, `prepare_hypervisor_gpu` require `confirm=true` |
 | Cluster delete VM cleanup | `cleanupVms` drives `destroy` (confirm is set by the controller) for the cluster's `kind: vm` guests only, after the Kubernetes reset; `cleanupVmDeclarations` then removes their inventory entries. Bare metal and hypervisors are never destroyed. |
 | Cluster delete app cleanup | `cleanupApps` uninstalls the cluster's applications (via their own finalizers) before the Kubernetes reset, so the Helm releases are removed while the spoke is reachable. A stuck uninstall is reported and left in `Deleting` rather than wedging the delete. |
+| Cluster delete storage cleanup | `cleanupStorage` deletes `<exportBase>/<clusterPath>` on the storage host from the cluster's bootstrap node. It is the only delete option that removes persistent data, and it is never implied by another flag. |
 | TempXE | Never arm PXE without confirm; connector always runs `tempxe_stop` after BM install / PXE discovery |
 | Mutual exclusion | One site provision action at a time; inventory sync blocked while sync job runs |
 | Hub schema boundary | Do **not** import YAIDAP `networks` / `uplinks` / `storages` / disk catalogs into Fleet CRDs — they stay in `group_vars` / `host_vars` |

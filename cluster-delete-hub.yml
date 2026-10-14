@@ -230,6 +230,17 @@
       changed_when: "'deleted' in fleet_cluster_delete_kc_secret.stdout"
       tags: [fleet_cluster_delete]
 
+- name: Fleet cluster delete | Remove cluster storage export (optional)
+  hosts: site_bootstrap
+  become: true
+  gather_facts: false
+  vars:
+    fleet_cluster_name: "{{ fleet_cluster_name | default(fleet_site_name) }}"
+  roles:
+    - role: fleet_cluster_storage
+      tasks_from: nfs_remove_export.yml
+  tags: [fleet_cluster_delete]
+
 - name: Fleet cluster delete | Node detach from fleet (default) or full K3s reset
   hosts: fleet_cluster_nodes
   become: true

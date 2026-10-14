@@ -231,7 +231,15 @@ func (r *AppReconciler) reconcileDelete(ctx context.Context, app *fleetv1alpha1.
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 	}
-	_ = r.Delete(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: appValuesCMName(app.Name), Namespace: app.Namespace}})
+	// Hub-side objects the app owned, none of which Helm or the chart knows about:
+	// the rendered values, the image map, and the directory bind credentials the
+	// controller keeps on the hub for the app's helm job to install on the spoke.
+	for _, name := range []string{appValuesCMName(app.Name), appImageMapCMName(app.Name)} {
+		_ = r.Delete(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: app.Namespace}})
+	}
+	_ = r.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name: appDirectoryBindSecretName(app.Name), Namespace: app.Namespace,
+	}})
 	llamaDeleted := llm.IsLlamaChart(app.Spec.Chart)
 	controllerutil.RemoveFinalizer(app, fleetv1alpha1.FleetAppFinalizer)
 	if err := r.Update(ctx, app); err != nil {
@@ -380,6 +388,13 @@ func (r *AppReconciler) substitutePlaceholders(ctx context.Context, app *fleetv1
 	return data, nil
 }
 
+// appDirectoryBindSecretName is the hub Secret holding an app's directory bind
+// credentials; the app's helm job installs the same name into the app namespace
+// on the spoke.
+func appDirectoryBindSecretName(appName string) string {
+	return appName + "-lldap-bind"
+}
+
 // directoryLDAPHost is the in-cluster LDAP endpoint of a cluster's own directory
 // (the ingress-auth chart deploys LLDAP into this namespace on the cluster).
 const directoryLDAPHost = "lldap.fleet-ingress-auth.svc.cluster.local"
@@ -400,7 +415,7 @@ func (r *AppReconciler) ensureDirectoryBindSecret(ctx context.Context, app *flee
 		return "", nil
 	}
 	sum := sha256.Sum256([]byte(jwt))
-	name := app.Name + "-lldap-bind"
+	name := appDirectoryBindSecretName(app.Name)
 	want := map[string]string{
 		"LLDAP_LDAP_USER_PASS": hex.EncodeToString(sum[:]),
 		"username":             "svc-bind",

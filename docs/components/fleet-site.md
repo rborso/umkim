@@ -55,6 +55,7 @@ cluster you intend to keep is a legitimate operation:
 | Flag (API / CLI / flow) | Effect |
 |-------------------------|--------|
 | `cleanupApps` / `--cleanup-apps` / `fleet_flow_cleanup_apps` | uninstall the cluster's applications through their own finalizers (Helm release, route, OIDC client); independent of the others |
+| `cleanupStorage` / `--cleanup-storage` / `fleet_flow_cleanup_storage` | delete the cluster's NFS export directory on the storage host — **this deletes data**; independent of the others |
 | `cleanupKubernetes` / `--cleanup-kubernetes` / `fleet_flow_cleanup_kubernetes` | reset K3s on the nodes |
 | `cleanupVms` / `--cleanup-vms` / `fleet_flow_cleanup_vms` | `destroy` each cluster node that is a YAIDAP VM guest; implies `cleanupKubernetes` |
 | `cleanupVmDeclarations` / `--cleanup-vm-declarations` / `fleet_flow_cleanup_vm_declarations` | also drop the destroyed guests from the site inventory (`guests.yml`, `host_vars`, status); implies `cleanupVms` |
@@ -65,10 +66,13 @@ leaves behind:
 1. **Applications** first, while the spoke is reachable — deleting the
    `FleetApp` objects lets the app reconciler run the Helm uninstall, drop the
    route and OIDC client, and only then release the object.
-2. **Kubernetes reset** (the Ansible delete job) — needs the nodes reachable.
-3. **VM destroy** — the `destroy` guard only permits a guest whose
+2. **Storage export** — a task in the delete job that runs on the cluster's
+   bootstrap node (nfs-utils present, storage server reachable) and removes
+   `<exportBase>/<clusterPath>`. It runs before the node leaves the fleet.
+3. **Kubernetes reset** (the same Ansible delete job) — needs the nodes reachable.
+4. **VM destroy** — the `destroy` guard only permits a guest whose
    `FleetClusterJoin` is `Deleting`, so it runs before the finalizer is removed.
-4. **VM declarations** last.
+5. **VM declarations** last.
 
 Progress is mirrored on the `FleetClusterJoin` status (`appsCleanup` and
 `vmCleanup`: `phase`, `hosts`/`apps`, `completed`, `failures`) so the console and
@@ -84,6 +88,13 @@ failing it is recorded in `failures` (and left in `Deleting`, or in the inventor
 respectively) while the cluster delete still completes — a broken spoke or
 hypervisor must not leave an undeletable cluster. Without `cleanupVmDeclarations`
 the guests stay `Declared` in the inventory, so **Provision** can recreate them.
+
+Every per-cluster hub object goes with the cluster: the bootstrap and ansible-ssh
+secrets, the per-cluster `fleet-ingress-auth-<cluster>` secret, the spoke
+`fleet-kubeconfig-<cluster>` secret, the cluster inventory ConfigMap, and
+cluster-scoped jobs. Deleting an app likewise removes its values ConfigMap, its
+image-map ConfigMap, and the directory bind credentials the controller keeps for
+its helm job.
 
 ## Site ingress
 
