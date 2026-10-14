@@ -560,11 +560,7 @@ func (s *Server) commitProvisionAction(ctx context.Context, fs *fleetv1alpha1.Fl
 }
 
 func provisionActionBusy(fs *fleetv1alpha1.FleetSite) bool {
-	if fs.Status.Provision == nil || fs.Status.Provision.Current == nil {
-		return false
-	}
-	p := fs.Status.Provision.Current.Phase
-	return p == fleetv1alpha1.ProvisionPhasePending || p == fleetv1alpha1.ProvisionPhaseRunning
+	return siteprovision.ActionBusy(fs)
 }
 
 func findProvisionAction(fs *fleetv1alpha1.FleetSite, id string) (fleetv1alpha1.SiteProvisionActionRecord, bool) {

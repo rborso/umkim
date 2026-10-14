@@ -262,6 +262,8 @@ full kickstart install).
   blocked when the guest is a cluster member and a live `FleetClusterJoin` exists
   (unless the join is deleting). On success the hub sets guest phase **Declared**
   (not Ready), clears cluster sub-status, and keeps inventory for reprovision.
+  Cluster delete can drive this for every node of a cluster automatically — see
+  [fleet-site.md](fleet-site.md) (`cleanupVms` / `cleanupVmDeclarations`).
 
 ### YAIDAP integration contract (`YAIDAP_RESULT`)
 
@@ -388,6 +390,23 @@ When `group_vars/{cluster}.yml` has `autoApply: true` and all member guests reac
 Status fields under each guest's `cluster` key in `_meta/status.json` mirror apply
 progress (`Pending`, `WaitingGroup`, `Applying`, `Ready`, `Failed`).
 
+### E. Cluster delete → VM cleanup (optional)
+
+```text
+1. DELETE /clusters/{name}?cleanupVms=true[&cleanupVmDeclarations=true]
+2. Hub teardown: OCM unjoin, ManifestWorks, WireGuard peers, edge/DNS entries
+3. For each cluster node that is a VM guest (one at a time):
+     destroy action → connector Job → guest Declared
+4. With cleanupVmDeclarations: drop guests.yml / host_vars / status entries
+5. FleetClusterJoin finalizer removed; cluster entry disappears from the API
+```
+
+Requires `provider: yaidap` on the site; other providers record
+`vmCleanup.phase: Skipped`. The same intent is on the CLI
+(`umkim cluster delete --cleanup-vms [--cleanup-vm-declarations]`), the console
+delete dialog, and `playbooks/flows/cluster-delete.yml`
+(`fleet_flow_cleanup_vms`, `fleet_flow_cleanup_vm_declarations`).
+
 ## Job execution
 
 ```text
@@ -468,6 +487,7 @@ configured independently (`FleetSite.spec.jumphost`).
 | Rule | Detail |
 |------|--------|
 | Confirm gate | `install_bm`, `discover_pxe`, `destroy`, `prepare_gpu_passthrough`, `prepare_hypervisor_gpu` require `confirm=true` |
+| Cluster delete VM cleanup | `cleanupVms` drives `destroy` (confirm is set by the controller) for the cluster's `kind: vm` guests only, after the Kubernetes reset; `cleanupVmDeclarations` then removes their inventory entries. Bare metal and hypervisors are never destroyed. |
 | TempXE | Never arm PXE without confirm; connector always runs `tempxe_stop` after BM install / PXE discovery |
 | Mutual exclusion | One site provision action at a time; inventory sync blocked while sync job runs |
 | Hub schema boundary | Do **not** import YAIDAP `networks` / `uplinks` / `storages` / disk catalogs into Fleet CRDs — they stay in `group_vars` / `host_vars` |

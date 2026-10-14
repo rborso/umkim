@@ -367,6 +367,33 @@ func (in *FleetClusterJoinStatus) DeepCopyInto(out *FleetClusterJoinStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.VmCleanup != nil {
+		in, out := &in.VmCleanup, &out.VmCleanup
+		*out = new(ClusterVmCleanupStatus)
+		(*in).DeepCopyInto(*out)
+	}
+}
+
+func (in *ClusterVmCleanupStatus) DeepCopyInto(out *ClusterVmCleanupStatus) {
+	*out = *in
+	if in.Hosts != nil {
+		out.Hosts = append([]string(nil), in.Hosts...)
+	}
+	if in.Completed != nil {
+		out.Completed = append([]string(nil), in.Completed...)
+	}
+	if in.Failures != nil {
+		out.Failures = append([]string(nil), in.Failures...)
+	}
+}
+
+func (in *ClusterVmCleanupStatus) DeepCopy() *ClusterVmCleanupStatus {
+	if in == nil {
+		return nil
+	}
+	out := new(ClusterVmCleanupStatus)
+	in.DeepCopyInto(out)
+	return out
 }
 
 func (in *ClusterNodeOperationStatus) DeepCopyInto(out *ClusterNodeOperationStatus) {

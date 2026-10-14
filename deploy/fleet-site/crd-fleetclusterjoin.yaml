@@ -309,6 +309,37 @@ spec:
                 deletionStartedAt:
                   type: string
                   format: date-time
+                vmCleanup:
+                  type: object
+                  description: >-
+                    Optional destroy of the cluster's YAIDAP VM guests (and removal of
+                    their site inventory declarations) during cluster delete.
+                  properties:
+                    phase:
+                      type: string
+                      enum:
+                        - Destroying
+                        - Done
+                        - Failed
+                        - Skipped
+                    message:
+                      type: string
+                    hosts:
+                      type: array
+                      items:
+                        type: string
+                    completed:
+                      type: array
+                      items:
+                        type: string
+                    actionID:
+                      type: string
+                    jobName:
+                      type: string
+                    failures:
+                      type: array
+                      items:
+                        type: string
                 managedClusterAvailable:
                   type: boolean
                 storage:

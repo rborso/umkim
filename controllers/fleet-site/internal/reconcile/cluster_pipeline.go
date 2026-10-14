@@ -49,7 +49,7 @@ func (r *ClusterJoinReconciler) reconcileClusterAutoProvision(ctx context.Contex
 	case fleetv1alpha1.JoinPhaseProvisioning:
 		// Surface the cluster provision Job in the site provision history too.
 		if fcj.Status.ProvisionJobName != "" && fcj.Status.ProvisionActionID == "" {
-			id := pipelineActionID()
+			id := newActionID()
 			if err := r.commitPipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionProvision, fcj.Status.ProvisionJobName, id, "Provision cluster (hub finalize)"); err != nil {
 				return ctrl.Result{}, true, err
 			}
@@ -214,7 +214,7 @@ func (r *ClusterJoinReconciler) pipelineHostsReady(ctx context.Context, fcj *fle
 func (r *ClusterJoinReconciler) startPipelineCreateVM(ctx context.Context, site *fleetv1alpha1.FleetSite, host string) error {
 	now := metav1.NewTime(time.Now().UTC())
 	rec := fleetv1alpha1.SiteProvisionActionRecord{
-		ID:        pipelineActionID(),
+		ID:        newActionID(),
 		Action:    fleetv1alpha1.ProvisionActionCreateVM,
 		Subject:   host,
 		Provider:  fleetv1alpha1.ProvisionProviderYaidap,
@@ -267,7 +267,7 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 	// by status.bootstrapActionID) so a re-run shows a new operation, not the previous
 	// run's, with logs next to the create_vm entries.
 	if fcj.Status.BootstrapActionID == "" {
-		id := pipelineActionID()
+		id := newActionID()
 		if err := r.commitPipelineAction(ctx, fcj, fleetv1alpha1.ProvisionActionBootstrap, jobName, id, "Bootstrap via jumphost"); err != nil {
 			return ctrl.Result{}, true, err
 		}
@@ -338,7 +338,8 @@ func (r *ClusterJoinReconciler) finalizePipelineAction(ctx context.Context, fcj 
 	_ = siteprovision.CommitAction(ctx, r.Client, site, rec, true)
 }
 
-func pipelineActionID() string {
+// newActionID returns a short random id for a site provision action record.
+func newActionID() string {
 	var b [6]byte
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
