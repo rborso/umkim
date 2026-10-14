@@ -26,6 +26,14 @@ npm test
 npm run test:e2e
 ```
 
+A source change reaches the console **only after the image is rebuilt and the
+deployment rolled**: `harbor.yml --tags harbor_push_fleet` with the
+`umkim-console` entry, then `hub-install.yml --tags fleet_console_helm`. The
+`npm run build` above is for local review — `dist/` is gitignored and the image
+rebuilds it in-container, so a locally-passing test suite says nothing about what
+the cluster is serving. Check the served bundle before reporting a UI change as
+done (`kubectl exec deploy/umkim-console -- grep -l "<new string>" /usr/share/nginx/html/fleet/assets/*.js`).
+
 **Apps → Install** supports a llama-cpp-helm values profile picker (hub-merged YAML)
 and **Edit** patches version/values on existing FleetApps. **Infrastructure → LLM**
 can optionally register llama-cpp installs for hub LiteLLM (install modal checkbox)
