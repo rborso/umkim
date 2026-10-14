@@ -250,6 +250,22 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 		return r.failClusterDelete(ctx, fcj, err)
 	}
 
+	// Optional last stage: destroy the cluster's YAIDAP VM guests (and, when
+	// asked, drop their inventory declarations). Runs after the hub is detached
+	// and before the finalizer is removed, so a failure leaves the cluster
+	// deletable on the next attempt rather than a wedged object.
+	done, wait, err := r.reconcileClusterDeleteVms(ctx, fcj)
+	if err != nil {
+		return r.failClusterDelete(ctx, fcj, err)
+	}
+	if !done {
+		fcj.Status.Message = vmCleanupMessage(fcj)
+		if err := r.Status().Update(ctx, fcj); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: wait}, nil
+	}
+
 	controllerutil.RemoveFinalizer(fcj, fleetv1alpha1.ClusterCleanupFinalizer)
 	if err := r.Update(ctx, fcj); err != nil {
 		return ctrl.Result{}, err

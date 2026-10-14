@@ -18,7 +18,34 @@ import (
 
 const (
 	annotationCleanupKubernetes = "fleet.umkim.com/cleanup-kubernetes"
+	annotationCleanupVms        = "fleet.umkim.com/cleanup-vms"
+	annotationCleanupVmDecls    = "fleet.umkim.com/cleanup-vm-declarations"
 )
+
+// clusterDeleteOptions captures the opt-in cleanup levels for a cluster delete.
+// Destroying the VMs that run the cluster implies the Kubernetes reset, and
+// removing the guest declarations implies destroying the VMs — each level needs
+// the one below it.
+type clusterDeleteOptions struct {
+	cleanupKubernetes     bool
+	cleanupVms            bool
+	cleanupVmDeclarations bool
+}
+
+func parseClusterDeleteOptions(r *http.Request) clusterDeleteOptions {
+	opts := clusterDeleteOptions{
+		cleanupKubernetes:     queryParamBool(r, "cleanupKubernetes"),
+		cleanupVms:            queryParamBool(r, "cleanupVms"),
+		cleanupVmDeclarations: queryParamBool(r, "cleanupVmDeclarations"),
+	}
+	if opts.cleanupVmDeclarations {
+		opts.cleanupVms = true
+	}
+	if opts.cleanupVms {
+		opts.cleanupKubernetes = true
+	}
+	return opts
+}
 
 func queryParamBool(r *http.Request, key string) bool {
 	v := strings.TrimSpace(r.URL.Query().Get(key))
@@ -57,8 +84,7 @@ func (s *Server) handleDeleteCluster(ctx context.Context, w http.ResponseWriter,
 				}
 			}
 		}
-		cleanupKubernetes := queryParamBool(r, "cleanupKubernetes")
-		if err := s.markClusterDeleting(ctx, fcj, cleanupKubernetes); err != nil {
+		if err := s.markClusterDeleting(ctx, fcj, parseClusterDeleteOptions(r)); err != nil {
 			if apierrors.IsConflict(err) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
@@ -95,7 +121,7 @@ func (s *Server) handleDeleteCluster(ctx context.Context, w http.ResponseWriter,
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) markClusterDeleting(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, cleanupKubernetes bool) error {
+func (s *Server) markClusterDeleting(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, opts clusterDeleteOptions) error {
 	key := client.ObjectKeyFromObject(fcj)
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var latest fleetv1alpha1.FleetClusterJoin
@@ -109,11 +135,19 @@ func (s *Server) markClusterDeleting(ctx context.Context, fcj *fleetv1alpha1.Fle
 		if !controllerutil.ContainsFinalizer(&latest, fleetv1alpha1.ClusterCleanupFinalizer) {
 			controllerutil.AddFinalizer(&latest, fleetv1alpha1.ClusterCleanupFinalizer)
 		}
-		if cleanupKubernetes {
+		if opts.cleanupKubernetes || opts.cleanupVms || opts.cleanupVmDeclarations {
 			if latest.Annotations == nil {
 				latest.Annotations = map[string]string{}
 			}
+		}
+		if opts.cleanupKubernetes {
 			latest.Annotations[annotationCleanupKubernetes] = "true"
+		}
+		if opts.cleanupVms {
+			latest.Annotations[annotationCleanupVms] = "true"
+		}
+		if opts.cleanupVmDeclarations {
+			latest.Annotations[annotationCleanupVmDecls] = "true"
 		}
 		if err := s.Client.Patch(ctx, &latest, client.MergeFrom(metaOrig)); err != nil {
 			return err

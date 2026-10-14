@@ -856,10 +856,16 @@ export async function deleteFleetSite(name: string): Promise<void> {
 
 export async function deleteFleetCluster(
   name: string,
-  opts?: { cleanupKubernetes?: boolean },
+  opts?: { cleanupKubernetes?: boolean; cleanupVms?: boolean; cleanupVmDeclarations?: boolean },
 ): Promise<void> {
   const q = new URLSearchParams();
   if (opts?.cleanupKubernetes) q.set('cleanupKubernetes', '1');
+  if (opts?.cleanupVms || opts?.cleanupVmDeclarations) {
+    // Destroying the VMs implies resetting Kubernetes first.
+    q.set('cleanupKubernetes', '1');
+    q.set('cleanupVms', '1');
+  }
+  if (opts?.cleanupVmDeclarations) q.set('cleanupVmDeclarations', '1');
   const qs = q.toString();
   const path = '/clusters/' + encodeURIComponent(name) + (qs ? '?' + qs : '');
   try {
@@ -878,6 +884,11 @@ export function fleetClusterIsConsoleProvisioned(c: FleetCluster): boolean {
     c.provisioning_mode === 'hub_job' ||
     (!!c.provisioning_phase && c.provisioning_phase !== 'Ready')
   );
+}
+
+/** YAIDAP-managed site: its VMs can be destroyed on cluster delete. */
+export function fleetSiteIsYaidap(site?: FleetSite | null): boolean {
+  return site?.spec?.provision?.provider === 'yaidap';
 }
 
 export function fleetClusterIsDeleting(c: FleetCluster): boolean {

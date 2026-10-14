@@ -91,3 +91,59 @@ func TestDeleteClusterAlreadyDeleting(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+// Destroying the site VMs implies the Kubernetes reset, and removing the guest
+// declarations implies destroying the VMs: each level needs the one below it.
+func TestDeleteClusterVmCleanupImpliesLowerLevels(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		query string
+		k8s   bool
+		vms   bool
+		decls bool
+	}{
+		{name: "vms only", query: "?cleanupVms=1", k8s: true, vms: true},
+		{name: "declarations only", query: "?cleanupVmDeclarations=1", k8s: true, vms: true, decls: true},
+		{name: "all three", query: "?cleanupKubernetes=1&cleanupVms=1&cleanupVmDeclarations=1", k8s: true, vms: true, decls: true},
+		{name: "none", query: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := "fleet-console"
+			fcj := &fleetv1alpha1.FleetClusterJoin{
+				ObjectMeta: metav1.ObjectMeta{Name: "lab-ha-0", Namespace: ns},
+				Spec:       fleetv1alpha1.FleetClusterJoinSpec{ClusterName: "lab-ha-0", SiteId: "homelab"},
+				Status:     fleetv1alpha1.FleetClusterJoinStatus{Phase: fleetv1alpha1.JoinPhaseReady},
+			}
+			s := &Server{
+				Client: fake.NewClientBuilder().
+					WithScheme(testClusterPatchScheme(t)).
+					WithObjects(fcj).
+					WithStatusSubresource(&fleetv1alpha1.FleetClusterJoin{}).
+					Build(),
+				Cfg: config.Config{Namespace: ns, RequireIdentity: false, ManagementClusterName: "management"},
+			}
+			req := httptest.NewRequest(http.MethodDelete, "/api/v1alpha1/clusters/lab-ha-0"+tc.query, nil)
+			rec := httptest.NewRecorder()
+			s.handleDeleteCluster(context.Background(), rec, req, "lab-ha-0")
+			if rec.Code != http.StatusAccepted {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			var got fleetv1alpha1.FleetClusterJoin
+			if err := s.Client.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: "lab-ha-0"}, &got); err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range []struct {
+				key string
+				set bool
+			}{
+				{annotationCleanupKubernetes, tc.k8s},
+				{annotationCleanupVms, tc.vms},
+				{annotationCleanupVmDecls, tc.decls},
+			} {
+				if v := got.Annotations[want.key] == "true"; v != want.set {
+					t.Fatalf("%s=%q want set=%v", want.key, got.Annotations[want.key], want.set)
+				}
+			}
+		})
+	}
+}

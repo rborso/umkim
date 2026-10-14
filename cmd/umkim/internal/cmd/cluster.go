@@ -187,7 +187,7 @@ func clusterCreateCmd() *cobra.Command {
 }
 
 func clusterDeleteCmd() *cobra.Command {
-	var cleanupK8s, force, wait bool
+	var cleanupK8s, cleanupVms, cleanupVmDecls, force, wait bool
 	var waitTimeout time.Duration
 	var waitInterval time.Duration
 	c := &cobra.Command{
@@ -200,6 +200,14 @@ func clusterDeleteCmd() *cobra.Command {
 			q := map[string]string{}
 			if cleanupK8s {
 				q["cleanupKubernetes"] = "true"
+			}
+			if cleanupVms || cleanupVmDecls {
+				// Destroying the VMs implies resetting Kubernetes first.
+				q["cleanupKubernetes"] = "true"
+				q["cleanupVms"] = "true"
+			}
+			if cleanupVmDecls {
+				q["cleanupVmDeclarations"] = "true"
 			}
 			if force {
 				q["force"] = "true"
@@ -233,6 +241,8 @@ func clusterDeleteCmd() *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&cleanupK8s, "cleanup-kubernetes", false, "Run Kubernetes cleanup on spoke nodes")
+	c.Flags().BoolVar(&cleanupVms, "cleanup-vms", false, "Also destroy the site VMs backing the cluster (implies --cleanup-kubernetes)")
+	c.Flags().BoolVar(&cleanupVmDecls, "cleanup-vm-declarations", false, "Also remove the destroyed VMs from the site inventory (implies --cleanup-vms)")
 	c.Flags().BoolVar(&force, "force", false, "Force delete while provisioning")
 	c.Flags().BoolVar(&wait, "wait", false, "Poll until the cluster is removed from the API")
 	c.Flags().DurationVar(&waitTimeout, "timeout", 90*time.Minute, "With --wait, overall timeout")

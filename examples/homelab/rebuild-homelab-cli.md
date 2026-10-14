@@ -73,11 +73,19 @@ Expected long steps: `virt03 install_bm`, HA `create_vm` ×4, HA `wait Ready` (u
 
 ```bash
 umkim whoami
-umkim cluster delete lab-single-0 --cleanup-kubernetes || true
-umkim cluster delete lab-ha-0 --cleanup-kubernetes || true
+umkim cluster delete lab-single-0 --cleanup-vms --cleanup-vm-declarations || true
+umkim cluster delete lab-ha-0 --cleanup-vms --cleanup-vm-declarations || true
 ```
 
+On a YAIDAP site these flags destroy the guest VMs and drop their inventory
+entries, so the manual virsh sweep below is only needed for guests that YAIDAP
+does not manage.
+
 ### Phase 1 — Ad-hoc virsh cleanup (all guest hypervisors)
+
+Only for guests the hub does not know about (for example leftovers from a
+cluster created outside the YAIDAP inventory); `--cleanup-vms` already removed
+the managed ones.
 
 **Do not** run on virt03 (`172.16.10.4`); it is reinstalled via TempXE later.
 

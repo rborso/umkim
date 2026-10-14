@@ -63,6 +63,12 @@ export interface FleetSiteSpec {
   minRootDiskGi?: number;
   clusterCapabilities?: Record<string, boolean>;
   gpu?: boolean;
+  provision?: {
+    provider?: 'noop' | 'yaidap';
+    jumphost?: string;
+    inventoryPath?: string;
+    yaidapRoot?: string;
+  };
   storage?: {
     backend?: 'local_path' | 'nfs_external';
     minDataDiskGi?: number;

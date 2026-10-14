@@ -73,7 +73,9 @@ hub Jobs after partial success (see [components/fleet-site.md](components/fleet-
 Cluster deletion defaults to **detach**:
 it removes hub-managed resources while preserving the cluster and workloads
 unless an operator explicitly requests Kubernetes cleanup
-(`cleanupKubernetes=true` on delete).
+(`cleanupKubernetes=true` on delete). On a YAIDAP site the delete can also
+destroy the cluster's guest VMs (`cleanupVms=true`) and drop their inventory
+declarations (`cleanupVmDeclarations=true`).
 
 ## Hub independence
 

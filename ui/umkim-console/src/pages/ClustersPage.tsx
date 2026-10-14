@@ -30,6 +30,7 @@ import {
   fleetClusterPhase,
   fleetDefaultWorkloadSiteId,
   fleetSiteById,
+  fleetSiteIsYaidap,
   fleetSiteEffectiveId,
   fleetSiteIsManagement,
   fleetSiteLabelForId,
@@ -144,6 +145,8 @@ export function ClustersPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<unknown>(null);
   const [deleteCleanupKubernetes, setDeleteCleanupKubernetes] = useState(false);
+  const [deleteCleanupVms, setDeleteCleanupVms] = useState(false);
+  const [deleteCleanupVmDecls, setDeleteCleanupVmDecls] = useState(false);
   const [localPathEnabled, setLocalPathEnabled] = useState(true);
   const [nfsLocalEnabled, setNfsLocalEnabled] = useState(false);
   const [nfsEnabled, setNfsEnabled] = useState(false);
@@ -347,10 +350,15 @@ export function ClustersPage() {
   const deleteConsoleProvisioned = deleteTarget
     ? fleetClusterIsConsoleProvisioned(deleteTarget)
     : false;
+  const deleteYaidapSite = fleetSiteIsYaidap(
+    deleteTarget ? fleetSiteById(sites, deleteTarget.site) : null,
+  );
 
   const openDelete = (c: FleetCluster) => {
     setDeleteTarget(c);
     setDeleteCleanupKubernetes(false);
+    setDeleteCleanupVms(false);
+    setDeleteCleanupVmDecls(false);
     setDeleteError(null);
     setDeleteOpen(true);
   };
@@ -362,6 +370,8 @@ export function ClustersPage() {
     try {
       await deleteFleetCluster(deleteTarget.name, {
         cleanupKubernetes: deleteConsoleProvisioned && deleteCleanupKubernetes,
+        cleanupVms: deleteConsoleProvisioned && deleteCleanupVms,
+        cleanupVmDeclarations: deleteConsoleProvisioned && deleteCleanupVmDecls,
       });
       setDeleteOpen(false);
       setDeleteTarget(null);
@@ -820,6 +830,38 @@ export function ClustersPage() {
             <strong>Warning:</strong> this is a fleet inventory spoke; deleting it removes OCM
             registration for the whole spoke.
           </p>
+        )}
+        {deleteConsoleProvisioned && deleteYaidapSite && (
+          <>
+            <LabeledField
+              label="Destroy the site VMs"
+              fieldId="deleteCleanupVms"
+              help={getFieldHelp('clusterDelete.cleanupVms')}
+            >
+              <Checkbox
+                id="deleteCleanupVms"
+                label="Destroy the site VMs"
+                isChecked={deleteCleanupVms}
+                onChange={(_e, checked) => setDeleteCleanupVms(checked)}
+                data-testid="cluster-delete-cleanup-vms"
+              />
+            </LabeledField>
+            {deleteCleanupVms && (
+              <LabeledField
+                label="Also remove the VMs from the site inventory"
+                fieldId="deleteCleanupVmDecls"
+                help={getFieldHelp('clusterDelete.cleanupVmDeclarations')}
+              >
+                <Checkbox
+                  id="deleteCleanupVmDecls"
+                  label="Also remove the VMs from the site inventory"
+                  isChecked={deleteCleanupVmDecls}
+                  onChange={(_e, checked) => setDeleteCleanupVmDecls(checked)}
+                  data-testid="cluster-delete-cleanup-vm-declarations"
+                />
+              </LabeledField>
+            )}
+          </>
         )}
       </Modal>
 

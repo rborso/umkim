@@ -27,6 +27,13 @@ const (
 	StoragePhaseApplied  = "Applied"
 	StoragePhaseFailed   = "Failed"
 
+	// VmCleanup phases for the optional destroy of a cluster's YAIDAP VM guests
+	// during cluster delete.
+	VmCleanupPhaseDestroying = "Destroying"
+	VmCleanupPhaseDone       = "Done"
+	VmCleanupPhaseFailed     = "Failed"
+	VmCleanupPhaseSkipped    = "Skipped"
+
 	ClusterCleanupFinalizer = "fleet.umkim.com/cluster-cleanup"
 
 	NodeRoleControl = "control"
@@ -275,6 +282,22 @@ type FleetClusterJoinStatus struct {
 	Acme                    FleetClusterJoinAcmeStatus        `json:"acme,omitempty"`
 	NodeOperation           *ClusterNodeOperationStatus       `json:"nodeOperation,omitempty"`
 	NodeOperationHistory    []ClusterNodeOperationRecord      `json:"nodeOperationHistory,omitempty"`
+	VmCleanup               *ClusterVmCleanupStatus           `json:"vmCleanup,omitempty"`
+}
+
+// ClusterVmCleanupStatus tracks the optional destroy of a cluster's YAIDAP VM
+// guests — and, when asked, removal of their site inventory declarations — as
+// the final stage of cluster delete. Hosts is the stable, ordered work list
+// derived from the cluster nodes; Completed accumulates finished hosts so a
+// requeue resumes instead of restarting.
+type ClusterVmCleanupStatus struct {
+	Phase     string   `json:"phase,omitempty"`
+	Message   string   `json:"message,omitempty"`
+	Hosts     []string `json:"hosts,omitempty"`
+	Completed []string `json:"completed,omitempty"`
+	ActionID  string   `json:"actionID,omitempty"`
+	JobName   string   `json:"jobName,omitempty"`
+	Failures  []string `json:"failures,omitempty"`
 }
 
 func (s *FleetClusterJoinSpec) K8sProviderName(clusterName string) string {

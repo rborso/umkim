@@ -3,6 +3,10 @@
 #
 # Default: detach from fleet (keeps K3s + user workloads).
 # Set fleet_flow_cleanup_kubernetes=true to reset K3s on all nodes.
+# Set fleet_flow_cleanup_vms=true to also destroy the site VMs backing the cluster
+# (YAIDAP sites only; implies the Kubernetes reset).
+# Set fleet_flow_cleanup_vm_declarations=true to also drop the destroyed guests
+# from the site inventory (implies fleet_flow_cleanup_vms).
 #
 #   ansible-playbook $INV playbooks/flows/cluster-delete.yml \
 #     -e fleet_flow_cluster_name=lab-gpu-0 \
@@ -26,11 +30,22 @@
         that:
           - fleet_flow_cluster_name | length > 0
 
+    - name: Build delete query
+      ansible.builtin.set_fact:
+        fleet_flow_delete_query: >-
+          {{ ['cleanupKubernetes=true' if (fleet_flow_cleanup_kubernetes | default(false) | bool
+              or fleet_flow_cleanup_vms | default(false) | bool
+              or fleet_flow_cleanup_vm_declarations | default(false) | bool) else '',
+              'cleanupVms=true' if (fleet_flow_cleanup_vms | default(false) | bool
+              or fleet_flow_cleanup_vm_declarations | default(false) | bool) else '',
+              'cleanupVmDeclarations=true' if (fleet_flow_cleanup_vm_declarations | default(false) | bool) else '']
+             | select('!=', '') | join('&') }}
+
     - name: Build delete URL
       ansible.builtin.set_fact:
         fleet_flow_delete_url: >-
           {{ fleet_flow_api_url | default(_flow_api_default) }}/clusters/{{ fleet_flow_cluster_name }}{{
-            '?cleanupKubernetes=true' if (fleet_flow_cleanup_kubernetes | default(false) | bool) else ''
+            ('?' ~ fleet_flow_delete_query) if (fleet_flow_delete_query | length > 0) else ''
           }}
 
     - name: DELETE /clusters/{name}
@@ -59,5 +74,12 @@
       ansible.builtin.debug:
         msg: >-
           Cluster {{ fleet_flow_cluster_name }} deleted{{
-            ' (K3s reset on nodes)' if (fleet_flow_cleanup_kubernetes | default(false) | bool) else ''
+            ' (K3s reset on nodes)' if (fleet_flow_cleanup_kubernetes | default(false) | bool
+              or fleet_flow_cleanup_vms | default(false) | bool
+              or fleet_flow_cleanup_vm_declarations | default(false) | bool) else ''
+          }}{{
+            ' (site VMs destroyed)' if (fleet_flow_cleanup_vms | default(false) | bool
+              or fleet_flow_cleanup_vm_declarations | default(false) | bool) else ''
+          }}{{
+            ' (VM declarations removed)' if (fleet_flow_cleanup_vm_declarations | default(false) | bool) else ''
           }}

@@ -266,6 +266,16 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
       'Uninstall K3s and wipe local cluster state on all nodes. Leave unchecked to detach from the fleet while keeping Kubernetes and your application pods running (standalone K3s).',
     example: 'false',
   },
+  'clusterDelete.cleanupVms': {
+    description:
+      'YAIDAP sites only. Destroy the libvirt VMs that back the cluster nodes, so no manual hypervisor cleanup is needed. Runs after the Kubernetes reset and implies it; the guests stay in the site inventory (Declared).',
+    example: 'false',
+  },
+  'clusterDelete.cleanupVmDeclarations': {
+    description:
+      'YAIDAP sites only. After the VMs are destroyed, also drop the guests from the site inventory (guests.yml, host_vars, status) so a rebuild starts from a clean inventory. Implies destroying the VMs.',
+    example: 'false',
+  },
   'clusterOperations.addWorkerAddress': {
     description:
       'SSH-reachable IP or hostname of the new Rocky node on the management LAN. The hub Ansible job installs K3s agent and joins the cluster.',

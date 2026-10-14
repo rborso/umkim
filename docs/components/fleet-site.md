@@ -45,6 +45,31 @@ OCM/DCM glue but keeps K3s; reset (`cleanupKubernetes`) additionally uninstalls
 K3s and wipes CNI/kubelet state and the control-plane VIP. The node play is
 skipped for hub-only clusters that have no node records.
 
+### YAIDAP VM cleanup on delete
+
+On a site whose provisioner is YAIDAP the delete can also remove the cluster's
+nodes instead of leaving them for manual hypervisor cleanup. Two more opt-ins,
+each implying the one below it:
+
+| Flag (API / CLI / flow) | Effect |
+|-------------------------|--------|
+| `cleanupVms` / `--cleanup-vms` / `fleet_flow_cleanup_vms` | `destroy` each cluster node that is a YAIDAP VM guest; implies `cleanupKubernetes` |
+| `cleanupVmDeclarations` / `--cleanup-vm-declarations` / `fleet_flow_cleanup_vm_declarations` | also drop the destroyed guests from the site inventory (`guests.yml`, `host_vars`, status); implies `cleanupVms` |
+
+VM cleanup is the **last stage** of the delete, after the hub is detached and
+before the finalizer is removed, because the `destroy` guard only permits a
+guest whose `FleetClusterJoin` is `Deleting`. Guests are destroyed one at a time
+(the connector runs one action per site) and progress is mirrored on
+`FleetClusterJoin.status.vmCleanup` (`phase`, `hosts`, `completed`, `failures`)
+so the console and CLI can show "destroying VMs (2/3)".
+
+Only `kind: vm` guests are affected: bare-metal nodes, hypervisors and hosts
+missing from the inventory are skipped. A `destroy` that keeps failing is
+retried (`vmCleanupMaxAttempts`) and then reported in `vmCleanup.failures` while
+the cluster delete still completes — a broken hypervisor must not leave an
+undeletable cluster. Without `cleanupVmDeclarations` the guests stay `Declared`
+in the inventory, so **Provision** can recreate them.
+
 ## Site ingress
 
 Each `FleetSite` carries `spec.edge.ingress[]` (port-forward and/or
