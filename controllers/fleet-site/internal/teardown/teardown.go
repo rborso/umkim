@@ -204,6 +204,26 @@ func deleteClusterKubeconfigSecret(ctx context.Context, c client.Client, cluster
 	return nil
 }
 
+// deleteClusterScopedCMs removes every ConfigMap the hub keeps for a cluster.
+// Names are `fleet-cluster-<cluster>-<purpose>` (inventory, discover), so match
+// on the prefix rather than listing each purpose — the discover CM was missed by
+// an earlier hand-maintained list.
+func deleteClusterScopedCMs(ctx context.Context, c client.Client, ns, clusterName string) error {
+	var cms corev1.ConfigMapList
+	if err := c.List(ctx, &cms, client.InNamespace(ns)); err != nil {
+		return err
+	}
+	for i := range cms.Items {
+		name := cms.Items[i].Name
+		if strings.HasPrefix(name, "fleet-cluster-") && strings.Contains(name, clusterName) {
+			if err := c.Delete(ctx, &cms.Items[i]); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // DeleteClusterJoinArtifacts removes bootstrap secrets, inventory CM, and cluster-scoped jobs after FCJ delete.
 func DeleteClusterJoinArtifacts(ctx context.Context, c client.Client, cfg config.Config, clusterName string) error {
 	ns := cfg.Namespace
@@ -216,8 +236,7 @@ func DeleteClusterJoinArtifacts(ctx context.Context, c client.Client, cfg config
 	if err := deleteClusterKubeconfigSecret(ctx, c, clusterName); err != nil {
 		return err
 	}
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: clusterInventoryCM(clusterName), Namespace: ns}}
-	if err := c.Delete(ctx, cm); err != nil && !apierrors.IsNotFound(err) {
+	if err := deleteClusterScopedCMs(ctx, c, ns, clusterName); err != nil {
 		return err
 	}
 	var jobs batchv1.JobList
@@ -245,8 +264,7 @@ func TeardownOrphanCluster(ctx context.Context, c client.Client, cfg config.Conf
 			return err
 		}
 	}
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: clusterInventoryCM(clusterName), Namespace: ns}}
-	if err := c.Delete(ctx, cm); err != nil && !apierrors.IsNotFound(err) {
+	if err := deleteClusterScopedCMs(ctx, c, ns, clusterName); err != nil {
 		return err
 	}
 	if err := deleteClusterKubeconfigSecret(ctx, c, clusterName); err != nil {

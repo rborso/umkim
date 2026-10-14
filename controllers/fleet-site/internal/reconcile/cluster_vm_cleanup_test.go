@@ -272,6 +272,48 @@ func TestVmCleanupGivesUpAfterMaxAttempts(t *testing.T) {
 	}
 }
 
+// A guest with no status record must not be read as "already destroyed": the
+// inventory view defaults it to Declared, which on a live delete silently skipped
+// a running VM. With no recorded phase the destroy is attempted.
+func TestVmCleanupAttemptsDestroyWhenPhaseIsUnknown(t *testing.T) {
+	ns := "fleet-console"
+	fcj := vmCleanupCluster(ns, "lab", nil)
+	// guests.yml lists the guests; the status doc has no entry for them.
+	inv := vmCleanupInventory(ns, `{"guests":{}}`)
+	r, _ := newVmCleanupTestReconciler(t, fcj, vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv)
+
+	done, wait, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
+	if err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if done || wait <= 0 {
+		t.Fatalf("expected a destroy attempt, done=%v wait=%v status=%+v", done, wait, fcj.Status.VmCleanup)
+	}
+	st := fcj.Status.VmCleanup
+	if st.JobName == "" {
+		t.Fatalf("no destroy job started for an unknown-phase guest: %+v", st)
+	}
+	if strings.Join(st.Completed, ",") != "" {
+		t.Fatalf("nothing should be completed yet: %+v", st.Completed)
+	}
+}
+
+// An explicitly Declared guest needs no destroy (only the declaration cleanup).
+func TestVmCleanupSkipsExplicitlyDeclaredGuest(t *testing.T) {
+	ns := "fleet-console"
+	fcj := vmCleanupCluster(ns, "lab", nil)
+	inv := vmCleanupInventory(ns, `{"guests":{"cp0":{"phase":"Declared"},"cp1":{"phase":"Declared"}}}`)
+	r, _ := newVmCleanupTestReconciler(t, fcj, vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv)
+
+	done, _, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
+	if err != nil || !done {
+		t.Fatalf("done=%v err=%v", done, err)
+	}
+	if fcj.Status.VmCleanup.JobName != "" {
+		t.Fatalf("a Declared guest needs no destroy: %+v", fcj.Status.VmCleanup)
+	}
+}
+
 // batchv1Job builds a connector job in either terminal state.
 type batchv1Job struct {
 	name      string

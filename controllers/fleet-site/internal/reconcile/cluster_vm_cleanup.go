@@ -101,9 +101,10 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 			continue
 		}
 
-		switch strings.TrimSpace(view.Status.Phase) {
+		switch phase := r.guestRecordedPhase(ctx, site.Name, host); strings.TrimSpace(phase) {
 		case fleetv1alpha1.SiteHostPhaseDeclared:
-			// No libvirt domain left; only the declaration can be cleaned up.
+			// Explicitly Declared: the hub believes there is no libvirt domain
+			// left, so only the declaration can be cleaned up.
 			if removeDecls {
 				if err := yaidap.RemoveHostDeclaration(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId, host); err != nil {
 					st.Message = fmt.Sprintf("removing declaration of %s failed: %v", host, err)
@@ -146,10 +147,15 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 			continue
 		}
 
-		if phase := strings.TrimSpace(view.Status.Phase); phase == fleetv1alpha1.SiteHostPhaseProvisioning || phase == fleetv1alpha1.SiteHostPhaseDestroying {
+		if phase := r.guestRecordedPhase(ctx, site.Name, host); phase == fleetv1alpha1.SiteHostPhaseProvisioning || phase == fleetv1alpha1.SiteHostPhaseDestroying {
 			st.Message = fmt.Sprintf("waiting for %s (%s)", host, phase)
 			return false, waitAfter, save()
 		}
+
+		// Ready, Failed, or no recorded phase: try the destroy. An unknown phase
+		// must not be read as "already gone" — the inventory view defaults a guest
+		// with no status record to Declared, which would silently skip a running
+		// VM (seen on a live delete).
 
 		fs := site.DeepCopy()
 		if siteprovision.ActionBusy(fs) {
@@ -172,6 +178,18 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 	}
 	st.Message = vmCleanupDoneMessage(st, removeDecls)
 	return true, 0, save()
+}
+
+// guestRecordedPhase returns the phase actually recorded for a guest. The
+// inventory host view substitutes Declared for a guest with no status record,
+// which is exactly the wrong answer when deciding whether a libvirt domain still
+// exists — so the cleanup reads the raw value and treats "" as unknown.
+func (r *ClusterJoinReconciler) guestRecordedPhase(ctx context.Context, siteName, host string) string {
+	doc, err := yaidap.LoadStatusDoc(ctx, r.Client, r.Cfg.Namespace, siteName)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(doc.Guests[host].Phase)
 }
 
 // vmCleanupHosts lists the cluster's nodes that are YAIDAP VM guests.

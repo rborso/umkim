@@ -88,6 +88,34 @@ func TestDeleteClusterJoinArtifactsRemovesClusterSecrets(t *testing.T) {
 	}
 }
 
+// Every cluster-scoped ConfigMap goes, not just the inventory one: the discover
+// CM was missed by the hand-maintained list.
+func TestDeleteClusterJoinArtifactsRemovesClusterCMs(t *testing.T) {
+	ns := "fleet-console"
+	objs := []client.Object{
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-lab-inventory", Namespace: ns}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-lab-discover", Namespace: ns}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "fleet-cluster-other-inventory", Namespace: ns}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "fleet-app-lab-values", Namespace: ns}},
+	}
+	r, c := newDeleteTestReconciler(t, objs...)
+	if err := teardown.DeleteClusterJoinArtifacts(context.Background(), c, r.Cfg, "lab"); err != nil {
+		t.Fatalf("teardown: %v", err)
+	}
+	for _, gone := range []string{"fleet-cluster-lab-inventory", "fleet-cluster-lab-discover"} {
+		var cm corev1.ConfigMap
+		if err := c.Get(context.Background(), types.NamespacedName{Name: gone, Namespace: ns}, &cm); err == nil {
+			t.Fatalf("%s should have been removed", gone)
+		}
+	}
+	for _, kept := range []string{"fleet-cluster-other-inventory", "fleet-app-lab-values"} {
+		var cm corev1.ConfigMap
+		if err := c.Get(context.Background(), types.NamespacedName{Name: kept, Namespace: ns}, &cm); err != nil {
+			t.Fatalf("%s must survive: %v", kept, err)
+		}
+	}
+}
+
 func clusterSSHSecret(ns, clusterName string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: clusterSSHSecretName(clusterName), Namespace: ns},
