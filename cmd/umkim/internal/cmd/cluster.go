@@ -159,17 +159,117 @@ func clusterGetCmd() *cobra.Command {
 }
 
 func clusterCreateCmd() *cobra.Command {
-	var file string
+	var (
+		file            string
+		name            string
+		site            string
+		bootstrapHost   string
+		topology        string
+		controlPlaneVip string
+		minRootDisk     int
+		jumphost        string
+		ingressID       string
+		autoProvision   bool
+		createVMs       bool
+		controlAddrs    string
+		workerAddrs     string
+		controlCores    int
+		controlMemory   int
+		controlDisk     int
+		controlDataDisk int
+		workerCores     int
+		workerMemory    int
+		workerDisk      int
+		workerDataDisk  int
+		hypervisor      string
+	)
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create cluster intent on the hub (POST /clusters)",
+		Long: `Create a cluster from a JSON body (-f) or from flags.
+
+With --create-vms the node VMs are generated from the address lists and given to
+the bring-up pipeline, which declares the YAIDAP guests (named after the cluster)
+and creates them — no separate "site host add" step. Without it, nodes are used
+as given (existing inventory hosts or external/bare-metal nodes).
+
+  umkim cluster create \
+    --name lab-ha-1 --site homelab --topology ha_3_node \
+    --control-addresses 172.16.10.101,172.16.10.102,172.16.10.103 \
+    --control-plane-vip 172.16.10.111 --create-vms \
+    --control-cores 4 --control-memory 6144 --control-disk 50 \
+    --auto-provision
+
+Flags override the same fields in -f; --create-vms replaces nodes.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if file == "" {
-				return fmt.Errorf("--file required (cluster create JSON body)")
+			body := map[string]interface{}{}
+			if file != "" {
+				if err := readFileJSON(file, &body); err != nil {
+					return err
+				}
 			}
-			var body map[string]interface{}
-			if err := readFileJSON(file, &body); err != nil {
-				return err
+			changed := func(flag string) bool { return cmd.Flags().Changed(flag) }
+			if changed("name") {
+				body["clusterName"] = name
+			}
+			if changed("site") {
+				body["siteId"] = site
+			}
+			if changed("bootstrap-host") {
+				body["bootstrapHost"] = bootstrapHost
+			}
+			if changed("topology") {
+				body["topology"] = topology
+			}
+			if changed("control-plane-vip") {
+				body["controlPlaneVip"] = controlPlaneVip
+			}
+			if changed("min-root-disk") {
+				body["minRootDiskGi"] = minRootDisk
+			}
+			if changed("jumphost") {
+				body["jumphost"] = jumphost
+			}
+			if changed("ingress-id") {
+				edge, _ := body["edge"].(map[string]interface{})
+				if edge == nil {
+					edge = map[string]interface{}{}
+				}
+				edge["ingressId"] = ingressID
+				body["edge"] = edge
+			}
+			if changed("auto-provision") {
+				body["autoProvision"] = autoProvision
+			}
+			if createVMs {
+				clusterName, _ := body["clusterName"].(string)
+				if strings.TrimSpace(clusterName) == "" {
+					return fmt.Errorf("--create-vms needs a cluster name (--name or -f)")
+				}
+				topo, _ := body["topology"].(string)
+				nodes, err := buildVMNodes(
+					topo, controlAddrs, workerAddrs,
+					nodeVMFlags{cores: controlCores, memory: controlMemory, diskGi: controlDisk, dataDiskGi: controlDataDisk},
+					nodeVMFlags{cores: workerCores, memory: workerMemory, diskGi: workerDisk, dataDiskGi: workerDataDisk},
+					hypervisor,
+				)
+				if err != nil {
+					return err
+				}
+				body["nodes"] = nodes
+				// The first control node is the bootstrap host.
+				if _, ok := body["bootstrapHost"]; !ok {
+					body["bootstrapHost"] = nodes[0]["address"]
+				}
+			}
+			if v, _ := body["clusterName"].(string); strings.TrimSpace(v) == "" {
+				return fmt.Errorf("cluster name required (--name or -f)")
+			}
+			if v, _ := body["siteId"].(string); strings.TrimSpace(v) == "" {
+				return fmt.Errorf("site required (--site or -f)")
+			}
+			if v, _ := body["bootstrapHost"].(string); strings.TrimSpace(v) == "" {
+				return fmt.Errorf("bootstrap host required (--bootstrap-host or -f)")
 			}
 			raw, code, err := api.Post("/clusters", body)
 			if err != nil {
@@ -182,8 +282,114 @@ func clusterCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVarP(&file, "file", "f", "", "Cluster create JSON body")
+	c.Flags().StringVarP(&file, "file", "f", "", "Cluster create JSON body (flags override its fields)")
+	c.Flags().StringVar(&name, "name", "", "Cluster name")
+	c.Flags().StringVar(&site, "site", "", "Site id")
+	c.Flags().StringVar(&bootstrapHost, "bootstrap-host", "", "Bootstrap host address (defaults to the first control address with --create-vms)")
+	c.Flags().StringVar(&topology, "topology", "", "single_node | ha_3_node")
+	c.Flags().StringVar(&controlPlaneVip, "control-plane-vip", "", "Control-plane VIP (ha_3_node)")
+	c.Flags().IntVar(&minRootDisk, "min-root-disk", 0, "Minimum root filesystem size in GiB validated by the bootstrap")
+	c.Flags().StringVar(&jumphost, "jumphost", "", "Site jumphost override (user@host:port)")
+	c.Flags().StringVar(&ingressID, "ingress-id", "", "Site ingress entry id")
+	c.Flags().BoolVar(&autoProvision, "auto-provision", false, "Let the controller create the VMs, bootstrap, and provision")
+	c.Flags().BoolVar(&createVMs, "create-vms", false, "Declare and create the node VMs (needs --control-addresses)")
+	c.Flags().StringVar(&controlAddrs, "control-addresses", "", "Comma-separated control node addresses")
+	c.Flags().StringVar(&workerAddrs, "worker-addresses", "", "Comma-separated worker node addresses")
+	c.Flags().IntVar(&controlCores, "control-cores", 0, "Control node vCPU (0 = catalog default)")
+	c.Flags().IntVar(&controlMemory, "control-memory", 0, "Control node memory MiB (0 = catalog default)")
+	c.Flags().IntVar(&controlDisk, "control-disk", 0, "Control node boot disk GiB (0 = catalog default)")
+	c.Flags().IntVar(&controlDataDisk, "control-data-disk", 0, "Control node data disk GiB (0 = derived from storage.longhorn)")
+	c.Flags().IntVar(&workerCores, "worker-cores", 0, "Worker node vCPU (0 = catalog default)")
+	c.Flags().IntVar(&workerMemory, "worker-memory", 0, "Worker node memory MiB (0 = catalog default)")
+	c.Flags().IntVar(&workerDisk, "worker-disk", 0, "Worker node boot disk GiB (0 = catalog default)")
+	c.Flags().IntVar(&workerDataDisk, "worker-data-disk", 0, "Worker node data disk GiB (0 = derived from storage.longhorn)")
+	c.Flags().StringVar(&hypervisor, "hypervisor", "", "Hypervisor for the node VMs (empty = least-utilized)")
 	return c
+}
+
+// nodeVMFlags are the per-role VM resources for --create-vms.
+type nodeVMFlags struct {
+	cores      int
+	memory     int
+	diskGi     int
+	dataDiskGi int
+}
+
+// buildVMNodes expands address lists into cluster nodes carrying a vm block. Node
+// hostnames are left to the server, which names guests after the cluster.
+func buildVMNodes(topology, controlAddrs, workerAddrs string, control, worker nodeVMFlags, hypervisor string) ([]map[string]interface{}, error) {
+	topology = strings.TrimSpace(topology)
+	if topology == "" {
+		topology = "single_node"
+	}
+	controls := splitAddresses(controlAddrs)
+	workers := splitAddresses(workerAddrs)
+	switch topology {
+	case "single_node":
+		if len(controls) != 1 {
+			return nil, fmt.Errorf("single_node needs exactly one --control-addresses entry (got %d)", len(controls))
+		}
+		if len(workers) > 0 {
+			return nil, fmt.Errorf("single_node does not support workers")
+		}
+	case "ha_3_node":
+		if len(controls) != 3 {
+			return nil, fmt.Errorf("ha_3_node needs exactly three --control-addresses entries (got %d)", len(controls))
+		}
+	default:
+		return nil, fmt.Errorf("--topology must be single_node or ha_3_node")
+	}
+	seen := map[string]bool{}
+	nodes := make([]map[string]interface{}, 0, len(controls)+len(workers))
+	add := func(role, address string, res nodeVMFlags) error {
+		address = strings.TrimSpace(address)
+		if address == "" {
+			return fmt.Errorf("empty address for %s node", role)
+		}
+		if seen[address] {
+			return fmt.Errorf("duplicate node address %s", address)
+		}
+		seen[address] = true
+		vm := map[string]interface{}{}
+		if res.cores > 0 {
+			vm["cores"] = res.cores
+		}
+		if res.memory > 0 {
+			vm["memory"] = res.memory
+		}
+		if res.diskGi > 0 {
+			vm["diskGi"] = res.diskGi
+		}
+		if res.dataDiskGi > 0 {
+			vm["dataDiskGi"] = res.dataDiskGi
+		}
+		if h := strings.TrimSpace(hypervisor); h != "" {
+			vm["hypervisor"] = h
+		}
+		nodes = append(nodes, map[string]interface{}{"address": address, "role": role, "vm": vm})
+		return nil
+	}
+	for _, a := range controls {
+		if err := add("control", a, control); err != nil {
+			return nil, err
+		}
+	}
+	for _, a := range workers {
+		if err := add("worker", a, worker); err != nil {
+			return nil, err
+		}
+	}
+	return nodes, nil
+}
+
+func splitAddresses(raw string) []string {
+	out := []string{}
+	for _, part := range strings.Split(raw, ",") {
+		if v := strings.TrimSpace(part); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func clusterDeleteCmd() *cobra.Command {
