@@ -1,0 +1,69 @@
+---
+# Remove a cluster's NFS export subdirectory.
+#
+# Runs on the cluster's bootstrap node (nfs-utils is installed by nfs_nodes.yml and
+# the NFS server is reachable from the cluster's own network), so no new SSH
+# credentials or hub-to-site routing are needed. Invoked from
+# cluster-delete-hub.yml before the node leaves the fleet, and only when the
+# operator asked for storage cleanup: this deletes the cluster's data.
+#
+# The export layout is the one UMKIM creates: <export_base>/<cluster_path>, with
+# the provisioner's <namespace>-<pvc> directories underneath.
+- name: Fleet cluster storage | Skip unless storage cleanup was requested
+  ansible.builtin.meta: end_host
+  when: not (fleet_cluster_cleanup_storage | default(false) | bool)
+
+- name: Fleet cluster storage | Skip when the cluster has no NFS export
+  ansible.builtin.meta: end_host
+  when: not (fleet_cluster_nfs_enabled | default(false) | bool)
+
+- name: Fleet cluster storage | Remove cluster export directory
+  ansible.builtin.shell: |
+    set -euo pipefail
+    SERVER="{{ fleet_cluster_nfs_server }}"
+    BASE="{{ fleet_cluster_nfs_export_base }}"
+    OPTS="{{ fleet_cluster_nfs_mount_options | join(',') }}"
+    CLUSTER_PATH="{{ fleet_cluster_nfs_cluster_path }}"
+    MP="/tmp/umkim-nfs-purge"
+    mkdir -p "$MP"
+    cleanup() { umount -f "$MP" 2>/dev/null || true; rmdir "$MP" 2>/dev/null || true; }
+    trap cleanup EXIT
+    mounted=""
+    for p in "$BASE" "/"; do
+      umount -f "$MP" 2>/dev/null || true
+      if mount -t nfs -o "$OPTS" "${SERVER}:${p}" "$MP" 2>/dev/null; then
+        mounted="$p"
+        break
+      fi
+    done
+    if [ -z "$mounted" ]; then
+      echo "cannot mount ${SERVER}:${BASE} (or the NFSv4 pseudo-root)" >&2
+      exit 1
+    fi
+    TARGET="${MP}/${CLUSTER_PATH}"
+    case "$TARGET" in
+      "$MP"/|"$MP") echo "refusing to remove the export base itself" >&2; exit 1 ;;
+    esac
+    if [ -d "$TARGET" ]; then
+      du -sh "$TARGET" 2>/dev/null || true
+      rm -rf "$TARGET"
+      echo "removed ${SERVER}:${BASE}/${CLUSTER_PATH} (via mount of ${SERVER}:${mounted})"
+    else
+      echo "nothing to remove at ${SERVER}:${BASE}/${CLUSTER_PATH}"
+    fi
+  args:
+    executable: /bin/bash
+  register: fleet_nfs_remove_export
+  failed_when: false
+  changed_when: fleet_nfs_remove_export.rc == 0
+  tags: [fleet_cluster_storage, fleet_cluster_delete]
+
+- name: Fleet cluster storage | Require export removal
+  ansible.builtin.assert:
+    that:
+      - fleet_nfs_remove_export.rc | default(1) | int == 0
+    fail_msg: >-
+      Could not remove {{ fleet_cluster_nfs_export_base }}/{{ fleet_cluster_nfs_cluster_path }}
+      on {{ fleet_cluster_nfs_server }}:
+      {{ fleet_nfs_remove_export.stderr | default('') | trim | default('see the job log', true) }}
+  tags: [fleet_cluster_storage, fleet_cluster_delete]

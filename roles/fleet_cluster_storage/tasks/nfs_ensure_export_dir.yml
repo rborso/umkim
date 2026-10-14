@@ -1,0 +1,58 @@
+---
+# Ensure the cluster's export subdirectory exists on a *remote* NFS server.
+#
+# The provisioner mounts <server>:<export_base>/<cluster_path> and cannot start
+# until that directory exists, so it must be created before the rollout wait.
+# Only two cases were covered: the NFS server is the play host (local mkdir) or a
+# delegateHost is configured (SSH mkdir). A shared NFS server reachable only over
+# the network had nothing creating the directory, so the provisioner sat in
+# ContainerCreating with "mount failed: No such file or directory" and the
+# storage step timed out.
+#
+# Creating it over NFS needs no SSH access to the server: mount the export base
+# (or the NFSv4 pseudo-root, which is the export base when the server exports with
+# fsid=0) and mkdir inside it.
+- name: Fleet cluster storage | Ensure cluster export subdirectory over NFS
+  ansible.builtin.shell: |
+    set -euo pipefail
+    SERVER="{{ fleet_cluster_nfs_server }}"
+    BASE="{{ fleet_cluster_nfs_export_base }}"
+    OPTS="{{ fleet_cluster_nfs_mount_options | join(',') }}"
+    CLUSTER_PATH="{{ fleet_cluster_nfs_cluster_path }}"
+    MP="/tmp/umkim-nfs-ensure"
+    mkdir -p "$MP"
+    cleanup() { umount -f "$MP" 2>/dev/null || true; rmdir "$MP" 2>/dev/null || true; }
+    trap cleanup EXIT
+    mounted=""
+    for p in "$BASE" "/"; do
+      umount -f "$MP" 2>/dev/null || true
+      if mount -t nfs -o "$OPTS" "${SERVER}:${p}" "$MP" 2>/dev/null; then
+        mounted="$p"
+        break
+      fi
+    done
+    if [ -z "$mounted" ]; then
+      echo "cannot mount ${SERVER}:${BASE} (or the NFSv4 pseudo-root) to create the cluster export" >&2
+      exit 1
+    fi
+    mkdir -p "${MP}/${CLUSTER_PATH}"
+    chmod 1777 "${MP}/${CLUSTER_PATH}"
+    echo "ensured ${SERVER}:${BASE}/${CLUSTER_PATH} (via mount of ${SERVER}:${mounted})"
+  args:
+    executable: /bin/bash
+  register: fleet_nfs_ensure_dir
+  failed_when: false
+  changed_when: fleet_nfs_ensure_dir.rc == 0
+  tags: [fleet_cluster_storage]
+
+- name: Fleet cluster storage | Require cluster export subdirectory
+  ansible.builtin.assert:
+    that:
+      - fleet_nfs_ensure_dir.rc | default(1) | int == 0
+    fail_msg: >-
+      Could not create {{ fleet_cluster_nfs_export_base }}/{{ fleet_cluster_nfs_cluster_path }}
+      on {{ fleet_cluster_nfs_server }}:
+      {{ fleet_nfs_ensure_dir.stderr | default('') | trim | default('see the job log', true) }}
+      Set a delegateHost for this cluster's storage if the server is not reachable
+      from the nodes over NFS.
+  tags: [fleet_cluster_storage]
