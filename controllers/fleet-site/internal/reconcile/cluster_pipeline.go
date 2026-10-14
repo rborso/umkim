@@ -181,8 +181,25 @@ func (r *ClusterJoinReconciler) pipelineHostsReady(ctx context.Context, fcj *fle
 			return false, ctrl.Result{}, err
 		}
 		if !found {
-			// External/BM nodes are not inventory guests; nothing to create.
-			continue
+			// A node with a vm spec is declared here and created on the next pass;
+			// anything else is an external/bare-metal node with nothing to create.
+			if node.VM == nil {
+				continue
+			}
+			declared, err := r.ensureNodeGuest(ctx, site, fcj, node)
+			if err != nil {
+				return false, ctrl.Result{}, err
+			}
+			fcj.Status.PipelineStep = "declare_vm:" + host
+			if declared {
+				fcj.Status.Message = "Declaring VM " + host
+			} else {
+				fcj.Status.Message = "Waiting for VM declaration " + host
+			}
+			if err := r.Status().Update(ctx, fcj); err != nil {
+				return false, ctrl.Result{}, err
+			}
+			return false, ctrl.Result{RequeueAfter: waitAfter}, nil
 		}
 		if view.Kind != "" && view.Kind != fleetv1alpha1.SiteHostKindVM {
 			continue

@@ -305,16 +305,27 @@ func mergeClusterGroup(current, cluster, host string) (string, error) {
 		group = map[string]interface{}{}
 		doc[cluster] = group
 	}
-	rawHosts, _ := group["hosts"].([]interface{})
-	seen := false
-	for _, h := range rawHosts {
-		if s, ok := h.(string); ok && s == host {
-			seen = true
+	// Ansible (and ParseInventoryGroupMembers) expect the map form:
+	//   cluster: {hosts: {node: {}}}
+	// Accept the legacy list form on read so an older file is healed rather than
+	// losing its members.
+	hosts := map[string]interface{}{}
+	switch raw := group["hosts"].(type) {
+	case map[string]interface{}:
+		for name, body := range raw {
+			hosts[name] = body
+		}
+	case []interface{}:
+		for _, h := range raw {
+			if s, ok := h.(string); ok && strings.TrimSpace(s) != "" {
+				hosts[s] = map[string]interface{}{}
+			}
 		}
 	}
-	if !seen {
-		group["hosts"] = append(rawHosts, host)
+	if _, ok := hosts[host]; !ok {
+		hosts[host] = map[string]interface{}{}
 	}
+	group["hosts"] = hosts
 	return marshalInventoryYAML(doc)
 }
 

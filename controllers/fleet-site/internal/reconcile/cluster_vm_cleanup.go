@@ -262,6 +262,13 @@ func (r *ClusterJoinReconciler) finishVmCleanupHost(ctx context.Context, fcj *fl
 			st.Message = fmt.Sprintf("removing declaration of %s failed: %v", host, err)
 			return err
 		}
+		// Also drop the host from the cluster group file, which the pipeline
+		// created when it declared the guest.
+		clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)
+		if err := yaidap.RemoveClusterGroupMembers(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId, clusterName, []string{host}); err != nil {
+			st.Message = fmt.Sprintf("removing %s from cluster group %s failed: %v", host, clusterName, err)
+			return err
+		}
 	}
 	vmCleanupFinish(st, host)
 	return nil

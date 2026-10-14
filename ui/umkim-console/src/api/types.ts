@@ -940,6 +940,16 @@ export interface FleetClusterNodeInput {
   role?: FleetClusterNodeRole;
   gpu?: boolean;
   labels?: Record<string, string>;
+  /** Declare (or reuse) a VM guest for this node and create it during bring-up. */
+  vm?: FleetClusterNodeVMInput;
+}
+
+export interface FleetClusterNodeVMInput {
+  cores?: number;
+  memory?: number;
+  diskGi?: number;
+  dataDiskGi?: number;
+  hypervisor?: string;
 }
 
 export interface FleetClusterCreate {

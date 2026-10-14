@@ -104,6 +104,22 @@ type FleetClusterJoinNodeSpec struct {
 	Role     string            `json:"role,omitempty"`
 	GPU      bool              `json:"gpu,omitempty"`
 	Labels   map[string]string `json:"labels,omitempty"`
+	// VM asks the autoProvision pipeline to declare (or reuse) a YAIDAP VM guest
+	// for this node and then create it. Nil means the node is not managed by the
+	// pipeline: an existing inventory host is used, or the node is external/bare
+	// metal. Zero resource fields fall back to the site catalog defaults.
+	VM *FleetClusterJoinNodeVM `json:"vm,omitempty"`
+}
+
+// FleetClusterJoinNodeVM is the optional VM spec for a node the bring-up
+// pipeline should declare and create. The guest name is the node hostname and
+// the guest address is the node address, so no extra naming input is needed.
+type FleetClusterJoinNodeVM struct {
+	Cores      int    `json:"cores,omitempty"`
+	Memory     int    `json:"memory,omitempty"`
+	DiskGi     int    `json:"diskGi,omitempty"`
+	DataDiskGi int    `json:"dataDiskGi,omitempty"`
+	Hypervisor string `json:"hypervisor,omitempty"`
 }
 
 func (n FleetClusterJoinNodeSpec) EffectiveRole() string {
