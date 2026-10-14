@@ -71,6 +71,8 @@ umkim site delete NAME --confirm
 umkim site validate NAME
 
 umkim cluster list | get NAME | create -f cluster.yaml
+umkim cluster create --name NAME --site SITE --topology single_node|ha_3_node [--bootstrap-host IP] [--control-plane-vip IP] [--auto-provision] [--ingress-id ID]
+umkim cluster create … --create-vms --control-addresses IP,IP,IP [--worker-addresses IP,…] [--control-cores N] [--control-memory MiB] [--control-disk GiB] [--worker-* …] [--hypervisor HV]
 umkim cluster list --require gpu,kvm
 umkim cluster candidates [--require gpu|kvm|ha_topology|storage.rwx|…] [--site SITE]
 umkim cluster patch NAME [--jumphost user@host:port] [--ingress-id ID] [-f patch.json]
@@ -217,6 +219,31 @@ For **HA** (`ha_3_node`), hub finalize Jobs allow up to **90 minutes**; use
 `umkim cluster wait --timeout 90m` (default `--timeout` is 30m). Bootstrap on
 three nodes can take ~20 minutes before hub provision starts.
 `node add/remove/replace` mirrors [cluster-node-op.yml](../../playbooks/flows/cluster-node-op.yml).
+
+### Cluster create from flags
+
+`cluster create` takes a JSON body (`-f`) or flags; explicit flags override the
+same fields in the file, and `--create-vms` replaces `nodes`. With `--create-vms`
+the node VMs are generated from the address lists and the bring-up pipeline
+declares the YAIDAP guests (named after the cluster) and creates them, so no
+separate `umkim site host add` per node is needed:
+
+```bash
+umkim cluster create \
+  --name lab-ha-1 --site homelab --topology ha_3_node \
+  --control-addresses 172.16.10.101,172.16.10.102,172.16.10.103 \
+  --worker-addresses 172.16.10.110 \
+  --control-plane-vip 172.16.10.111 \
+  --create-vms --auto-provision \
+  --control-cores 4 --control-memory 6144 --control-disk 50 \
+  --worker-cores 4 --worker-memory 8192 --worker-disk 60
+```
+
+`--bootstrap-host` defaults to the first control address. Resource flags at `0`
+use the site catalog defaults; the data disk is derived from `storage.longhorn`
+and the boot disk is raised above `minRootDisk` by the EFI/boot overhead (see
+[components/fleet-site.md](fleet-site.md)). Addresses are explicit — there is no
+auto-allocation — and `--hypervisor` empty means least-utilized.
 
 ## Output
 
