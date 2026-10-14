@@ -33,6 +33,49 @@ the provision Job succeeded but finalize failed once.
 
 Do not assume a partial provisioning run is safe to repeat without inspection.
 
+### Node VM declarations during bring-up
+
+A cluster created with `autoProvision` normally needs its VM guests declared
+first (console **Site → Hosts → Add host**, or `umkim site host add`). A node
+may instead carry an optional **`vm`** block, in which case the bring-up
+pipeline declares the guest for it and then creates it:
+
+```json
+{
+  "clusterName": "lab-ha-0",
+  "siteId": "homelab",
+  "topology": "ha_3_node",
+  "autoProvision": true,
+  "nodes": [
+    { "address": "172.16.10.101", "role": "control", "vm": { "cores": 4, "memory": 6144, "diskGi": 50 } },
+    { "address": "172.16.10.102", "role": "control", "vm": {} },
+    { "address": "172.16.10.103", "role": "control", "vm": {} }
+  ]
+}
+```
+
+- The **guest name is the node hostname** (`<cluster>-1..3` for controls,
+  `<cluster>-w1..` for workers, generated when omitted) and the guest address is
+  the node address, so no extra naming input is needed.
+- Zero-valued resource fields fall back to the site catalog defaults. The boot
+  disk is raised above `minRootDiskGi` by the EFI/boot overhead (2 GiB) when
+  smaller — a disk sized exactly at the threshold reports a smaller root
+  filesystem and fails the bootstrap check — and a **data disk** is derived from
+  `storage.longhorn` (`minDataDiskGi`, else 10 GiB) so a Longhorn cluster does
+  not fail the bootstrap.
+- The pipeline records the declaration as the **`declare_vm:<host>`** step, then
+  runs the usual `create_vm:<host>` step. Declaring is idempotent: an existing
+  guest with the same address is reused, and one with a different address is an
+  error rather than a silent rewrite.
+- A node **without** a `vm` block behaves as before: an existing inventory host
+  is used, or the node is treated as external/bare metal.
+- Placeholder addresses (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`,
+  `203.0.113.0/24`) are refused for a `vm` node — a guest cannot be created on
+  one — while nodes without a `vm` block still accept them.
+- Guests declared this way are ordinary `guests.yml` / `host_vars/<name>.yml` /
+  `<cluster>.yml` entries, so they can be edited by hand afterwards and are
+  removed by the delete cleanup flags (`cleanupVms`, `cleanupVmDeclarations`).
+
 Cluster deletion **defaults to detach**: hub-managed resources are removed
 while K3s and workloads on the spoke are preserved. Full Kubernetes cleanup
 is opt-in (`cleanupKubernetes=true` on delete, or

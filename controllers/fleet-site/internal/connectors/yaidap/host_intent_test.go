@@ -62,9 +62,41 @@ func TestBuildHostFilesHypervisorAndCluster(t *testing.T) {
 		t.Fatalf("cluster yaml: %v", err)
 	}
 	group, _ := doc["lab-ha-0"].(map[string]interface{})
-	hosts, _ := group["hosts"].([]interface{})
-	if len(hosts) != 1 || hosts[0] != "hv01" {
+	hosts, _ := group["hosts"].(map[string]interface{})
+	if len(hosts) != 1 {
 		t.Fatalf("cluster hosts = %v", hosts)
+	}
+	if _, ok := hosts["hv01"]; !ok {
+		t.Fatalf("cluster hosts missing hv01: %v", hosts)
+	}
+	// The generated group file must pass the same validator the API uses: the
+	// map form is what Ansible and ParseInventoryGroupMembers require.
+	if err := ValidateInventoryFile("lab-ha-0.yml", cluster); err != nil {
+		t.Fatalf("generated cluster file does not validate: %v", err)
+	}
+	if members, err := ParseInventoryGroupMembers(cluster, "lab-ha-0"); err != nil {
+		t.Fatalf("ParseInventoryGroupMembers: %v", err)
+	} else if len(members) != 1 || members[0] != "hv01" {
+		t.Fatalf("members = %v", members)
+	}
+}
+
+func TestMergeClusterGroupHealsLegacyListForm(t *testing.T) {
+	legacy := "lab-ha-0:\n  hosts:\n    - old-node\n"
+	files, err := BuildHostFiles(
+		map[string]string{"lab-ha-0.yml": legacy},
+		HostIntent{Kind: "vm", Name: "new-node", AnsibleHost: "172.16.10.11", Cluster: "lab-ha-0"},
+		Catalog{},
+	)
+	if err != nil {
+		t.Fatalf("BuildHostFiles: %v", err)
+	}
+	members, err := ParseInventoryGroupMembers(files["lab-ha-0.yml"], "lab-ha-0")
+	if err != nil {
+		t.Fatalf("ParseInventoryGroupMembers: %v", err)
+	}
+	if strings.Join(members, ",") != "new-node,old-node" {
+		t.Fatalf("members = %v (legacy member must be kept)", members)
 	}
 }
 

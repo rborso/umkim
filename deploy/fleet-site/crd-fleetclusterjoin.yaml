@@ -156,6 +156,31 @@ spec:
                         type: object
                         additionalProperties:
                           type: string
+                      vm:
+                        type: object
+                        description: >-
+                          Optional VM spec: declare (or reuse) a YAIDAP VM guest for
+                          this node and create it during autoProvision. Omit for an
+                          existing inventory host or an external/bare-metal node.
+                        properties:
+                          cores:
+                            type: integer
+                            minimum: 0
+                          memory:
+                            type: integer
+                            minimum: 0
+                            description: Memory in MiB
+                          diskGi:
+                            type: integer
+                            minimum: 0
+                            description: Boot disk in GiB
+                          dataDiskGi:
+                            type: integer
+                            minimum: 0
+                            description: Additional data disk in GiB (Longhorn)
+                          hypervisor:
+                            type: string
+                            description: Hypervisor host name; empty means least-utilized
                 edge:
                   type: object
                   properties:

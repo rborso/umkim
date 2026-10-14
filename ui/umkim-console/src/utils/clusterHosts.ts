@@ -30,3 +30,16 @@ export function hostSelectOptions(
 ): SiteHostRecord[] {
   return eligible.filter((h) => h.name === current || !selectedNames.has(h.name));
 }
+
+/**
+ * RFC 5737 documentation ranges used as wizard placeholders. A VM cannot be
+ * created on one, so the create form must not offer to.
+ */
+const PLACEHOLDER_PREFIXES = ['192.0.2.', '198.51.100.', '203.0.113.'];
+
+/** True for an address a VM guest must not be created on (placeholder or empty). */
+export function isPlaceholderAddress(address: string): boolean {
+  const addr = (address || '').trim();
+  if (!addr) return true;
+  return PLACEHOLDER_PREFIXES.some((p) => addr.startsWith(p));
+}

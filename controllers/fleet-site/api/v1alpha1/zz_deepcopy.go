@@ -171,7 +171,15 @@ func (in *FleetClusterJoin) DeepCopyInto(out *FleetClusterJoin) {
 		}
 	}
 	if in.Spec.Nodes != nil {
-		out.Spec.Nodes = append([]FleetClusterJoinNodeSpec(nil), in.Spec.Nodes...)
+		out.Spec.Nodes = make([]FleetClusterJoinNodeSpec, len(in.Spec.Nodes))
+		for i := range in.Spec.Nodes {
+			n := in.Spec.Nodes[i]
+			if n.VM != nil {
+				vm := *n.VM
+				n.VM = &vm
+			}
+			out.Spec.Nodes[i] = n
+		}
 	}
 	if in.Spec.IngressAuth.OIDCClients != nil {
 		out.Spec.IngressAuth.OIDCClients = make([]IngressAuthOIDCClient, len(in.Spec.IngressAuth.OIDCClients))

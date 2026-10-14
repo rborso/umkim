@@ -99,6 +99,18 @@ Resolve all hosts, registries, tags, and credentials from authorized inventory a
 This README documents the UI workflow only. It does not configure a backend,
 ingress, authentication provider, or external endpoint.
 
+### Cluster create: node VMs
+
+The cluster create wizard can declare the node VMs for you. Each control/worker
+slot has a **Create this VM** box (`NodeVMEditor`): enabling it makes the
+bring-up pipeline declare a YAIDAP guest named after the node hostname and then
+create it, so the separate **Site → Hosts → Add host** step is not needed.
+Resource fields default to the site catalog (vCPU / RAM / boot disk, plus a data
+disk when Longhorn is enabled), and the wizard shows a summary of what will be
+created before submit. The box is disabled when the slot is bound to an existing
+inventory host, and a placeholder address (RFC 5737) blocks submit. The same
+option is available from the API/CLI as the optional `vm` block on each node.
+
 ## Mobile
 
 The console is usable on a phone (tested at 390×844):

@@ -157,6 +157,8 @@ func TestVmCleanupRemovesDeclarationsAfterDestroy(t *testing.T) {
 	ns := "fleet-console"
 	fcj := vmCleanupCluster(ns, "lab", map[string]string{annotationCleanupVmDecls: "true"})
 	inv := vmCleanupInventory(ns, `{"guests":{"cp0":{"phase":"Declared"},"cp1":{"phase":"Declared"}}}`)
+	// The pipeline-created cluster group file must go too, not just the guests.
+	inv.Data["file.lab.yml"] = "lab:\n  hosts:\n    cp0: {}\n    cp1: {}\n"
 	finished0 := &batchv1Job{name: "fleet-site-prov-a1", namespace: ns}
 	fcj.Status.VmCleanup = &fleetv1alpha1.ClusterVmCleanupStatus{
 		Phase:   fleetv1alpha1.VmCleanupPhaseDestroying,
@@ -205,6 +207,9 @@ func TestVmCleanupRemovesDeclarationsAfterDestroy(t *testing.T) {
 	}
 	if guests := cm.Data["file.guests.yml"]; strings.Contains(guests, "cp0:") || strings.Contains(guests, "cp1:") {
 		t.Fatalf("declarations survived:\n%s", guests)
+	}
+	if _, ok := cm.Data["file.lab.yml"]; ok {
+		t.Fatalf("cluster group file survived:\n%s", cm.Data["file.lab.yml"])
 	}
 }
 

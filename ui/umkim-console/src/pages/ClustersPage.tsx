@@ -43,12 +43,14 @@ import type {
   FleetCluster,
   FleetClusterCreate,
   FleetClusterNodeInput,
+  FleetClusterNodeVMInput,
   FleetClusterTopology,
   FleetSite,
   SiteHostRecord,
 } from '../api/types';
 import { ErrorAlert } from '../components/ErrorAlert';
 import { NfsStorageSetupHelp } from '../components/clusters/NfsStorageSetupHelp';
+import { NodeVMEditor } from '../components/clusters/NodeVMEditor';
 import { LabeledField } from '../components/forms/LabeledField';
 import { LabelKeyValueEditor } from '../components/forms/LabelKeyValueEditor';
 import {
@@ -56,7 +58,12 @@ import {
   ingressOptionDisabled,
 } from '../edge/ingressMethod';
 import { getFieldHelp } from '../help/fieldHelp';
-import { eligibleClusterHosts, hostAnsibleAddr, hostSelectOptions } from '../utils/clusterHosts';
+import {
+  eligibleClusterHosts,
+  hostAnsibleAddr,
+  hostSelectOptions,
+  isPlaceholderAddress,
+} from '../utils/clusterHosts';
 import { useFleetClustersQuery, useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
 import { canMutate } from '../auth/roles';
@@ -314,7 +321,7 @@ export function ClustersPage() {
       const nodes = [...base];
       const targets = nodes.map((n, i) => ({ n, i })).filter((x) => (x.n.role || 'control') === role);
       const t = targets[index]?.i ?? index;
-      nodes[t] = { ...nodes[t], hostname: hostName, address: addr, role };
+      nodes[t] = { ...nodes[t], hostname: hostName, address: addr, role, vm: undefined };
       return {
         ...f,
         nodes,
@@ -349,6 +356,63 @@ export function ClustersPage() {
     setPendingNode('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingNode, hostByName, topology]);
+
+  // Node slots are addressed by (role, index-within-role), like applyHostToNode.
+  const updateNodeVM = (
+    index: number,
+    role: FleetClusterNodeInput['role'],
+    patch: Partial<FleetClusterNodeVMInput> | null,
+  ) => {
+    setForm((f) => {
+      const base =
+        topology === 'ha_3_node' ? f.nodes || defaultHaControlNodes(f.clusterName) : f.nodes || [];
+      const nodes = [...base];
+      const targets = nodes
+        .map((n, i) => ({ n, i }))
+        .filter((x) => (x.n.role || 'control') === role);
+      const t = targets[index]?.i ?? index;
+      if (!nodes[t]) return f;
+      const cur = nodes[t];
+      nodes[t] =
+        patch === null
+          ? { ...cur, vm: undefined }
+          : { ...cur, vm: { ...(cur.vm || {}), ...patch } };
+      return { ...f, nodes };
+    });
+  };
+
+  const copyNodeVMToSiblings = (index: number, role: FleetClusterNodeInput['role']) => {
+    setForm((f) => {
+      const base =
+        topology === 'ha_3_node' ? f.nodes || defaultHaControlNodes(f.clusterName) : f.nodes || [];
+      const nodes = [...base];
+      const targets = nodes
+        .map((n, i) => ({ n, i }))
+        .filter((x) => (x.n.role || 'control') === role);
+      const srcIndex = targets[index]?.i;
+      const src = srcIndex === undefined ? undefined : nodes[srcIndex];
+      if (!src?.vm) return f;
+      for (const { i } of targets) {
+        nodes[i] = { ...nodes[i], vm: { ...src.vm } };
+      }
+      return { ...f, nodes };
+    });
+  };
+
+  const vmSummary = useMemo(() => {
+    const nodes = (form.nodes || []).filter((n) => n.vm);
+    if (nodes.length === 0) return null;
+    const names = nodes.map((n) => n.hostname || '(unnamed)');
+    const first = nodes[0].vm || {};
+    const bootGi = Math.max(first.diskGi || 0, (form.minRootDiskGi || 40) + 2);
+    const parts = [
+      `${first.cores || 2} vCPU`,
+      `${first.memory || 4096} MiB`,
+      `${bootGi} GiB boot`,
+    ];
+    if (longhornEnabled) parts.push(`${first.dataDiskGi || 10} GiB data`);
+    return { names, detail: parts.join(' · ') };
+  }, [form.nodes, form.minRootDiskGi, longhornEnabled]);
 
   const deleteConsoleProvisioned = deleteTarget
     ? fleetClusterIsConsoleProvisioned(deleteTarget)
@@ -549,6 +613,17 @@ export function ClustersPage() {
       const bootstrapHost = isHa ? nodes[0]?.address || form.bootstrapHost : form.bootstrapHost;
       if (isHa && !controlPlaneVip.trim()) {
         setActionError(new Error('Control-plane VIP is required for 3-node HA'));
+        setSaving(false);
+        return;
+      }
+      const badVM = nodes.find((n) => n.vm && isPlaceholderAddress(n.address));
+      if (badVM) {
+        setActionError(
+          new Error(
+            `Set the real site address for ${badVM.hostname || 'the VM node'} before creating a VM ` +
+              `(placeholder addresses cannot be used).`,
+          ),
+        );
         setSaving(false);
         return;
       }
@@ -1098,6 +1173,19 @@ export function ClustersPage() {
                     />
                     <small>{controlNodes[i]?.hostname || `${form.clusterName || 'cluster'}-${i + 1}`}</small>
                   </LabeledField>
+                  <NodeVMEditor
+                    idPrefix={`control-${i}`}
+                    hostname={controlNodes[i]?.hostname || `${form.clusterName || 'cluster'}-${i + 1}`}
+                    address={controlNodes[i]?.address || ''}
+                    vm={controlNodes[i]?.vm}
+                    hostSelected={!!hostByName[controlNodes[i]?.hostname || '']}
+                    longhornEnabled={longhornEnabled}
+                    disabled={saving}
+                    copyLabel="Copy to all control nodes"
+                    onToggle={(on) => updateNodeVM(i, 'control', on ? {} : null)}
+                    onChange={(patch) => updateNodeVM(i, 'control', patch)}
+                    onCopyToSiblings={() => copyNodeVMToSiblings(i, 'control')}
+                  />
                   <LabeledField
                     label={`Control node ${i + 1} labels`}
                     fieldId={`node-labels-${i}`}
@@ -1211,6 +1299,19 @@ export function ClustersPage() {
                     </div>
                     <small>{w.hostname}</small>
                   </LabeledField>
+                  <NodeVMEditor
+                    idPrefix={`worker-${wi}`}
+                    hostname={w.hostname || `${form.clusterName || 'cluster'}-w${wi + 1}`}
+                    address={w.address || ''}
+                    vm={w.vm}
+                    hostSelected={!!hostByName[w.hostname || '']}
+                    longhornEnabled={longhornEnabled}
+                    disabled={saving}
+                    copyLabel="Copy to all workers"
+                    onToggle={(on) => updateNodeVM(wi, 'worker', on ? {} : null)}
+                    onChange={(patch) => updateNodeVM(wi, 'worker', patch)}
+                    onCopyToSiblings={() => copyNodeVMToSiblings(wi, 'worker')}
+                  />
                   <LabeledField
                     label={`Worker ${wi + 1} labels`}
                     fieldId={`worker-labels-${wi}`}
@@ -1267,6 +1368,17 @@ export function ClustersPage() {
                   placeholder="198.51.100.50 or hostname"
                 />
               </LabeledField>
+              <NodeVMEditor
+                idPrefix="single"
+                hostname={form.nodes?.[0]?.hostname || form.clusterName || 'node'}
+                address={form.bootstrapHost}
+                vm={form.nodes?.[0]?.vm}
+                hostSelected={!!hostByName[form.nodes?.[0]?.hostname || '']}
+                longhornEnabled={longhornEnabled}
+                disabled={saving}
+                onToggle={(on) => updateNodeVM(0, 'control', on ? {} : null)}
+                onChange={(patch) => updateNodeVM(0, 'control', patch)}
+              />
               <LabeledField label="Node labels" fieldId="singleNodeLabels" help={getFieldHelp('clusterJoin.nodeLabels')}>
                 <LabelKeyValueEditor
                   labels={form.nodes?.[0]?.labels || {}}
@@ -1275,6 +1387,18 @@ export function ClustersPage() {
                 />
               </LabeledField>
             </>
+          )}
+          {vmSummary && (
+            <p
+              data-testid="cluster-create-vm-summary"
+              style={{ margin: '0.5rem 0 0.75rem', fontSize: '0.85rem' }}
+            >
+              <strong>{vmSummary.names.length}</strong> VM
+              {vmSummary.names.length === 1 ? '' : 's'} will be created on {form.siteId || 'the site'}:{' '}
+              {vmSummary.names.join(', ')}
+              <br />
+              {vmSummary.detail} · hypervisor: least-utilized
+            </p>
           )}
           <LabeledField label="Min root disk (GiB)" fieldId="minRootDiskGi" help={getFieldHelp('clusterJoin.minRootDiskGi')}>
             <TextInput
