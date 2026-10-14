@@ -261,6 +261,7 @@ func (r *ClusterJoinReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		} else {
 			fcj.Status.Phase = fleetv1alpha1.JoinPhaseFailed
 			fcj.Status.ProvisionJobName = ""
+			fcj.Status.PipelineStep = "provision-failed"
 			fcj.Status.Message = "Provision failed: " + msg
 		}
 		_ = r.Status().Update(ctx, &fcj)

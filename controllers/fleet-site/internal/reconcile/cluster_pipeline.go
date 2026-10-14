@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,8 +58,53 @@ func (r *ClusterJoinReconciler) reconcileClusterAutoProvision(ctx context.Contex
 				return ctrl.Result{}, true, err
 			}
 		}
+	case fleetv1alpha1.JoinPhaseFailed:
+		return r.resumePipelineAfterFailure(ctx, fcj)
 	}
 	return ctrl.Result{}, false, nil
+}
+
+const (
+	pipelineRetriesAnnotation = "fleet.umkim.com/pipeline-retries"
+	maxPipelineRetries        = 3
+)
+
+// resumePipelineAfterFailure re-runs the step that failed so a transient error
+// (hub not yet accepting the cluster, image pull, ACME rate limit) does not wedge
+// an auto-provisioned cluster forever. Bounded by an annotation so a genuinely
+// broken cluster stops retrying and stays Failed for the operator.
+func (r *ClusterJoinReconciler) resumePipelineAfterFailure(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin) (ctrl.Result, bool, error) {
+	retries := 0
+	if fcj.Annotations != nil {
+		retries, _ = strconv.Atoi(strings.TrimSpace(fcj.Annotations[pipelineRetriesAnnotation]))
+	}
+	if retries >= maxPipelineRetries {
+		return ctrl.Result{}, false, nil
+	}
+	if fcj.Annotations == nil {
+		fcj.Annotations = map[string]string{}
+	}
+	fcj.Annotations[pipelineRetriesAnnotation] = strconv.Itoa(retries + 1)
+	// Write metadata first: Update rewrites the object from the store, so the
+	// status must be set afterwards (it is a subresource).
+	if err := r.Update(ctx, fcj); err != nil {
+		return ctrl.Result{}, true, err
+	}
+	switch fcj.Status.PipelineStep {
+	case "provision-failed":
+		// Back to Validated: the pipeline then re-arms the provision annotation.
+		fcj.Status.Phase = fleetv1alpha1.JoinPhaseValidated
+		fcj.Status.Message = fmt.Sprintf("Retrying provision (attempt %d/%d)", retries+1, maxPipelineRetries)
+	default:
+		// Bootstrap failed (or the step is unknown): re-run it from ScriptIssued;
+		// the failure handler already cleared BootstrapJobName.
+		fcj.Status.Phase = fleetv1alpha1.JoinPhaseScriptIssued
+		fcj.Status.Message = fmt.Sprintf("Retrying bootstrap (attempt %d/%d)", retries+1, maxPipelineRetries)
+	}
+	if err := r.Status().Update(ctx, fcj); err != nil {
+		return ctrl.Result{}, true, err
+	}
+	return ctrl.Result{Requeue: true}, true, nil
 }
 
 // commitPipelineAction records a cluster bring-up step (bootstrap/provision) in
@@ -238,7 +284,7 @@ func (r *ClusterJoinReconciler) ensurePipelineBootstrap(ctx context.Context, fcj
 		r.finalizePipelineAction(ctx, fcj, fcj.Status.BootstrapActionID, fleetv1alpha1.ProvisionActionBootstrap, jobName, fleetv1alpha1.ProvisionPhaseFailed, "Bootstrap failed: "+msg)
 		fcj.Status.Phase = fleetv1alpha1.JoinPhaseFailed
 		fcj.Status.BootstrapJobName = ""
-		fcj.Status.PipelineStep = ""
+		fcj.Status.PipelineStep = "bootstrap-failed"
 		fcj.Status.Message = "Bootstrap failed: " + msg
 		if err := r.Status().Update(ctx, fcj); err != nil {
 			return ctrl.Result{}, true, err
