@@ -861,6 +861,7 @@ export async function deleteFleetCluster(
     cleanupVms?: boolean;
     cleanupVmDeclarations?: boolean;
     cleanupApps?: boolean;
+    cleanupStorage?: boolean;
   },
 ): Promise<void> {
   const q = new URLSearchParams();
@@ -872,6 +873,7 @@ export async function deleteFleetCluster(
   }
   if (opts?.cleanupVmDeclarations) q.set('cleanupVmDeclarations', '1');
   if (opts?.cleanupApps) q.set('cleanupApps', '1');
+  if (opts?.cleanupStorage) q.set('cleanupStorage', '1');
   const qs = q.toString();
   const path = '/clusters/' + encodeURIComponent(name) + (qs ? '?' + qs : '');
   try {
@@ -895,6 +897,14 @@ export function fleetClusterIsConsoleProvisioned(c: FleetCluster): boolean {
 /** YAIDAP-managed site: its VMs can be destroyed on cluster delete. */
 export function fleetSiteIsYaidap(site?: FleetSite | null): boolean {
   return site?.spec?.provision?.provider === 'yaidap';
+}
+
+/** Cluster backed by an NFS export: its storage directory can be removed. */
+export function fleetClusterHasNfsStorage(c?: FleetCluster | null): boolean {
+  const s = c?.storage;
+  if (!s) return false;
+  if (s.nfs?.enabled) return true;
+  return s.backend === 'nfs_external';
 }
 
 export function fleetClusterIsDeleting(c: FleetCluster): boolean {

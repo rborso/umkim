@@ -29,6 +29,7 @@ import {
   enableClusterIngressAuth,
   enableClusterAcme,
   fleetClusterIsConsoleProvisioned,
+  fleetClusterHasNfsStorage,
   fleetClusterIsDeleting,
   fleetClusterIsPending,
   fleetClusterPhase,
@@ -120,6 +121,7 @@ export function ClusterDetailPage() {
   const [deleteCleanupVms, setDeleteCleanupVms] = useState(false);
   const [deleteCleanupVmDecls, setDeleteCleanupVmDecls] = useState(false);
   const [deleteCleanupApps, setDeleteCleanupApps] = useState(false);
+  const [deleteCleanupStorage, setDeleteCleanupStorage] = useState(false);
   const [nodesFetchFailed, setNodesFetchFailed] = useState(false);
   const [tab, setTab] = useState<string | number>('overview');
 
@@ -256,6 +258,7 @@ export function ClusterDetailPage() {
     setDeleteCleanupVms(false);
     setDeleteCleanupVmDecls(false);
     setDeleteCleanupApps(false);
+    setDeleteCleanupStorage(false);
     setDeleteError(null);
     setDeleteOpen(true);
   };
@@ -270,6 +273,7 @@ export function ClusterDetailPage() {
         cleanupVms: consoleProvisioned && deleteCleanupVms,
         cleanupVmDeclarations: consoleProvisioned && deleteCleanupVmDecls,
         cleanupApps: consoleProvisioned && deleteCleanupApps,
+        cleanupStorage: consoleProvisioned && deleteCleanupStorage,
       });
       setDeleteOpen(false);
       navigate('/clusters');
@@ -822,6 +826,21 @@ export function ClusterDetailPage() {
               </LabeledField>
             )}
           </>
+        )}
+        {consoleProvisioned && fleetClusterHasNfsStorage(cluster) && (
+          <LabeledField
+            label="Delete the cluster's storage export"
+            fieldId="deleteCleanupStorage"
+            help={getFieldHelp('clusterDelete.cleanupStorage')}
+          >
+            <Checkbox
+              id="deleteCleanupStorage"
+              label="Delete the cluster's storage export (data)"
+              isChecked={deleteCleanupStorage}
+              onChange={(_e, checked) => setDeleteCleanupStorage(checked)}
+              data-testid="cluster-delete-cleanup-storage"
+            />
+          </LabeledField>
         )}
         {!consoleProvisioned && cluster?.available && (
           <p>

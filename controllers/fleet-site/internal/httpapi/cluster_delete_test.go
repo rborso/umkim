@@ -97,17 +97,19 @@ func TestDeleteClusterAlreadyDeleting(t *testing.T) {
 // Uninstalling the applications is independent.
 func TestDeleteClusterVmCleanupImpliesLowerLevels(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		query string
-		k8s   bool
-		vms   bool
-		decls bool
-		apps  bool
+		name    string
+		query   string
+		k8s     bool
+		vms     bool
+		decls   bool
+		apps    bool
+		storage bool
 	}{
 		{name: "vms only", query: "?cleanupVms=1", k8s: true, vms: true},
 		{name: "declarations only", query: "?cleanupVmDeclarations=1", k8s: true, vms: true, decls: true},
 		{name: "apps only", query: "?cleanupApps=1", apps: true},
-		{name: "all four", query: "?cleanupKubernetes=1&cleanupVms=1&cleanupVmDeclarations=1&cleanupApps=1", k8s: true, vms: true, decls: true, apps: true},
+		{name: "storage only", query: "?cleanupStorage=1", storage: true},
+		{name: "all five", query: "?cleanupKubernetes=1&cleanupVms=1&cleanupVmDeclarations=1&cleanupApps=1&cleanupStorage=1", k8s: true, vms: true, decls: true, apps: true, storage: true},
 		{name: "none", query: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -143,6 +145,7 @@ func TestDeleteClusterVmCleanupImpliesLowerLevels(t *testing.T) {
 				{annotationCleanupVms, tc.vms},
 				{annotationCleanupVmDecls, tc.decls},
 				{annotationCleanupApps, tc.apps},
+				{annotationCleanupStorage, tc.storage},
 			} {
 				if v := got.Annotations[want.key] == "true"; v != want.set {
 					t.Fatalf("%s=%q want set=%v", want.key, got.Annotations[want.key], want.set)

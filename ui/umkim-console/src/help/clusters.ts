@@ -266,6 +266,11 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
       'Uninstall the cluster\'s applications first, while the spoke is still reachable: each Helm release is removed and its route and OIDC client are dropped. Independent of the Kubernetes and VM options — useful on its own to empty a cluster you intend to keep.',
     example: 'false',
   },
+  'clusterDelete.cleanupStorage': {
+    description:
+      'Delete the cluster\'s NFS export directory on the storage host, including all PersistentVolume data. This is the only delete option that removes data, and it is independent of the others. Requires the cluster nodes to be reachable.',
+    example: 'false',
+  },
   'clusterDelete.cleanupKubernetes': {
     description:
       'Uninstall K3s and wipe local cluster state on all nodes. Leave unchecked to detach from the fleet while keeping Kubernetes and your application pods running (standalone K3s).',

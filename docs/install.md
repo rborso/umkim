@@ -195,9 +195,10 @@ spoke ingress probe details.
 To remove a cluster from the hub without wiping workloads, delete it with the
 default **detach** mode. Full K3s reset is opt-in (`cleanupKubernetes=true`).
 `cleanupApps=true` uninstalls the cluster's applications first (while the spoke
-is reachable), and on a YAIDAP site `cleanupVms=true` also destroys the
-cluster's guest VMs (with `cleanupVmDeclarations=true` dropping them from the
-site inventory) so no manual cleanup is needed.
+is reachable), `cleanupStorage=true` deletes the cluster's NFS export directory
+on the storage host (this deletes data), and on a YAIDAP site `cleanupVms=true`
+also destroys the cluster's guest VMs (with `cleanupVmDeclarations=true` dropping
+them from the site inventory) so no manual cleanup is needed.
 See [playbooks/flows/cluster-delete.yml](../playbooks/flows/cluster-delete.yml).
 
 ## 6. Install a Helm chart on a selected cluster

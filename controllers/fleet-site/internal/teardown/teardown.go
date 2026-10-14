@@ -19,6 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// spokeKubeconfigSecretNS holds the hub-side kubeconfig Secret for each spoke.
+const spokeKubeconfigSecretNS = "fleet-system"
+
 // ManifestWorkNames matches inventory fleet_cleanup_manifestworks (hub-delivered spoke workloads).
 var ManifestWorkNames = []string{
 	"fleet-ingress-auth",
@@ -173,15 +176,32 @@ func ReconcileDomains(ctx context.Context, c client.Client, cfg config.Config) e
 	return registry.ReconcileEdgeDomains(ctx, c, domainCfg)
 }
 
+// clusterSecretNames are the per-cluster hub Secrets removed with the cluster.// The ingress-auth secret is included because the ingress-auth reconciler only
+// builds desired state for Ready joins, so once the cluster is Deleting nothing
+// recreates it — it would otherwise sit on the hub forever.
 func clusterSecretNames(clusterName string) []string {
 	return []string{
 		"fleet-cluster-" + clusterName + "-bootstrap",
 		"fleet-cluster-" + clusterName + "-ansible-ssh",
+		"fleet-ingress-auth-" + clusterName,
 	}
 }
 
 func clusterInventoryCM(clusterName string) string {
 	return "fleet-cluster-" + clusterName + "-inventory"
+}
+
+// deleteClusterKubeconfigSecret removes the spoke kubeconfig the hub keeps for a
+// cluster. It lives in the spoke-kubeconfig namespace, not the controller one.
+func deleteClusterKubeconfigSecret(ctx context.Context, c client.Client, clusterName string) error {
+	obj := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name:      "fleet-kubeconfig-" + clusterName,
+		Namespace: spokeKubeconfigSecretNS,
+	}}
+	if err := c.Delete(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 // DeleteClusterJoinArtifacts removes bootstrap secrets, inventory CM, and cluster-scoped jobs after FCJ delete.
@@ -192,6 +212,9 @@ func DeleteClusterJoinArtifacts(ctx context.Context, c client.Client, cfg config
 		if err := c.Delete(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+	}
+	if err := deleteClusterKubeconfigSecret(ctx, c, clusterName); err != nil {
+		return err
 	}
 	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: clusterInventoryCM(clusterName), Namespace: ns}}
 	if err := c.Delete(ctx, cm); err != nil && !apierrors.IsNotFound(err) {
@@ -224,6 +247,9 @@ func TeardownOrphanCluster(ctx context.Context, c client.Client, cfg config.Conf
 	}
 	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: clusterInventoryCM(clusterName), Namespace: ns}}
 	if err := c.Delete(ctx, cm); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if err := deleteClusterKubeconfigSecret(ctx, c, clusterName); err != nil {
 		return err
 	}
 	var jobs batchv1.JobList

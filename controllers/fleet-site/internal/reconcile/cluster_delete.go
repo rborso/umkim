@@ -23,6 +23,7 @@ import (
 const (
 	annotationWGPeersRemoved     = "fleet.umkim.com/wg-peers-removed"
 	annotationCleanupKubernetes  = "fleet.umkim.com/cleanup-kubernetes"
+	annotationCleanupStorage     = "fleet.umkim.com/cleanup-storage"
 	annotationDeleteJobSucceeded = "fleet.umkim.com/delete-job-succeeded"
 	annotationDeleteJobFails     = "fleet.umkim.com/delete-job-fails"
 	// deleteJobMaxAttempts bounds Ansible delete-job retries before the hub falls
@@ -36,6 +37,13 @@ func wgPeersRemoved(fcj *fleetv1alpha1.FleetClusterJoin) bool {
 
 func clusterCleanupKubernetes(fcj *fleetv1alpha1.FleetClusterJoin) bool {
 	return fcj.Annotations != nil && fcj.Annotations[annotationCleanupKubernetes] == "true"
+}
+
+// clusterCleanupStorage removes the cluster's NFS export directory on the storage
+// host. It is the only cleanup that deletes persistent data, so it is opt-in and
+// independent of the others.
+func clusterCleanupStorage(fcj *fleetv1alpha1.FleetClusterJoin) bool {
+	return fcj.Annotations != nil && fcj.Annotations[annotationCleanupStorage] == "true"
 }
 
 func deleteJobSucceeded(fcj *fleetv1alpha1.FleetClusterJoin) bool {
@@ -351,7 +359,8 @@ func (r *ClusterJoinReconciler) startClusterDelete(ctx context.Context, fcj *fle
 	hubOnly := len(nodeWG) == 0
 	cleanupKubernetes := clusterCleanupKubernetes(fcj)
 	j := jobs.DeleteJob(fcj.Namespace, clusterName, fcj.Spec.SiteId, r.Cfg.AnsibleRunnerImage,
-		clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), hubOnly, cleanupKubernetes)
+		clusterSSHSecretName(clusterName), clusterInventoryCMName(clusterName), hubOnly, cleanupKubernetes,
+		clusterCleanupStorage(fcj))
 	j.Name = jobName
 	if err := controllerutil.SetControllerReference(fcj, j, r.Scheme); err != nil {
 		return err

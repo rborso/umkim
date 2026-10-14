@@ -27,6 +27,7 @@ import {
   createFleetCluster,
   deleteFleetCluster,
   fleetClusterIsConsoleProvisioned,
+  fleetClusterHasNfsStorage,
   fleetClusterPhase,
   fleetDefaultWorkloadSiteId,
   fleetSiteById,
@@ -148,6 +149,7 @@ export function ClustersPage() {
   const [deleteCleanupVms, setDeleteCleanupVms] = useState(false);
   const [deleteCleanupVmDecls, setDeleteCleanupVmDecls] = useState(false);
   const [deleteCleanupApps, setDeleteCleanupApps] = useState(false);
+  const [deleteCleanupStorage, setDeleteCleanupStorage] = useState(false);
   const [localPathEnabled, setLocalPathEnabled] = useState(true);
   const [nfsLocalEnabled, setNfsLocalEnabled] = useState(false);
   const [nfsEnabled, setNfsEnabled] = useState(false);
@@ -361,6 +363,7 @@ export function ClustersPage() {
     setDeleteCleanupVms(false);
     setDeleteCleanupVmDecls(false);
     setDeleteCleanupApps(false);
+    setDeleteCleanupStorage(false);
     setDeleteError(null);
     setDeleteOpen(true);
   };
@@ -375,6 +378,7 @@ export function ClustersPage() {
         cleanupVms: deleteConsoleProvisioned && deleteCleanupVms,
         cleanupVmDeclarations: deleteConsoleProvisioned && deleteCleanupVmDecls,
         cleanupApps: deleteConsoleProvisioned && deleteCleanupApps,
+        cleanupStorage: deleteConsoleProvisioned && deleteCleanupStorage,
       });
       setDeleteOpen(false);
       setDeleteTarget(null);
@@ -840,6 +844,21 @@ export function ClustersPage() {
               isChecked={deleteCleanupKubernetes}
               onChange={(_e, checked) => setDeleteCleanupKubernetes(checked)}
               data-testid="cluster-delete-cleanup-kubernetes"
+            />
+          </LabeledField>
+        )}
+        {deleteConsoleProvisioned && fleetClusterHasNfsStorage(deleteTarget) && (
+          <LabeledField
+            label="Delete the cluster's storage export"
+            fieldId="deleteCleanupStorage"
+            help={getFieldHelp('clusterDelete.cleanupStorage')}
+          >
+            <Checkbox
+              id="deleteCleanupStorage"
+              label="Delete the cluster's storage export (data)"
+              isChecked={deleteCleanupStorage}
+              onChange={(_e, checked) => setDeleteCleanupStorage(checked)}
+              data-testid="cluster-delete-cleanup-storage"
             />
           </LabeledField>
         )}

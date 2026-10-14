@@ -282,13 +282,16 @@ func ValidateStorageJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret
 	return ansibleJob(ns, jobName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 120)
 }
 
-func DeleteJob(ns, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, hubOnly, cleanupKubernetes bool) *batchv1.Job {
+func DeleteJob(ns, clusterName, siteID, runnerImage, sshSecret, inventoryCM string, hubOnly, cleanupKubernetes, cleanupStorage bool) *batchv1.Job {
 	args := ansiblePlaybookArgs("/ansible/cluster-delete-hub.yml", clusterName, siteID)
 	if hubOnly {
 		args = append(args, "-e", "fleet_cluster_delete_hub_only=true")
 	}
 	if cleanupKubernetes {
 		args = append(args, "-e", "fleet_cluster_cleanup_kubernetes=true")
+	}
+	if cleanupStorage {
+		args = append(args, "-e", "fleet_cluster_cleanup_storage=true")
 	}
 	return ansibleJob(ns, "fleet-cluster-delete-"+clusterName, clusterName, runnerImage, args, sshSecret, inventoryCM, "", 1200)
 }

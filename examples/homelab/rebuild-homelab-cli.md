@@ -73,11 +73,12 @@ Expected long steps: `virt03 install_bm`, HA `create_vm` ×4, HA `wait Ready` (u
 
 ```bash
 umkim whoami
-umkim cluster delete lab-single-0 --cleanup-apps --cleanup-vms --cleanup-vm-declarations || true
-umkim cluster delete lab-ha-0 --cleanup-apps --cleanup-vms --cleanup-vm-declarations || true
+umkim cluster delete lab-single-0 --cleanup-apps --cleanup-storage --cleanup-vms --cleanup-vm-declarations || true
+umkim cluster delete lab-ha-0 --cleanup-apps --cleanup-storage --cleanup-vms --cleanup-vm-declarations || true
 ```
 
 `--cleanup-apps` uninstalls the apps while the spoke is still up;
+`--cleanup-storage` removes the cluster's NFS export directory (its data);
 `--cleanup-vms --cleanup-vm-declarations` then destroys the guest VMs and drops
 their inventory entries, so the manual virsh sweep below is only needed for
 guests that YAIDAP does not manage.
