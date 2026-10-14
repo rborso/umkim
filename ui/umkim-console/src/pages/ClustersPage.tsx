@@ -64,24 +64,14 @@ import {
   hostSelectOptions,
   isPlaceholderAddress,
 } from '../utils/clusterHosts';
+import {
+  buildCreateNodes,
+  defaultHaControlNodes,
+  defaultSingleNode,
+} from '../utils/clusterCreate';
 import { useFleetClustersQuery, useFleetSitesQuery, useInvalidateFleet } from '../hooks/useFleetQueries';
 import { useAuth } from '../auth/AuthContext';
 import { canMutate } from '../auth/roles';
-
-const defaultHaControlNodes = (clusterName: string): FleetClusterNodeInput[] =>
-  [1, 2, 3].map((i) => ({
-    hostname: clusterName ? `${clusterName}-${i}` : '',
-    address: `198.51.100.2${i}`,
-    role: 'control' as const,
-  }));
-
-const defaultSingleNode = (clusterName: string, address: string): FleetClusterNodeInput[] => [
-  {
-    hostname: clusterName || 'node',
-    address,
-    role: 'control',
-  },
-];
 
 const emptyClusterForm = (siteId = ''): FleetClusterCreate => ({
   clusterName: '',
@@ -573,43 +563,7 @@ export function ClustersPage() {
       if (prov.kubevirt) caps.kvm = true;
       const isHa = topology === 'ha_3_node';
       if (isHa) caps.ha_topology = true;
-      let nodes: FleetClusterNodeInput[] | undefined;
-      if (isHa) {
-        const controls = (form.nodes || defaultHaControlNodes(form.clusterName))
-          .filter((n) => (n.role || 'control') === 'control')
-          .slice(0, 3)
-          .map((n, i) => ({
-            ...n,
-            role: 'control' as const,
-            hostname: n.hostname || `${form.clusterName}-${i + 1}`,
-          }));
-        while (controls.length < 3) {
-          const i = controls.length;
-          const fallback = defaultHaControlNodes(form.clusterName)[i];
-          controls.push({
-            ...fallback,
-            role: 'control' as const,
-            hostname: fallback.hostname || `${form.clusterName}-${i + 1}`,
-          });
-        }
-        const workers = (form.nodes || [])
-          .filter((n) => n.role === 'worker')
-          .map((n, i) => ({
-            ...n,
-            role: 'worker' as const,
-            hostname: n.hostname || `${form.clusterName}-w${i + 1}`,
-          }));
-        nodes = [...controls, ...workers];
-      } else {
-        nodes = [
-          {
-            hostname: form.clusterName || 'node',
-            address: form.bootstrapHost,
-            role: 'control' as const,
-            labels: form.nodes?.[0]?.labels,
-          },
-        ];
-      }
+      const nodes = buildCreateNodes(topology, form);
       const bootstrapHost = isHa ? nodes[0]?.address || form.bootstrapHost : form.bootstrapHost;
       if (isHa && !controlPlaneVip.trim()) {
         setActionError(new Error('Control-plane VIP is required for 3-node HA'));
