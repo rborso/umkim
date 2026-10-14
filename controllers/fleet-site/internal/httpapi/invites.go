@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -118,6 +119,13 @@ func (s *Server) listInvites(w http.ResponseWriter, r *http.Request) {
 	for _, inv := range all {
 		views = append(views, inviteToView(inv, now))
 	}
+	// invites.Load returns a map, so order newest first (then by id) before answering.
+	sort.SliceStable(views, func(i, j int) bool {
+		if views[i].CreatedAt == views[j].CreatedAt {
+			return views[i].ID < views[j].ID
+		}
+		return views[i].CreatedAt > views[j].CreatedAt
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"invites": views})
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -255,6 +256,9 @@ func (s *Server) handleListClusters(ctx context.Context, w http.ResponseWriter) 
 		out = append(out, clusterSummaryFromJoin(&joins[i]))
 		seen[joins[i].Spec.EffectiveClusterName(joins[i].Name)] = true
 	}
+	// listManagedClusters and pendingJoinsFromMap both iterate maps, so order by
+	// name before answering.
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	writeJSON(w, http.StatusOK, map[string]interface{}{"clusters": out})
 }
 

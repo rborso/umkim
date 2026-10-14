@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 
 	authv1 "github.com/rborso/umkim/controllers/fleet-console-auth/api/v1alpha1"
@@ -23,6 +24,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		sortByName(list.Items, func(u authv1.FleetUser) string { return u.Name })
 		writeJSON(w, http.StatusOK, map[string]interface{}{"users": list.Items})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -85,6 +87,7 @@ func (s *Server) handleGroups(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		var list authv1.FleetGroupList
 		_ = s.Client.List(r.Context(), &list, client.InNamespace(s.Cfg.Namespace))
+		sortByName(list.Items, func(g authv1.FleetGroup) string { return g.Name })
 		writeJSON(w, http.StatusOK, map[string]interface{}{"groups": list.Items})
 	case http.MethodPost:
 		var g authv1.FleetGroup
@@ -137,6 +140,7 @@ func (s *Server) handleRoleBindings(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		var list authv1.FleetRoleBindingList
 		_ = s.Client.List(r.Context(), &list, client.InNamespace(s.Cfg.Namespace))
+		sortByName(list.Items, func(rb authv1.FleetRoleBinding) string { return rb.Name })
 		writeJSON(w, http.StatusOK, map[string]interface{}{"roleBindings": list.Items})
 	case http.MethodPost:
 		var rb authv1.FleetRoleBinding
@@ -206,6 +210,7 @@ func (s *Server) handleServiceAccounts(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		var list authv1.FleetServiceAccountList
 		_ = s.Client.List(r.Context(), &list, client.InNamespace(s.Cfg.Namespace))
+		sortByName(list.Items, func(sa authv1.FleetServiceAccount) string { return sa.Name })
 		writeJSON(w, http.StatusOK, map[string]interface{}{"serviceAccounts": list.Items})
 	case http.MethodPost:
 		var sa authv1.FleetServiceAccount
@@ -297,6 +302,14 @@ func (s *Server) handleAuditEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	var list authv1.FleetAuditEventList
 	_ = s.Client.List(r.Context(), &list, client.InNamespace(s.Cfg.Namespace))
+	// Audit events are shown newest first; cached List order is not meaningful.
+	sort.SliceStable(list.Items, func(i, j int) bool {
+		ti, tj := list.Items[i].Spec.Timestamp, list.Items[j].Spec.Timestamp
+		if ti.Equal(&tj) {
+			return list.Items[i].Name < list.Items[j].Name
+		}
+		return tj.Before(&ti)
+	})
 	writeJSON(w, http.StatusOK, map[string]interface{}{"auditEvents": list.Items})
 	actor, _ := s.resolveActor(r)
 	_ = s.Audit.Record(r.Context(), authorizer.SubjectRefFromActor(actor), "audit.list", "allow", nil, nil, httpInfo(r), "")

@@ -54,6 +54,7 @@ func (s *Server) handleLLMApiKeys(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		sortByName(keys, func(k authv1.FleetLLMApiKey) string { return k.Name })
 		writeJSON(w, http.StatusOK, llmApiKeyListResponse{
 			APIEndpoint: s.llmPublicEndpoint(r.Context()),
 			Keys:        keys,

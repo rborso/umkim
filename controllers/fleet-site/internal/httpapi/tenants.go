@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"sort"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -77,6 +78,20 @@ func (s *Server) listTenants(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	// The directory returns groups and users in no defined order; sort so the
+	// console's tenant and member lists are stable.
+	sort.SliceStable(groups, func(i, j int) bool {
+		if groups[i].DisplayName == groups[j].DisplayName {
+			return groups[i].ID < groups[j].ID
+		}
+		return groups[i].DisplayName < groups[j].DisplayName
+	})
+	sort.SliceStable(users, func(i, j int) bool {
+		if users[i].DisplayName == users[j].DisplayName {
+			return users[i].ID < users[j].ID
+		}
+		return users[i].DisplayName < users[j].DisplayName
+	})
 	views := make([]tenantGroupView, 0, len(groups))
 	for _, g := range groups {
 		members := g.Users

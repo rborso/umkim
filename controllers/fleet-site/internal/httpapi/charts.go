@@ -79,6 +79,7 @@ func (s *Server) listCharts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	sortByName(list.Items, func(c fleetv1alpha1.FleetChart) string { return c.Name })
 	out := make([]chartResponse, 0, len(list.Items))
 	for i := range list.Items {
 		out = append(out, chartToResponse(&list.Items[i]))

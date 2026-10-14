@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -160,9 +161,15 @@ func (s *Server) listSiteInventoryGuests(ctx context.Context, w http.ResponseWri
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	out := make([]interface{}, 0, len(guests))
-	for name, spec := range guests {
-		out = append(out, map[string]interface{}{"name": name, "spec": spec})
+	// LoadBundle returns a map, so order the guests by name before answering.
+	names := make([]string, 0, len(guests))
+	for name := range guests {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	out := make([]interface{}, 0, len(names))
+	for _, name := range names {
+		out = append(out, map[string]interface{}{"name": name, "spec": guests[name]})
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": out})
 }

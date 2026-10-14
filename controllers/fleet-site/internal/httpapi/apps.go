@@ -102,6 +102,7 @@ func (s *Server) listApps(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	sortByName(list.Items, func(a fleetv1alpha1.FleetApp) string { return a.Name })
 	out := make([]appResponse, 0, len(list.Items))
 	for i := range list.Items {
 		out = append(out, appToResponse(&list.Items[i]))

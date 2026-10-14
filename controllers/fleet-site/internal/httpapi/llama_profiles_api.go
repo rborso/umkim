@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -137,6 +138,7 @@ func (s *Server) listLlamaProfiles(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	sortByName(list.Items, func(p fleetv1alpha1.FleetLlamaProfile) string { return p.Name })
 	out := make([]llamaProfileResponse, 0, len(list.Items))
 	for i := range list.Items {
 		out = append(out, profileToResponse(&list.Items[i]))
@@ -397,6 +399,14 @@ func (s *Server) listLlamaProfileTests(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Tests are shown newest first; cached List order is not meaningful.
+	sort.SliceStable(list.Items, func(i, j int) bool {
+		ti, tj := list.Items[i].CreationTimestamp, list.Items[j].CreationTimestamp
+		if ti.Equal(&tj) {
+			return list.Items[i].Name < list.Items[j].Name
+		}
+		return tj.Before(&ti)
+	})
 	extendedOnly := strings.EqualFold(r.URL.Query().Get("extended"), "true")
 	activeOnly := strings.EqualFold(r.URL.Query().Get("active"), "true")
 	out := make([]llamaProfileTestResponse, 0)
