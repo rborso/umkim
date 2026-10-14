@@ -3,6 +3,8 @@
 #
 # Default: detach from fleet (keeps K3s + user workloads).
 # Set fleet_flow_cleanup_kubernetes=true to reset K3s on all nodes.
+# Set fleet_flow_cleanup_apps=true to uninstall the cluster's applications first
+# (needs the spoke reachable; independent of the flags below).
 # Set fleet_flow_cleanup_vms=true to also destroy the site VMs backing the cluster
 # (YAIDAP sites only; implies the Kubernetes reset).
 # Set fleet_flow_cleanup_vm_declarations=true to also drop the destroyed guests
@@ -38,7 +40,8 @@
               or fleet_flow_cleanup_vm_declarations | default(false) | bool) else '',
               'cleanupVms=true' if (fleet_flow_cleanup_vms | default(false) | bool
               or fleet_flow_cleanup_vm_declarations | default(false) | bool) else '',
-              'cleanupVmDeclarations=true' if (fleet_flow_cleanup_vm_declarations | default(false) | bool) else '']
+              'cleanupVmDeclarations=true' if (fleet_flow_cleanup_vm_declarations | default(false) | bool) else '',
+              'cleanupApps=true' if (fleet_flow_cleanup_apps | default(false) | bool) else '']
              | select('!=', '') | join('&') }}
 
     - name: Build delete URL
@@ -74,6 +77,8 @@
       ansible.builtin.debug:
         msg: >-
           Cluster {{ fleet_flow_cluster_name }} deleted{{
+            ' (applications uninstalled)' if (fleet_flow_cleanup_apps | default(false) | bool) else ''
+          }}{{
             ' (K3s reset on nodes)' if (fleet_flow_cleanup_kubernetes | default(false) | bool
               or fleet_flow_cleanup_vms | default(false) | bool
               or fleet_flow_cleanup_vm_declarations | default(false) | bool) else ''

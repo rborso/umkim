@@ -34,6 +34,12 @@ const (
 	VmCleanupPhaseFailed     = "Failed"
 	VmCleanupPhaseSkipped    = "Skipped"
 
+	// AppsCleanup phases for the optional uninstall of a cluster's applications
+	// during cluster delete.
+	AppsCleanupPhaseUninstalling = "Uninstalling"
+	AppsCleanupPhaseDone         = "Done"
+	AppsCleanupPhaseFailed       = "Failed"
+
 	ClusterCleanupFinalizer = "fleet.umkim.com/cluster-cleanup"
 
 	NodeRoleControl = "control"
@@ -283,6 +289,21 @@ type FleetClusterJoinStatus struct {
 	NodeOperation           *ClusterNodeOperationStatus       `json:"nodeOperation,omitempty"`
 	NodeOperationHistory    []ClusterNodeOperationRecord      `json:"nodeOperationHistory,omitempty"`
 	VmCleanup               *ClusterVmCleanupStatus           `json:"vmCleanup,omitempty"`
+	AppsCleanup             *ClusterAppsCleanupStatus         `json:"appsCleanup,omitempty"`
+}
+
+// ClusterAppsCleanupStatus tracks the optional uninstall of a cluster's
+// applications during cluster delete. The apps are deleted through their own
+// finalizer (which runs the Helm uninstall on the spoke and drops the route and
+// OIDC client), so Apps accumulates the work list and Completed the apps that
+// are gone.
+type ClusterAppsCleanupStatus struct {
+	Phase     string       `json:"phase,omitempty"`
+	Message   string       `json:"message,omitempty"`
+	Apps      []string     `json:"apps,omitempty"`
+	Completed []string     `json:"completed,omitempty"`
+	Failures  []string     `json:"failures,omitempty"`
+	StartedAt *metav1.Time `json:"startedAt,omitempty"`
 }
 
 // ClusterVmCleanupStatus tracks the optional destroy of a cluster's YAIDAP VM

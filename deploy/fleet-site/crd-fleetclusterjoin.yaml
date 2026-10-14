@@ -340,6 +340,35 @@ spec:
                       type: array
                       items:
                         type: string
+                appsCleanup:
+                  type: object
+                  description: >-
+                    Optional uninstall of the cluster's applications during cluster
+                    delete, driven through each FleetApp's own finalizer.
+                  properties:
+                    phase:
+                      type: string
+                      enum:
+                        - Uninstalling
+                        - Done
+                        - Failed
+                    message:
+                      type: string
+                    apps:
+                      type: array
+                      items:
+                        type: string
+                    completed:
+                      type: array
+                      items:
+                        type: string
+                    failures:
+                      type: array
+                      items:
+                        type: string
+                    startedAt:
+                      type: string
+                      format: date-time
                 managedClusterAvailable:
                   type: boolean
                 storage:

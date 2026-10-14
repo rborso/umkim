@@ -261,6 +261,11 @@ export const CLUSTERS_FIELD_HELP: Record<string, FieldHelpContent> = {
     description: 'When enabled, exposes LLDAP web UI at lldap.<site-zone> behind Authelia forward-auth.',
     example: 'false',
   },
+  'clusterDelete.cleanupApps': {
+    description:
+      'Uninstall the cluster\'s applications first, while the spoke is still reachable: each Helm release is removed and its route and OIDC client are dropped. Independent of the Kubernetes and VM options — useful on its own to empty a cluster you intend to keep.',
+    example: 'false',
+  },
   'clusterDelete.cleanupKubernetes': {
     description:
       'Uninstall K3s and wipe local cluster state on all nodes. Leave unchecked to detach from the fleet while keeping Kubernetes and your application pods running (standalone K3s).',

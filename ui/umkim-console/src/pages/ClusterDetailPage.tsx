@@ -119,6 +119,7 @@ export function ClusterDetailPage() {
   const [deleteCleanupKubernetes, setDeleteCleanupKubernetes] = useState(false);
   const [deleteCleanupVms, setDeleteCleanupVms] = useState(false);
   const [deleteCleanupVmDecls, setDeleteCleanupVmDecls] = useState(false);
+  const [deleteCleanupApps, setDeleteCleanupApps] = useState(false);
   const [nodesFetchFailed, setNodesFetchFailed] = useState(false);
   const [tab, setTab] = useState<string | number>('overview');
 
@@ -254,6 +255,7 @@ export function ClusterDetailPage() {
     setDeleteCleanupKubernetes(false);
     setDeleteCleanupVms(false);
     setDeleteCleanupVmDecls(false);
+    setDeleteCleanupApps(false);
     setDeleteError(null);
     setDeleteOpen(true);
   };
@@ -267,6 +269,7 @@ export function ClusterDetailPage() {
         cleanupKubernetes: consoleProvisioned && deleteCleanupKubernetes,
         cleanupVms: consoleProvisioned && deleteCleanupVms,
         cleanupVmDeclarations: consoleProvisioned && deleteCleanupVmDecls,
+        cleanupApps: consoleProvisioned && deleteCleanupApps,
       });
       setDeleteOpen(false);
       navigate('/clusters');
@@ -758,6 +761,21 @@ export function ClusterDetailPage() {
           removes hub WireGuard peers and the fleet overlay
           (wg-umkim) on nodes. User workloads on K3s are kept unless you opt in below.
         </p>
+        {consoleProvisioned && (
+          <LabeledField
+            label="Uninstall applications first"
+            fieldId="deleteCleanupApps"
+            help={getFieldHelp('clusterDelete.cleanupApps')}
+          >
+            <Checkbox
+              id="deleteCleanupApps"
+              label="Uninstall applications first"
+              isChecked={deleteCleanupApps}
+              onChange={(_e, checked) => setDeleteCleanupApps(checked)}
+              data-testid="cluster-delete-cleanup-apps"
+            />
+          </LabeledField>
+        )}
         {consoleProvisioned && (
           <LabeledField
             label="Uninstall Kubernetes (destroy cluster)"

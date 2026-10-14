@@ -45,30 +45,45 @@ OCM/DCM glue but keeps K3s; reset (`cleanupKubernetes`) additionally uninstalls
 K3s and wipes CNI/kubelet state and the control-plane VIP. The node play is
 skipped for hub-only clusters that have no node records.
 
-### YAIDAP VM cleanup on delete
+### Application and VM cleanup on delete
 
-On a site whose provisioner is YAIDAP the delete can also remove the cluster's
-nodes instead of leaving them for manual hypervisor cleanup. Two more opt-ins,
-each implying the one below it:
+Cluster delete can also remove what the cluster was running, instead of leaving
+apps and nodes for manual cleanup. Three of the four flags chain (each implies
+the one below it); uninstalling applications is independent, because emptying a
+cluster you intend to keep is a legitimate operation:
 
 | Flag (API / CLI / flow) | Effect |
 |-------------------------|--------|
+| `cleanupApps` / `--cleanup-apps` / `fleet_flow_cleanup_apps` | uninstall the cluster's applications through their own finalizers (Helm release, route, OIDC client); independent of the others |
+| `cleanupKubernetes` / `--cleanup-kubernetes` / `fleet_flow_cleanup_kubernetes` | reset K3s on the nodes |
 | `cleanupVms` / `--cleanup-vms` / `fleet_flow_cleanup_vms` | `destroy` each cluster node that is a YAIDAP VM guest; implies `cleanupKubernetes` |
 | `cleanupVmDeclarations` / `--cleanup-vm-declarations` / `fleet_flow_cleanup_vm_declarations` | also drop the destroyed guests from the site inventory (`guests.yml`, `host_vars`, status); implies `cleanupVms` |
 
-VM cleanup is the **last stage** of the delete, after the hub is detached and
-before the finalizer is removed, because the `destroy` guard only permits a
-guest whose `FleetClusterJoin` is `Deleting`. Guests are destroyed one at a time
-(the connector runs one action per site) and progress is mirrored on
-`FleetClusterJoin.status.vmCleanup` (`phase`, `hosts`, `completed`, `failures`)
-so the console and CLI can show "destroying VMs (2/3)".
+The stages run in that order, because each needs the state the previous one
+leaves behind:
 
-Only `kind: vm` guests are affected: bare-metal nodes, hypervisors and hosts
-missing from the inventory are skipped. A `destroy` that keeps failing is
-retried (`vmCleanupMaxAttempts`) and then reported in `vmCleanup.failures` while
-the cluster delete still completes — a broken hypervisor must not leave an
-undeletable cluster. Without `cleanupVmDeclarations` the guests stay `Declared`
-in the inventory, so **Provision** can recreate them.
+1. **Applications** first, while the spoke is reachable — deleting the
+   `FleetApp` objects lets the app reconciler run the Helm uninstall, drop the
+   route and OIDC client, and only then release the object.
+2. **Kubernetes reset** (the Ansible delete job) — needs the nodes reachable.
+3. **VM destroy** — the `destroy` guard only permits a guest whose
+   `FleetClusterJoin` is `Deleting`, so it runs before the finalizer is removed.
+4. **VM declarations** last.
+
+Progress is mirrored on the `FleetClusterJoin` status (`appsCleanup` and
+`vmCleanup`: `phase`, `hosts`/`apps`, `completed`, `failures`) so the console and
+CLI can show "uninstalling applications (1/3)" or "destroying VMs (2/3)".
+
+Apps are uninstalled one delete at a time by their own reconciler, bounded by
+`appsCleanupTimeout` (15m). VM guests are destroyed one at a time (the connector
+runs one action per site). Only `kind: vm` guests are affected: bare-metal nodes,
+hypervisors and hosts missing from the inventory are skipped.
+
+Neither stage may wedge the delete: when an uninstall or a `destroy` keeps
+failing it is recorded in `failures` (and left in `Deleting`, or in the inventory,
+respectively) while the cluster delete still completes — a broken spoke or
+hypervisor must not leave an undeletable cluster. Without `cleanupVmDeclarations`
+the guests stay `Declared` in the inventory, so **Provision** can recreate them.
 
 ## Site ingress
 

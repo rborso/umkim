@@ -75,7 +75,8 @@ it removes hub-managed resources while preserving the cluster and workloads
 unless an operator explicitly requests Kubernetes cleanup
 (`cleanupKubernetes=true` on delete). On a YAIDAP site the delete can also
 destroy the cluster's guest VMs (`cleanupVms=true`) and drop their inventory
-declarations (`cleanupVmDeclarations=true`).
+declarations (`cleanupVmDeclarations=true`), and it can uninstall the cluster's
+applications first (`cleanupApps=true`) while the spoke is still reachable.
 
 ## Hub independence
 
