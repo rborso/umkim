@@ -77,7 +77,7 @@ umkim cluster provision NAME | wait NAME [--phase Ready] [--timeout 30m]
 umkim cluster validate NAME
 umkim cluster discover NAME [--wait 5m]
 umkim cluster bootstrap NAME --bootstrap-host MGMT_IP [--ssh-user linux] [--jumphost user@host:port]
-umkim cluster delete NAME [--cleanup-kubernetes] [--cleanup-vms] [--cleanup-vm-declarations] [--wait] [--timeout 90m] [--interval 3m]
+umkim cluster delete NAME [--cleanup-apps] [--cleanup-kubernetes] [--cleanup-vms] [--cleanup-vm-declarations] [--wait] [--timeout 90m] [--interval 3m]
 umkim cluster ingress-auth enable NAME --lldap-password-file FILE [--expose-lldap-webui]
 umkim cluster ingress-auth disable NAME
 umkim cluster acme enable NAME

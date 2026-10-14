@@ -145,6 +145,20 @@ func (r *ClusterJoinReconciler) reconcileClusterDelete(ctx context.Context, fcj 
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// Optional first stage: uninstall the cluster's applications while the spoke is
+	// still reachable, before any Kubernetes reset or VM destroy.
+	appsDone, appsWait, err := r.reconcileClusterDeleteApps(ctx, fcj, clusterName)
+	if err != nil {
+		return r.failClusterDelete(ctx, fcj, err)
+	}
+	if !appsDone {
+		fcj.Status.Message = appsCleanupMessage(fcj)
+		if err := r.Status().Update(ctx, fcj); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: appsWait}, nil
+	}
+
 	// Run hub/spoke delete while overlay WG is still up so klusterlet can finish ManifestWork cleanup.
 	needsDeleteJob := r.clusterNeedsDeleteJob(ctx, fcj, clusterName)
 	if needsDeleteJob && deleteJobSucceeded(fcj) {

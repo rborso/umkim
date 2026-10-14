@@ -856,7 +856,12 @@ export async function deleteFleetSite(name: string): Promise<void> {
 
 export async function deleteFleetCluster(
   name: string,
-  opts?: { cleanupKubernetes?: boolean; cleanupVms?: boolean; cleanupVmDeclarations?: boolean },
+  opts?: {
+    cleanupKubernetes?: boolean;
+    cleanupVms?: boolean;
+    cleanupVmDeclarations?: boolean;
+    cleanupApps?: boolean;
+  },
 ): Promise<void> {
   const q = new URLSearchParams();
   if (opts?.cleanupKubernetes) q.set('cleanupKubernetes', '1');
@@ -866,6 +871,7 @@ export async function deleteFleetCluster(
     q.set('cleanupVms', '1');
   }
   if (opts?.cleanupVmDeclarations) q.set('cleanupVmDeclarations', '1');
+  if (opts?.cleanupApps) q.set('cleanupApps', '1');
   const qs = q.toString();
   const path = '/clusters/' + encodeURIComponent(name) + (qs ? '?' + qs : '');
   try {

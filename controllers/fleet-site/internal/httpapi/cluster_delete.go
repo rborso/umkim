@@ -20,16 +20,19 @@ const (
 	annotationCleanupKubernetes = "fleet.umkim.com/cleanup-kubernetes"
 	annotationCleanupVms        = "fleet.umkim.com/cleanup-vms"
 	annotationCleanupVmDecls    = "fleet.umkim.com/cleanup-vm-declarations"
+	annotationCleanupApps       = "fleet.umkim.com/cleanup-apps"
 )
 
 // clusterDeleteOptions captures the opt-in cleanup levels for a cluster delete.
 // Destroying the VMs that run the cluster implies the Kubernetes reset, and
 // removing the guest declarations implies destroying the VMs — each level needs
-// the one below it.
+// the one below it. Uninstalling the applications is independent: it is a
+// graceful spoke-side removal that is useful with or without a node reset.
 type clusterDeleteOptions struct {
 	cleanupKubernetes     bool
 	cleanupVms            bool
 	cleanupVmDeclarations bool
+	cleanupApps           bool
 }
 
 func parseClusterDeleteOptions(r *http.Request) clusterDeleteOptions {
@@ -37,6 +40,7 @@ func parseClusterDeleteOptions(r *http.Request) clusterDeleteOptions {
 		cleanupKubernetes:     queryParamBool(r, "cleanupKubernetes"),
 		cleanupVms:            queryParamBool(r, "cleanupVms"),
 		cleanupVmDeclarations: queryParamBool(r, "cleanupVmDeclarations"),
+		cleanupApps:           queryParamBool(r, "cleanupApps"),
 	}
 	if opts.cleanupVmDeclarations {
 		opts.cleanupVms = true
@@ -135,7 +139,7 @@ func (s *Server) markClusterDeleting(ctx context.Context, fcj *fleetv1alpha1.Fle
 		if !controllerutil.ContainsFinalizer(&latest, fleetv1alpha1.ClusterCleanupFinalizer) {
 			controllerutil.AddFinalizer(&latest, fleetv1alpha1.ClusterCleanupFinalizer)
 		}
-		if opts.cleanupKubernetes || opts.cleanupVms || opts.cleanupVmDeclarations {
+		if opts.cleanupKubernetes || opts.cleanupVms || opts.cleanupVmDeclarations || opts.cleanupApps {
 			if latest.Annotations == nil {
 				latest.Annotations = map[string]string{}
 			}
@@ -148,6 +152,9 @@ func (s *Server) markClusterDeleting(ctx context.Context, fcj *fleetv1alpha1.Fle
 		}
 		if opts.cleanupVmDeclarations {
 			latest.Annotations[annotationCleanupVmDecls] = "true"
+		}
+		if opts.cleanupApps {
+			latest.Annotations[annotationCleanupApps] = "true"
 		}
 		if err := s.Client.Patch(ctx, &latest, client.MergeFrom(metaOrig)); err != nil {
 			return err

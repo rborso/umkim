@@ -147,6 +147,7 @@ export function ClustersPage() {
   const [deleteCleanupKubernetes, setDeleteCleanupKubernetes] = useState(false);
   const [deleteCleanupVms, setDeleteCleanupVms] = useState(false);
   const [deleteCleanupVmDecls, setDeleteCleanupVmDecls] = useState(false);
+  const [deleteCleanupApps, setDeleteCleanupApps] = useState(false);
   const [localPathEnabled, setLocalPathEnabled] = useState(true);
   const [nfsLocalEnabled, setNfsLocalEnabled] = useState(false);
   const [nfsEnabled, setNfsEnabled] = useState(false);
@@ -359,6 +360,7 @@ export function ClustersPage() {
     setDeleteCleanupKubernetes(false);
     setDeleteCleanupVms(false);
     setDeleteCleanupVmDecls(false);
+    setDeleteCleanupApps(false);
     setDeleteError(null);
     setDeleteOpen(true);
   };
@@ -372,6 +374,7 @@ export function ClustersPage() {
         cleanupKubernetes: deleteConsoleProvisioned && deleteCleanupKubernetes,
         cleanupVms: deleteConsoleProvisioned && deleteCleanupVms,
         cleanupVmDeclarations: deleteConsoleProvisioned && deleteCleanupVmDecls,
+        cleanupApps: deleteConsoleProvisioned && deleteCleanupApps,
       });
       setDeleteOpen(false);
       setDeleteTarget(null);
@@ -810,6 +813,21 @@ export function ClustersPage() {
           ManifestWorks, revokes hub WireGuard peers, and removes the fleet overlay (wg-umkim) on
           nodes. User workloads on K3s are kept unless you opt in below.
         </p>
+        {deleteConsoleProvisioned && (
+          <LabeledField
+            label="Uninstall applications first"
+            fieldId="deleteCleanupApps"
+            help={getFieldHelp('clusterDelete.cleanupApps')}
+          >
+            <Checkbox
+              id="deleteCleanupApps"
+              label="Uninstall applications first"
+              isChecked={deleteCleanupApps}
+              onChange={(_e, checked) => setDeleteCleanupApps(checked)}
+              data-testid="cluster-delete-cleanup-apps"
+            />
+          </LabeledField>
+        )}
         {deleteConsoleProvisioned && (
           <LabeledField
             label="Uninstall Kubernetes (destroy cluster)"
