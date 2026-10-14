@@ -110,20 +110,27 @@ func (r *AppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 	}
 	jobName := appJobName("fa-i-", app.Name)
+	// Native-LDAP charts read the cluster directory's bind credentials from a
+	// Secret the job installs into the app namespace on the spoke.
+	directoryBind, bindErr := r.ensureDirectoryBindSecret(ctx, &app)
+	if bindErr != nil {
+		return r.failApp(ctx, &app, bindErr.Error())
+	}
 	job := jobs.HelmAppJob(jobs.HelmAppJobOpts{
-		Namespace:         app.Namespace,
-		JobName:           jobName,
-		Cluster:           app.Spec.ClusterName,
-		Chart:             chart,
-		Version:           strings.TrimSpace(app.Spec.Version),
-		Release:           release,
-		TargetNamespace:   ns,
-		Action:            "install",
-		RunnerImage:       r.Cfg.AnsibleRunnerImage,
-		ValuesConfigMap:   appValuesCMName(app.Name),
-		ImageMapConfigMap: imageMapCM,
-		RegistryHost:      appchart.NeedsRegistryLogin(chart),
-		HubSecretsName:    jobs.HubAnsibleSecretsName,
+		Namespace:           app.Namespace,
+		JobName:             jobName,
+		Cluster:             app.Spec.ClusterName,
+		Chart:               chart,
+		Version:             strings.TrimSpace(app.Spec.Version),
+		Release:             release,
+		TargetNamespace:     ns,
+		Action:              "install",
+		RunnerImage:         r.Cfg.AnsibleRunnerImage,
+		ValuesConfigMap:     appValuesCMName(app.Name),
+		ImageMapConfigMap:   imageMapCM,
+		RegistryHost:        appchart.NeedsRegistryLogin(chart),
+		HubSecretsName:      jobs.HubAnsibleSecretsName,
+		DirectoryBindSecret: directoryBind,
 	})
 	if err := controllerutil.SetControllerReference(&app, job, r.Scheme); err != nil {
 		return r.failApp(ctx, &app, err.Error())
@@ -251,6 +258,16 @@ func (r *AppReconciler) ensureValuesCM(ctx context.Context, app *fleetv1alpha1.F
 	if err != nil {
 		return err
 	}
+	// Charts that follow the UMKIM ingress convention (ingress.enabled/host/
+	// forwardAuth) get the public host and the Authelia gate filled in, so the
+	// operator does not have to restate them; anything the operator set wins.
+	if defaults := ingressValueDefaults(app); defaults != "" {
+		merged, err := appchart.MergeValuesYAML(defaults, data)
+		if err != nil {
+			return err
+		}
+		data = merged
+	}
 	if data == "" {
 		data = "{}\n"
 	}
@@ -271,22 +288,11 @@ func (r *AppReconciler) ensureValuesCM(ctx context.Context, app *fleetv1alpha1.F
 	return r.Update(ctx, &existing)
 }
 
-// substitutePlaceholders resolves UMKIM-managed values in the app values:
-//   ${APP_HOST}                  public host of the app's route
-//   ${FORWARD_AUTH}              "true" when any route requires Authelia
-//   ${FORWARD_AUTH_MIDDLEWARE}   the Authelia forward-auth middleware name
-//   ${OIDC_ISSUER_URL}           cluster Authelia OIDC issuer
-//   ${OIDC_CLIENT_ID}            app OIDC client id
-//   ${OIDC_CLIENT_SECRET}        generated app OIDC client secret
-//
-// This lets a chart opt into UMKIM's route/OIDC wiring without the operator
-// wiring hosts, middleware names, or secrets by hand.
-func (r *AppReconciler) substitutePlaceholders(ctx context.Context, app *fleetv1alpha1.FleetApp, data string) (string, error) {
-	if !strings.Contains(data, "${") {
-		return data, nil
-	}
+// appRouteHostAndAuth returns the app's first routed host and whether any route
+// requires Authelia.
+func appRouteHostAndAuth(app *fleetv1alpha1.FleetApp) (string, bool) {
 	host := ""
-	forwardAuth := "false"
+	forwardAuth := false
 	for _, rt := range app.Spec.EffectiveRoutes() {
 		h := strings.TrimSpace(rt.SiteHost)
 		if h == "" {
@@ -296,12 +302,53 @@ func (r *AppReconciler) substitutePlaceholders(ctx context.Context, app *fleetv1
 			host = h
 		}
 		if rt.RequireAuth {
-			forwardAuth = "true"
+			forwardAuth = true
 		}
 	}
+	return host, forwardAuth
+}
+
+// ingressValueDefaults renders the conventional ingress block for the app's first
+// route, or "" when the app has no routed host.
+func ingressValueDefaults(app *fleetv1alpha1.FleetApp) string {
+	host, forwardAuth := appRouteHostAndAuth(app)
+	if host == "" {
+		return ""
+	}
+	return fmt.Sprintf("ingress:\n  enabled: true\n  host: %q\n  forwardAuth: %t\n", host, forwardAuth)
+}
+
+// substitutePlaceholders resolves UMKIM-managed values in the app values:
+//
+//	${APP_HOST}                  public host of the app's route
+//	${FORWARD_AUTH}              "true" when any route requires Authelia
+//	${FORWARD_AUTH_MIDDLEWARE}   the Authelia forward-auth middleware name
+//	${LLDAP_BIND_SECRET}         Secret (in the app namespace) holding the
+//	                             cluster directory's bind credentials
+//	${LLDAP_LDAP_URL}            in-cluster directory LDAP host
+//	${OIDC_ISSUER_URL}           cluster Authelia OIDC issuer
+//	${OIDC_CLIENT_ID}            app OIDC client id
+//	${OIDC_CLIENT_SECRET}        generated app OIDC client secret
+//
+// This lets a chart opt into UMKIM's route/OIDC/directory wiring without the
+// operator wiring hosts, middleware names, or secrets by hand.
+func (r *AppReconciler) substitutePlaceholders(ctx context.Context, app *fleetv1alpha1.FleetApp, data string) (string, error) {
+	if !strings.Contains(data, "${") {
+		return data, nil
+	}
+	host, forwardAuth := appRouteHostAndAuth(app)
 	data = strings.ReplaceAll(data, "${APP_HOST}", host)
-	data = strings.ReplaceAll(data, "${FORWARD_AUTH}", forwardAuth)
+	data = strings.ReplaceAll(data, "${FORWARD_AUTH}", boolLabel(forwardAuth))
 	data = strings.ReplaceAll(data, "${FORWARD_AUTH_MIDDLEWARE}", "fleet-ingress-authelia@file")
+
+	if strings.Contains(data, "${LLDAP_") {
+		bindSecret, err := r.ensureDirectoryBindSecret(ctx, app)
+		if err != nil {
+			return "", err
+		}
+		data = strings.ReplaceAll(data, "${LLDAP_BIND_SECRET}", bindSecret)
+		data = strings.ReplaceAll(data, "${LLDAP_LDAP_URL}", directoryLDAPHost)
+	}
 
 	if !strings.Contains(data, "${OIDC_") {
 		return data, nil
@@ -331,6 +378,59 @@ func (r *AppReconciler) substitutePlaceholders(ctx context.Context, app *fleetv1
 	data = strings.ReplaceAll(data, "${OIDC_CLIENT_ID}", clientID)
 	data = strings.ReplaceAll(data, "${OIDC_CLIENT_SECRET}", secret)
 	return data, nil
+}
+
+// directoryLDAPHost is the in-cluster LDAP endpoint of a cluster's own directory
+// (the ingress-auth chart deploys LLDAP into this namespace on the cluster).
+const directoryLDAPHost = "lldap.fleet-ingress-auth.svc.cluster.local"
+
+// ensureDirectoryBindSecret holds a cluster's directory bind credentials on the
+// hub, keyed by app, so the app's helm job can install them into the app
+// namespace *on the spoke* (the controller cannot write to spoke namespaces
+// itself). The password is derived exactly as the ingress-auth chart derives it
+// (sha256 of the per-cluster LLDAP JWT secret), so no new secret plumbing is
+// introduced. Returns "" when the cluster has no directory of its own.
+func (r *AppReconciler) ensureDirectoryBindSecret(ctx context.Context, app *fleetv1alpha1.FleetApp) (string, error) {
+	var sec corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: ingressauth.ClusterSecretName(app.Spec.ClusterName)}, &sec); err != nil {
+		return "", nil
+	}
+	jwt := strings.TrimSpace(string(sec.Data["lldapJwtSecret"]))
+	if jwt == "" {
+		return "", nil
+	}
+	sum := sha256.Sum256([]byte(jwt))
+	name := app.Name + "-lldap-bind"
+	want := map[string]string{
+		"LLDAP_LDAP_USER_PASS": hex.EncodeToString(sum[:]),
+		"username":             "svc-bind",
+		"group":                "lldap_strict_readonly",
+	}
+	labels := map[string]string{"fleet.umkim.com/app": app.Name}
+	var existing corev1.Secret
+	switch err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: r.Cfg.Namespace}, &existing); {
+	case apierrors.IsNotFound(err):
+		if err := r.Create(ctx, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: r.Cfg.Namespace, Labels: labels},
+			StringData: want,
+		}); err != nil {
+			return "", err
+		}
+	case err != nil:
+		return "", err
+	default:
+		existing.StringData = want
+		if existing.Labels == nil {
+			existing.Labels = map[string]string{}
+		}
+		for k, v := range labels {
+			existing.Labels[k] = v
+		}
+		if err := r.Update(ctx, &existing); err != nil {
+			return "", err
+		}
+	}
+	return name, nil
 }
 
 func (r *AppReconciler) libraryChart(ctx context.Context, app *fleetv1alpha1.FleetApp) *fleetv1alpha1.FleetChart {
@@ -508,11 +608,11 @@ func (r *AppReconciler) ensureOneRoute(ctx context.Context, app *fleetv1alpha1.F
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, far, func() error {
 		far.Labels = map[string]string{"fleet.umkim.com/app": app.Name}
 		far.Spec = fleetedge.FleetAppRouteSpec{
-			InstanceID:  name,
-			Cluster:     app.Spec.ClusterName,
-			Mode:        mode,
-			HubHost:     hubHost,
-			SiteHost:    siteHost,
+			InstanceID:        name,
+			Cluster:           app.Spec.ClusterName,
+			Mode:              mode,
+			HubHost:           hubHost,
+			SiteHost:          siteHost,
 			RequireAuth:       rt.RequireAuth,
 			RequireAuthGroups: append([]string(nil), rt.RequireAuthGroups...),
 			HealthPath:        rt.EffectiveHealthPath(),

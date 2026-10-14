@@ -635,6 +635,17 @@ if [ "${FLEET_APP_ACTION}" = "uninstall" ]; then
   echo uninstalled
   exit 0
 fi
+# Directory bind credentials for native-LDAP charts: the controller derives them
+# on the hub, the job installs them into the app namespace on the spoke (the
+# controller cannot write to spoke namespaces itself).
+if [ -n "${FLEET_APP_DIRECTORY_BIND_SECRET:-}" ] && [ -f /secrets/directory/LLDAP_LDAP_USER_PASS ]; then
+  kubectl --kubeconfig "$KC" create namespace "${FLEET_APP_NAMESPACE}" --dry-run=client -o yaml | kubectl --kubeconfig "$KC" apply -f - >/dev/null
+  kubectl --kubeconfig "$KC" -n "${FLEET_APP_NAMESPACE}" create secret generic "${FLEET_APP_DIRECTORY_BIND_SECRET}" \
+    --from-file=LLDAP_LDAP_USER_PASS=/secrets/directory/LLDAP_LDAP_USER_PASS \
+    --from-literal=username=svc-bind --from-literal=group=lldap_strict_readonly \
+    --dry-run=client -o yaml | kubectl --kubeconfig "$KC" apply -f - >/dev/null
+  echo "directory bind secret ${FLEET_APP_DIRECTORY_BIND_SECRET} installed on ${FLEET_APP_CLUSTER}"
+fi
 if [ -n "${FLEET_APP_REGISTRY:-}" ]; then
   python3 - <<'PY'
 import yaml
@@ -691,6 +702,9 @@ type HelmAppJobOpts struct {
 	ImageMapConfigMap string
 	RegistryHost      string
 	HubSecretsName    string
+	// DirectoryBindSecret is a hub Secret with the cluster directory's bind
+	// credentials; the job installs it into the app namespace on the spoke.
+	DirectoryBindSecret string
 }
 
 func HelmAppJob(opts HelmAppJobOpts) *batchv1.Job {
@@ -713,6 +727,9 @@ func HelmAppJob(opts HelmAppJobOpts) *batchv1.Job {
 		{Name: "FLEET_APP_NAMESPACE", Value: opts.TargetNamespace},
 		{Name: "FLEET_APP_REGISTRY", Value: opts.RegistryHost},
 		{Name: "FLEET_APP_REGISTRY_USER", Value: "admin"},
+	}
+	if opts.DirectoryBindSecret != "" {
+		env = append(env, corev1.EnvVar{Name: "FLEET_APP_DIRECTORY_BIND_SECRET", Value: opts.DirectoryBindSecret})
 	}
 	mounts := []corev1.VolumeMount{
 		{Name: "kube", MountPath: "/etc/kube", ReadOnly: true},
@@ -746,6 +763,15 @@ func HelmAppJob(opts HelmAppJobOpts) *batchv1.Job {
 			Name: "imagemap",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: opts.ImageMapConfigMap}},
+			},
+		})
+	}
+	if opts.DirectoryBindSecret != "" && action != "uninstall" {
+		mounts = append(mounts, corev1.VolumeMount{Name: "directory-bind", MountPath: "/secrets/directory", ReadOnly: true})
+		volumes = append(volumes, corev1.Volume{
+			Name: "directory-bind",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{SecretName: opts.DirectoryBindSecret},
 			},
 		})
 	}
