@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -53,6 +54,14 @@ func SyncSiteIngressAssignments(ctx context.Context, c client.Client, cfg Domain
 		return err
 	}
 
+	siteSpecs := map[string]*fleetv1alpha1.FleetSiteSpec{}
+	for i := range list.Items {
+		fs := &list.Items[i]
+		fs.Spec.NormalizeIngress()
+		siteSpecs[fs.Spec.EffectiveSiteID(fs.Name)] = &fs.Spec
+	}
+	effective := effectiveIngressBindings(siteSpecs, bindings)
+
 	for i := range list.Items {
 		fs := &list.Items[i]
 		fs.Spec.NormalizeIngress()
@@ -63,7 +72,7 @@ func SyncSiteIngressAssignments(ctx context.Context, c client.Client, cfg Domain
 			ent := &fs.Spec.Edge.Ingress[j]
 			var assigned []string
 			if !mgmt {
-				assigned = clustersForIngress(siteID, ent.ID, bindings, clusterSite)
+				assigned = clustersForIngress(siteID, ent.ID, effective, clusterSite)
 			}
 			if !stringSliceEqual(ent.AssignedClusters, assigned) {
 				ent.AssignedClusters = assigned
@@ -84,13 +93,30 @@ func SyncSiteAssignedClusters(ctx context.Context, c client.Client, cfg DomainCo
 	return SyncSiteIngressAssignments(ctx, c, cfg)
 }
 
-func clustersForIngress(siteID, ingressID string, bindings map[string]edgeClusterBinding, clusterSite map[string]string) []string {
+// effectiveIngressBindings resolves each cluster's ingress id, falling back to
+// the site's sole port_forward entry when the cluster left ingressId unset (the
+// same implicit binding the route and edge-cluster code use).
+func effectiveIngressBindings(siteSpecs map[string]*fleetv1alpha1.FleetSiteSpec, bindings map[string]edgeClusterBinding) map[string]string {
+	out := make(map[string]string, len(bindings))
+	for name, ent := range bindings {
+		id := strings.TrimSpace(ent.IngressID)
+		if id == "" {
+			if sp := siteSpecs[ent.Site]; sp != nil {
+				id = sp.AutoIngressID()
+			}
+		}
+		out[name] = id
+	}
+	return out
+}
+
+func clustersForIngress(siteID, ingressID string, effective map[string]string, clusterSite map[string]string) []string {
 	out := []string{}
-	for clusterName, ent := range bindings {
+	for clusterName := range effective {
 		if clusterSite[clusterName] != siteID {
 			continue
 		}
-		if ent.IngressID == ingressID {
+		if effective[clusterName] == ingressID {
 			out = append(out, clusterName)
 		}
 	}

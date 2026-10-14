@@ -16,6 +16,11 @@ import (
 func validateSiteIngressRows(edge fleetv1alpha1.FleetSiteEdgeSpec, ingress []fleetv1alpha1.FleetSiteIngressSpec) error {
 	siteSpec := fleetv1alpha1.FleetSiteSpec{Edge: edge}
 	seen := map[string]struct{}{}
+	// wildcardOwner maps an effective port_forward wildcard to the id that
+	// claimed it. Two port_forward entries claiming the same public hostnames
+	// are always a misconfiguration: DNS and the router can only point one way,
+	// so one of the entries could never take effect.
+	wildcardOwner := map[string]string{}
 	for _, ent := range ingress {
 		id := strings.TrimSpace(ent.ID)
 		if id == "" {
@@ -38,6 +43,15 @@ func validateSiteIngressRows(edge fleetv1alpha1.FleetSiteEdgeSpec, ingress []fle
 				mode != fleetv1alpha1.WanAddressModeFixed && mode != fleetv1alpha1.WanAddressModeDNS {
 				return fmt.Errorf("ingress %q: wanAddressMode must be fixed or dns", id)
 			}
+			wildcard := strings.ToLower(strings.TrimSpace(ent.EffectiveWildcard()))
+			if wildcard == "" {
+				break
+			}
+			if owner, ok := wildcardOwner[wildcard]; ok {
+				return fmt.Errorf("ingress %q duplicates wildcard %q already used by ingress %q; two port_forward entries must not claim the same public hostnames",
+					id, wildcard, owner)
+			}
+			wildcardOwner[wildcard] = id
 		case fleetv1alpha1.IngressMethodReverseProxy:
 			// id only; address and operatorNotes optional
 		default:
@@ -115,6 +129,62 @@ func clusterIngressAllowsAuth(site *fleetv1alpha1.FleetSite, ingressID string) b
 	}
 	ci, err := ingress.ResolveClusterIngress(site.Spec, ingressID)
 	return err == nil && ci.AllowsAuth
+}
+
+// validateAppRouteHosts rejects site/hub route hosts that fall outside the
+// wildcard the cluster's bound ingress (site routes) or the site hub gateway
+// (hub routes) is configured for. A host outside the wildcard never resolves
+// publicly, so accepting it would silently publish a dead URL.
+func (s *Server) validateAppRouteHosts(ctx context.Context, clusterName string, routes []fleetv1alpha1.FleetAppRouteIntent) string {
+	clusterName = strings.TrimSpace(clusterName)
+	if clusterName == "" || len(routes) == 0 {
+		return ""
+	}
+	fcj, err := s.findFleetClusterJoin(ctx, clusterName)
+	if err != nil || fcj == nil {
+		return ""
+	}
+	siteID := strings.TrimSpace(fcj.Spec.SiteId)
+	if siteID == "" {
+		return ""
+	}
+	site, err := s.loadSiteForCluster(ctx, siteID)
+	if err != nil || site == nil {
+		return ""
+	}
+	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
+	if ingressID == "" {
+		ingressID = site.Spec.AutoIngressID()
+	}
+	ci := ingress.ClusterIngress{}
+	haveIngress := false
+	if ingressID != "" {
+		if resolved, rerr := ingress.ResolveClusterIngress(site.Spec, ingressID); rerr == nil {
+			ci = resolved
+			haveIngress = true
+		}
+	}
+	hubWildcard := strings.TrimSpace(site.Spec.EffectiveHubWildcard())
+	for _, rt := range routes {
+		switch rt.EffectiveMode() {
+		case fleetv1alpha1.AppRouteModeSite:
+			if !haveIngress {
+				continue
+			}
+			if err := ingress.ValidateRouteHost(ci, rt.SiteHost); err != nil {
+				return err.Error()
+			}
+		case fleetv1alpha1.AppRouteModeHub:
+			host := strings.TrimSpace(rt.HubHost)
+			if hubWildcard == "" || host == "" {
+				continue
+			}
+			if !ingress.HostMatchesWildcard(host, hubWildcard) {
+				return fmt.Sprintf("route hubHost %q is outside the site hub gateway wildcard %q", host, hubWildcard)
+			}
+		}
+	}
+	return ""
 }
 
 func writeIngressConflict(w http.ResponseWriter, err error) {

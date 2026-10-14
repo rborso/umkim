@@ -211,6 +211,53 @@ func WriteSiteIngress(site string, hubGateway bool, hubZone string, rows []map[s
 	return nil
 }
 
+// WriteSiteIngressVerify renders the read-only site ingress verification
+// response: one table row per (ingress entry, check).
+func WriteSiteIngressVerify(raw []byte, format Format) error {
+	if format == FormatJSON {
+		WriteJSON(raw)
+		return nil
+	}
+	var body struct {
+		Site string                   `json:"site"`
+		OK   bool                     `json:"ok"`
+		Rows []map[string]interface{} `json:"ingress"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return err
+	}
+	okLabel := "no"
+	if body.OK {
+		okLabel = "yes"
+	}
+	fmt.Printf("SITE\t%s\nOK\t%s\n", body.Site, okLabel)
+	rows := make([]map[string]interface{}, 0)
+	for _, r := range body.Rows {
+		id := strField(r, "id")
+		checks, _ := r["checks"].([]interface{})
+		for _, c := range checks {
+			cm, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			rows = append(rows, map[string]interface{}{
+				"id":     id,
+				"check":  strField(cm, "name"),
+				"status": strField(cm, "status"),
+				"detail": strField(cm, "detail"),
+			})
+		}
+	}
+	if len(rows) == 0 {
+		fmt.Println("No ingress checks.")
+		return nil
+	}
+	printTable([]string{"ID", "CHECK", "STATUS", "DETAIL"}, rows, func(r map[string]interface{}) []string {
+		return []string{strField(r, "id"), strField(r, "check"), strField(r, "status"), strField(r, "detail")}
+	})
+	return nil
+}
+
 func WriteSites(raw []byte, format Format) error {
 	if format == FormatJSON {
 		WriteJSON(raw)

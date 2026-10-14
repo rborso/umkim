@@ -184,10 +184,6 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 		return out, err
 	}
 	enabledSet := map[string]struct{}{}
-	accessUnion := map[string]struct{}{}
-	for _, d := range out.AccessDomains {
-		accessUnion[d] = struct{}{}
-	}
 	for _, fcj := range joins.Items {
 		name := fcj.Spec.EffectiveClusterName(fcj.Name)
 		if !fcj.Spec.IngressAuth.Enabled || fcj.Status.Phase != fleetv1alpha1.JoinPhaseReady {
@@ -227,12 +223,13 @@ func ComputeDesired(ctx context.Context, c client.Client, cfg config.Config, fia
 			}
 		}
 		out.ClusterConfigs[name] = cfgEntry
-		for _, d := range dns.AccessDomains {
-			accessUnion[d] = struct{}{}
-		}
 	}
 	out.EnabledClusters = sortedKeys(enabledSet)
-	out.AccessDomains = sortedKeys(accessUnion)
+	// Hub Authelia access domains stay scoped to the hub zone. Each spoke's
+	// Authelia allows its own ingress zone (ClusterAuthConfig.AccessDomains),
+	// and the hub only forward-auths hub-gateway hosts, so listing site zones
+	// here would only widen access to hosts the hub does not serve.
+	out.AccessDomains = sortedKeys(sliceToSet(out.AccessDomains))
 
 	rules, err := loadRouteAccessRules(ctx, c, cfg)
 	if err != nil {

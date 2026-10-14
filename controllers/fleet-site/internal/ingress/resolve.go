@@ -121,3 +121,24 @@ func DefaultSiteHost(release string, ci ClusterIngress) string {
 	}
 	return release + "." + ci.Zone
 }
+
+// ValidateRouteHost rejects a public route host that is not covered by the
+// resolved ingress wildcard. The wildcard is what the operator's DNS and router
+// are configured for, so a host outside it would never resolve publicly. When
+// the ingress has no wildcard (for example a reverse_proxy entry with no zone)
+// there is nothing to enforce and the host is accepted.
+func ValidateRouteHost(ci ClusterIngress, host string) error {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return nil
+	}
+	wildcard := strings.TrimSpace(ci.Wildcard)
+	if wildcard == "" {
+		return nil
+	}
+	if !HostMatchesWildcard(host, wildcard) {
+		return fmt.Errorf("host %q is outside the %s ingress %q wildcard %q",
+			host, ci.Method, ci.IngressID, wildcard)
+	}
+	return nil
+}

@@ -41,7 +41,48 @@ func siteIngressCmd() *cobra.Command {
 	cmd.AddCommand(siteIngressAddCmd())
 	cmd.AddCommand(siteIngressSetCmd())
 	cmd.AddCommand(siteIngressDeleteCmd())
+	cmd.AddCommand(siteIngressVerifyCmd())
 	return cmd
+}
+
+func siteIngressVerifyCmd() *cobra.Command {
+	var id string
+	c := &cobra.Command{
+		Use:   "verify [site]",
+		Short: "Read-only check of a site's ingress entries",
+		Long: `Check a site's ingress declarations without changing anything.
+
+Each entry is checked for: well-formed fields (zone, address per WAN mode), a
+unique wildcard (two port_forward entries must not claim the same public
+hostnames), the cluster binding and its cardinality, the site-mode routes
+published through it (host under the wildcard, DNS resolution, expected WAN
+address in fixed mode), and whether the bound spoke Traefik answers over the
+WireGuard address.
+
+The operator-managed WAN DNS and router port-forward cannot be checked from the
+hub and are reported as skipped.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			body := map[string]interface{}{}
+			if v := strings.TrimSpace(id); v != "" {
+				body["id"] = v
+			}
+			raw, code, err := api.Post("/sites/"+args[0]+"/ingress/verify", body)
+			if err != nil {
+				return err
+			}
+			if err := mustOK(raw, code, 200); err != nil {
+				return err
+			}
+			format, ferr := outputFormat()
+			if ferr != nil {
+				return ferr
+			}
+			return output.WriteSiteIngressVerify(raw, format)
+		},
+	}
+	c.Flags().StringVar(&id, "id", "", "Verify a single ingress entry id")
+	return c
 }
 
 func siteIngressListCmd() *cobra.Command {

@@ -14,6 +14,7 @@ import (
 	fleetedge "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/appchart"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/ingress"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/ingressauth"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/jobs"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/llm"
@@ -612,6 +613,18 @@ func (r *AppReconciler) ensureOneRoute(ctx context.Context, app *fleetv1alpha1.F
 	}
 	if siteHost == "" && mode == fleetv1alpha1.AppRouteModeSite {
 		return fmt.Errorf("route %q: siteHost is required for mode %s", name, mode)
+	}
+	edgeSite, edgeIngress, haveIngress := r.clusterEdgeSiteAndIngress(ctx, app.Spec.ClusterName)
+	if mode == fleetv1alpha1.AppRouteModeSite && haveIngress {
+		if err := ingress.ValidateRouteHost(edgeIngress, siteHost); err != nil {
+			return fmt.Errorf("route %q: %w", name, err)
+		}
+	}
+	if mode == fleetv1alpha1.AppRouteModeHub && edgeSite != nil {
+		if w := strings.TrimSpace(edgeSite.Spec.EffectiveHubWildcard()); w != "" && hubHost != "" &&
+			!ingress.HostMatchesWildcard(hubHost, w) {
+			return fmt.Errorf("route %q: hubHost %q is outside the site hub gateway wildcard %q", name, hubHost, w)
+		}
 	}
 	far := &fleetedge.FleetAppRoute{
 		ObjectMeta: metav1.ObjectMeta{

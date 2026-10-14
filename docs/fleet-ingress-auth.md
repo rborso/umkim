@@ -38,6 +38,27 @@ shared read-only account (`svc-bind`), not the directory administrator.
 Changing `directory` is a spec change; reconcile the ingress-auth stack for it
 to take effect (the console enable/disable actions do this automatically).
 
+## Session cookie and access domains
+
+Authelia runs once per ingress-auth-enabled spoke, plus once on the hub. Each
+instance's session cookie is scoped to the **zone of the ingress the cluster is
+bound to** (`session.cookies[].domain`), so every site-routed host under that
+zone shares one session. In effect the cookie is already per-ingress: it is
+derived from the bound entry, not configured separately.
+
+Authelia supports several cookies, but a browser only sends a cookie to its own
+domain and its subdomains. Multiple cookies therefore only share a session
+across sibling subdomains of a common parent (`app1.example.com` and
+`app2.example.com` under `example.com`); they cannot unify unrelated zones. A
+cluster binds one `port_forward` entry and so has one zone, so each Authelia
+needs exactly one cookie.
+
+Access domains follow the same split. The **spoke** Authelia allows its own
+ingress zone (and the hosts of its `route.requireAuthGroups` rules). The **hub**
+Authelia allows only the hub gateway zone: it forward-auths hub-routed hosts
+alone, so listing site zones there would only widen access to hosts the hub does
+not serve. Keep site zones out of `fleet_ingress_auth_access_domains`.
+
 ## Tenant groups
 
 A route may restrict access to directory groups (tenants) with
