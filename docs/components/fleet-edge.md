@@ -19,6 +19,29 @@ Each `FleetSite` declares one or more **ingress entries** under
 | `port_forward` | One cluster per entry (`id`, `zone` required; `address` required only when `wanAddressMode` is `fixed`) | `acme_cluster` on spoke | Allowed (zone from ingress) |
 | `reverse_proxy` | Many clusters per entry (`id` required; optional `address`, `operatorNotes`) | `external` (off-cluster) | Not available |
 
+A `port_forward` entry's **effective wildcard** is its `wildcard`, or `*.<zone>`
+when `wildcard` is empty. A `reverse_proxy` entry has an effective wildcard only
+when it sets `wildcard` or `zone`. The wildcard is the set of public hostnames
+the operator configures DNS and the router for, so it is enforced, not
+decorative:
+
+- Two `port_forward` entries on a site may not share an effective wildcard. The
+  site is refused (`duplicates wildcard`) on create and patch, because DNS can
+  only point one way and one of the entries could never take effect.
+- A `site`-mode route host must fall under the bound entry's wildcard. The
+  controller rejects a `siteHost` outside it at app create/patch and again at
+  reconcile, instead of publishing a URL that never resolves.
+- A `hub`-mode route host is checked the same way against the site hub gateway
+  wildcard when the site sets `hubZone` / `hubWildcard`.
+- A cluster that leaves `ingressId` unset binds implicitly when the site has
+  exactly one `port_forward` entry; that implicit binding is shown as the entry's
+  `assignedClusters`.
+
+`umkim site ingress verify SITE` reports the same checks read-only, plus DNS
+resolution of the published hosts and spoke Traefik reachability over WireGuard.
+The WAN DNS record and router port-forward remain operator-managed and are
+reported as skipped.
+
 Clusters bound to **`reverse_proxy`** do not receive spoke Let's Encrypt or the
 Traefik `web` entrypoint HTTP→HTTPS redirect (phase6 spoke ingress). TLS
 terminates on the operator reverse proxy; site `FleetApp` routes use plain HTTP

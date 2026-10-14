@@ -46,6 +46,15 @@ Ready cluster). Profile CRUD, quick/extended verify, and hub-proxied chat:
 [components/fleet-apps.md](components/fleet-apps.md) and
 [components/fleet-llama-profiles.md](components/fleet-llama-profiles.md).
 
+For a site's public ingress, `umkim site ingress verify SITE` (or
+`--id ENTRY`) is a read-only check of each entry: well-formed fields, a unique
+wildcard, the cluster binding and its cardinality, the site-mode routes
+published through it (host under the wildcard, DNS resolution, expected WAN
+address in `fixed` mode), and whether the bound spoke Traefik answers over
+WireGuard. The operator-managed WAN DNS record and router port-forward cannot be
+reached from the hub and are reported as skipped, so a passing run is not proof
+that a public URL works end to end.
+
 ## Cluster delete cleanup (from-zero e2e)
 
 The delete cleanup stages (applications, storage export, Kubernetes reset, VM

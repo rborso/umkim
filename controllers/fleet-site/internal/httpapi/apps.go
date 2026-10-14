@@ -238,6 +238,10 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 	if len(app.Spec.Routes) == 0 && app.Spec.Route.Mode == "" {
 		app.Spec.Route.Mode = fleetv1alpha1.AppRouteModeNone
 	}
+	if msg := s.validateAppRouteHosts(r.Context(), cluster, append([]fleetv1alpha1.FleetAppRouteIntent{body.Route}, body.Routes...)); msg != "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
+		return
+	}
 	if msg := s.findRouteHostConflict(r.Context(), routeHosts(body.Route, body.Routes), ""); msg != "" {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": msg})
 		return
@@ -366,6 +370,10 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 	}
 	if !changed {
 		writeJSON(w, http.StatusOK, appToResponse(&app))
+		return
+	}
+	if msg := s.validateAppRouteHosts(r.Context(), app.Spec.ClusterName, append([]fleetv1alpha1.FleetAppRouteIntent{app.Spec.Route}, app.Spec.Routes...)); msg != "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 		return
 	}
 	if msg := s.findRouteHostConflict(r.Context(), routeHosts(app.Spec.Route, app.Spec.Routes), app.Name); msg != "" {

@@ -230,6 +230,10 @@ func (s *Server) handleSites(w http.ResponseWriter, r *http.Request) {
 			fs.Namespace = s.Cfg.Namespace
 		}
 		fs.Spec.NormalizeIngress()
+		if err := validateSiteIngressRows(fs.Spec.Edge, fs.Spec.Edge.Ingress); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if fs.Spec.ProvisioningMode == "" {
 			fs.Spec.ProvisioningMode = fleetv1alpha1.ProvisioningModeRegistry
 		}
@@ -298,6 +302,8 @@ func (s *Server) handleSiteByName(w http.ResponseWriter, r *http.Request) {
 		s.handleSiteProvisionRoutes(ctx, w, r, name, rest)
 	case rest == "hosts" || strings.HasPrefix(rest, "hosts/"):
 		s.handleSiteHostRoutes(ctx, w, r, name, rest)
+	case rest == "ingress/verify" && r.Method == http.MethodPost:
+		s.verifySiteIngress(ctx, w, r, name)
 	case rest == "issue-script" && r.Method == http.MethodPost:
 		if s.siteIsManagement(ctx, name) {
 			http.Error(w, "management site does not support greenfield actions", http.StatusForbidden)

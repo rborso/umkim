@@ -19,31 +19,42 @@ func defaultRouteHostname(release, domain string) string {
 }
 
 func (r *AppReconciler) clusterEdgeDomain(ctx context.Context, clusterName string) string {
-	if clusterName == "" {
+	_, ci, ok := r.clusterEdgeSiteAndIngress(ctx, clusterName)
+	if !ok || ci.Method != fleetv1alpha1.IngressMethodPortForward {
 		return ""
+	}
+	return ci.Zone
+}
+
+// clusterEdgeSiteAndIngress loads the cluster's site and its resolved ingress.
+// The site is nil only when the cluster or site cannot be read; ciOK is false
+// when the cluster has no resolvable ingress binding.
+func (r *AppReconciler) clusterEdgeSiteAndIngress(ctx context.Context, clusterName string) (*fleetv1alpha1.FleetSite, ingress.ClusterIngress, bool) {
+	if clusterName == "" {
+		return nil, ingress.ClusterIngress{}, false
 	}
 	var fcj fleetv1alpha1.FleetClusterJoin
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: clusterName}, &fcj); err != nil {
-		return ""
+		return nil, ingress.ClusterIngress{}, false
 	}
 	siteID := strings.TrimSpace(fcj.Spec.SiteId)
 	if siteID == "" {
-		return ""
+		return nil, ingress.ClusterIngress{}, false
 	}
 	var fs fleetv1alpha1.FleetSite
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: siteID}, &fs); err != nil {
-		return ""
+		return nil, ingress.ClusterIngress{}, false
 	}
 	ingressID := strings.TrimSpace(fcj.Spec.Edge.IngressId)
 	if ingressID == "" {
 		ingressID = fs.Spec.AutoIngressID()
 	}
 	if ingressID == "" {
-		return ""
+		return &fs, ingress.ClusterIngress{}, false
 	}
 	ci, err := ingress.ResolveClusterIngress(fs.Spec, ingressID)
-	if err != nil || ci.Method != fleetv1alpha1.IngressMethodPortForward {
-		return ""
+	if err != nil {
+		return &fs, ingress.ClusterIngress{}, false
 	}
-	return ci.Zone
+	return &fs, ci, true
 }

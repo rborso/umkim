@@ -60,6 +60,7 @@ umkim site ingress list SITE
 umkim site ingress add SITE --id ID --method port_forward|reverse_proxy [--address A] [--wan-address-mode fixed|dns] [--zone Z] [--wildcard W]
 umkim site ingress set SITE ID [--new-id ID] [--method …] [--address …] [--wan-address-mode fixed|dns] [--zone …] [--wildcard …]
 umkim site ingress delete SITE ID
+umkim site ingress verify SITE [--id ID]    # read-only check of the entry (binding, wildcard, DNS, spoke Traefik)
 umkim site host list SITE | get SITE NAME | provision SITE NAME [--confirm] [--wait]
 umkim site host prepare SITE NAME [--gpu-passthrough] [--confirm] [--wait]
 umkim site host cluster-apply SITE NAME
@@ -268,8 +269,23 @@ umkim site ingress add SITE --id site-pf --method port_forward \
   --address 203.0.113.50 --zone site.example.com
 umkim site ingress set SITE site-pf --description "Router WAN"
 umkim site ingress delete SITE edge-rp
+umkim site ingress verify SITE
 umkim cluster patch CLUSTER --ingress-id site-pf
 ```
+
+A `port_forward` row must carry a `zone`; the effective wildcard (the row's
+`wildcard`, else `*.<zone>`) is what the operator's DNS and router are
+configured for. Two `port_forward` rows may not claim the same wildcard: the
+site is refused with a `duplicates wildcard` error, because DNS can only point
+one way and one of the rows could never take effect. A cluster that leaves
+`ingressId` unset binds implicitly when the site has exactly one `port_forward`
+row, and `site ingress list` shows that binding in its `CLUSTERS` column.
+
+`site ingress verify` reports per-check outcomes (`shape`, `wildcard`,
+`binding`, `routes`, `upstream`, `operator`) and never changes anything. It
+resolves the published site hosts, dials the bound cluster's spoke Traefik over
+the WireGuard address, and reports the operator-managed WAN DNS and router
+port-forward as skipped, since the hub cannot reach them.
 
 ### Site provisioner connector
 

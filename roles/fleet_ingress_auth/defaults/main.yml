@@ -41,11 +41,12 @@ fleet_ingress_auth_session_secret: "{{ fleet_ingress_auth_session_secret_vault |
 fleet_ingress_auth_storage_encryption_key: "{{ fleet_ingress_auth_storage_key_vault | default('fleet-authelia-storage-change-me-32bytes!!') }}"
 fleet_ingress_auth_reset_jwt_secret: "{{ fleet_ingress_auth_reset_jwt_secret_vault | default('fleet-authelia-reset-jwt-change-me') }}"
 fleet_ingress_auth_cookie_domain: "{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
+# Hub Authelia access domains are scoped to the hub zone. Site-routed hosts are
+# allowed by each spoke's Authelia (fleet_ingress_auth_cluster_configs[].access_domains),
+# and the hub only forward-auths hub-gateway hosts.
 fleet_ingress_auth_access_domains:
   - "*.{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
   - "{{ fleet_edge_domain | default('mgmt.umkim.com') }}"
-  - "*.{{ fleet_homelab_edge_domain | default('homelab.' ~ fleet_edge_domain) }}"
-  - "{{ fleet_homelab_edge_domain | default('homelab.' ~ fleet_edge_domain) }}"
 
 fleet_ingress_auth_traefik_middleware_name: fleet-ingress-authelia
 fleet_ingress_auth_forward_auth_url: "http://authelia.{{ fleet_ingress_auth_namespace }}.svc.cluster.local:{{ fleet_ingress_auth_authelia_port }}/api/authz/forward-auth"

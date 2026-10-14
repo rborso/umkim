@@ -89,6 +89,23 @@ func TestSiteIngressSummary(t *testing.T) {
 	}
 }
 
+func TestWriteSiteIngressVerify(t *testing.T) {
+	raw := []byte(`{"site":"homelab","ok":false,"ingress":[{"id":"homelab-pf","method":"port_forward","checks":[
+		{"name":"shape","status":"ok","detail":"port_forward, wanAddressMode dns"},
+		{"name":"wildcard","status":"fail","detail":"wildcard *.homelab.example.com is also claimed by ingress \"homelab-ha-pf\""}
+	]}]}`)
+	out := capture(func() {
+		if err := WriteSiteIngressVerify(raw, FormatTable); err != nil {
+			t.Fatal(err)
+		}
+	})
+	for _, want := range []string{"homelab", "no", "homelab-pf", "wildcard", "fail", "claimed"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output missing %q: %q", want, out)
+		}
+	}
+}
+
 func TestWriteAppsTable(t *testing.T) {
 	raw := []byte(`{"apps":[{"name":"whoami","clusterName":"lab","chart":"whoami","phase":"Ready","route":{"mode":"hub","hubHost":"whoami.apps.example.com"}}]}`)
 	out := capture(func() {
