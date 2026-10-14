@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -554,6 +555,11 @@ func (r *RouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			predicate.GenerationChangedPredicate{},
 			routeRebuildPredicate{},
 		)).
+		// A reconcile drives the per-cluster ACME queue, which probes the public
+		// hostname (up to 8 rounds) for every cluster on every pass. With a single
+		// worker that serialises the whole queue: a new route can wait many minutes
+		// behind another route's ACME probing, and a stuck probe blocks everything.
+		WithOptions(controller.Options{MaxConcurrentReconciles: 4}).
 		Complete(r)
 }
 
