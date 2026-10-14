@@ -28,7 +28,18 @@
     mkdir -p "$MP"
     cleanup() { umount -f "$MP" 2>/dev/null || true; rmdir "$MP" 2>/dev/null || true; }
     trap cleanup EXIT
-    mount -t nfs -o "$OPTS" "${SERVER}:${BASE}" "$MP"
+    mounted=""
+    for p in "$BASE" "/"; do
+      umount -f "$MP" 2>/dev/null || true
+      if mount -t nfs -o "$OPTS" "${SERVER}:${p}" "$MP" 2>/dev/null; then
+        mounted="$p"
+        break
+      fi
+    done
+    if [ -z "$mounted" ]; then
+      echo "cannot mount ${SERVER}:${BASE} (or the NFSv4 pseudo-root)" >&2
+      exit 1
+    fi
     TARGET="${MP}/${CLUSTER_PATH}"
     case "$TARGET" in
       "$MP"/|"$MP") echo "refusing to remove the export base itself" >&2; exit 1 ;;
@@ -36,7 +47,7 @@
     if [ -d "$TARGET" ]; then
       du -sh "$TARGET" 2>/dev/null || true
       rm -rf "$TARGET"
-      echo "removed ${SERVER}:${BASE}/${CLUSTER_PATH}"
+      echo "removed ${SERVER}:${BASE}/${CLUSTER_PATH} (via mount of ${SERVER}:${mounted})"
     else
       echo "nothing to remove at ${SERVER}:${BASE}/${CLUSTER_PATH}"
     fi

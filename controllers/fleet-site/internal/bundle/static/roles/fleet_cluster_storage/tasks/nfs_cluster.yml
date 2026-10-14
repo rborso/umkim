@@ -89,6 +89,15 @@
     - fleet_cluster_nfs_server == ansible_host | default('')
   tags: [fleet_cluster_storage]
 
+# Remote server, no delegate: create the subdirectory over NFS. Without this the
+# provisioner cannot mount the cluster path and the storage step times out.
+- name: Fleet cluster storage | Ensure cluster export subdirectory over NFS
+  ansible.builtin.include_tasks: nfs_ensure_export_dir.yml
+  when:
+    - fleet_nfs_delegate_effective | default('') | length == 0
+    - fleet_cluster_nfs_server != ansible_host | default('')
+  tags: [fleet_cluster_storage]
+
 - name: Fleet cluster storage | Resolve NFS client mount path
   ansible.builtin.include_tasks: nfs_resolve_mount_path.yml
   tags: [fleet_cluster_storage]
