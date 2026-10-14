@@ -190,6 +190,168 @@ Timings for run 2: guests to `Ready` ≈ 23 min (three `create_vm` actions, then
 bootstrap and hub provision), ingress auth ≈ 2 min, three apps to `Ready` ≈ 8 min,
 delete ≈ 6 min.
 
+## HA cluster with node VMs, dual storage, ingress auth, ACME, and apps
+
+This exercises the whole day-0 path in one run: guests created from the node
+**`vm`** spec, **both** storage backends, cluster ingress auth (Authelia + LLDAP)
+with a directory user, per-cluster ACME, and library charts installed with their
+post-install bootstrap behind forward-auth. It is the broadest single-cluster
+check in this file.
+
+Preconditions: a YAIDAP site with three hypervisors and spare RAM/disk, an
+exported NFS base reachable from the site, the chart library seeded, and hub ACME
+settings `Ready`.
+
+The JSON below uses `<cluster>`, `<site>`, `<ingress-id>`, `<vip>`, `<cp1>`…`<cp3>`,
+`<nfs-server>`, `<nfs-base>` and `<nfs-delegate>` for: a fresh cluster name; the
+site id; a `port_forward` entry id (one cluster per entry); a management-LAN VIP
+that is not a node address; three free management-LAN addresses; the NFS host
+(which must not be a cluster node), its exported base directory, and its
+inventory host name (used to create the cluster export subdirectory).
+
+```bash
+# 1. Create the cluster. The node vm block makes the pipeline declare and create
+#    the guests; storage.minDataDiskGi must be <= the node data disk or the
+#    bootstrap's Longhorn capacity assertion fails (see Cautions).
+umkim cluster create -f cluster.json
+umkim cluster wait <cluster> --phase Ready
+```
+
+`cluster.json` (HA, node VMs, NFS data + Longhorn config):
+
+```json
+{
+  "clusterName": "<cluster>",
+  "siteId": "<site>",
+  "bootstrapHost": "<cp1>",
+  "topology": "ha_3_node",
+  "controlPlaneVip": "<vip>",
+  "autoProvision": true,
+  "edge": { "ingressId": "<ingress-id>" },
+  "nodes": [
+    { "hostname": "<cluster>-1", "address": "<cp1>", "role": "control",
+      "vm": { "cores": 6, "memory": 16384, "diskGi": 50, "dataDiskGi": 20 } },
+    { "hostname": "<cluster>-2", "address": "<cp2>", "role": "control",
+      "vm": { "cores": 6, "memory": 16384, "diskGi": 50, "dataDiskGi": 20 } },
+    { "hostname": "<cluster>-3", "address": "<cp3>", "role": "control",
+      "vm": { "cores": 6, "memory": 16384, "diskGi": 50, "dataDiskGi": 20 } }
+  ],
+  "storage": {
+    "backend": "nfs_external",
+    "minDataDiskGi": 20,
+    "nfs": { "enabled": true, "server": "<nfs-server>", "exportBase": "<nfs-base>",
+             "clusterPath": "<cluster>", "storageClass": "nfs-client",
+             "delegateHost": "<nfs-delegate>" },
+    "longhorn": { "enabled": true, "device": "/dev/vdb", "storageClass": "longhorn" }
+  }
+}
+```
+
+```bash
+# 2. Ingress auth + ACME. A port_forward-bound cluster receives both from the
+#    inventory defaults when FLEET_FCJ_DEFAULT_INGRESS_AUTH_ENABLED and
+#    FLEET_FCJ_DEFAULT_ACME_ENABLED are set; otherwise enable them explicitly.
+umkim cluster ingress-auth enable <cluster> --lldap-password-file <file>
+umkim cluster acme enable <cluster>
+
+# 3. Directory user. `umkim tenant add-user` targets the shared hub directory;
+#    a spoke-local directory has no CLI path — create the user in its LLDAP over
+#    GraphQL and set the password with the image's `lldap_set_password`.
+
+# 4. Apps. Data PVCs on the NFS class, small config PVCs on Longhorn, every route
+#    site mode with requireAuth, bootstrap left enabled.
+umkim app create -f app.json --values-file app-values.yaml
+umkim app list
+```
+
+The storage split is per-chart values, not a cluster-wide setting:
+
+```yaml
+storage:                        # small per-app config PVCs
+  storageClass: longhorn
+media:                          # shared, data-bearing volume
+  enabled: true
+  storageClass: nfs-client
+```
+
+**Assert the end state:**
+
+| Check | Expected |
+|---|---|
+| `umkim cluster get <cluster>` | `Ready`, `available`, `tls_policy: acme_cluster` |
+| `virsh list` per hypervisor | one guest per node, spread, at the requested vCPU/RAM |
+| `umkim app list` | every app `Ready` |
+| PVCs on the spoke | data PVCs on the NFS class, config PVCs on Longhorn, all `Bound` |
+| Longhorn volumes | `attached` / `healthy` |
+| `<NFS_BASE>/<cluster>` on the storage host | one directory per NFS PVC, non-trivial size |
+| Each app host, unauthenticated | `302` to the Authelia portal |
+| Each app host, authenticated | reaches the app (or the app's own login redirect) |
+| Certificate per host | issued by the ACME authority, not the Traefik default |
+| Directory user login | succeeds through the portal |
+
+```bash
+# Spoke kubeconfig the controller stores for every cluster:
+kubectl -n fleet-system get secret "fleet-kubeconfig-<cluster>" \
+  -o jsonpath='{.data.kubeconfig}' | base64 -d > /tmp/spoke.kubeconfig
+
+# Routes are only published after the spoke cert is queued: the edge controller
+# serialises ACME issuance to one host per cluster at a time and rotates a host
+# that has not completed after a few minutes, so a batch of new routes drains
+# slowly. A host that still answers 404 is normally still queued.
+kubectl -n fleet-system get fleetapproute -o custom-columns=\
+NAME:.metadata.name,TLS:.status.tlsPhase,MESSAGE:.status.tlsMessage
+```
+
+Cautions found by running this procedure:
+
+- **`storage.minDataDiskGi` vs the node data disk.** The bootstrap asserts the
+  Longhorn device is at least `fleet_cluster_min_data_disk_gi`, which comes from
+  `storage.minDataDiskGi` and defaults to **40 GiB**. A per-node
+  `vm.dataDiskGi` below that (or the CLI's `--control-data-disk`, which does not
+  set `minDataDiskGi`) fails the bootstrap with
+  `Longhorn device too small … (need 40 GiB)`. Set `minDataDiskGi` to match the
+  disk you ask for. The derivation's own fallback (`else 10 GiB`) is below the
+  validation default, so a Longhorn cluster that states **no** size at all also
+  fails: state `minDataDiskGi`, or size the data disk at 40 GiB or more.
+- **Two default StorageClasses.** Enabling NFS and Longhorn together marks both
+  `nfs-client` and `longhorn` as default. A PVC without an explicit
+  `storageClassName` then binds to whichever the API server picks. Always set
+  the class in the chart values.
+- **Ingress-auth status can read `Ready` before the spoke stack exists.** The
+  cluster is marked ready when the per-cluster Secret is created; the spoke's
+  Authelia/LLDAP arrive with the next reconcile. Check
+  `kubectl -n fleet-ingress-auth get deploy` on the spoke before treating the
+  stack as live, and re-trigger the reconcile (annotation
+  `fleet.umkim.com/ingress-auth-reconcile` on the `FleetIngressAuth`) if the
+  ManifestWork was rendered before the cluster joined the enabled list.
+- **A hook that mounts a `ReadWriteOnce` config PVC deadlocks on a multi-node
+  cluster.** A post-install hook that edits a running app's config volume cannot
+  start while the app's pod holds that volume on another node, so it times out
+  and the Helm release fails. Where a chart offers it, use `ReadWriteMany` for
+  the config volume (Longhorn serves RWX through its share-manager), or seed the
+  config before the first install.
+- **A failed post-install hook leaves the release `pending-upgrade`.** Every
+  later `helm upgrade` then fails with *another operation … in progress* until
+  the hook Job is deleted and the release status is cleared. `umkim app update`
+  also skips a `Failed` app whose spec is unchanged, so the update must change a
+  value to re-run.
+- **Chart/bootstrap contracts can disagree on components.** A bootstrap image
+  that enables a component by default while the chart ships no such workload
+  waits for a Service that never appears; pass the component's `*_ENABLE_*`
+  switch through the bootstrap Secret (a key the generated ConfigMap does not
+  set is not overwritten by `envFrom`).
+- **A server-to-server integration cannot use its own public route.** An app
+  whose pod must call another app's public hostname (a WOPI/SSO discovery URL)
+  fails twice: the pod's request from an RFC1918 address to the public address
+  can be refused by the site router's NAT loopback policy, and the route is
+  behind forward-auth. Map the host to the in-cluster ingress (as the Immich
+  chart does for its OIDC issuer), or exempt the machine-to-machine path.
+- **Not every chart bootstrap can run unattended.** A bootstrap that verifies an
+  indexer, a model, or another external resource needs the operator's
+  credentials for it; without them the job fails at its verification step even
+  though it configured everything else. Supply the credential, or leave that
+  chart's bootstrap disabled and document why.
+
 ## Cluster reinstall presets
 
 Cluster reinstall is an L2 operation. The built-in preset names are homelab-profile
