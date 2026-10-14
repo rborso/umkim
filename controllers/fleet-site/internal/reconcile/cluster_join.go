@@ -673,7 +673,7 @@ func writeFleetClusterStorageVars(b *strings.Builder, fcj *fleetv1alpha1.FleetCl
 	if !st.NFSEnabled() {
 		return
 	}
-	server, exportBase, clusterPath, storageClass, delegateHost := "", "/srv/fleet-nfs", clusterName, "nfs-client", ""
+	server, exportBase, clusterPath, storageClass, delegateHost := "", "/srv/fleet-nfs", nfsClusterPath(fcj, clusterName), "nfs-client", ""
 	if nfs := fcj.Spec.Storage.NFS; nfs != nil {
 		server = nfs.Server
 		if nfs.ExportBase != "" {
@@ -704,6 +704,23 @@ func writeFleetClusterStorageVars(b *strings.Builder, fcj *fleetv1alpha1.FleetCl
 	if delegateHost != "" && !st.NFSLocalEnabled() {
 		b.WriteString(fmt.Sprintf("cluster_storage_nfs_delegate_host=%s\n", storage.NFSDelegateInventoryHost()))
 	}
+}
+
+// nfsClusterPath returns the export subdirectory for a cluster. It carries a
+// short token from the FleetClusterJoin UID so a rebuilt cluster (a new object)
+// gets fresh storage: the provisioner names volumes "<namespace>-<pvc>", so
+// without it a rebuilt cluster silently inherits the previous cluster's data —
+// stale app config and old database credentials. The UID is stable for the life
+// of the cluster object, so its PVCs keep their data.
+func nfsClusterPath(fcj *fleetv1alpha1.FleetClusterJoin, clusterName string) string {
+	token := strings.TrimSpace(string(fcj.UID))
+	if len(token) > 8 {
+		token = token[:8]
+	}
+	if token == "" {
+		return clusterName
+	}
+	return clusterName + "-" + token
 }
 
 func writeFleetNFSDelegateInventory(b *strings.Builder, fcj *fleetv1alpha1.FleetClusterJoin, hubRunner bool, sshUser string) {
