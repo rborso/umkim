@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -162,6 +163,8 @@ func (s *Server) listSiteInventoryHosts(ctx context.Context, w http.ResponseWrit
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// ListInventoryHosts builds the list from inventory maps, so order by name.
+	sort.SliceStable(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": hosts})
 }
 

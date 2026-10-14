@@ -321,3 +321,34 @@ func TestForceReplaceDropsSupersededInboxFile(t *testing.T) {
 		t.Fatalf("want only the new upload in the inbox, got %v", matches)
 	}
 }
+
+func TestListChartsIsSorted(t *testing.T) {
+	s := testChartServer(t,
+		&fleetv1alpha1.FleetChart{ObjectMeta: metav1.ObjectMeta{Name: "whoami", Namespace: "fleet-console"}},
+		&fleetv1alpha1.FleetChart{ObjectMeta: metav1.ObjectMeta{Name: "gitea", Namespace: "fleet-console"}},
+		&fleetv1alpha1.FleetChart{ObjectMeta: metav1.ObjectMeta{Name: "nextcloud", Namespace: "fleet-console"}},
+		&fleetv1alpha1.FleetChart{ObjectMeta: metav1.ObjectMeta{Name: "immich", Namespace: "fleet-console"}},
+	)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1alpha1/charts", nil)
+	rec := httptest.NewRecorder()
+	s.handleCharts(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Charts []struct {
+			Name string `json:"name"`
+		} `json:"charts"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(body.Charts))
+	for _, c := range body.Charts {
+		got = append(got, c.Name)
+	}
+	want := []string{"gitea", "immich", "nextcloud", "whoami"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("charts order=%v want=%v", got, want)
+	}
+}

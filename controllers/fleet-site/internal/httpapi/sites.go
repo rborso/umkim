@@ -54,6 +54,7 @@ func (s *Server) listSitesEnriched(ctx context.Context) ([]siteResponse, error) 
 	if err := s.Client.List(ctx, &list, client.InNamespace(s.Cfg.Namespace)); err != nil {
 		return nil, err
 	}
+	sortByName(list.Items, func(fs fleetv1alpha1.FleetSite) string { return fs.Name })
 	mcMap, _ := registry.ClustersBySiteID(ctx, s.Client)
 	out := make([]siteResponse, 0, len(list.Items))
 	for i := range list.Items {

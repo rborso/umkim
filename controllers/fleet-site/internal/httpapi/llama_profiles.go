@@ -29,6 +29,7 @@ func (s *Server) handleLlamaCppProfiles(w http.ResponseWriter, r *http.Request, 
 		_ = s.ensureLlamaProfileSeed(r.Context())
 		var list fleetv1alpha1.FleetLlamaProfileList
 		if err := s.Client.List(r.Context(), &list, client.InNamespace(s.profileNS())); err == nil && len(list.Items) > 0 {
+			sortByName(list.Items, func(p fleetv1alpha1.FleetLlamaProfile) string { return p.Name })
 			writeJSON(w, http.StatusOK, llamaProfilesListResponse{Profiles: llamaprofiles.ListProfileMetasFromCRs(list.Items)})
 			return
 		}

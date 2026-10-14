@@ -404,6 +404,12 @@ Public fleet-site management API access requires authenticated use through
 do not publish direct controller ports or include credentials in scripts and
 examples. Enrollment is a separate, bearer-controlled bootstrap operation.
 
+List responses are ordered deterministically. The controllers read through
+controller-runtime's cached client, whose `List` returns items in map order, so
+every list handler sorts before it answers (named resources by name; audit
+events and profile tests newest first). Clients may rely on that order instead
+of re-sorting, and a new list handler must sort too.
+
 ## Related features
 
 - [fleet-apps.md](fleet-apps.md) — Helm install onto a selected cluster
