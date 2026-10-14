@@ -96,11 +96,39 @@ umkim app create --name <app> --cluster "$CLUSTER" --chart <chart> --version <v>
 | `guests.yml` + `host_vars/` | the three guests present |
 | hub objects | `fleet-cluster-<cluster>-{bootstrap,ansible-ssh}`, `fleet-ingress-auth-<cluster>`, `fleet-kubeconfig-<cluster>`, `fleet-cluster-<cluster>-inventory`, `fleet-cluster-discover-<cluster>`, `fa-vals-*`, per-app bind secrets, routes |
 
+The commands behind those rows, run against the hub (cluster-scoped objects) and
+the site (VMs, storage):
+
+```bash
+# VMs and their disks, per hypervisor
+virsh list --all --name; du -sh /opt/local/<cluster>-cp*
+
+# NFS export subdirectory and one directory per PersistentVolume
+ls -1d "$NFS_BASE"/<cluster>-*; ls -1 "$NFS_BASE"/<cluster>-*; du -sh "$NFS_BASE"/<cluster>-*
+
+# Apps, and the PVCs they bound on the spoke
+umkim app list
+k3s kubectl get pvc -A; k3s kubectl get sc
+
+# Hub objects the delete must remove
+kubectl -n <controller-ns> get secret | grep -E "<cluster>|lldap-bind"
+kubectl -n <spoke-kubeconfig-ns> get secret | grep "$CLUSTER"
+kubectl -n <controller-ns> get cm | grep -E "<cluster>|fa-vals"
+kubectl -n <edge-routes-ns> get fleetapproute | grep "$CLUSTER"
+
+# Inventory declarations
+kubectl -n <controller-ns> get cm <site>-yaidap-inventory -o jsonpath='{.data.file\.guests\.yml}'
+```
+
 Then the full delete and its end state:
 
 ```bash
 umkim cluster delete "$CLUSTER" \
   --cleanup-apps --cleanup-storage --cleanup-vms --cleanup-vm-declarations --wait
+
+# Re-run the same checks: every one of them must now come back empty/gone.
+# The second call must be a no-op:
+umkim cluster delete "$CLUSTER"
 ```
 
 | Check | Expected |
@@ -120,6 +148,12 @@ YAIDAP's destroy leaves beside the removed disks, `.probe-*` markers from storag
 validation, and the site's provision history and inventory revision log (audit
 records).
 
+One more cosmetic leftover: a stale `_meta/status.json` entry can remain for a
+guest whose declaration was removed. The destroy action's completion is recorded
+by the site reconciler, which can write the guest status just after the delete
+removed it. It is invisible in `umkim site host list` (that reads `guests.yml`)
+and is overwritten if the guest is declared again.
+
 Cautions found by running this procedure:
 
 - The bootstrap bundle is **cached in `fleet-cluster-<cluster>-bootstrap`**. A
@@ -132,6 +166,20 @@ Cautions found by running this procedure:
 - A guest's recorded phase is a hint, not proof: the delete destroys every VM
   guest in the cluster regardless of phase, because a stale `Declared` would
   otherwise leave a running VM behind with its declaration already removed.
+
+### Verified runs
+
+Two full runs of this procedure on a YAIDAP site with a shared NFS export and
+three apps (two native-LDAP charts and one OIDC chart), three-node HA cluster:
+
+| Run | Outcome |
+|---|---|
+| 1 | Bring-up needed manual intervention: the storage step failed (export subdirectory never created on a remote NFS server) and the fix did not reach the bootstrap (cached bundle). Delete cleaned apps, storage, hub objects, routes and inventory, but left one VM running — the stage skipped a guest whose recorded phase said `Declared`. |
+| 2 | Bring-up completed first attempt (storage `Applied` before `Provisioning`). Delete with all five flags removed all three VMs and their disks, the export directory, every hub object, the routes and the inventory declarations; the second `DELETE` was a no-op. |
+
+Timings for run 2: guests to `Ready` ≈ 23 min (three `create_vm` actions, then
+bootstrap and hub provision), ingress auth ≈ 2 min, three apps to `Ready` ≈ 8 min,
+delete ≈ 6 min.
 
 ## Cluster reinstall presets
 
