@@ -151,28 +151,51 @@ func TestVmCleanupListsOnlyVmGuests(t *testing.T) {
 
 // A guest whose VM is already gone (Declared) is finished without a destroy job;
 // with declaration cleanup the inventory entry goes with it.
-func TestVmCleanupRemovesDeclarationsForDeclaredGuests(t *testing.T) {
+// With the declaration flag, a Declared guest whose destroy succeeds (the VM is
+// really gone) is dropped from the inventory.
+func TestVmCleanupRemovesDeclarationsAfterDestroy(t *testing.T) {
 	ns := "fleet-console"
 	fcj := vmCleanupCluster(ns, "lab", map[string]string{annotationCleanupVmDecls: "true"})
 	inv := vmCleanupInventory(ns, `{"guests":{"cp0":{"phase":"Declared"},"cp1":{"phase":"Declared"}}}`)
-	r, c := newVmCleanupTestReconciler(t, fcj, vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv)
+	finished0 := &batchv1Job{name: "fleet-site-prov-a1", namespace: ns}
+	fcj.Status.VmCleanup = &fleetv1alpha1.ClusterVmCleanupStatus{
+		Phase:   fleetv1alpha1.VmCleanupPhaseDestroying,
+		Hosts:   []string{"cp0", "cp1"},
+		JobName: "fleet-site-prov-a1",
+	}
+	r, c := newVmCleanupTestReconciler(t, fcj,
+		vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv, finished0.object())
+
+	// Pass 1: cp0's destroy finishes and the stage starts one for cp1.
+	if _, _, err := r.reconcileClusterDeleteVms(context.Background(), fcj); err != nil {
+		t.Fatalf("reconcile 1: %v", err)
+	}
+	if !vmCleanupCompleted(fcj.Status.VmCleanup, "cp0") {
+		t.Fatalf("cp0 should be done: %+v", fcj.Status.VmCleanup)
+	}
+	// Complete the destroy the stage started for cp1 (the connector job exists).
+	cp1Job := fcj.Status.VmCleanup.JobName
+	if cp1Job == "" {
+		t.Fatalf("no destroy started for cp1: %+v", fcj.Status.VmCleanup)
+	}
+	var job batchv1.Job
+	if err := c.Get(context.Background(), types.NamespacedName{Name: cp1Job, Namespace: ns}, &job); err != nil {
+		t.Fatalf("cp1 job: %v", err)
+	}
+	job.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}
+	if err := c.Status().Update(context.Background(), &job); err != nil {
+		t.Fatalf("finish cp1 job: %v", err)
+	}
 
 	done, _, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
 	if err != nil {
-		t.Fatalf("reconcile: %v", err)
+		t.Fatalf("reconcile 2: %v", err)
 	}
 	if !done {
 		t.Fatalf("expected cleanup to finish, status=%+v", fcj.Status.VmCleanup)
 	}
-	st := fcj.Status.VmCleanup
-	if st == nil || st.Phase != fleetv1alpha1.VmCleanupPhaseDone {
-		t.Fatalf("phase=%+v", st)
-	}
-	if strings.Join(st.Completed, ",") != "cp0,cp1" {
-		t.Fatalf("completed=%v", st.Completed)
-	}
-	if st.JobName != "" {
-		t.Fatalf("a Declared guest needs no destroy job, got %q", st.JobName)
+	if fcj.Status.VmCleanup.Phase != fleetv1alpha1.VmCleanupPhaseDone {
+		t.Fatalf("phase=%+v", fcj.Status.VmCleanup)
 	}
 	var cm corev1.ConfigMap
 	if err := c.Get(context.Background(), types.NamespacedName{
@@ -185,16 +208,22 @@ func TestVmCleanupRemovesDeclarationsForDeclaredGuests(t *testing.T) {
 	}
 }
 
-// Without the declaration flag the guests stay in the inventory (Declared).
+// Without the declaration flag the guests stay in the inventory.
 func TestVmCleanupKeepsDeclarationsByDefault(t *testing.T) {
 	ns := "fleet-console"
 	fcj := vmCleanupCluster(ns, "lab", nil)
 	inv := vmCleanupInventory(ns, `{"guests":{"cp0":{"phase":"Declared"},"cp1":{"phase":"Declared"}}}`)
-	r, c := newVmCleanupTestReconciler(t, fcj, vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv)
+	finished := &batchv1Job{name: "fleet-site-prov-a1", namespace: ns}
+	fcj.Status.VmCleanup = &fleetv1alpha1.ClusterVmCleanupStatus{
+		Phase:   fleetv1alpha1.VmCleanupPhaseDestroying,
+		Hosts:   []string{"cp0", "cp1"},
+		JobName: "fleet-site-prov-a1",
+	}
+	r, c := newVmCleanupTestReconciler(t, fcj,
+		vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv, finished.object())
 
-	done, _, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
-	if err != nil || !done {
-		t.Fatalf("done=%v err=%v", done, err)
+	if _, _, err := r.reconcileClusterDeleteVms(context.Background(), fcj); err != nil {
+		t.Fatalf("reconcile: %v", err)
 	}
 	var cm corev1.ConfigMap
 	if err := c.Get(context.Background(), types.NamespacedName{
@@ -298,19 +327,63 @@ func TestVmCleanupAttemptsDestroyWhenPhaseIsUnknown(t *testing.T) {
 	}
 }
 
-// An explicitly Declared guest needs no destroy (only the declaration cleanup).
-func TestVmCleanupSkipsExplicitlyDeclaredGuest(t *testing.T) {
+// A Declared guest is still attempted: the recorded phase has read Declared for a
+// VM that was still running, and a skipped destroy leaves it behind.
+func TestVmCleanupAttemptsDestroyForDeclaredGuest(t *testing.T) {
 	ns := "fleet-console"
 	fcj := vmCleanupCluster(ns, "lab", nil)
 	inv := vmCleanupInventory(ns, `{"guests":{"cp0":{"phase":"Declared"},"cp1":{"phase":"Declared"}}}`)
 	r, _ := newVmCleanupTestReconciler(t, fcj, vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv)
 
-	done, _, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
-	if err != nil || !done {
-		t.Fatalf("done=%v err=%v", done, err)
+	done, wait, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
+	if err != nil {
+		t.Fatalf("reconcile: %v", err)
 	}
-	if fcj.Status.VmCleanup.JobName != "" {
-		t.Fatalf("a Declared guest needs no destroy: %+v", fcj.Status.VmCleanup)
+	if done || wait <= 0 {
+		t.Fatalf("expected a destroy attempt, done=%v wait=%v status=%+v", done, wait, fcj.Status.VmCleanup)
+	}
+	if fcj.Status.VmCleanup.JobName == "" {
+		t.Fatalf("no destroy started for a Declared guest: %+v", fcj.Status.VmCleanup)
+	}
+}
+
+// When the phase said Declared and the destroy fails, that confirms the guest is
+// gone: no failure is recorded and the declaration is kept (the phase has been
+// wrong before, so it stays as the pointer to a possibly-live VM).
+func TestVmCleanupDeclaredGuestFailureKeepsDeclaration(t *testing.T) {
+	ns := "fleet-console"
+	fcj := vmCleanupCluster(ns, "lab", map[string]string{annotationCleanupVmDecls: "true"})
+	inv := vmCleanupInventory(ns, `{"guests":{"cp0":{"phase":"Declared"},"cp1":{"phase":"Declared"}}}`)
+	fcj.Status.VmCleanup = &fleetv1alpha1.ClusterVmCleanupStatus{
+		Phase:   fleetv1alpha1.VmCleanupPhaseDestroying,
+		Hosts:   []string{"cp0", "cp1"},
+		JobName: "fleet-site-prov-abc123",
+	}
+	failed := &batchv1Job{name: "fleet-site-prov-abc123", namespace: ns, failed: true}
+	r, c := newVmCleanupTestReconciler(t, fcj, vmCleanupSite(ns, fleetv1alpha1.ProvisionProviderYaidap), inv, failed.object())
+
+	done, wait, err := r.reconcileClusterDeleteVms(context.Background(), fcj)
+	if err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if done || wait <= 0 {
+		t.Fatalf("expected a requeue, done=%v wait=%v", done, wait)
+	}
+	st := fcj.Status.VmCleanup
+	if len(st.Failures) != 0 {
+		t.Fatalf("a Declared guest with a failed destroy is not a failure: %+v", st.Failures)
+	}
+	if !vmCleanupCompleted(st, "cp0") {
+		t.Fatalf("cp0 should be finished: %+v", st)
+	}
+	var cm corev1.ConfigMap
+	if err := c.Get(context.Background(), types.NamespacedName{
+		Name: connectors.InventoryCMName("homelab", fleetv1alpha1.ProvisionProviderYaidap), Namespace: ns,
+	}, &cm); err != nil {
+		t.Fatal(err)
+	}
+	if guests := cm.Data["file.guests.yml"]; !strings.Contains(guests, "cp0:") {
+		t.Fatalf("the declaration must be kept:\n%s", guests)
 	}
 }
 

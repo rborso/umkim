@@ -96,27 +96,15 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 		}
 		if !found || view.External || kind != fleetv1alpha1.SiteHostKindVM {
 			// Not a destroyable VM guest (bare metal, hypervisor, gone from the
-			// inventory): nothing to remove here.
-			vmCleanupFinish(st, host)
-			continue
-		}
-
-		switch phase := r.guestRecordedPhase(ctx, site.Name, host); strings.TrimSpace(phase) {
-		case fleetv1alpha1.SiteHostPhaseDeclared:
-			// Explicitly Declared: the hub believes there is no libvirt domain
-			// left, so only the declaration can be cleaned up.
-			if removeDecls {
-				if err := yaidap.RemoveHostDeclaration(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId, host); err != nil {
-					st.Message = fmt.Sprintf("removing declaration of %s failed: %v", host, err)
-					return false, 30 * time.Second, save()
-				}
-				st.Message = "guest already destroyed; declaration removed"
-			} else {
-				st.Message = "guest already destroyed"
+			// inventory). A cluster node with no inventory entry at all is worth
+			// flagging: its VM can only be found on the hypervisor.
+			if !found && !view.External {
+				recordVmCleanupFailure(st, host, "not in the site inventory; check the hypervisor")
 			}
 			vmCleanupFinish(st, host)
 			continue
 		}
+		phase := r.guestRecordedPhase(ctx, site.Name, host)
 
 		// An in-flight destroy is polled before the guest phase is considered: the
 		// connector marks the guest Destroying for the whole action, so the phase
@@ -134,6 +122,15 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 				}
 				continue
 			}
+			if phase == fleetv1alpha1.SiteHostPhaseDeclared {
+				// The recorded phase said there was no VM to destroy; the failure
+				// confirms that. Keep the declaration: the phase has been wrong
+				// before, and dropping it would lose the only pointer to a VM that
+				// might still be running.
+				st.Message = fmt.Sprintf("%s reported no VM to destroy; declaration kept", host)
+				vmCleanupFinish(st, host)
+				continue
+			}
 			attempts := vmCleanupAttempts(st, host) + 1
 			recordVmCleanupFailure(st, host, msg)
 			if attempts < vmCleanupMaxAttempts {
@@ -147,15 +144,17 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 			continue
 		}
 
-		if phase := r.guestRecordedPhase(ctx, site.Name, host); phase == fleetv1alpha1.SiteHostPhaseProvisioning || phase == fleetv1alpha1.SiteHostPhaseDestroying {
+		if phase == fleetv1alpha1.SiteHostPhaseProvisioning || phase == fleetv1alpha1.SiteHostPhaseDestroying {
 			st.Message = fmt.Sprintf("waiting for %s (%s)", host, phase)
 			return false, waitAfter, save()
 		}
 
-		// Ready, Failed, or no recorded phase: try the destroy. An unknown phase
-		// must not be read as "already gone" — the inventory view defaults a guest
-		// with no status record to Declared, which would silently skip a running
-		// VM (seen on a live delete).
+		// Destroy regardless of the recorded phase — Ready, Failed, Declared or
+		// unknown. The phase is only a hint: it has read Declared for a VM that was
+		// still running (stale status), and a skipped destroy leaves that VM behind,
+		// which is the one outcome this cleanup must not have. A destroy against a
+		// guest that really is gone either no-ops or fails harmlessly (handled
+		// above, where the declaration is kept).
 
 		fs := site.DeepCopy()
 		if siteprovision.ActionBusy(fs) {

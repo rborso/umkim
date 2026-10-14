@@ -83,6 +83,10 @@ umkim cluster delete lab-ha-0 --cleanup-apps --cleanup-storage --cleanup-vms --c
 their inventory entries, so the manual virsh sweep below is only needed for
 guests that YAIDAP does not manage.
 
+The full delete-and-verify procedure (pre-state evidence and the end-state
+checklist) is in
+[../../docs/fleet-verify.md](../../docs/fleet-verify.md#cluster-delete-cleanup-from-zero-e2e).
+
 ### Phase 1 — Ad-hoc virsh cleanup (all guest hypervisors)
 
 Only for guests the hub does not know about (for example leftovers from a
