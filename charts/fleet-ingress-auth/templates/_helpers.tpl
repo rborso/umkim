@@ -188,3 +188,88 @@ notifier:
   filesystem:
     filename: /data/notification.txt
 {{- end -}}
+
+{{/*
+Ensure every group the cluster's routes declare exists in this cluster's own
+directory. Route access rules (route.requireAuthGroups) are the declaration:
+without this, an operator has to create each tenant group by hand before it can
+be used, and a group deleted in the directory is never restored.
+*/}}
+{{- define "fleet-ingress-auth.ensureManagedGroupsScript" -}}
+set -uo pipefail
+url="${LLDAP_URL}"
+for i in $(seq 1 40); do
+  curl -fsS "${url}/health" >/dev/null 2>&1 && break
+  sleep 3
+done
+token=""
+for i in $(seq 1 10); do
+  token=$(curl -fsS -X POST "${url}/auth/simple/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"admin\",\"password\":\"${LLDAP_ADMIN_PASSWORD}\"}" 2>/dev/null \
+    | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+  [ -n "${token}" ] && break
+  sleep 3
+done
+if [ -z "${token}" ]; then echo "LLDAP admin login failed"; exit 1; fi
+gql() { curl -fsS -X POST "${url}/api/graphql" \
+  -H "Authorization: Bearer ${token}" -H 'Content-Type: application/json' --data "$1"; }
+
+if [ -z "${MANAGED_GROUPS:-}" ]; then
+  echo "==> no declared groups; nothing to reconcile"
+  exit 0
+fi
+groups=$(gql '{"query":"{ groups { id displayName } }"}') || { echo "listing directory groups failed"; exit 1; }
+created=0
+for g in ${MANAGED_GROUPS}; do
+  case "${g}" in
+    *[!A-Za-z0-9_-]*|'') echo "skipping unsafe group name ${g}"; continue;;
+  esac
+  if printf '%s' "${groups}" | tr '{' '\n' | grep -qF "\"displayName\":\"${g}\""; then
+    echo "==> group ${g} present"
+    continue
+  fi
+  if gql "{\"query\":\"mutation{createGroup(name:\\\"${g}\\\"){id displayName}}\"}" >/dev/null; then
+    echo "==> created group ${g}"
+    created=$((created + 1))
+  else
+    echo "creating group ${g} failed"; exit 1
+  fi
+done
+echo "==> declared groups reconciled (${created} created)"
+{{- end -}}
+
+{{/*
+Pod spec for reconciling declared directory groups. Shared by the hook Job and
+the drift CronJob so both run exactly the same script.
+*/}}
+{{- define "fleet-ingress-auth.managedGroupsJobSpec" -}}
+backoffLimit: 4
+template:
+  metadata:
+    labels:
+      app.kubernetes.io/name: fleet-ingress-auth
+      app.kubernetes.io/component: lldap-managed-groups
+  spec:
+    restartPolicy: OnFailure
+    containers:
+      - name: managed-groups
+        image: {{ .Values.lldap.image | quote }}
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+{{ include "fleet-ingress-auth.ensureManagedGroupsScript" . | indent 12 }}
+        env:
+          - name: LLDAP_URL
+            value: "http://lldap:{{ .Values.lldap.httpPort }}"
+          - name: LLDAP_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: lldap-credentials
+                key: LLDAP_LDAP_USER_PASS
+          - name: MANAGED_GROUPS
+            value: {{ join " " .Values.lldap.managedGroups | quote }}
+        resources:
+          requests: { cpu: 5m, memory: 32Mi }
+          limits: { memory: 128Mi }
+{{- end -}}

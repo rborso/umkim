@@ -107,13 +107,13 @@ func applyOptionalLLMBackend(body map[string]interface{}, opt string) error {
 func appCreateCmd() *cobra.Command {
 	var (
 		jsonFile, cluster, chart, version, release, namespace, valuesFile, appName string
-		routeMode, routeHost                                                        string
-		llamaProfile, llmBackendOpt, oidcClient, requireAuthGroups                  string
-		routeServiceName                                                            string
-		routeServicePort                                                            int
-		routeProtocol                                                               string
-		routeForwardPort                                                            int
-		requireAuth                                                                 bool
+		routeMode, routeHost                                                       string
+		llamaProfile, llmBackendOpt, oidcClient, requireAuthGroups                 string
+		routeServiceName                                                           string
+		routeServicePort                                                           int
+		routeProtocol                                                              string
+		routeForwardPort                                                           int
+		requireAuth                                                                bool
 	)
 	c := &cobra.Command{
 		Use:   "create",
@@ -187,6 +187,10 @@ Use -f app.json or flags. Route mode: none (default), hub, or site.`,
 					if len(groups) > 0 {
 						route["requireAuthGroups"] = groups
 					}
+				} else if cmd.Flags().Changed("require-auth-groups") {
+					// An explicit empty value clears the restriction; omitting the
+					// field would leave it in place with no way to remove it.
+					route["requireAuthGroups"] = []string{}
 				}
 				body["route"] = route
 			}
@@ -289,7 +293,7 @@ func appUpdateCmd() *cobra.Command {
 				}
 				body["valuesYaml"] = string(raw)
 			}
-			if routeMode != "" || routeHost != "" || requireAuth || strings.TrimSpace(requireAuthGroups) != "" || routeServiceName != "" || routeServicePort > 0 || strings.TrimSpace(routeProtocol) != "" || routeForwardPort > 0 {
+			if routeMode != "" || routeHost != "" || requireAuth || strings.TrimSpace(requireAuthGroups) != "" || cmd.Flags().Changed("require-auth-groups") || routeServiceName != "" || routeServicePort > 0 || strings.TrimSpace(routeProtocol) != "" || routeForwardPort > 0 {
 				route := map[string]interface{}{}
 				if routeMode != "" {
 					switch routeMode {
@@ -336,6 +340,10 @@ func appUpdateCmd() *cobra.Command {
 					if len(groups) > 0 {
 						route["requireAuthGroups"] = groups
 					}
+				} else if cmd.Flags().Changed("require-auth-groups") {
+					// An explicit empty value clears the restriction; omitting the
+					// field would leave it in place with no way to remove it.
+					route["requireAuthGroups"] = []string{}
 				}
 				body["route"] = route
 			}

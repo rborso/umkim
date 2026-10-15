@@ -75,6 +75,26 @@ management and from the invitation picker, and cannot be deleted there.
 Per-cluster directory placement is selected in the cluster edge tab (local vs
 shared hub directory).
 
+## Declared groups
+
+A cluster that runs its own LLDAP reconciles the groups its **routes declare**
+into that directory. `route.requireAuthGroups` is the declaration, so the group
+an operator needs for an invite already exists because a route references it:
+
+- the `fleet-ingress-auth` chart renders the declared set (deduplicated across
+  the cluster's routes) into its values;
+- a Job named for that set runs on the spoke whenever the set changes, creating
+  any missing group in the cluster's own directory;
+- a CronJob (every 10 minutes by default) restores a group that is deleted out of
+  band.
+
+A hub-directory cluster gets no such Job: its groups live in the hub directory,
+which the hub manages directly.
+
+The workflow for a new tenant is therefore: give the tenant's route
+`requireAuthGroups: [<tenant>]` first, and the group appears in the cluster's
+directory; then invite users into it.
+
 ## Invitations
 
 A platform administrator can mint a single-use invite from the console
