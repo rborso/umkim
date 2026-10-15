@@ -16,6 +16,10 @@
     fleet_site_spoke_ingress_method: >-
       {{ fleet_edge_clusters[item].method | default('')
          if item in fleet_edge_clusters else '' }}
+    # The site zone this spoke serves, used for the in-cluster name override.
+    spoke_ingress_site_zone: >-
+      {{ fleet_edge_clusters[item].dns_zone | default('')
+         if item in fleet_edge_clusters else '' }}
     # TLS-ALPN for spoke port_forward ACME (see push_cluster_spoke_ingress.yml).
     phase6_spoke_acme_http_challenge: false
   tags: [spoke_ingress, phase6, spoke_ingress_push, phase6_push]

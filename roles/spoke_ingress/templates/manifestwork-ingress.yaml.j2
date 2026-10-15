@@ -210,6 +210,7 @@ spec:
           namespace: {{ phase6_spoke_ingress_namespace }}
         spec:
           type: NodePort
+          clusterIP: {{ spoke_ingress_cluster_ip }}
           selector:
             app: traefik
           ports:
@@ -225,6 +226,26 @@ spec:
               port: 8080
               targetPort: 8001
               nodePort: {{ spoke_ingress_hub_http_nodeport | default(30081) }}
+{% if spoke_ingress_site_zone | default('') %}
+      - apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: coredns-custom
+          namespace: kube-system
+        data:
+          # A pod that calls one of this site's own public hostnames (WOPI,
+          # webhooks, SSO discovery) must not leave the cluster: the site router
+          # drops a private-to-public NAT loopback, and the request never arrives.
+          # Answer those names with the in-cluster ingress instead, and forward
+          # every other record type upstream.
+          site.server: |
+            {{ spoke_ingress_site_zone }}:53 {
+                template IN A {{ spoke_ingress_site_zone }} {
+                    answer "{% raw %}{{ .Name }}{% endraw %} 60 IN A {{ spoke_ingress_cluster_ip }}"
+                }
+                forward . /etc/resolv.conf
+            }
+{% endif %}
 {% if phase6_deploy_whoami_demo | bool %}
 {% set fleet_whoami_apps = [] %}
 {% set homelab_whoami_apps = [] %}
