@@ -100,6 +100,16 @@ deployment-specific. This release does not claim to fix runtime firewall or
 certificate-issuance issues. Validate the live route, certificate, redirect,
 and external network policy before treating an application as protected.
 
+### Verifying an OIDC app login
+
+The provider issuer is derived from the request `Host`, so driving an OIDC login
+through a NodePort (`auth.<zone>:30443`) produces an issuer that includes the
+port and strict relying parties reject it. Run the flow on the public path
+(`https://auth.<zone>`) as an invitee's browser would. Authelia advertises
+RFC 9207 support and returns the `iss` authorization-response parameter, so a
+client that validates it (Immich, via `oauth4webapi`) needs the complete
+callback URL — `iss` included — handed back to its own callback.
+
 ## Related documentation
 
 - [fleet-edge.md](components/fleet-edge.md) — site exposure and route model
