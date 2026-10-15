@@ -111,6 +111,30 @@ Multi-cluster **hub** routing is active–backup behavior, not active–active
 load sharing. Per-site `port_forward` and `reverse_proxy` exposure is
 independent of hub-gateway failover.
 
+## Spoke ACME queue
+
+Site routes on a `port_forward` cluster are issued one hostname at a time. The
+controller keeps a per-cluster queue: the active hostname holds the slot until
+its certificate is live, and a hostname that has held it longer than
+`spokeACMEHostStaleAfter` (3 minutes) without a certificate is rotated to the
+back so it cannot starve the others. Queue transitions are logged under the
+`spoke-acme-queue` logger (queued, released, rotated), which is what makes a
+stall diagnosable.
+
+Two details decide whether a hostname can be stranded:
+
+- The queue probes the spoke's **registered Traefik HTTPS port** (`30443` for
+  `port_forward`), not 443. Probing 443 never observes a spoke certificate, so
+  the queue could previously advance only by rotating on staleness.
+- The production reload token (`edge.umkim.com/spoke-acme-prod-retry`) is
+  re-stamped while the certificate is still not live, and after two refreshes
+  the spoke Traefik is restarted once for that hostname. A one-shot token left a
+  hostname that failed a single challenge — for example a connection refusal
+  during TLS-ALPN-01 validation — in `Issuing` with nothing left to retry.
+
+A route that answers `404` while `status.tlsPhase` is `Queued` is still in this
+queue. A route stuck in `Issuing` for more than a few minutes is a bug.
+
 ## Hub gateway health probes
 
 The fleet-edge controller can probe hub-routed gateway reachability from the pod.

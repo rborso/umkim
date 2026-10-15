@@ -87,6 +87,10 @@ type RouteReconciler struct {
 	fleetRoutesMu  sync.Mutex
 	stagingEvictMu sync.Mutex
 	stagingEvict   map[string]struct{}
+	prodRetryMu    sync.Mutex
+	// prodRetryAttempts counts production issuance refreshes per cluster/host so
+	// a stalled host is escalated to a spoke Traefik restart only once.
+	prodRetryAttempts map[string]int
 }
 
 func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
