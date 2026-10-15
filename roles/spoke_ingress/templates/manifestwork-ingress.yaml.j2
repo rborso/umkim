@@ -210,7 +210,6 @@ spec:
           namespace: {{ phase6_spoke_ingress_namespace }}
         spec:
           type: NodePort
-          clusterIP: {{ spoke_ingress_cluster_ip }}
           selector:
             app: traefik
           ports:
@@ -237,11 +236,13 @@ spec:
           # webhooks, SSO discovery) must not leave the cluster: the site router
           # drops a private-to-public NAT loopback, and the request never arrives.
           # Answer those names with the in-cluster ingress instead, and forward
-          # every other record type upstream.
+          # every other record type upstream. A CNAME to the Service keeps this
+          # free of any address: a ClusterIP is immutable, so pinning one would
+          # fail the reconcile on a cluster whose Service already exists.
           site.server: |
             {{ spoke_ingress_site_zone }}:53 {
                 template IN A {{ spoke_ingress_site_zone }} {
-                    answer "{% raw %}{{ .Name }}{% endraw %} 60 IN A {{ spoke_ingress_cluster_ip }}"
+                    answer "{% raw %}{{ .Name }}{% endraw %} 60 IN CNAME traefik.{{ phase6_spoke_ingress_namespace }}.svc.cluster.local."
                 }
                 forward . /etc/resolv.conf
             }

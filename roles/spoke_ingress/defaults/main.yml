@@ -5,11 +5,10 @@ phase6_manifestwork_name: phase6-spoke-ingress
 phase6_traefik_image: docker.io/traefik:v3.6.25@sha256:31267173a15b4944e797a76ffd9c419707c8d8b32fe5b610f80cd0cfa05f372d
 phase6_http_nodeport: 30080
 phase6_https_nodeport: 30443
-# Fixed ClusterIP for the spoke ingress Service, so a pod can reach the
-# site's own public hostnames in-cluster (see the coredns-custom override in
-# the ingress ManifestWork). Without it a server-to-server call to a public
-# hostname leaves the cluster and the site router drops the NAT loopback.
-spoke_ingress_cluster_ip: "10.43.255.53"
+# The spoke's CoreDNS answers the site zone with the in-cluster ingress
+# Service (see the coredns-custom override in the ingress ManifestWork), so a
+# server-to-server call to a public hostname does not leave the cluster and
+# hit the site router's NAT loopback policy.
 spoke_ingress_hub_http_nodeport: 30081
 
 phase6_deploy_whoami_demo: true
