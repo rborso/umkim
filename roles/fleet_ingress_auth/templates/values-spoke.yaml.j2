@@ -101,10 +101,13 @@ authelia:
 {% endif %}
 
 signup:
-  # Cluster-local sign-up page for clusters using the shared hub directory.
-  enabled: {{ _hub_dir | bool | lower }}
+  # Cluster-local sign-up page. The form posts to the hub, which redeems the
+  # invite against whichever directory the invite targets: the cluster's own
+  # LLDAP (directory: local) or the shared hub directory (directory: hub).
+  # Enabled whenever the hub redeem URL is configured.
+  enabled: {{ ((fleet_ingress_auth_hub_redeem_url | default('')) | length > 0) | bool | lower }}
   image: {{ fleet_ingress_auth_signup_image | default('nginx:1.27-alpine') | quote }}
-  hubRedeemURL: {{ (fleet_ingress_auth_hub_redeem_url | default('')) if _hub_dir else '' | quote }}
+  hubRedeemURL: {{ fleet_ingress_auth_hub_redeem_url | default('') | quote }}
 
 traefik:
   deploySpokeMiddleware: true

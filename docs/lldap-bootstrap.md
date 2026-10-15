@@ -83,22 +83,51 @@ new user should join and expires after 72 hours by default. Only a SHA-256 hash
 of the token is stored, in the `fleet-invites` Secret; the one-time link is
 shown once at creation.
 
-Redeeming the link creates the user in the shared hub directory, adds the
-recorded groups, and sets the chosen password. LLDAP exposes no GraphQL
-password mutation (passwords use the OPAQUE protocol), so the controller creates
-the user and group membership over GraphQL as `dir-admin` and then runs a
-short-lived Job using the LLDAP image's `lldap_set_password` for the password.
+An invite is either **untargeted** (redeemed against the shared hub directory)
+or **targeted at one cluster** (`--cluster`, or the console's cluster picker),
+which redeems against whatever directory that cluster uses: its own LLDAP for
+`directory: local`, the hub directory for `directory: hub`. Redemption creates
+the user, adds the recorded groups, and sets the chosen password.
 
-The sign-up page is available on the hub console (`/fleet/invite`) and, for
-clusters bound to `directory: hub`, on the Authelia portal host (`/invite`).
-The cluster page proxies redemption to the hub over WireGuard on the console
-auth NodePort; that port is blocked on the public interface.
+LLDAP exposes no GraphQL password mutation (passwords use the OPAQUE protocol),
+so the controller creates the user and group membership over GraphQL and then
+runs a short-lived Job using the LLDAP image's `lldap_set_password` for the
+password.
+
+- **Hub directory.** The controller calls the hub LLDAP API directly as
+  `dir-admin`.
+- **A cluster's own LLDAP.** The hub cannot reach that directory — it is a
+  ClusterIP Service — so redemption runs as a Job *on the spoke*, beside LLDAP,
+  in the `fleet-ingress-auth` namespace. The Job reuses the image the cluster's
+  own LLDAP Deployment runs and reads the admin password from the chart's
+  `lldap-credentials` Secret; the invitee's username, password, and groups
+  travel in a `lldap-invite-redeem` Secret that is deleted with the Job. This
+  mirrors the chart's `lldap-bind-account` Job and needs no new exposure of the
+  directory.
+
+```bash
+umkim invite create --groups <tenant> --cluster <cluster> --ttl-hours 72
+umkim tenant add-user <tenant> <username> --password <pw> --cluster <cluster>
+```
+
+Authelia caches directory lookups, so a user created moments ago can fail the
+first sign-in attempt with a 401 before the cache refreshes; retry after a
+minute. The account and its password are already correct (an LDAP bind succeeds
+immediately).
+
+The sign-up page is available on the hub console (`/fleet/invite`) and on the
+Authelia portal host of every ingress-auth cluster (`/invite`), for both
+directories: the page always posts to the hub, which redeems against whichever
+directory the invite targets. The cluster page proxies redemption to the hub
+over WireGuard on the console auth NodePort; that port is blocked on the public
+interface.
 
 When the hub console is not publicly reachable, the console is WireGuard-only
 and a link built from the browser origin is useless to an invitee. The create
-response therefore returns public sign-up links: one per `directory: hub`
-cluster (its Authelia portal host) plus the hub console when
-`FLEET_CONSOLE_PUBLIC_URL` is set. Share one of those links.
+response therefore returns public sign-up links: the hub console when
+`FLEET_CONSOLE_PUBLIC_URL` is set, plus the Authelia portal host of the targeted
+cluster (or of every `directory: hub` cluster for an untargeted invite). Share
+one of those links.
 
 - Created by the `fleet-ingress-auth` chart's `lldap-bind-account` Job on
   install/upgrade. The account name, group, and password are chart values

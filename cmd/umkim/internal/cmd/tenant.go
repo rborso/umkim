@@ -124,11 +124,16 @@ func tenantRemoveMemberCmd() *cobra.Command {
 // tenantAddUserCmd creates a new directory account with an initial password (via
 // a one-time invite) and adds it to the tenant group.
 func tenantAddUserCmd() *cobra.Command {
-	var password, displayName, email string
+	var password, displayName, email, cluster string
 	c := &cobra.Command{
 		Use:   "add-user TENANT USERNAME --password P",
 		Short: "Create a directory user with a password and add it to a tenant (invite + redeem)",
-		Args:  cobra.ExactArgs(2),
+		Long: "Create a directory account with an initial password (via a one-time\n" +
+			"invite) and add it to the tenant group.\n\n" +
+			"Without --cluster the account is created in the shared hub directory.\n" +
+			"With --cluster it is created in that cluster's directory: its own\n" +
+			"LLDAP, or the hub directory when the cluster is bound to it.",
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tenant := strings.TrimSpace(args[0])
 			username := strings.ToLower(strings.TrimSpace(args[1]))
@@ -136,6 +141,9 @@ func tenantAddUserCmd() *cobra.Command {
 				return fmt.Errorf("--password is required")
 			}
 			createBody := map[string]interface{}{"groups": []string{tenant}}
+			if cluster != "" {
+				createBody["cluster"] = strings.TrimSpace(cluster)
+			}
 			if displayName != "" {
 				createBody["displayNameHint"] = displayName
 			}
@@ -186,6 +194,7 @@ func tenantAddUserCmd() *cobra.Command {
 	c.Flags().StringVar(&password, "password", "", "Initial password for the new user (required)")
 	c.Flags().StringVar(&displayName, "display-name", "", "Display name for the new user")
 	c.Flags().StringVar(&email, "email", "", "Email address for the new user")
+	c.Flags().StringVar(&cluster, "cluster", "", "Create the account in this cluster's own directory instead of the hub directory")
 	return c
 }
 
@@ -220,11 +229,16 @@ func inviteListCmd() *cobra.Command {
 }
 
 func inviteCreateCmd() *cobra.Command {
-	var groups, displayName, email, note string
+	var groups, displayName, email, note, cluster string
 	var ttlHours int
 	c := &cobra.Command{
 		Use:   "create --groups TENANT[,TENANT...]",
 		Short: "Create a tenant-scoped invite (POST /invites)",
+		Long: "Create a single-use invitation for a tenant.\n\n" +
+			"Without --cluster the invite is redeemed against the shared hub\n" +
+			"directory. With --cluster it is redeemed against that cluster's\n" +
+			"directory: its own LLDAP, or the hub directory when the cluster is\n" +
+			"bound to it.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var gs []string
 			for _, g := range strings.Split(groups, ",") {
@@ -236,6 +250,9 @@ func inviteCreateCmd() *cobra.Command {
 				return fmt.Errorf("--groups is required (comma-separated tenant names)")
 			}
 			body := map[string]interface{}{"groups": gs}
+			if cluster != "" {
+				body["cluster"] = strings.TrimSpace(cluster)
+			}
 			if ttlHours > 0 {
 				body["ttlHours"] = ttlHours
 			}
@@ -260,6 +277,7 @@ func inviteCreateCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&groups, "groups", "", "Comma-separated tenant groups (required)")
+	c.Flags().StringVar(&cluster, "cluster", "", "Redeem against this cluster's own directory instead of the hub directory")
 	c.Flags().IntVar(&ttlHours, "ttl-hours", 0, "Invite lifetime in hours (default 72)")
 	c.Flags().StringVar(&displayName, "display-name", "", "Display name hint")
 	c.Flags().StringVar(&email, "email", "", "Email hint")

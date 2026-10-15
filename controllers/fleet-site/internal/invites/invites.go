@@ -27,8 +27,12 @@ const DefaultTTL = 72 * time.Hour
 
 // Invite is one single-use directory invitation.
 type Invite struct {
-	ID              string   `json:"id"`
-	TokenHash       string   `json:"tokenHash"`
+	ID        string `json:"id"`
+	TokenHash string `json:"tokenHash"`
+	// Cluster is the cluster whose own LLDAP the invitation targets. Empty means
+	// the shared hub directory. A cluster that is later switched to the hub
+	// directory redeems against the hub, so this records intent, not a binding.
+	Cluster         string   `json:"cluster,omitempty"`
 	Groups          []string `json:"groups,omitempty"`
 	DisplayNameHint string   `json:"displayNameHint,omitempty"`
 	EmailHint       string   `json:"emailHint,omitempty"`

@@ -32,6 +32,7 @@ var inviteUserRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
 
 type inviteCreateBody struct {
 	Groups          []string `json:"groups"`
+	Cluster         string   `json:"cluster"`
 	TTLHours        int      `json:"ttlHours"`
 	DisplayNameHint string   `json:"displayNameHint"`
 	EmailHint       string   `json:"emailHint"`
@@ -48,6 +49,7 @@ type inviteRedeemBody struct {
 
 type inviteView struct {
 	ID              string   `json:"id"`
+	Cluster         string   `json:"cluster,omitempty"`
 	Groups          []string `json:"groups,omitempty"`
 	DisplayNameHint string   `json:"displayNameHint,omitempty"`
 	EmailHint       string   `json:"emailHint,omitempty"`
@@ -64,6 +66,7 @@ type inviteView struct {
 func inviteToView(inv invites.Invite, now time.Time) inviteView {
 	return inviteView{
 		ID:              inv.ID,
+		Cluster:         inv.Cluster,
 		Groups:          inv.Groups,
 		DisplayNameHint: inv.DisplayNameHint,
 		EmailHint:       inv.EmailHint,
@@ -153,6 +156,11 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "at least one tenant group is required", http.StatusBadRequest)
 		return
 	}
+	cluster := strings.TrimSpace(req.Cluster)
+	if _, err := s.inviteTargetCluster(r.Context(), cluster); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	ttl := req.TTLHours
 	if ttl <= 0 {
 		ttl = int(invites.DefaultTTL.Hours())
@@ -175,6 +183,7 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	inv := invites.Invite{
 		ID:              id,
 		TokenHash:       invites.HashToken(token),
+		Cluster:         cluster,
 		Groups:          groups,
 		DisplayNameHint: strings.TrimSpace(req.DisplayNameHint),
 		EmailHint:       strings.TrimSpace(req.EmailHint),
@@ -191,7 +200,8 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 		"id":        id,
 		"token":     token,
 		"path":      "/fleet/invite?token=" + token,
-		"links":     s.inviteSignupLinks(r.Context(), token),
+		"cluster":   cluster,
+		"links":     s.inviteSignupLinks(r.Context(), token, cluster),
 		"groups":    groups,
 		"expiresAt": inv.ExpiresAt,
 	})
@@ -203,10 +213,12 @@ type inviteSignupLink struct {
 	URL     string `json:"url"`
 }
 
-// inviteSignupLinks returns publicly reachable sign-up pages for an invite:
-// one per cluster that uses the shared hub directory (its Authelia portal host
-// serves /invite), plus the hub console when a public console URL is configured.
-func (s *Server) inviteSignupLinks(ctx context.Context, token string) []inviteSignupLink {
+// inviteSignupLinks returns publicly reachable sign-up pages for an invite: the
+// hub console, plus the Authelia portal host of the clusters the invite can be
+// redeemed on. An invite targeted at a cluster is redeemed against that
+// cluster's directory (its own LLDAP or the hub's); an untargeted one only
+// applies to clusters sharing the hub directory.
+func (s *Server) inviteSignupLinks(ctx context.Context, token, cluster string) []inviteSignupLink {
 	links := []inviteSignupLink{}
 	if base := strings.TrimRight(strings.TrimSpace(s.Cfg.ConsolePublicURL), "/"); base != "" {
 		links = append(links, inviteSignupLink{Cluster: "hub", URL: base + "/fleet/invite?token=" + token})
@@ -217,10 +229,17 @@ func (s *Server) inviteSignupLinks(ctx context.Context, token string) []inviteSi
 	}
 	for i := range joins.Items {
 		fcj := &joins.Items[i]
-		if !fcj.Spec.IngressAuth.Enabled || fcj.Spec.IngressAuth.Directory != "hub" {
+		if !fcj.Spec.IngressAuth.Enabled {
 			continue
 		}
 		name := fcj.Spec.EffectiveClusterName(fcj.Name)
+		if cluster != "" {
+			if name != cluster {
+				continue
+			}
+		} else if fcj.Spec.IngressAuth.Directory != "hub" {
+			continue
+		}
 		host := strings.TrimSpace(fcj.Status.IngressAuth.PortalHost)
 		if dns, err := ingressauth.ResolveClusterDNS(ctx, s.Client, s.Cfg, name, fcj); err == nil && dns.PortalHost != "" {
 			host = dns.PortalHost
@@ -234,6 +253,26 @@ func (s *Server) inviteSignupLinks(ctx context.Context, token string) []inviteSi
 		})
 	}
 	return links
+}
+
+// inviteTargetCluster validates an invite's target cluster: it must exist, be
+// Ready, and have ingress auth enabled, because redemption writes to whatever
+// directory that cluster uses.
+func (s *Server) inviteTargetCluster(ctx context.Context, name string) (*fleetv1alpha1.FleetClusterJoin, error) {
+	if name == "" {
+		return nil, nil
+	}
+	fcj, err := s.findFleetClusterJoin(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("cluster %q: %w", name, err)
+	}
+	if fcj.Status.Phase != fleetv1alpha1.JoinPhaseReady {
+		return nil, fmt.Errorf("cluster %q is not Ready", name)
+	}
+	if !fcj.Spec.IngressAuth.Enabled {
+		return nil, fmt.Errorf("cluster %q has no ingress auth, so it has no directory", name)
+	}
+	return fcj, nil
 }
 
 func (s *Server) deleteInvite(w http.ResponseWriter, r *http.Request, id string) {
@@ -315,6 +354,18 @@ func (s *Server) redeemInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) provisionInvitedUser(ctx context.Context, inv invites.Invite, username, password, displayName, email string) error {
+	// A cluster-targeted invite is redeemed against that cluster's directory. A
+	// cluster with its own LLDAP needs the work done on the spoke; one bound to
+	// the hub directory falls through to the hub path below.
+	if inv.Cluster != "" {
+		target, err := s.inviteTargetCluster(ctx, inv.Cluster)
+		if err != nil {
+			return err
+		}
+		if clusterUsesOwnDirectory(target) {
+			return s.provisionInvitedUserOnSpoke(ctx, inv, target, username, password, displayName, email)
+		}
+	}
 	adminUser, adminPass, err := s.lldapServiceAccount(ctx)
 	if err != nil {
 		return err

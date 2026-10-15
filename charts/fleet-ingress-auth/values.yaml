@@ -57,8 +57,9 @@ authelia:
   # are evaluated before accessDomains. Empty groups means any authenticated user.
   accessRules: []
 
-# Cluster-local invite sign-up page. Enabled for clusters using the shared hub
-# directory (directory: hub); the form proxies redemption to the hub over WG.
+# Cluster-local invite sign-up page. The form posts to the hub over WireGuard,
+# which redeems the invite against whichever directory it targets: the cluster's
+# own LLDAP (directory: local) or the shared hub directory (directory: hub).
 signup:
   enabled: false
   image: nginx:1.27-alpine
