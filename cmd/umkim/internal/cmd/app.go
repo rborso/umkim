@@ -342,9 +342,8 @@ func appUpdateCmd() *cobra.Command {
 			if err := applyOptionalLLMBackend(body, llmBackendOpt); err != nil {
 				return err
 			}
-			if len(body) == 0 {
-				return fmt.Errorf("no patch fields; use --version, --values-file, --namespace, --route-mode, or --llm-backend")
-			}
+			// An empty body is an explicit re-apply: the API asks the controller to
+			// retry a Failed app, and returns the app unchanged when it is Ready.
 			raw, code, err := api.Patch("/apps/"+args[0], body)
 			if err != nil {
 				return err

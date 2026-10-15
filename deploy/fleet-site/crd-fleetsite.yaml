@@ -152,7 +152,7 @@ spec:
                 minRootDiskGi:
                   type: integer
                   minimum: 10
-                  default: 40
+                  default: 20
                 clusterCapabilities:
                   type: object
                   additionalProperties:

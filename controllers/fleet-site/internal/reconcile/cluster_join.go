@@ -866,7 +866,7 @@ func (r *ClusterJoinReconciler) buildClusterInventoryINI(ctx context.Context, fc
 	sshArgs, useMgmtLAN := r.inventorySSH(ctx, fcj, hubRunner)
 	minDisk := fcj.Spec.MinRootDiskGi
 	if minDisk == 0 {
-		minDisk = 40
+		minDisk = 20
 	}
 
 	writeNodeGroups := func(b *strings.Builder) {

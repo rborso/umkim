@@ -3,6 +3,8 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
@@ -177,13 +179,13 @@ func (r *IngressAuthReconciler) pollIngressAuthJob(ctx context.Context, fia *fle
 	var job batchv1.Job
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Cfg.Namespace, Name: fia.Status.LastJobName}, &job); err != nil {
 		if apierrors.IsNotFound(err) {
-			return r.completeIngressAuth(ctx, fia, desired)
+			return r.completeIngressAuth(ctx, fia, desired, nil)
 		}
 		return ctrl.Result{}, err
 	}
 	for _, c := range job.Status.Conditions {
 		if c.Type == batchv1.JobComplete && c.Status == "True" {
-			return r.completeIngressAuth(ctx, fia, desired)
+			return r.completeIngressAuth(ctx, fia, desired, appliedClusters(&job))
 		}
 		if c.Type == batchv1.JobFailed && c.Status == "True" {
 			return r.failIngressAuth(ctx, fia, fmt.Errorf("job %s failed", job.Name))
@@ -192,7 +194,45 @@ func (r *IngressAuthReconciler) pollIngressAuthJob(ctx context.Context, fia *fle
 	return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
-func (r *IngressAuthReconciler) completeIngressAuth(ctx context.Context, fia *fleetv1alpha1.FleetIngressAuth, desired ingressauth.DesiredState) (ctrl.Result, error) {
+// appliedClusters returns the enabled clusters a reconcile Job rendered, or nil
+// when the Job predates the annotation. Nil means "unknown", and the caller falls
+// back to the current desired state (the pre-annotation behaviour).
+func appliedClusters(job *batchv1.Job) []string {
+	raw := strings.TrimSpace(job.Annotations[jobs.AppliedClustersAnnotation])
+	if raw == "" {
+		return nil
+	}
+	out := []string{}
+	for _, name := range strings.Split(raw, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// enabledSubset returns desired restricted to the named clusters (sorted). It is
+// used to act on exactly the clusters a Job rendered, leaving any cluster enabled
+// while that Job ran untouched for the follow-up reconcile.
+func enabledSubset(desired ingressauth.DesiredState, names []string) ingressauth.DesiredState {
+	out := desired
+	out.EnabledClusters = append([]string(nil), names...)
+	sort.Strings(out.EnabledClusters)
+	return out
+}
+
+// completeIngressAuth records a successful reconcile. `applied` is the set of
+// clusters the finished Job actually rendered; only those are marked ready and
+// only those count towards the stored spec hash. A cluster enabled while the Job
+// was running therefore stays pending, the hash keeps differing from the current
+// desired state, and the next reconcile deploys it. Marking the whole current
+// desired state ready instead was the bug: the cluster read `Ready` with no spoke
+// stack, and the stored hash matched, so it was never deployed.
+func (r *IngressAuthReconciler) completeIngressAuth(ctx context.Context, fia *fleetv1alpha1.FleetIngressAuth, desired ingressauth.DesiredState, applied []string) (ctrl.Result, error) {
+	rendered := desired
+	if applied != nil {
+		rendered = enabledSubset(desired, applied)
+	}
 	if desired.GlobalEnabled {
 		fia.Status.Phase = fleetv1alpha1.IngressAuthPhaseReady
 		fia.Status.Message = "Ingress auth ready"
@@ -209,18 +249,18 @@ func (r *IngressAuthReconciler) completeIngressAuth(ctx context.Context, fia *fl
 		fia.Status.Hub.AutheliaServiceURL = ""
 		fia.Status.Hub.Message = ""
 	}
-	fia.Status.Clusters = clusterStatusReady(desired)
+	fia.Status.Clusters = clusterStatuses(desired, rendered)
 	if err := r.Status().Update(ctx, fia); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.patchAnsibleSpecHash(ctx, fia, desired); err != nil {
+	if err := r.patchAnsibleSpecHash(ctx, fia, rendered); err != nil {
 		return ctrl.Result{}, err
 	}
 	phase := fleetv1alpha1.IngressAuthClusterPhaseDisabled
 	if desired.GlobalEnabled {
 		phase = fleetv1alpha1.IngressAuthClusterPhaseReady
 	}
-	if err := r.updateFCJIngressAuthPhases(ctx, desired, phase, ""); err != nil {
+	if err := r.updateFCJIngressAuthPhases(ctx, rendered, phase, ""); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: time.Duration(r.Cfg.RequeueIntervalSec) * time.Second}, nil
@@ -257,12 +297,24 @@ func clusterStatusApplying(desired ingressauth.DesiredState) []fleetv1alpha1.Fle
 	return out
 }
 
-func clusterStatusReady(desired ingressauth.DesiredState) []fleetv1alpha1.FleetIngressAuthClusterStatus {
-	out := make([]fleetv1alpha1.FleetIngressAuthClusterStatus, 0, len(desired.EnabledClusters))
-	for _, name := range desired.EnabledClusters {
+// clusterStatuses reports every currently desired cluster: the ones the finished
+// Job rendered are ready, and any cluster enabled while it ran is still applying.
+func clusterStatuses(desired, rendered ingressauth.DesiredState) []fleetv1alpha1.FleetIngressAuthClusterStatus {
+	ready := map[string]struct{}{}
+	for _, name := range rendered.EnabledClusters {
+		ready[name] = struct{}{}
+	}
+	names := append([]string(nil), desired.EnabledClusters...)
+	sort.Strings(names)
+	out := make([]fleetv1alpha1.FleetIngressAuthClusterStatus, 0, len(names))
+	for _, name := range names {
+		phase := fleetv1alpha1.IngressAuthClusterPhaseApplying
+		if _, ok := ready[name]; ok {
+			phase = fleetv1alpha1.IngressAuthClusterPhaseReady
+		}
 		out = append(out, fleetv1alpha1.FleetIngressAuthClusterStatus{
 			Name:  name,
-			Phase: fleetv1alpha1.IngressAuthClusterPhaseReady,
+			Phase: phase,
 		})
 	}
 	return out
@@ -280,11 +332,7 @@ func (r *IngressAuthReconciler) syncStuckFCJIngressAuth(ctx context.Context, fia
 	for _, n := range desired.EnabledClusters {
 		enabled[n] = struct{}{}
 	}
-	targetPhase := fleetv1alpha1.IngressAuthClusterPhaseReady
-	if fia.Status.Phase == fleetv1alpha1.IngressAuthPhaseFailed {
-		targetPhase = fleetv1alpha1.IngressAuthClusterPhaseFailed
-	}
-	needSync := false
+	var readySet, failedSet []string
 	for i := range joins.Items {
 		fcj := &joins.Items[i]
 		if !fcj.Spec.IngressAuth.Enabled {
@@ -315,18 +363,40 @@ func (r *IngressAuthReconciler) syncStuckFCJIngressAuth(ctx context.Context, fia
 		if !done {
 			continue
 		}
-		if failed {
-			targetPhase = fleetv1alpha1.IngressAuthClusterPhaseFailed
+		// Only a cluster the Job actually rendered can be settled from its result;
+		// one enabled after the Job started waits for the follow-up reconcile.
+		if applied := appliedClusters(&job); applied != nil && !containsString(applied, name) {
+			continue
 		}
-		needSync = true
+		if failed {
+			failedSet = append(failedSet, name)
+		} else {
+			readySet = append(readySet, name)
+		}
 	}
-	if !needSync {
+	if len(readySet) == 0 && len(failedSet) == 0 {
 		return false, nil
 	}
-	if err := r.updateFCJIngressAuthPhases(ctx, desired, targetPhase, ""); err != nil {
-		return false, err
+	if len(readySet) > 0 {
+		if err := r.updateFCJIngressAuthPhases(ctx, enabledSubset(desired, readySet), fleetv1alpha1.IngressAuthClusterPhaseReady, ""); err != nil {
+			return false, err
+		}
+	}
+	if len(failedSet) > 0 {
+		if err := r.updateFCJIngressAuthPhases(ctx, enabledSubset(desired, failedSet), fleetv1alpha1.IngressAuthClusterPhaseFailed, ""); err != nil {
+			return false, err
+		}
 	}
 	return true, nil
+}
+
+func containsString(list []string, want string) bool {
+	for _, v := range list {
+		if v == want {
+			return true
+		}
+	}
+	return false
 }
 
 func ingressAuthJobFinished(job *batchv1.Job) (done bool, failed bool) {

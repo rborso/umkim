@@ -87,15 +87,26 @@ func (r *AppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return r.pollInstall(ctx, &app, chart, release, ns, hash)
 	}
 	specUnchanged := app.Status.SpecHash == hash && app.Status.ObservedGeneration == app.Generation
-	if app.Status.Phase == fleetv1alpha1.AppPhaseReady && specUnchanged {
+	// An explicit retry (a no-op `app update` on a Failed app) must re-run even
+	// though the spec did not change.
+	retryRequested := app.RetryRequested()
+	if app.Status.Phase == fleetv1alpha1.AppPhaseReady && specUnchanged && !retryRequested {
 		if err := r.ensureRoute(ctx, &app, release, ns, mode); err != nil {
 			logger.Error(err, "ensure FleetAppRoute")
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		return ctrl.Result{}, nil
 	}
-	if app.Status.Phase == fleetv1alpha1.AppPhaseFailed && specUnchanged {
+	if app.Status.Phase == fleetv1alpha1.AppPhaseFailed && specUnchanged && !retryRequested {
 		return ctrl.Result{}, nil
+	}
+	if retryRequested {
+		// Consume the request: the install that follows is the retry.
+		orig := app.DeepCopy()
+		app.ConsumeRetry()
+		if err := r.Patch(ctx, &app, client.MergeFrom(orig)); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	if err := r.ensureValuesCM(ctx, &app); err != nil {

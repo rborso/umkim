@@ -77,7 +77,7 @@ const emptyClusterForm = (siteId = ''): FleetClusterCreate => ({
   clusterName: '',
   siteId,
   bootstrapHost: '198.51.100.11',
-  minRootDiskGi: 40,
+  minRootDiskGi: 20,
   clusterRegion: '',
   providers: {
     kubevirt: false,
@@ -394,7 +394,7 @@ export function ClustersPage() {
     if (nodes.length === 0) return null;
     const names = nodes.map((n) => n.hostname || '(unnamed)');
     const first = nodes[0].vm || {};
-    const bootGi = Math.max(first.diskGi || 0, (form.minRootDiskGi || 40) + 2);
+    const bootGi = Math.max(first.diskGi || 0, (form.minRootDiskGi || 20) + 2);
     const parts = [
       `${first.cores || 2} vCPU`,
       `${first.memory || 4096} MiB`,
@@ -1358,8 +1358,8 @@ export function ClustersPage() {
             <TextInput
               id="minRootDiskGi"
               type="number"
-              value={String(form.minRootDiskGi ?? 40)}
-              onChange={(_e, v) => setForm({ ...form, minRootDiskGi: parseInt(v, 10) || 40 })}
+              value={String(form.minRootDiskGi ?? 20)}
+              onChange={(_e, v) => setForm({ ...form, minRootDiskGi: parseInt(v, 10) || 20 })}
             />
           </LabeledField>
           <LabeledField label="Region" fieldId="clusterRegion" help={getFieldHelp('clusterJoin.region')}>

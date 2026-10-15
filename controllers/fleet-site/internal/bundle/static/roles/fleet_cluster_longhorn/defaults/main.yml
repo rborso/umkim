@@ -3,5 +3,9 @@ fleet_cluster_longhorn_device: ""
 fleet_cluster_longhorn_storage_class: longhorn
 fleet_cluster_longhorn_mount_path: /var/lib/longhorn
 fleet_cluster_longhorn_chart_version: 1.6.2
-fleet_cluster_min_data_disk_gi: 40
+fleet_cluster_min_data_disk_gi: 5
+# When NFS is configured it owns the default StorageClass (fleet_cluster_storage
+# sets it and clears the others), so Longhorn must not claim it too. Two defaults
+# leave a PVC without an explicit class binding unpredictably.
+fleet_cluster_longhorn_set_default_sc: "{{ not (fleet_cluster_nfs_enabled | default(false) | bool) }}"
 fleet_cluster_storage_kubeconfig: /etc/rancher/k3s/k3s.yaml

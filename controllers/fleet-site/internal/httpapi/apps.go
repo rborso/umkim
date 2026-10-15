@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/appchart"
@@ -370,6 +371,16 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 		changed = true
 	}
 	if !changed {
+		// A no-op patch is still an explicit "re-apply": a Failed app must retry,
+		// otherwise the operator's request is silently ignored (the reconciler
+		// skips a Failed app whose spec did not change).
+		if app.Status.Phase == fleetv1alpha1.AppPhaseFailed {
+			app.RequestRetry(time.Now().UTC().Format(time.RFC3339Nano))
+			if err := s.Client.Update(r.Context(), &app); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 		writeJSON(w, http.StatusOK, appToResponse(&app))
 		return
 	}

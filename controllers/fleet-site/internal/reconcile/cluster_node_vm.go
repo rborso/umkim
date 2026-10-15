@@ -15,7 +15,7 @@ const nodeVMActorName = "cluster-pipeline"
 
 // defaultNodeVMDataDiskGi is the data disk given to a pipeline-created guest when
 // Longhorn is enabled but the cluster does not state a minimum.
-const defaultNodeVMDataDiskGi = 10
+const defaultNodeVMDataDiskGi = 5
 
 // nodeVMBootDiskOverheadGi is the space a guest disk loses to EFI/boot before the
 // root LV. The bootstrap asserts the root filesystem is at least minRootDiskGi, so

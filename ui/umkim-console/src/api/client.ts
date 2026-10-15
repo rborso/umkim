@@ -655,7 +655,7 @@ export async function createFleetCluster(body: FleetClusterCreate): Promise<Flee
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       ...body,
-      minRootDiskGi: body.minRootDiskGi ?? 40,
+      minRootDiskGi: body.minRootDiskGi ?? 20,
       clusterRegion: body.clusterRegion || 'fleet',
       clusterCapabilities: caps,
       providers: install

@@ -302,50 +302,50 @@ kubectl -n fleet-system get fleetapproute -o custom-columns=\
 NAME:.metadata.name,TLS:.status.tlsPhase,MESSAGE:.status.tlsMessage
 ```
 
-Cautions found by running this procedure:
+Cautions found by running this procedure, and what now holds:
 
-- **`storage.minDataDiskGi` vs the node data disk.** The bootstrap asserts the
-  Longhorn device is at least `fleet_cluster_min_data_disk_gi`, which comes from
-  `storage.minDataDiskGi` and defaults to **40 GiB**. A per-node
-  `vm.dataDiskGi` below that (or the CLI's `--control-data-disk`, which does not
-  set `minDataDiskGi`) fails the bootstrap with
-  `Longhorn device too small … (need 40 GiB)`. Set `minDataDiskGi` to match the
-  disk you ask for. The derivation's own fallback (`else 10 GiB`) is below the
-  validation default, so a Longhorn cluster that states **no** size at all also
-  fails: state `minDataDiskGi`, or size the data disk at 40 GiB or more.
-- **Two default StorageClasses.** Enabling NFS and Longhorn together marks both
-  `nfs-client` and `longhorn` as default. A PVC without an explicit
-  `storageClassName` then binds to whichever the API server picks. Always set
-  the class in the chart values.
-- **Ingress-auth status can read `Ready` before the spoke stack exists.** The
-  cluster is marked ready when the per-cluster Secret is created; the spoke's
-  Authelia/LLDAP arrive with the next reconcile. Check
-  `kubectl -n fleet-ingress-auth get deploy` on the spoke before treating the
-  stack as live, and re-trigger the reconcile (annotation
-  `fleet.umkim.com/ingress-auth-reconcile` on the `FleetIngressAuth`) if the
-  ManifestWork was rendered before the cluster joined the enabled list.
-- **A hook that mounts a `ReadWriteOnce` config PVC deadlocks on a multi-node
-  cluster.** A post-install hook that edits a running app's config volume cannot
-  start while the app's pod holds that volume on another node, so it times out
-  and the Helm release fails. Where a chart offers it, use `ReadWriteMany` for
-  the config volume (Longhorn serves RWX through its share-manager), or seed the
-  config before the first install.
-- **A failed post-install hook leaves the release `pending-upgrade`.** Every
-  later `helm upgrade` then fails with *another operation … in progress* until
-  the hook Job is deleted and the release status is cleared. `umkim app update`
-  also skips a `Failed` app whose spec is unchanged, so the update must change a
-  value to re-run.
-- **Chart/bootstrap contracts can disagree on components.** A bootstrap image
-  that enables a component by default while the chart ships no such workload
-  waits for a Service that never appears; pass the component's `*_ENABLE_*`
-  switch through the bootstrap Secret (a key the generated ConfigMap does not
-  set is not overwritten by `envFrom`).
-- **A server-to-server integration cannot use its own public route.** An app
-  whose pod must call another app's public hostname (a WOPI/SSO discovery URL)
-  fails twice: the pod's request from an RFC1918 address to the public address
-  can be refused by the site router's NAT loopback policy, and the route is
-  behind forward-auth. Map the host to the in-cluster ingress (as the Immich
-  chart does for its OIDC issuer), or exempt the machine-to-machine path.
+- **Sizing the Longhorn data disk.** The bootstrap asserts the device is at
+  least `fleet_cluster_min_data_disk_gi`, which comes from `storage.minDataDiskGi`
+  (default **5 GiB**) and is also what a pipeline-created guest derives its data
+  disk from when the node states no `vm.dataDiskGi`. A per-node `vm.dataDiskGi`
+  below `minDataDiskGi` still fails the bootstrap
+  (`Longhorn device too small … (need N GiB)`), so state a consistent minimum.
+  The boot-disk minimum `minRootDiskGi` defaults to **20 GiB**, and a node VM's
+  boot disk is raised above it by the 2 GiB EFI/boot overhead.
+- **One default StorageClass.** When NFS is configured it owns the default:
+  `nfs-client` is marked default and the storage role clears the flag from every
+  other class, while the Longhorn role no longer claims it (both the chart value
+  `persistence.defaultClass` and the explicit patch are skipped). Set an explicit
+  class in chart values anyway.
+- **Ingress auth settles only the clusters a reconcile actually rendered.**
+  Completion marks the enabled set the Job recorded, so a cluster enabled while
+  that Job ran stays pending and the changed spec hash re-triggers a reconcile
+  that deploys it. A cluster that reads ready without a spoke stack is now a bug
+  worth reporting, not an expected lag.
+- **Config volumes that a hook mounts must be shareable.** A post-install hook
+  that edits a running app's config volume cannot start while the app's pod holds
+  a `ReadWriteOnce` volume on another node, so it times out and the release
+  fails. The servarr chart now defaults its config volumes to `ReadWriteMany`
+  (Longhorn serves RWX through its share-manager); a single-node cluster can opt
+  back into RWO.
+- **A stuck `pending-*` release is cleared automatically.** An upgrade killed
+  mid-flight leaves the release pending, and every later upgrade then fails with
+  *another operation … in progress*; the install job marks such a revision failed
+  before retrying, so no manual recovery is needed. A `Failed` app is also re-run
+  by a no-change `umkim app update` (an explicit retry), not only when a value
+  changes.
+- **State the bootstrap switches a chart does not ship.** The bootstrap image
+  enables every component by default, and a component the chart has no workload
+  for makes the job wait for a Service that never appears. The servarr chart now
+  emits a flag for every component the image knows, defaulting to off when it has
+  no such app.
+- **A server-to-server integration needs an in-cluster address.** An app whose pod
+  calls another app's public hostname (a WOPI or SSO discovery URL) fails twice:
+  the request from an RFC1918 address to the public address can be refused by the
+  site router's NAT loopback policy, and the route is behind forward-auth. The
+  nextcloud chart fetches WOPI discovery on the in-cluster Collabora Service and
+  keeps the public host only for the browser, so no forward-auth exemption is
+  needed; mapping the host to the in-cluster ingress is the alternative.
 - **Not every chart bootstrap can run unattended.** A bootstrap that verifies an
   indexer, a model, or another external resource needs the operator's
   credentials for it; without them the job fails at its verification step even

@@ -93,7 +93,18 @@ availability, or backup guarantee. Validation is not used for `nfs_local`
 
 Longhorn is validated only for `ha_3_node` topology at create time and may use either its
 default data directory or a dedicated block device. Review disk selection and
-failure-domain requirements before choosing it.
+failure-domain requirements before choosing it. The bootstrap asserts the device
+is at least `storage.minDataDiskGi` (default 5 GiB).
+
+## Default StorageClass
+
+The cluster has exactly one default class. When NFS is configured, `nfs-client`
+owns it: the storage role marks it default and clears the flag from every other
+class, and the Longhorn role installs with `persistence.defaultClass=false` and
+skips its own default patch. Without NFS, Longhorn takes the default when it is
+enabled. A `local_path` cluster keeps the K3s `local-path` class. Charts should
+still set an explicit `storageClassName` per volume so placement does not depend
+on the default.
 
 ## Verify
 
