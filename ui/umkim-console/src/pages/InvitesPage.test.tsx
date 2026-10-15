@@ -80,25 +80,49 @@ describe('InvitesPage target directory', () => {
 
   const createButton = () => screen.getAllByRole('button', { name: 'Create invite' })[0];
 
-  it('creates the invite against the selected cluster directory', async () => {
-    renderPage();
+  async function pickCluster(value: string) {
     const select = await screen.findByLabelText('invite target directory');
     await waitFor(() =>
       expect(Array.from(select.querySelectorAll('option')).map((o) => o.textContent)).toContain(
         'lab-e2e-7 (own directory)',
       ),
     );
-    fireEvent.change(select, { target: { value: 'lab-e2e-7' } });
+    fireEvent.change(select, { target: { value } });
+  }
+
+  it('names groups by hand for a cluster with its own directory', async () => {
+    renderPage();
+    await pickCluster('lab-e2e-7');
+
+    // The hub group list does not apply: no hub checkboxes and no "create one on
+    // the Tenants page" advice, which would create it in the wrong directory.
+    const input = await screen.findByLabelText(/Groups in lab-e2e-7/);
+    expect(screen.queryByLabelText('labtenant')).not.toBeInTheDocument();
+    expect(screen.queryByText('No tenant groups yet')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'labtenant, movies' } });
+    fireEvent.click(createButton());
+
+    await waitFor(() => expect(createInvite).toHaveBeenCalledTimes(1));
+    expect(createInvite.mock.calls[0][0]).toMatchObject({
+      groups: ['labtenant', 'movies'],
+      cluster: 'lab-e2e-7',
+    });
+    expect(await screen.findByLabelText('invite link lab-e2e-7')).toBeInTheDocument();
+  });
+
+  it('uses the hub group list for a cluster bound to the hub directory', async () => {
+    renderPage();
+    await pickCluster('rp-test');
+
     fireEvent.click(await screen.findByLabelText('labtenant'));
     fireEvent.click(createButton());
 
     await waitFor(() => expect(createInvite).toHaveBeenCalledTimes(1));
     expect(createInvite.mock.calls[0][0]).toMatchObject({
       groups: ['labtenant'],
-      cluster: 'lab-e2e-7',
+      cluster: 'rp-test',
     });
-    // The one-time link is surfaced for the targeted cluster.
-    expect(await screen.findByLabelText('invite link lab-e2e-7')).toBeInTheDocument();
   });
 
   it('leaves the target empty for the shared hub directory', async () => {
