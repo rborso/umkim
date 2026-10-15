@@ -5,20 +5,30 @@ import {
   Checkbox,
   Form,
   FormGroup,
+  FormSelect,
+  FormSelectOption,
   PageSection,
   TextInput,
   Title,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { Link, Navigate } from 'react-router-dom';
-import { createInvite, deleteInvite, listInvites, listTenants } from '../api/client';
-import type { Invite } from '../api/types';
+import { createInvite, deleteInvite, listFleetClusters, listInvites, listTenants } from '../api/client';
+import type { FleetCluster, Invite } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+
+/** A cluster that runs or binds a directory an invite can be redeemed against. */
+function inviteTargetLabel(c: FleetCluster): string {
+  const own = (c.ingressAuthStatus?.directory ?? '') !== 'hub';
+  return `${c.name} (${own ? 'own directory' : 'hub directory'})`;
+}
 
 export function InvitesPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState<Invite[]>([]);
   const [tenants, setTenants] = useState<string[]>([]);
+  const [clusters, setClusters] = useState<FleetCluster[]>([]);
+  const [target, setTarget] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [ttlHours, setTtlHours] = useState('72');
   const [note, setNote] = useState('');
@@ -32,6 +42,9 @@ export function InvitesPage() {
       .catch((e) => setError(String(e)));
     void listTenants()
       .then((d) => setTenants((d.groups ?? []).filter((g) => !g.system).map((g) => g.name)))
+      .catch((e) => setError(String(e)));
+    void listFleetClusters()
+      .then((all) => setClusters(all.filter((c) => c.ingress_auth_enabled)))
       .catch((e) => setError(String(e)));
   };
 
@@ -56,13 +69,14 @@ export function InvitesPage() {
     try {
       const res = await createInvite({
         groups: selected,
+        cluster: target || undefined,
         ttlHours: Number.parseInt(ttlHours, 10) || undefined,
         note: note || undefined,
       });
       setLinks(
         res.links && res.links.length
           ? res.links
-          : [{ cluster: 'hub', url: window.location.origin + res.path }],
+          : [{ cluster: res.cluster || 'hub', url: window.location.origin + res.path }],
       );
       setSelected([]);
       setNote('');
@@ -88,13 +102,26 @@ export function InvitesPage() {
     <PageSection>
       <Title headingLevel="h1">Invitations</Title>
       <Alert variant="info" isInline title="One-time directory invitations" style={{ marginBottom: '1rem' }}>
-        Create a single-use link for a new user. Redeeming it creates the user in the shared directory,
+        Create a single-use link for a new user. Redeeming it creates the user in the selected directory,
         adds the selected tenant groups, and sets the initial password. Links expire after 72 hours by default.
       </Alert>
       {error ? (
         <Alert variant="danger" isInline title={error} style={{ marginBottom: '1rem' }} />
       ) : null}
       <Form onSubmit={(e) => { e.preventDefault(); void submit(); }} style={{ marginBottom: '1.5rem' }}>
+        <FormGroup label="Directory" fieldId="invite-target">
+          <FormSelect
+            id="invite-target"
+            value={target}
+            onChange={(_e, v) => setTarget(v)}
+            aria-label="invite target directory"
+          >
+            <FormSelectOption value="" label="Hub directory (shared)" />
+            {clusters.map((c) => (
+              <FormSelectOption key={c.name} value={c.name} label={inviteTargetLabel(c)} />
+            ))}
+          </FormSelect>
+        </FormGroup>
         <FormGroup label="Tenant groups" isRequired fieldId="invite-groups">
           {tenants.length === 0 ? (
             <Alert variant="warning" isInline title="No tenant groups yet">
@@ -113,6 +140,12 @@ export function InvitesPage() {
               ))}
             </div>
           )}
+          {target ? (
+            <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+              Groups are resolved in <strong>{target}</strong>&apos;s directory, so each name must exist there
+              (the list above is the hub directory&apos;s).
+            </div>
+          ) : null}
         </FormGroup>
         <FormGroup label="Expires in (hours)" fieldId="invite-ttl">
           <TextInput
@@ -155,6 +188,7 @@ export function InvitesPage() {
         <Thead>
           <Tr>
             <Th>Created</Th>
+            <Th>Directory</Th>
             <Th>Groups</Th>
             <Th>Expires</Th>
             <Th>Status</Th>
@@ -166,6 +200,7 @@ export function InvitesPage() {
           {rows.map((inv) => (
             <Tr key={inv.id}>
               <Td dataLabel="Created">{inv.createdAt}</Td>
+              <Td dataLabel="Directory">{inv.cluster || 'hub'}</Td>
               <Td dataLabel="Groups">{(inv.groups ?? []).join(', ')}</Td>
               <Td dataLabel="Expires">{inv.expiresAt}</Td>
               <Td dataLabel="Status">
