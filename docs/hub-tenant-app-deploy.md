@@ -128,7 +128,7 @@ umkim app create -f servarr-hub.json
   "version": "0.2.9",
   "releaseName": "servarr",
   "namespace": "servarr",
-  "valuesYaml": "bootstrap:\n  enabled: true\n  image: 10.10.0.1:30443/fleet/servarr-bootstrap:0.2\napps:\n  jellyfin:\n    ldap:\n      enabled: true\n      server: 10.10.0.1\n      port: 30389\n      bindUser: uid=svc-bind,ou=people,dc=otthol,dc=local\n      existingSecret: servarr-lldap-bind\n",
+  "valuesYaml": "bootstrap:\n  enabled: true\n  image: 10.10.0.1:30443/fleet/servarr-bootstrap:0.8\napps:\n  jellyfin:\n    ldap:\n      enabled: true\n      server: 10.10.0.1\n      port: 30389\n      bindUser: uid=svc-bind,ou=people,dc=otthol,dc=local\n      existingSecret: servarr-lldap-bind\n",
   "routes": [
     {"key": "sonarr", "mode": "hub", "hubHost": "sonarr.demo.otthol.hu", "requireAuth": true, "requireAuthGroups": ["newtenant"], "serviceName": "sonarr", "servicePort": 80}
   ]
