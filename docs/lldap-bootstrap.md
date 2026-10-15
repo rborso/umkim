@@ -93,9 +93,19 @@ list shows the target directory, and the console only offers clusters that have
 ingress auth (so they have a directory).
 
 The tenant groups a console invite offers come from the hub directory. A
-cluster's own directory usually has different groups, so for a cluster-targeted
-invite make sure the selected names exist **in that directory** — redemption
-fails with `directory group "x" does not exist` otherwise.
+cluster's own directory usually has different groups, so a cluster-targeted
+invite names them by hand and each must already exist **in that directory**;
+the redeem fails with `group <name> does not exist in this directory` otherwise
+(the Job log is reported back, so the failure names the group). Create the
+group in the cluster's directory first — the Tenants page manages the hub
+directory, and `umkim cluster ingress-auth enable --expose-lldap-webui` puts
+that directory's own UI behind Authelia for exactly this.
+
+Redemption is retried and idempotent: a Job restart completes the remaining
+steps instead of failing on a user the previous attempt already created, so an
+interrupted invite can simply be redeemed again. A failed Job is left in place
+for its TTL so its log can be read; a successful one is removed with the Secret
+that carried the invitee's password.
 
 LLDAP exposes no GraphQL password mutation (passwords use the OPAQUE protocol),
 so the controller creates the user and group membership over GraphQL and then

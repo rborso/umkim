@@ -65,10 +65,15 @@ func (s *Server) provisionInvitedUserOnSpoke(ctx context.Context, inv invites.In
 	}
 	job := buildInviteRedeemJob(image)
 	background := metav1.DeletePropagationBackground
+	var redeemErr error
 	defer func() {
-		// Best effort: the Job carries a TTL, but the Secret holds a password.
-		_ = cs.BatchV1().Jobs(ns).Delete(context.Background(), job.Name, metav1.DeleteOptions{PropagationPolicy: &background})
+		// Keep a failed Job so its log can be read; its TTL removes it. A
+		// successful one is removed along with the Secret holding the password.
 		_ = cs.CoreV1().Secrets(ns).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
+		if redeemErr != nil {
+			return
+		}
+		_ = cs.BatchV1().Jobs(ns).Delete(context.Background(), job.Name, metav1.DeleteOptions{PropagationPolicy: &background})
 	}()
 	if err := cs.BatchV1().Jobs(ns).Delete(ctx, job.Name, metav1.DeleteOptions{PropagationPolicy: &background}); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -78,7 +83,8 @@ func (s *Server) provisionInvitedUserOnSpoke(ctx context.Context, inv invites.In
 	if _, err := cs.BatchV1().Jobs(ns).Create(ctx, job, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("create invite redeem job: %w", err)
 	}
-	return s.waitInviteRedeemJob(ctx, cs, ns, job.Name)
+	redeemErr = s.waitInviteRedeemJob(ctx, cs, ns, job.Name)
+	return redeemErr
 }
 
 // waitInviteRedeemJob waits for the Job to finish and surfaces its log, which is
@@ -118,15 +124,24 @@ func (s *Server) inviteRedeemJobLog(ctx context.Context, cs kubernetes.Interface
 	if err != nil || len(pods.Items) == 0 {
 		return "no pod log"
 	}
-	raw, err := cs.CoreV1().Pods(ns).GetLogs(pods.Items[0].Name, &corev1.PodLogOptions{}).DoRaw(ctx)
-	if err != nil {
+	// Every attempt matters: a retry after a partial success reports a different
+	// error from the attempt that actually broke.
+	var out strings.Builder
+	for _, pod := range pods.Items {
+		raw, err := cs.CoreV1().Pods(ns).GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
+		if err != nil {
+			continue
+		}
+		out.WriteString(fmt.Sprintf("[%s] %s\n", pod.Name, strings.TrimSpace(string(raw))))
+	}
+	if out.Len() == 0 {
 		return "pod log unavailable"
 	}
-	out := strings.TrimSpace(string(raw))
-	if len(out) > 600 {
-		out = out[len(out)-600:]
+	text := out.String()
+	if len(text) > 1200 {
+		text = text[len(text)-1200:]
 	}
-	return out
+	return text
 }
 
 // spokeLLDAPImage reuses the image the spoke's own LLDAP Deployment runs, so the
@@ -173,40 +188,74 @@ func buildInviteRedeemSecret(username, password, displayName, email string, grou
 // inviteRedeemScript creates the user, adds it to every invited group and sets
 // its password. Values arrive as environment variables so nothing user-supplied
 // is ever interpolated into the shell.
-const inviteRedeemScript = `set -euo pipefail
+//
+// Every step is idempotent and retried: the Job restarts on failure, and a
+// restart must complete the work rather than die on a user it already created.
+// A one-shot group lookup is what left a user with no group and no password
+// while the Job still reported failure.
+const inviteRedeemScript = `set -uo pipefail
 url="${LLDAP_URL}"
 for i in $(seq 1 40); do
   curl -fsS "${url}/health" >/dev/null 2>&1 && break
   sleep 3
 done
-token=$(curl -fsS -X POST "${url}/auth/simple/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"username\":\"admin\",\"password\":\"${LLDAP_ADMIN_PASSWORD}\"}" \
-  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+
+token=""
+for i in $(seq 1 10); do
+  token=$(curl -fsS -X POST "${url}/auth/simple/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"admin\",\"password\":\"${LLDAP_ADMIN_PASSWORD}\"}" 2>/dev/null \
+    | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+  [ -n "${token}" ] && break
+  sleep 3
+done
 if [ -z "${token}" ]; then echo "LLDAP admin login failed"; exit 1; fi
+
 gql() { curl -fsS -X POST "${url}/api/graphql" \
   -H "Authorization: Bearer ${token}" -H 'Content-Type: application/json' --data "$1"; }
+# gql_retry tolerates a transient directory error by trying again.
+gql_retry() {
+  local out=""
+  for i in $(seq 1 6); do
+    out=$(gql "$1" 2>/dev/null) && [ -n "${out}" ] && { printf '%s' "${out}"; return 0; }
+    sleep 3
+  done
+  return 1
+}
 
-created=$(gql "{\"query\":\"mutation(\$u:CreateUserInput!){createUser(user:\$u){id}}\",\"variables\":{\"u\":{\"id\":\"${INVITE_USERNAME}\",\"displayName\":\"${INVITE_DISPLAY_NAME}\",\"email\":\"${INVITE_EMAIL}\"}}}")
+created=$(gql_retry "{\"query\":\"mutation(\$u:CreateUserInput!){createUser(user:\$u){id}}\",\"variables\":{\"u\":{\"id\":\"${INVITE_USERNAME}\",\"displayName\":\"${INVITE_DISPLAY_NAME}\",\"email\":\"${INVITE_EMAIL}\"}}}") || true
 case "${created}" in
-  *'"errors"'*) echo "createUser failed: ${created}"; exit 1;;
+  *'"id"'*) echo "==> created directory user ${INVITE_USERNAME}";;
+  # A restart after a partial attempt must carry on, not fail here.
+  *"UNIQUE constraint"*|*"already exists"*) echo "==> ${INVITE_USERNAME} already exists; completing the remaining steps";;
+  *) echo "createUser failed: ${created}"; exit 1;;
 esac
-echo "==> created directory user ${INVITE_USERNAME}"
 
+# List the directory groups once. Retry only a failed call: a group that is
+# simply absent must fail immediately, or the caller waits out its HTTP timeout
+# and reports a gateway error instead of the real problem.
+groups=$(gql_retry '{"query":"{ groups { id displayName } }"}') || { echo "listing directory groups failed"; exit 1; }
 for g in ${INVITE_GROUPS}; do
-  groups=$(gql '{"query":"{ groups { id displayName } }"}' 2>/dev/null || true)
   gid=$(printf '%s' "${groups}" | tr '{' '\n' | grep -F "\"displayName\":\"${g}\"" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9][0-9]*' || true)
-  if [ -z "${gid}" ]; then echo "group ${g} not found"; exit 1; fi
-  gql "{\"query\":\"mutation(\$u:String!,\$g:Int!){addUserToGroup(userId:\$u,groupId:\$g){__typename}}\",\"variables\":{\"u\":\"${INVITE_USERNAME}\",\"g\":${gid}}}" >/dev/null
-  echo "==> ${INVITE_USERNAME} added to ${g} (id ${gid})"
+  if [ -z "${gid}" ]; then echo "group ${g} does not exist in this directory"; exit 1; fi
+  if ! gql_retry "{\"query\":\"mutation(\$u:String!,\$g:Int!){addUserToGroup(userId:\$u,groupId:\$g){__typename}}\",\"variables\":{\"u\":\"${INVITE_USERNAME}\",\"g\":${gid}}}" >/dev/null; then
+    echo "adding ${INVITE_USERNAME} to ${g} failed"; exit 1
+  fi
+  echo "==> ${INVITE_USERNAME} in ${g} (id ${gid})"
 done
 
-/app/lldap_set_password \
-  --base-url "${url}" \
-  --admin-username admin \
-  --admin-password "${LLDAP_ADMIN_PASSWORD}" \
-  --username "${INVITE_USERNAME}" \
-  --password "${INVITE_PASSWORD}"
+for i in $(seq 1 6); do
+  if /app/lldap_set_password \
+    --base-url "${url}" \
+    --admin-username admin \
+    --admin-password "${LLDAP_ADMIN_PASSWORD}" \
+    --username "${INVITE_USERNAME}" \
+    --password "${INVITE_PASSWORD}" >/dev/null 2>&1; then
+    break
+  fi
+  if [ "${i}" = "6" ]; then echo "setting the password for ${INVITE_USERNAME} failed"; exit 1; fi
+  sleep 3
+done
 echo "==> invite redeemed for ${INVITE_USERNAME}"`
 
 func buildInviteRedeemJob(image string) *batchv1.Job {
