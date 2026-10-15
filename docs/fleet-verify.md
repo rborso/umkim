@@ -157,11 +157,11 @@ YAIDAP's destroy leaves beside the removed disks, `.probe-*` markers from storag
 validation, and the site's provision history and inventory revision log (audit
 records).
 
-One more cosmetic leftover: a stale `_meta/status.json` entry can remain for a
-guest whose declaration was removed. The destroy action's completion is recorded
-by the site reconciler, which can write the guest status just after the delete
-removed it. It is invisible in `umkim site host list` (that reads `guests.yml`)
-and is overwritten if the guest is declared again.
+Declarations are re-asserted at the end of the VM-cleanup stage, because a
+`destroy` completion triggers an inventory sync that can undo a removal made
+while it was in flight; a cluster group file the hub no longer has is likewise
+pruned on the jumphost on the next sync. Both were live defects: a run left one
+destroyed guest declared and destroyed it twice.
 
 Cautions found by running this procedure:
 

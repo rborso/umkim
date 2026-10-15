@@ -115,7 +115,13 @@ leaves behind:
 3. **Kubernetes reset** (the same Ansible delete job) — needs the nodes reachable.
 4. **VM destroy** — the `destroy` guard only permits a guest whose
    `FleetClusterJoin` is `Deleting`, so it runs before the finalizer is removed.
-5. **VM declarations** last.
+5. **VM declarations** last. Each guest's declaration is dropped as soon as its
+   destroy succeeds, and the stage re-asserts every removal once all destroys
+   have settled: a destroy completion triggers an inventory sync, and a removal
+   that races one can be undone by it. The re-assert is idempotent, so it also
+   cleans up a declaration a later sync put back. A failure to prune the cluster
+   group file is recorded but does not fail the stage — the declaration is the
+   part that must go, and aborting it used to re-run the destroy.
 
 Progress is mirrored on the `FleetClusterJoin` status (`appsCleanup` and
 `vmCleanup`: `phase`, `hosts`/`apps`, `completed`, `failures`) so the console and
