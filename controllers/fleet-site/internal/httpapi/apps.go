@@ -19,7 +19,7 @@ import (
 )
 
 type appPatchBody struct {
-	Version    string                              `json:"version"`
+	Version      string                              `json:"version"`
 	Values       json.RawMessage                     `json:"values"`
 	ValuesYAML   string                              `json:"valuesYaml"`
 	Namespace    string                              `json:"namespace"`
@@ -225,11 +225,11 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) {
 	app := &fleetv1alpha1.FleetApp{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: s.Cfg.Namespace},
 		Spec: fleetv1alpha1.FleetAppSpec{
-			ClusterName: cluster,
-			Chart:       chart,
-			Version:     strings.TrimSpace(body.Version),
-			ReleaseName: release,
-			Namespace:   ns,
+			ClusterName:  cluster,
+			Chart:        chart,
+			Version:      strings.TrimSpace(body.Version),
+			ReleaseName:  release,
+			Namespace:    ns,
 			ValuesYAML:   valuesYAML,
 			Route:        body.Route,
 			Routes:       body.Routes,
@@ -359,6 +359,18 @@ func (s *Server) patchApp(w http.ResponseWriter, r *http.Request, name string) {
 	}
 	if body.Route.ServiceNamespace != "" {
 		app.Spec.Route.ServiceNamespace = body.Route.ServiceNamespace
+		changed = true
+	}
+	// requireAuth / requireAuthGroups were dropped here, so `app update
+	// --require-auth-groups` reported success and changed nothing. A nil slice
+	// means "not mentioned"; an empty one clears the restriction. Clearing
+	// requireAuth itself needs a mode, which replaces the whole route.
+	if body.Route.RequireAuth {
+		app.Spec.Route.RequireAuth = true
+		changed = true
+	}
+	if body.Route.RequireAuthGroups != nil {
+		app.Spec.Route.RequireAuthGroups = append([]string(nil), body.Route.RequireAuthGroups...)
 		changed = true
 	}
 	if body.OIDCClient != nil || strings.TrimSpace(body.OIDCClientID) != "" {

@@ -152,6 +152,46 @@ func TestPatchAppUpdatesVersion(t *testing.T) {
 	}
 }
 
+func TestPatchAppUpdatesRouteGroups(t *testing.T) {
+	app := &fleetv1alpha1.FleetApp{
+		ObjectMeta: metav1.ObjectMeta{Name: "whoami", Namespace: "fleet-console"},
+		Spec: fleetv1alpha1.FleetAppSpec{
+			ClusterName: "lab-single-0",
+			Chart:       "oci://10.10.0.1:30443/charts/whoami",
+			ReleaseName: "whoami",
+			Route: fleetv1alpha1.FleetAppRouteIntent{
+				Mode:     fleetv1alpha1.AppRouteModeSite,
+				SiteHost: "whoami.example.com",
+			},
+		},
+		Status: fleetv1alpha1.FleetAppStatus{Phase: fleetv1alpha1.AppPhaseReady},
+	}
+	s := testAppServer(t, app)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1alpha1/apps/whoami",
+		bytes.NewBufferString(`{"route":{"requireAuth":true,"requireAuthGroups":["labtenant"]}}`))
+	rec := httptest.NewRecorder()
+	s.handleAppByName(rec, req, "whoami")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var stored fleetv1alpha1.FleetApp
+	if err := s.Client.Get(req.Context(), client.ObjectKey{Namespace: "fleet-console", Name: "whoami"}, &stored); err != nil {
+		t.Fatal(err)
+	}
+	// These were silently dropped, so `app update --require-auth-groups` changed
+	// nothing while reporting success.
+	if !stored.Spec.Route.RequireAuth {
+		t.Fatal("requireAuth was not applied")
+	}
+	if len(stored.Spec.Route.RequireAuthGroups) != 1 || stored.Spec.Route.RequireAuthGroups[0] != "labtenant" {
+		t.Fatalf("requireAuthGroups=%v", stored.Spec.Route.RequireAuthGroups)
+	}
+	// The rest of the route is untouched by a partial update.
+	if stored.Spec.Route.SiteHost != "whoami.example.com" || stored.Spec.Route.Mode != fleetv1alpha1.AppRouteModeSite {
+		t.Fatalf("route replaced: %+v", stored.Spec.Route)
+	}
+}
+
 func TestPatchAppRejectsInstalling(t *testing.T) {
 	app := &fleetv1alpha1.FleetApp{
 		ObjectMeta: metav1.ObjectMeta{Name: "whoami", Namespace: "fleet-console"},

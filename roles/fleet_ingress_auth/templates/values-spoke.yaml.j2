@@ -16,6 +16,15 @@
 {% set _storage = lookup('ansible.builtin.file', _secrets + '/storageEncryptionKey', errors='ignore') | default(fleet_ingress_auth_storage_encryption_key, true) | trim %}
 {% set _reset = lookup('ansible.builtin.file', _secrets + '/resetJwtSecret', errors='ignore') | default(fleet_ingress_auth_reset_jwt_secret, true) | trim %}
 {% set _oidc_clients = _cc.oidc_clients | default([]) %}
+{# Groups the cluster's routes declare. The chart reconciles them into this
+   cluster's own directory so an operator never has to create a tenant group by
+   hand before an invite can use it. #}
+{% set _managed = namespace(groups=[]) %}
+{% for r in _access_rules %}
+{% for g in r.groups %}
+{% if g not in _managed.groups %}{% set _managed.groups = _managed.groups + [g] %}{% endif %}
+{% endfor %}
+{% endfor %}
 {% set _oidc_hmac = lookup('ansible.builtin.file', _secrets + '/oidcHmacSecret', errors='ignore') | default('') | trim %}
 {% set _oidc_key = lookup('ansible.builtin.file', _secrets + '/oidcIssuerPrivateKey', errors='ignore') | default('') | trim %}
 {% set _oidc_raw = lookup('ansible.builtin.file', _secrets + '/oidcClientSecrets', errors='ignore') %}
@@ -39,6 +48,16 @@ lldap:
   adminPassword: {{ _lldap_pass | quote }}
   exposeWebUI: {{ _expose_lldap }}
   webUIHost: {{ (_lldap_host if _expose_lldap else '') | quote }}
+  # Groups the cluster's routes declare (route.requireAuthGroups). Only a
+  # cluster with its own directory owns them; a hub-directory cluster uses the
+  # hub's groups, which the hub reconciles.
+  managedGroups:
+{% if not _hub_dir %}
+{% for g in _managed.groups %}
+    - {{ g | quote }}
+{% endfor %}
+{% endif %}
+  managedGroupsSchedule: {{ fleet_ingress_auth_lldap_managed_groups_schedule | default('*/10 * * * *') | quote }}
   bindAccount:
     # Only clusters that run their own LLDAP create the shared bind account.
     enabled: {{ (not _hub_dir) | bool | lower }}

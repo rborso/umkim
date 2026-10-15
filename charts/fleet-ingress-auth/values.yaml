@@ -19,6 +19,12 @@ lldap:
   adminPassword: change-me-lldap-admin
   exposeWebUI: false
   webUIHost: ""
+  # Groups the cluster's routes declare (route.requireAuthGroups). The chart
+  # ensures each exists in this cluster's own directory: a post-install/upgrade
+  # Job applies a change immediately, and a CronJob restores a group that is
+  # deleted out of band.
+  managedGroups: []
+  managedGroupsSchedule: "*/10 * * * *"
   # Shared low-privilege LLDAP bind account for apps (Authelia, Jellyfin, ...).
   # Created by a post-install/upgrade Job and added to lldap_strict_readonly.
   # Set password from the role (per-cluster); empty disables creation.
