@@ -329,9 +329,9 @@ osFamily: rocky
 siteId: SITE
 ```
 
-Used by enroll / add-worker flows. VM guests created through the connector use
-**`minRootDiskGi: 38`** on `FleetClusterJoin` (40G vdisk root LV < 40 GiB after
-EFI/boot partitions).
+Used by enroll / add-worker flows. `FleetClusterJoin.spec.minRootDiskGi` (default
+20 GiB) is the root filesystem the bootstrap asserts; a node VM's boot disk is
+raised above it by the EFI/boot overhead so the root LV still meets it.
 
 Guest provision status is mirrored in `_meta/status.json` per guest:
 `Declared` → `Provisioning` → `Ready` | `Failed`.

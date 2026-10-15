@@ -13,6 +13,11 @@ const (
 	// Values: "true", "false". Absent means include (legacy installs and CLI without the flag).
 	FleetAppAnnotationLLMBackend = "fleet.umkim.com/llm-backend"
 
+	// FleetAppAnnotationRetry asks the controller for one more install attempt on
+	// a Failed app even when its spec is unchanged (a no-op `app update`). The
+	// reconciler consumes it, so a repeated reconcile does not loop.
+	FleetAppAnnotationRetry = "fleet.umkim.com/retry"
+
 	AppPhasePending    = "Pending"
 	AppPhaseInstalling = "Installing"
 	AppPhaseReady      = "Ready"
@@ -290,4 +295,31 @@ func (app *FleetApp) SetLLMBackendAnnotation(enabled bool) {
 	} else {
 		app.Annotations[FleetAppAnnotationLLMBackend] = "false"
 	}
+}
+
+// RequestRetry asks for one more install attempt even when the spec is unchanged.
+func (app *FleetApp) RequestRetry(token string) {
+	if app.Annotations == nil {
+		app.Annotations = map[string]string{}
+	}
+	app.Annotations[FleetAppAnnotationRetry] = token
+}
+
+// RetryRequested reports whether a retry is pending.
+func (app *FleetApp) RetryRequested() bool {
+	if app.Annotations == nil {
+		return false
+	}
+	return strings.TrimSpace(app.Annotations[FleetAppAnnotationRetry]) != ""
+}
+
+// ConsumeRetry clears a pending retry request, reporting whether one was set. The
+// reconciler calls it when it acts on the request so the next reconcile does not
+// start another install.
+func (app *FleetApp) ConsumeRetry() bool {
+	if !app.RetryRequested() {
+		return false
+	}
+	delete(app.Annotations, FleetAppAnnotationRetry)
+	return true
 }

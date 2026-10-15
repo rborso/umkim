@@ -61,7 +61,7 @@ pipeline declares the guest for it and then creates it:
   disk is raised above `minRootDiskGi` by the EFI/boot overhead (2 GiB) when
   smaller — a disk sized exactly at the threshold reports a smaller root
   filesystem and fails the bootstrap check — and a **data disk** is derived from
-  `storage.longhorn` (`minDataDiskGi`, else 10 GiB) so a Longhorn cluster does
+  `storage.longhorn` (`minDataDiskGi`, else 5 GiB) so a Longhorn cluster does
   not fail the bootstrap.
 - The pipeline records the declaration as the **`declare_vm:<host>`** step, then
   runs the usual `create_vm:<host>` step. Declaring is idempotent: an existing
@@ -272,9 +272,10 @@ bootstrap Job via the jumphost, and provisions — so the flow continues even if
 browser closes. Without it the intent is created idle (`POST /clusters`), matching
 the CLI and `umkim cluster bootstrap`.
 
-VM hosts created through the connector use **`minRootDiskGi: 38`** on the FCJ
-(40G vdisk root LV is smaller than 40 GiB after EFI/boot). Bare-metal enroll
-defaults remain 40 GiB.
+`FleetClusterJoin.spec.minRootDiskGi` (default **20 GiB**) is the root filesystem
+size the bootstrap asserts. A node VM's boot disk is raised above it by the
+EFI/boot overhead (2 GiB) so the root LV still meets it; bare-metal enroll uses
+the same default.
 
 In bundle mode, hub provision accepts **`Enrolled`** phase (bootstrap enrolls
 before the progress POST marks `Validated`) so `cluster provision` is not

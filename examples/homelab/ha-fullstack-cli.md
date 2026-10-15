@@ -273,18 +273,21 @@ TLS: `openssl s_client -servername <host>` on each host shows an issuer of
 K3s: three nodes `Ready` (`v1.36.5+k3s1`), kube-vip held `172.16.10.100` on
 `lab-e2e-6-2`, StorageClasses `longhorn` + `nfs-client` + `local-path`.
 
-## Open findings
+## Findings and fixes
 
-| # | Finding | Impact |
-|---|---|---|
-| 1 | `vm.dataDiskGi` below `storage.minDataDiskGi` (default 40) fails the bootstrap; the `else 10 GiB` derivation is itself below that default | create-time footgun; CLI `--control-data-disk` does not set `minDataDiskGi` |
-| 2 | NFS + Longhorn together mark **two** StorageClasses default | a PVC without an explicit class binds unpredictably |
-| 3 | Cluster ingress-auth status `Ready` before the spoke stack is deployed | false-positive readiness |
-| 4 | A hook mounting a `ReadWriteOnce` config PVC deadlocks on a multi-node cluster | servarr install fails until the volume is RWX |
-| 5 | Bootstrap image enables `lidarr` by default; chart ships none | servarr bootstrap times out |
-| 6 | servarr bootstrap verification requires a Prowlarr-synced indexer | needs the operator's private indexer credential |
-| 7 | Collabora WOPI discovery from the Nextcloud pod uses the public host | refused (RFC1918 → public NAT loopback) and behind forward-auth |
-| 8 | A failed hook leaves the release `pending-upgrade`; `app update` no-ops on an unchanged spec | manual release-state recovery |
+| # | Finding | Fix | Verified |
+|---|---|---|---|
+| 1 | Boot-disk minimum 40 GiB and Longhorn data-disk minimum 40 GiB made a small data disk (or an unstated one) fail the bootstrap | defaults lowered: `minRootDiskGi` **20 GiB**, `fleet_cluster_min_data_disk_gi` / the derived data disk **5 GiB** (roles, Go defaults, CRDs, console) | fresh intent renders `fleet_site_min_root_disk_gi=20`; bundle role default is 5 |
+| 2 | NFS + Longhorn together marked **two** StorageClasses default | the storage role clears the flag from every class but `nfs-client`; the Longhorn role installs with `persistence.defaultClass=false` and skips its patch | live cluster: `nfs-client` is the only default |
+| 3 | A cluster could read ingress-auth `Ready` with no spoke stack | the reconcile Job records the clusters it rendered; completion settles only those, and the hash includes the enabled-cluster set so a late cluster re-triggers | unit tests (`TestAnsibleSpecHashTracksEnabledClusters`, `TestAppliedClusters`, `TestEnabledSubsetRestrictsAndSorts`) |
+| 4 | A hook mounting a `ReadWriteOnce` config PVC deadlocked on a multi-node cluster | servarr chart 0.2.17: config volumes default to `ReadWriteMany` | live: the qBittorrent password hook completed in seconds |
+| 5 | The bootstrap image enables `lidarr`; the chart ships none | servarr chart 0.2.17: the ConfigMap states a flag for every component the image knows | live: `"lidarr":false` in the bootstrap's component list |
+| 6 | servarr bootstrap verification needs a Prowlarr-synced indexer | not fixed — needs the operator's private tracker credential; servarr's bootstrap stays disabled | — |
+| 7 | Collabora WOPI discovery used the public host | nextcloud chart 0.1.5: `wopi_url` is the in-cluster Collabora Service, `public_wopi_url` stays the public host — no forward-auth exemption needed | live: discovery succeeded; the browser path returns 200 authenticated / 302 unauthenticated |
+| 8 | A killed upgrade left the release `pending-upgrade`; a no-change `app update` no-opped | the install job marks a stuck `pending-*` revision failed before retrying; a no-change update sets a retry the reconciler consumes | live: job logged `clearing stuck release revision … (pending-upgrade)` then installed; a bare `umkim app update servarr` re-ran a Failed app |
+
+Charts are fixed in their own repositories (`rborso/servarr-helm` 0.2.17,
+`rborso/nextcloud-helm` 0.1.5) and republished to the hub library.
 
 ## Cleanup
 

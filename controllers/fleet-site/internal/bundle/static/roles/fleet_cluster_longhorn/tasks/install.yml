@@ -53,6 +53,7 @@
         --create-namespace \
         --version {{ fleet_cluster_longhorn_chart_version }} \
         --set defaultSettings.defaultDataPath={{ fleet_cluster_longhorn_mount_path }} \
+        --set persistence.defaultClass={{ fleet_cluster_longhorn_set_default_sc | bool | lower }} \
         --set persistence.defaultClassReplicaCount=3 \
         --wait --timeout 20m
     executable: /bin/bash
@@ -90,6 +91,9 @@
   environment:
     KUBECONFIG: "{{ fleet_cluster_storage_kubeconfig }}"
     PATH: "{{ k3s_command_path | default('/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin') }}"
+  # When NFS is configured it owns the default class; claiming it here as well
+  # would leave two defaults.
+  when: fleet_cluster_longhorn_set_default_sc | bool
   changed_when: false
 
 - name: Fleet cluster longhorn | Verify Longhorn StorageClass exists

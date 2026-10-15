@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -12,6 +13,13 @@ import (
 // HubAnsibleSecretsName is the Secret with ansible_vars.yml (harbor_admin_password, etc.)
 // for console-driven cluster provider install/delete jobs.
 const HubAnsibleSecretsName = "fleet-site-hub-ansible-secrets"
+
+// AppliedClustersAnnotation records, on an ingress-auth reconcile Job, the enabled
+// clusters that Job actually rendered a ManifestWork for. Completion uses it to
+// mark only those clusters ready: a cluster enabled while the Job was running has
+// no spoke stack yet, so marking it ready from the current desired state would be
+// a false positive and would stop the follow-up reconcile that deploys it.
+const AppliedClustersAnnotation = "fleet.umkim.com/ingress-auth-applied-clusters"
 
 func ansiblePlaybookArgs(playbook, clusterName, siteID string) []string {
 	return []string{
@@ -520,11 +528,16 @@ func ingressAuthJob(ns, jobName, image string, cmd []string, inventoryCM, secret
 			ReadOnly:  true,
 		})
 	}
+	sorted := append([]string(nil), enabledClusters...)
+	sort.Strings(sorted)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: ns,
 			Labels:    map[string]string{"app": "fleet-ingress-auth-ansible"},
+			Annotations: map[string]string{
+				AppliedClustersAnnotation: strings.Join(sorted, ","),
+			},
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit:            &backoff,
@@ -658,6 +671,43 @@ PY
   helm registry login "${FLEET_APP_REGISTRY}" -u "${FLEET_APP_REGISTRY_USER:-admin}" --password-stdin --insecure < /tmp/harbor.pass
   rm -f /tmp/harbor.pass
 fi
+# A previous upgrade killed mid-flight (Job deadline, node loss) leaves the release
+# pending-*; every later upgrade then fails with "another operation
+# (install/upgrade/rollback) is in progress". Mark such a revision failed so this
+# upgrade is accepted. Nothing is uninstalled, so app data (PVCs) is untouched.
+python3 - "$KC" "${FLEET_APP_NAMESPACE}" "${FLEET_APP_RELEASE}" <<'PY'
+import base64, gzip, json, subprocess, sys
+
+kc, ns, release = sys.argv[1], sys.argv[2], sys.argv[3]
+
+
+def kubectl(*args):
+    return subprocess.run(["kubectl", "--kubeconfig", kc, *args], capture_output=True, text=True)
+
+
+listing = kubectl("-n", ns, "get", "secret", "-l", "owner=helm,name=" + release, "-o", "json")
+try:
+    items = json.loads(listing.stdout or "{}").get("items", [])
+except Exception:
+    items = []
+for item in items:
+    raw = (item.get("data") or {}).get("release")
+    if not raw:
+        continue
+    try:
+        rel = json.loads(gzip.decompress(base64.b64decode(base64.b64decode(raw))))
+    except Exception:
+        continue
+    status = (rel.get("info") or {}).get("status", "")
+    if not status.startswith("pending-"):
+        continue
+    rel["info"]["status"] = "failed"
+    rel["info"]["description"] = "cleared stuck " + status + " before retry"
+    inner = base64.b64encode(gzip.compress(json.dumps(rel).encode(), mtime=0)).decode()
+    patch = json.dumps({"data": {"release": base64.b64encode(inner.encode()).decode()}})
+    print("clearing stuck release revision %s (%s)" % (item["metadata"]["name"], status))
+    kubectl("-n", ns, "patch", "secret", item["metadata"]["name"], "--type", "merge", "-p", patch)
+PY
 VER=()
 if [ -n "${FLEET_APP_VERSION:-}" ]; then
   VER=(--version "${FLEET_APP_VERSION}")

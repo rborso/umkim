@@ -383,7 +383,7 @@ func (s *Server) handleCreateCluster(ctx context.Context, w http.ResponseWriter,
 	}
 	minDisk := req.MinRootDiskGi
 	if minDisk == 0 {
-		minDisk = 40
+		minDisk = 20
 	}
 	fcj := fleetv1alpha1.FleetClusterJoin{
 		ObjectMeta: metav1.ObjectMeta{

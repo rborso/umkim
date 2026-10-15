@@ -53,6 +53,12 @@ func AnsibleSpecHash(fia *fleetv1alpha1.FleetIngressAuth, desired DesiredState) 
 	for _, r := range desired.AccessRules {
 		parts = append(parts, "hr="+r.Domain+"="+strings.Join(r.Groups, ","))
 	}
+	// The enabled cluster set is part of the rendered state: a cluster with no
+	// access rules or OIDC clients still needs its own ManifestWork, so adding or
+	// removing one must change the hash and re-trigger the reconcile.
+	for _, name := range sortedKeys(sliceToSet(desired.EnabledClusters)) {
+		parts = append(parts, "cl="+name)
+	}
 	for _, name := range sortedKeys(sliceToSet(desired.EnabledClusters)) {
 		cc := desired.ClusterConfigs[name]
 		for _, r := range cc.AccessRules {

@@ -147,12 +147,18 @@
   changed_when: false
   tags: [fleet_cluster_storage]
 
-- name: Fleet cluster storage | Clear default from local-path StorageClass
+- name: Fleet cluster storage | Clear default class from other StorageClasses
   ansible.builtin.shell: |
     set -euo pipefail
-    if kubectl get storageclass local-path &>/dev/null; then
-      kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' || true
-    fi
+    # nfs-client owns the default when NFS is configured: clear the flag from
+    # every other class (local-path, longhorn) so a PVC without an explicit
+    # class binds here and the cluster never has two defaults.
+    for sc in $(kubectl get storageclass -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+      [ "${sc}" = "{{ fleet_cluster_nfs_storage_class }}" ] && continue
+      kubectl patch storageclass "${sc}" \
+        -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
+        >/dev/null 2>&1 || true
+    done
   args:
     executable: /bin/bash
   environment:
