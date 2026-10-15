@@ -57,7 +57,7 @@
             PY
             cd "$TMP"
             python3 - <<'PY'
-            import json, os, pathlib
+            import json, pathlib
             files = json.load(open("manifest.json"))
             for rel, content in files.items():
                 path = pathlib.Path(rel)
@@ -72,6 +72,31 @@
             if [ -d "$TMP/host_vars" ]; then
               rsync -a --delete "$TMP/host_vars/" "$ROOT/host_vars/"
             fi
+            # Prune stale cluster group files. A cluster group file is written when
+            # its guests are declared and dropped when the cluster is deleted, but
+            # the copy in the inventory root was never removed, so it kept declaring
+            # guests that no longer exist. Only files shaped like a cluster group (one
+            # top-level key equal to the file stem, holding a hosts mapping) are
+            # touched, so hand-written inventory files are left alone.
+            ROOT="$ROOT" TMP="$TMP" python3 - <<'PY'
+            import os, pathlib, yaml
+            root = pathlib.Path(os.environ["ROOT"])
+            staged = {p.name for p in pathlib.Path(os.environ["TMP"]).glob("*.yml")}
+            for path in sorted(root.glob("*.yml")):
+                if path.name in staged:
+                    continue
+                try:
+                    doc = yaml.safe_load(path.read_text()) or {}
+                except Exception:
+                    continue
+                if not isinstance(doc, dict) or len(doc) != 1:
+                    continue
+                key, val = next(iter(doc.items()))
+                if key != path.stem or not isinstance(val, dict) or "hosts" not in val:
+                    continue
+                os.remove(path)
+                print("pruned stale cluster group file", path.name)
+            PY
             rm -rf "$TMP"
             echo "FLEET_INVENTORY_SYNCED=1"
           environment:

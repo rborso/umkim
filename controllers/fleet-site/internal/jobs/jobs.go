@@ -174,6 +174,11 @@ func OverlayRecoverJob(ns, jobName, clusterName, siteID, runnerImage, sshSecret,
 
 func hostNetworkPrivilegedJob(ns, jobName, app, containerName, cmd string) *batchv1.Job {
 	ttl := int32(300)
+	// A probe Job must always reach a terminal state. Without a deadline a Job
+	// whose pod is gone (evicted, node drained) keeps no condition and is polled
+	// forever, which wedged the overlay check on a cluster whose probe pod had
+	// disappeared.
+	deadline := int64(120)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
@@ -181,6 +186,7 @@ func hostNetworkPrivilegedJob(ns, jobName, app, containerName, cmd string) *batc
 			Labels:    map[string]string{"app": app},
 		},
 		Spec: batchv1.JobSpec{
+			ActiveDeadlineSeconds:   &deadline,
 			TTLSecondsAfterFinished: &ttl,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

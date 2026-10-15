@@ -115,13 +115,19 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 				st.Message = fmt.Sprintf("destroying %s (%s)", host, st.JobName)
 				return false, 15 * time.Second, save()
 			}
-			st.JobName, st.ActionID = "", ""
 			if ok {
+				// Finish before clearing the Job reference. A finish failure must
+				// retry the finish, not destroy the guest a second time: clearing the
+				// reference first made the next pass fall through to the destroy path
+				// again (a duplicate destroy in the site history and a second
+				// connector action for a VM that was already gone).
 				if err := r.finishVmCleanupHost(ctx, fcj, st, host, removeDecls); err != nil {
 					return false, 30 * time.Second, save()
 				}
+				st.JobName, st.ActionID = "", ""
 				continue
 			}
+			st.JobName, st.ActionID = "", ""
 			if phase == fleetv1alpha1.SiteHostPhaseDeclared {
 				// The recorded phase said there was no VM to destroy; the failure
 				// confirms that. Keep the declaration: the phase has been wrong
@@ -171,12 +177,38 @@ func (r *ClusterJoinReconciler) reconcileClusterDeleteVms(ctx context.Context, f
 		return false, waitAfter, save()
 	}
 
+	// Re-assert the removals now that every destroy has settled. A destroy
+	// completion triggers an inventory sync, and removing a declaration while one
+	// is in flight can be undone by it — which left a destroyed guest declared in
+	// the site inventory. This pass is idempotent and makes the cleanup the last
+	// writer, so a guest removed here cannot reappear.
+	if removeDecls {
+		r.reassertVmCleanupDeclarations(ctx, fcj, st)
+	}
 	st.Phase = fleetv1alpha1.VmCleanupPhaseDone
 	if len(st.Failures) > 0 {
 		st.Phase = fleetv1alpha1.VmCleanupPhaseFailed
 	}
 	st.Message = vmCleanupDoneMessage(st, removeDecls)
 	return true, 0, save()
+}
+
+// reassertVmCleanupDeclarations removes the cluster's guest declarations again,
+// after every destroy (and the inventory sync each one triggers) has settled.
+// It is idempotent: a guest already gone is a no-op, and a guest that a racing
+// sync put back is removed. Failures are recorded, not returned, so a stale
+// declaration cannot wedge the delete.
+func (r *ClusterJoinReconciler) reassertVmCleanupDeclarations(ctx context.Context, fcj *fleetv1alpha1.FleetClusterJoin, st *fleetv1alpha1.ClusterVmCleanupStatus) {
+	clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)
+	for _, host := range st.Hosts {
+		if err := yaidap.RemoveHostDeclaration(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId, host); err != nil {
+			recordVmCleanupFailure(st, host, "declaration re-check failed: "+err.Error())
+			continue
+		}
+		if err := yaidap.RemoveClusterGroupMembers(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId, clusterName, []string{host}); err != nil {
+			recordVmCleanupFailure(st, host, "cluster group re-check failed: "+err.Error())
+		}
+	}
 }
 
 // guestRecordedPhase returns the phase actually recorded for a guest. The
@@ -263,11 +295,12 @@ func (r *ClusterJoinReconciler) finishVmCleanupHost(ctx context.Context, fcj *fl
 			return err
 		}
 		// Also drop the host from the cluster group file, which the pipeline
-		// created when it declared the guest.
+		// created when it declared the guest. A failure here is reported but not
+		// fatal: the declaration is the part that must go, and aborting the finish
+		// used to trigger a redundant destroy of a VM that was already gone.
 		clusterName := fcj.Spec.EffectiveClusterName(fcj.Name)
 		if err := yaidap.RemoveClusterGroupMembers(ctx, r.Client, r.Cfg.Namespace, fcj.Spec.SiteId, clusterName, []string{host}); err != nil {
-			st.Message = fmt.Sprintf("removing %s from cluster group %s failed: %v", host, clusterName, err)
-			return err
+			st.Message = fmt.Sprintf("removed %s; pruning cluster group %s failed: %v", host, clusterName, err)
 		}
 	}
 	vmCleanupFinish(st, host)

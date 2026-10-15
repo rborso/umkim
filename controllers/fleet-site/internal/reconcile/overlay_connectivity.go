@@ -32,6 +32,9 @@ const (
 	labelOverlayReachable   = "fleet.health/overlay_reachable"
 	overlayCheckInterval    = 60 * time.Second
 	overlayRecoverFailCount = 3
+	// overlayCheckJobMaxAge bounds how long a probe Job without its own deadline
+	// may be waited on before the check gives up on it and moves on.
+	overlayCheckJobMaxAge = 5 * time.Minute
 	// overlayAPIPort is the spoke kube-apiserver port reachable over WireGuard
 	// (the same endpoint the synced spoke kubeconfig uses).
 	overlayAPIPort = 6443
@@ -67,7 +70,19 @@ func (r *ClusterJoinReconciler) reconcileOverlayConnectivity(ctx context.Context
 	if jobName := fcj.Annotations[annOverlayCheckJob]; jobName != "" {
 		done, ok, msg := r.jobDone(ctx, fcj.Namespace, jobName)
 		if !done {
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			// A Job whose pod is gone (evicted, node drained) keeps no condition.
+			// The Job now carries a deadline so that becomes terminal, but bound the
+			// wait here too: a Job created before the deadline existed, or one the
+			// Job controller never finalizes, must not wedge the check forever.
+			if !r.overlayCheckJobExpired(ctx, fcj.Namespace, jobName) {
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			// Drop the abandoned Job so it does not linger as a Running object.
+			var stale batchv1.Job
+			if err := r.Get(ctx, types.NamespacedName{Namespace: fcj.Namespace, Name: jobName}, &stale); err == nil {
+				_ = r.Delete(ctx, &stale, client.PropagationPolicy(metav1.DeletePropagationBackground))
+			}
+			done, ok, msg = true, false, "overlay probe job did not finish in time"
 		}
 		delete(fcj.Annotations, annOverlayCheckJob)
 		fcj.Annotations[annOverlayCheckAt] = strconv.FormatInt(time.Now().Unix(), 10)
@@ -130,6 +145,25 @@ func (r *ClusterJoinReconciler) reconcileOverlayConnectivity(ctx context.Context
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+// overlayCheckJobExpired reports whether a probe Job has outlived its bound without
+// reaching a terminal condition — its pod is gone and nothing will finish it.
+func (r *ClusterJoinReconciler) overlayCheckJobExpired(ctx context.Context, ns, name string) bool {
+	var job batchv1.Job
+	if err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, &job); err != nil {
+		// Gone entirely: jobDone already treats that as terminal, so reaching here
+		// means a race. Do not keep waiting.
+		return true
+	}
+	if job.Status.StartTime == nil {
+		return false
+	}
+	limit := overlayCheckJobMaxAge
+	if job.Spec.ActiveDeadlineSeconds != nil && *job.Spec.ActiveDeadlineSeconds > 0 {
+		limit = time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second + time.Minute
+	}
+	return time.Since(job.Status.StartTime.Time) > limit
 }
 
 // pruneOverlayCheckJobs removes finished overlay probe jobs for a cluster so periodic

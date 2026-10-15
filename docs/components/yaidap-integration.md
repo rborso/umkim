@@ -119,7 +119,7 @@ under `_meta/` and is **never** pushed to the jumphost.
 | `guests.yml` | yes (hub: VM index only) | `guests.hosts`; jumphost copy also has `external.hosts` composed from hub `bare_metals.yml` on sync |
 | `bare_metals.yml` | **hub only** | Bare-metal cluster nodes (`kind: bare_metal` in host APIs) |
 | `hypervisors.yml` | yes | Hypervisor group (`kind: hypervisor` in host APIs) |
-| `{cluster}.yml` | yes | Ansible group membership (`hosts:` list) |
+| `{cluster}.yml` | yes | Ansible group membership (`hosts:` list); a cluster group file the hub no longer has is pruned on the jumphost during sync |
 | `group_vars/all/all.yml` (+ optional `group_vars/all/*.yml`) | yes | Site networks, storages, defaults |
 | `group_vars/{group}.yml` | yes | Group vars; Fleet cluster intent for cluster groups |
 | `host_vars/{guest}.yml` | yes | Per-guest YAIDAP profile (disks, uplinks, TempXE discovery) |
