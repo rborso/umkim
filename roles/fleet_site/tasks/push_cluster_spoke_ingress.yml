@@ -42,6 +42,12 @@
     fleet_site_spoke_ingress_method: >-
       {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].method
          | default('') }}
+    # The site zone this spoke serves. The spoke's CoreDNS answers it with the
+    # in-cluster ingress, so a pod calling a public hostname of this site stays
+    # inside the cluster instead of hitting the site router's NAT loopback.
+    fleet_site_spoke_ingress_zone: >-
+      {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].dns_zone
+         | default('') }}
     # port_forward ACME: TLS-ALPN (HTTP-01 WAN 404 with websecure-only Ingress).
     fleet_site_spoke_acme_http_challenge: false
 
@@ -56,6 +62,7 @@
     spoke_ingress_https_nodeport: "{{ fleet_site_spoke_https_port }}"
     fleet_edge_direct_ingress: "{{ fleet_site_spoke_direct_ingress }}"
     fleet_site_spoke_ingress_method: "{{ fleet_site_spoke_ingress_method }}"
+    spoke_ingress_site_zone: "{{ fleet_site_spoke_ingress_zone }}"
     phase6_spoke_acme_http_challenge: "{{ fleet_site_spoke_acme_http_challenge }}"
 
 - name: Fleet site | Apply spoke ingress ManifestWork on hub
