@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // spokeACMEQueue serializes TLS ingress pushes per cluster (one site hostname at a time).
@@ -136,10 +137,26 @@ func (q *spokeACMEQueue) activeHost(cluster string) string {
 // rotated to the back of the queue so it cannot starve the others.
 const spokeACMEHostStaleAfter = 3 * time.Minute
 
+const (
+	// spokeACMEProdRetryRefreshAfter is how long a production issuance attempt
+	// may go without a live certificate before the ingress reload token is
+	// re-stamped, giving Traefik a fresh router revision to retry from.
+	spokeACMEProdRetryRefreshAfter = 3 * time.Minute
+	// spokeACMEProdRetryRestartsAfter is the number of refreshes after which the
+	// spoke Traefik is restarted once for that host. A restart is the retry
+	// Traefik honours when the router configuration itself has not changed.
+	spokeACMEProdRetryRestartsAfter = 2
+)
+
 func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName string, regCluster clusters.Cluster) {
 	if r.spokeACME == nil || !regCluster.SpokeACMEEnabled(r.Config.ACMEEnabled) {
 		return
 	}
+	logger := log.FromContext(ctx).WithName("spoke-acme-queue").WithValues("cluster", clusterName)
+	// The probe must use the port the spoke Traefik actually serves HTTPS on
+	// (30443 for port_forward spokes). Probing :443 here made every check fail,
+	// so the queue could only ever advance by rotating a host on staleness.
+	probePort := spokeProbeHTTPSPort(regCluster)
 	probeHost := ""
 	for i := 0; i < 8; i++ {
 		host := r.spokeACME.activeHost(clusterName)
@@ -153,15 +170,25 @@ func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName
 		if route == nil {
 			// Hostname no longer has a route (app deleted or renamed): drop it so
 			// it cannot hold the cluster's ACME slot forever, and try the next.
+			logger.Info("dropping queued host with no route", "host", host)
+			r.spokeACME.release(clusterName, host)
+			probeHost = ""
+			continue
+		}
+		// A host whose certificate is already live must not hold the slot at all:
+		// release it so the hostnames still waiting can be issued.
+		if route.Status.TLSPhase == fleetv1alpha1.TLSPhaseReady {
+			logger.Info("releasing slot for an already-issued host", "host", host)
 			r.spokeACME.release(clusterName, host)
 			probeHost = ""
 			continue
 		}
 
 		if r.Config.SpokeACMEPreflightEnabled && !spokeStagingOK(route) {
-			ok, err := probeACMECert(probeHost, host, true)
+			ok, err := probeACMECertOnPort(probeHost, probePort, host, true)
 			if err != nil || !ok {
 				if r.spokeACME.staleFor(clusterName) >= spokeACMEHostStaleAfter {
+					logger.Info("rotating stale host (staging preflight)", "host", host, "stale", r.spokeACME.staleFor(clusterName).String())
 					r.spokeACME.rotate(clusterName)
 					probeHost = ""
 					continue
@@ -173,17 +200,19 @@ func (r *RouteReconciler) advanceSpokeACMEQueue(ctx context.Context, clusterName
 			return
 		}
 
-		ok, err := probeACMECert(probeHost, host, false)
+		ok, err := probeACMECertOnPort(probeHost, probePort, host, false)
 		if err != nil || !ok {
 			// A stuck hostname must not block the rest of the cluster's queue:
 			// rotate it to the back after the staleness window.
 			if r.spokeACME.staleFor(clusterName) >= spokeACMEHostStaleAfter {
+				logger.Info("rotating stale host (production certificate not live)", "host", host, "stale", r.spokeACME.staleFor(clusterName).String())
 				r.spokeACME.rotate(clusterName)
 				probeHost = ""
 				continue
 			}
 			return
 		}
+		logger.Info("releasing slot for an issued host", "host", host)
 		r.spokeACME.release(clusterName, host)
 		_ = r.markSiteHostTLSReady(ctx, clusterName, host)
 	}
@@ -238,6 +267,9 @@ func (r *RouteReconciler) annotateSpokeStagingOK(ctx context.Context, route *fle
 func (r *RouteReconciler) markSiteHostTLSReady(ctx context.Context, clusterName, siteHost string) error {
 	siteHost = normalizeHostname(siteHost)
 	clusterName = normalizeHostname(clusterName)
+	// The certificate is live: end the issuance episode so a later re-issuance
+	// starts with a fresh escalation budget.
+	r.clearProdRetryAttempts(clusterName, siteHost)
 	var list fleetv1alpha1.FleetAppRouteList
 	if err := r.List(ctx, &list); err != nil {
 		return err

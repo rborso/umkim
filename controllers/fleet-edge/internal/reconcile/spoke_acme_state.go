@@ -6,6 +6,7 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-edge/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-edge/internal/clusters"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (r *RouteReconciler) resolveSpokeACMEState(
@@ -61,6 +62,7 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 	// A hostname whose production certificate is already live needs no issuance,
 	// so it must not queue behind hostnames that are still being issued.
 	if prodOK, _ := probeACMECertOnPort(probeHost, probePort, siteHost, false); prodOK {
+		r.clearProdRetryAttempts(clusterName, siteHost)
 		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseReady, "")
 		return spokeACMEState{
 			ApplyACME:    true,
@@ -73,6 +75,8 @@ func (r *RouteReconciler) resolveSpokeACMEState(
 		r.spokeACME = newSpokeACMEQueue()
 	}
 	if !r.spokeACME.allow(clusterName, siteHost) {
+		log.FromContext(ctx).WithName("spoke-acme-queue").V(1).Info(
+			"host queued behind the cluster ACME slot", "cluster", clusterName, "host", siteHost)
 		_ = r.patchTLSStatus(ctx, route, fleetv1alpha1.TLSPhaseQueued, "waiting for spoke ACME queue")
 		return spokeACMEState{
 			ApplyACME:  true,

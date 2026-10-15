@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,14 +45,21 @@ func stagingPromotionAction(evictedHost, siteHost string, stagingCertServed, ini
 // standard issuing message. A non-empty return is a status message for a
 // restart that could not be completed yet.
 
-// ensureSpokeProdACMERetry records a one-shot ingress reload token after the
-// staging certificate is gone and Traefik is Ready. Issuance during pod start
-// races NodePort programming and Let's Encrypt often sees connection refused;
-// the token changes the TLS ingress so Traefik retries without another restart.
+// ensureSpokeProdACMERetry records an ingress reload token after the staging
+// certificate is gone and Traefik is Ready. Issuance during pod start races
+// NodePort programming and Let's Encrypt often sees connection refused; the
+// token changes the TLS ingress so Traefik re-evaluates the router without
+// another restart.
+//
+// The token is refreshed while the certificate is still not live. A one-shot
+// token left a host that failed a single challenge stuck in Issuing forever:
+// nothing changed afterwards, so Traefik never retried. After a couple of
+// refreshes the spoke Traefik is restarted once, which is the retry Traefik
+// honours when the router configuration itself has not changed.
 func (r *RouteReconciler) ensureSpokeProdACMERetry(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, clusterName string, regCluster clusters.Cluster, siteHost string) string {
 	if route != nil && route.Annotations != nil {
 		if token := strings.TrimSpace(route.Annotations[annotationSpokeACMEProdRetry]); token != "" {
-			return token
+			return r.refreshSpokeProdACMERetry(ctx, route, clusterName, regCluster, siteHost, token)
 		}
 	}
 	initDrops, stagingServed, err := r.spokeStagingEvictInputs(ctx, clusterName, regCluster, siteHost)
@@ -65,6 +73,55 @@ func (r *RouteReconciler) ensureSpokeProdACMERetry(ctx context.Context, route *f
 	route.Annotations[annotationSpokeACMEProdRetry] = token
 	_ = r.annotateSpokeProdRetry(ctx, route, token)
 	return token
+}
+
+// refreshSpokeProdACMERetry keeps a production issuance attempt alive. It only
+// runs for a route whose production certificate is not live yet (the caller
+// reaches it after that probe failed).
+func (r *RouteReconciler) refreshSpokeProdACMERetry(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, clusterName string, regCluster clusters.Cluster, siteHost, token string) string {
+	issuedAt, err := strconv.ParseInt(strings.TrimSpace(token), 10, 64)
+	if err != nil {
+		return token
+	}
+	if time.Since(time.Unix(issuedAt, 0)) < spokeACMEProdRetryRefreshAfter {
+		return token
+	}
+	logger := log.FromContext(ctx).WithValues("cluster", clusterName, "host", siteHost)
+
+	// Escalate once per host: a fresh token alone may not be enough for Traefik
+	// to re-attempt a domain it has already failed.
+	if r.markProdRetryAttempt(clusterName, siteHost) >= spokeACMEProdRetryRestartsAfter {
+		if err := r.restartSpokeTraefik(ctx, clusterName, regCluster.UpstreamHost); err != nil {
+			logger.Error(err, "restarting spoke traefik to retry production issuance")
+		} else {
+			logger.Info("restarted spoke traefik to retry a stalled production issuance")
+		}
+	}
+
+	next := fmt.Sprintf("%d", time.Now().Unix())
+	_ = r.annotateSpokeProdRetry(ctx, route, next)
+	return next
+}
+
+// markProdRetryAttempt counts refreshes for one host so the escalation runs at
+// most once per issuance episode, and reports the new count.
+func (r *RouteReconciler) markProdRetryAttempt(clusterName, siteHost string) int {
+	key := clusterName + "/" + siteHost
+	r.prodRetryMu.Lock()
+	defer r.prodRetryMu.Unlock()
+	if r.prodRetryAttempts == nil {
+		r.prodRetryAttempts = map[string]int{}
+	}
+	r.prodRetryAttempts[key]++
+	return r.prodRetryAttempts[key]
+}
+
+// clearProdRetryAttempts forgets a host once its certificate is live, so a
+// later re-issuance starts a fresh episode.
+func (r *RouteReconciler) clearProdRetryAttempts(clusterName, siteHost string) {
+	r.prodRetryMu.Lock()
+	defer r.prodRetryMu.Unlock()
+	delete(r.prodRetryAttempts, clusterName+"/"+siteHost)
 }
 
 func (r *RouteReconciler) annotateSpokeProdRetry(ctx context.Context, route *fleetv1alpha1.FleetAppRoute, token string) error {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rborso/umkim/cmd/umkim/internal/output"
 	"github.com/spf13/cobra"
@@ -305,6 +306,48 @@ func fetchSiteIngress(name string) (*siteIngressDoc, []byte, error) {
 	return &doc, raw, nil
 }
 
+// siteIngressSettleAttempts / siteIngressSettleBackoff bound how long the CLI
+// waits for a PATCH to show up in a re-read of the site.
+const (
+	siteIngressSettleAttempts = 12
+	siteIngressSettleBackoff  = 500 * time.Millisecond
+)
+
+type siteIngressFetch func(string) (*siteIngressDoc, []byte, error)
+
+// waitSiteIngress re-reads a site until done reports the expected state. It
+// returns the last readable document either way, so the caller's own checks
+// still run and report a genuine mismatch.
+func waitSiteIngress(site string, done func(*siteIngressDoc) bool) (*siteIngressDoc, error) {
+	return waitSiteIngressWith(site, fetchSiteIngress, done, siteIngressSettleAttempts, siteIngressSettleBackoff)
+}
+
+func waitSiteIngressWith(site string, fetch siteIngressFetch, done func(*siteIngressDoc) bool, attempts int, backoff time.Duration) (*siteIngressDoc, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+	var last *siteIngressDoc
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		doc, _, err := fetch(site)
+		if err != nil {
+			lastErr = err
+		} else {
+			last = doc
+			if done(doc) {
+				return doc, nil
+			}
+		}
+		if i < attempts-1 {
+			time.Sleep(backoff)
+		}
+	}
+	if last != nil {
+		return last, nil
+	}
+	return nil, lastErr
+}
+
 func patchSiteIngress(site string, rows []siteIngressRow) error {
 	return patchSiteIngressAction(site, rows, "")
 }
@@ -357,14 +400,27 @@ func patchSiteIngressAction(site string, rows []siteIngressRow, action string) e
 		return nil
 	}
 	fmt.Printf("OK: site %q ingress %s\n", site, action)
-	doc, _, err := fetchSiteIngress(site)
-	if err != nil {
-		return fmt.Errorf("patch accepted but failed to re-read site: %w", err)
-	}
 	want := make(map[string]struct{}, len(clean))
 	for _, m := range clean {
 		id, _ := m["id"].(string)
 		want[id] = struct{}{}
+	}
+	// A re-read can still answer with the pre-patch list, which used to report a
+	// successful delete as "ingress count mismatch". Give the patch a moment to
+	// become visible before treating the result as a failure.
+	doc, err := waitSiteIngress(site, func(d *siteIngressDoc) bool {
+		if len(d.Spec.Edge.Ingress) != len(want) {
+			return false
+		}
+		for _, row := range d.Spec.Edge.Ingress {
+			if _, ok := want[row.ID]; !ok {
+				return false
+			}
+		}
+		return true
+	})
+	if err != nil {
+		return fmt.Errorf("patch accepted but failed to re-read site: %w", err)
 	}
 	got := make(map[string]struct{}, len(doc.Spec.Edge.Ingress))
 	for _, row := range doc.Spec.Edge.Ingress {
