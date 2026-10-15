@@ -57,6 +57,9 @@ func (s *Server) refreshInventoryJobs(ctx context.Context, fs *fleetv1alpha1.Fle
 				_ = yaidap.FinalizeSyncFromJobLogs(ctx, s.Client, s.Cfg.Namespace, fs.Name, path, logs)
 			}
 		}
-		_ = s.Client.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+		// Foreground: the Job's pods go with it. Background deletion can leave them
+		// orphaned, and the pod GC only reclaims orphaned terminated pods past a
+		// high water mark, so they would accumulate on the hub.
+		_ = s.Client.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationForeground))
 	}
 }

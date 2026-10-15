@@ -664,3 +664,14 @@
   script: scripts/verify-shared-directory.sh
   timeout_s: 120
   blocking: true
+
+- id: hub.pod-hygiene
+  layer: [1]
+  suite: [hub, core]
+  module: S7
+  mode: readonly
+  requires: [hub, kubectl]
+  profiles: [hub-only, homelab]
+  script: scripts/fleet-verify/checks/hub-pod-hygiene.sh
+  timeout_s: 60
+  blocking: true
