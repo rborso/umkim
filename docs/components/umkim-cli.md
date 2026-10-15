@@ -119,9 +119,13 @@ umkim app delete NAME [NAME...]
 
 umkim tenant list | create NAME | delete NAME
 umkim tenant add-member TENANT USERNAME | remove-member TENANT USERNAME
-umkim tenant add-user TENANT USERNAME --password P [--display-name D] [--email E]
-umkim invite list | create --groups TENANT[,TENANT] [--ttl-hours N] | delete ID
+umkim tenant add-user TENANT USERNAME --password P [--display-name D] [--email E] [--cluster C]
+umkim invite list | create --groups TENANT[,TENANT] [--ttl-hours N] [--cluster C] | delete ID
 umkim invite redeem --token T --username U --password P
+
+`--cluster` targets the invitation at one cluster's directory: the cluster's own
+LLDAP (`directory: local`) or the hub directory (`directory: hub`). Without it
+the invite is redeemed against the shared hub directory.
 
 umkim infra get hub
 umkim ingress-auth get | set [--hub-enabled] [--hub-lldap-webui] …
