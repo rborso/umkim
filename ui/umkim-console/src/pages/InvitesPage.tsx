@@ -30,6 +30,7 @@ export function InvitesPage() {
   const [clusters, setClusters] = useState<FleetCluster[]>([]);
   const [target, setTarget] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [clusterGroups, setClusterGroups] = useState('');
   const [ttlHours, setTtlHours] = useState('72');
   const [note, setNote] = useState('');
   const [links, setLinks] = useState<{ cluster: string; url: string }[]>([]);
@@ -58,17 +59,33 @@ export function InvitesPage() {
     setSelected((s) => (checked ? [...s, name] : s.filter((x) => x !== name)));
   };
 
+  // A cluster with its own LLDAP keeps its own groups, and the hub cannot read
+  // them, so the operator names them instead of picking from the hub list. A
+  // cluster bound to the hub directory uses the hub list like an untargeted
+  // invite does.
+  const targetCluster = clusters.find((c) => c.name === target);
+  const ownDirectory = targetCluster ? (targetCluster.ingressAuthStatus?.directory ?? '') !== 'hub' : false;
+  const typedGroups = clusterGroups
+    .split(/[,\s]+/)
+    .map((g) => g.trim())
+    .filter(Boolean);
+  const groups = ownDirectory ? typedGroups : selected;
+
   const submit = async () => {
     setError(null);
     setLinks([]);
-    if (selected.length === 0) {
-      setError('Select at least one tenant group.');
+    if (groups.length === 0) {
+      setError(
+        ownDirectory
+          ? `Name at least one group that exists in ${target}'s directory.`
+          : 'Select at least one tenant group.',
+      );
       return;
     }
     setBusy(true);
     try {
       const res = await createInvite({
-        groups: selected,
+        groups,
         cluster: target || undefined,
         ttlHours: Number.parseInt(ttlHours, 10) || undefined,
         note: note || undefined,
@@ -79,6 +96,7 @@ export function InvitesPage() {
           : [{ cluster: res.cluster || 'hub', url: window.location.origin + res.path }],
       );
       setSelected([]);
+      setClusterGroups('');
       setNote('');
       load();
     } catch (e) {
@@ -122,31 +140,46 @@ export function InvitesPage() {
             ))}
           </FormSelect>
         </FormGroup>
-        <FormGroup label="Tenant groups" isRequired fieldId="invite-groups">
-          {tenants.length === 0 ? (
-            <Alert variant="warning" isInline title="No tenant groups yet">
-              Create one on the <Link to="/admin/tenants">Tenants</Link> page first.
-            </Alert>
-          ) : (
-            <div>
-              {tenants.map((g) => (
-                <Checkbox
-                  key={g}
-                  id={`invite-group-${g}`}
-                  label={g}
-                  isChecked={selected.includes(g)}
-                  onChange={(_e, checked) => toggle(g, checked)}
-                />
-              ))}
-            </div>
-          )}
-          {target ? (
+        {ownDirectory ? (
+          <FormGroup label={`Groups in ${target}'s directory`} isRequired fieldId="invite-cluster-groups">
+            <TextInput
+              id="invite-cluster-groups"
+              value={clusterGroups}
+              onChange={(_e, v) => setClusterGroups(v)}
+              placeholder="labtenant"
+            />
             <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              Groups are resolved in <strong>{target}</strong>&apos;s directory, so each name must exist there
-              (the list above is the hub directory&apos;s).
+              Comma or space separated. Each name must already exist in <strong>{target}</strong>&apos;s own
+              directory — the <Link to="/admin/tenants">Tenants</Link> page manages the hub directory, not
+              this one.
             </div>
-          ) : null}
-        </FormGroup>
+          </FormGroup>
+        ) : (
+          <FormGroup label="Tenant groups" isRequired fieldId="invite-groups">
+            {tenants.length === 0 ? (
+              <Alert variant="warning" isInline title="No tenant groups yet">
+                Create one on the <Link to="/admin/tenants">Tenants</Link> page first.
+              </Alert>
+            ) : (
+              <div>
+                {tenants.map((g) => (
+                  <Checkbox
+                    key={g}
+                    id={`invite-group-${g}`}
+                    label={g}
+                    isChecked={selected.includes(g)}
+                    onChange={(_e, checked) => toggle(g, checked)}
+                  />
+                ))}
+              </div>
+            )}
+            {target ? (
+              <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                <strong>{target}</strong> uses the hub directory, so these groups apply there too.
+              </div>
+            ) : null}
+          </FormGroup>
+        )}
         <FormGroup label="Expires in (hours)" fieldId="invite-ttl">
           <TextInput
             id="invite-ttl"
@@ -163,7 +196,7 @@ export function InvitesPage() {
           type="submit"
           variant="primary"
           isLoading={busy}
-          isDisabled={busy || selected.length === 0}
+          isDisabled={busy || groups.length === 0}
         >
           Create invite
         </Button>
