@@ -110,10 +110,10 @@ umkim invite create --groups <tenant> --cluster <cluster> --ttl-hours 72
 umkim tenant add-user <tenant> <username> --password <pw> --cluster <cluster>
 ```
 
-Authelia caches directory lookups, so a user created moments ago can fail the
-first sign-in attempt with a 401 before the cache refreshes; retry after a
-minute. The account and its password are already correct (an LDAP bind succeeds
-immediately).
+Authelia resolves the directory over the cluster network, so a user created
+moments ago normally signs in immediately; a first attempt can fail with a 401
+if that lookup times out (transient DNS or service blip). Retry: the account and
+its password are already correct, and a direct LDAP bind succeeds.
 
 The sign-up page is available on the hub console (`/fleet/invite`) and on the
 Authelia portal host of every ingress-auth cluster (`/invite`), for both
