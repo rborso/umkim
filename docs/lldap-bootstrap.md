@@ -84,10 +84,18 @@ of the token is stored, in the `fleet-invites` Secret; the one-time link is
 shown once at creation.
 
 An invite is either **untargeted** (redeemed against the shared hub directory)
-or **targeted at one cluster** (`--cluster`, or the console's cluster picker),
-which redeems against whatever directory that cluster uses: its own LLDAP for
+or **targeted at one cluster** (`--cluster` on the CLI, or the **Directory**
+selector on the console's *Access control → Invitations* page), which redeems
+against whatever directory that cluster uses: its own LLDAP for
 `directory: local`, the hub directory for `directory: hub`. Redemption creates
-the user, adds the recorded groups, and sets the chosen password.
+the user, adds the recorded groups, and sets the chosen password. The invite
+list shows the target directory, and the console only offers clusters that have
+ingress auth (so they have a directory).
+
+The tenant groups a console invite offers come from the hub directory. A
+cluster's own directory usually has different groups, so for a cluster-targeted
+invite make sure the selected names exist **in that directory** — redemption
+fails with `directory group "x" does not exist` otherwise.
 
 LLDAP exposes no GraphQL password mutation (passwords use the OPAQUE protocol),
 so the controller creates the user and group membership over GraphQL and then

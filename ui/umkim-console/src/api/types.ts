@@ -413,6 +413,8 @@ export type FleetAppRouteMode = 'none' | 'hub' | 'site';
 
 export interface Invite {
   id: string;
+  /** Cluster whose own directory the invite targets; empty means the shared hub directory. */
+  cluster?: string;
   groups?: string[];
   displayNameHint?: string;
   emailHint?: string;
@@ -428,6 +430,8 @@ export interface Invite {
 
 export interface InviteCreate {
   groups: string[];
+  /** Redeem against this cluster's own directory instead of the shared hub directory. */
+  cluster?: string;
   ttlHours?: number;
   displayNameHint?: string;
   emailHint?: string;
@@ -443,6 +447,7 @@ export interface InviteCreateResult {
   id: string;
   token: string;
   path: string;
+  cluster?: string;
   links?: InviteSignupLink[];
   groups?: string[];
   expiresAt: string;
