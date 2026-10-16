@@ -91,3 +91,8 @@
   ansible.builtin.import_tasks: patch_metrics_server.yml
   when: k3s_role == 'server'
   tags: [k3s, k3s_metrics_server]
+
+- name: K3s | Ship the local-path StorageClass and provisioner
+  ansible.builtin.import_tasks: local_path.yml
+  when: k3s_role == 'server'
+  tags: [k3s, k3s_local_path]

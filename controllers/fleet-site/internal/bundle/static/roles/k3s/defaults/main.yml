@@ -8,9 +8,16 @@ k3s_node_ip: "{{ k3s_bind_address }}"
 k3s_token: ""
 k3s_server_url: ""
 
+# local-storage is disabled as well: k3s re-applies its packaged
+# local-storage.yaml on every server start, and that manifest marks local-path
+# the default StorageClass. That would override whichever class the cluster's
+# storage backend owns (NFS or Longhorn), leaving two defaults. The fleet ships
+# its own copy instead — k3s/tasks/local_path.yml — with the default flag under
+# the backend's control.
 k3s_disable_components:
   - traefik
   - servicelb
+  - local-storage
 k3s_flannel_backend: none
 k3s_disable_network_policy: true
 k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
@@ -18,6 +25,24 @@ k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
 k3s_kubeconfig_server_host: "127.0.0.1"
 # Root login PATH on Rocky often omits /usr/local/bin.
 k3s_command_path: /usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Local-path storage: the fleet ships the provisioner and StorageClass that the
+# disabled k3s local-storage addon used to provide. The images mirror the ones
+# k3s packaged for this release.
+local_path_storage_class: local-path
+local_path_provisioner_image: rancher/local-path-provisioner:v0.0.37
+local_path_helper_image: rancher/mirrored-library-busybox:1.37.0
+# local-path is the default only when no other backend claims it: NFS when it is
+# configured and left as the default, otherwise Longhorn, otherwise local-path.
+# The storage roles still clear any stray default, but this decides what the
+# fleet's own manifest asks for so a reinstall lands on one default.
+local_path_set_default_sc: >-
+  {{ not (
+       ((fleet_cluster_nfs_enabled | default(false) | bool)
+        and (fleet_cluster_nfs_set_default_sc | default(true) | bool))
+       or ((fleet_cluster_longhorn_enabled | default(false) | bool)
+           and (fleet_cluster_longhorn_set_default_sc | default(true) | bool))
+     ) }}
 
 # Metrics-server must use hostNetwork when kubelet listens on WireGuard node-ip
 # (pod scrapes to InternalIP:10250 are rejected by firewalld). secure-port must

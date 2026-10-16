@@ -1,0 +1,19 @@
+---
+# The k3s local-storage addon is disabled (k3s_disable_components), so the fleet
+# ships the local-path provisioner and StorageClass itself. Writing the manifest
+# once is enough for the cluster: k3s no longer re-asserts the packaged default
+# on every server start, which is what left a cluster with two default
+# StorageClasses.
+- name: Local-path | Create K3s static manifests directory
+  ansible.builtin.file:
+    path: /var/lib/rancher/k3s/server/manifests
+    state: directory
+    mode: "0755"
+  tags: [k3s, k3s_local_path]
+
+- name: Local-path | Write local-path provisioner and StorageClass manifest
+  ansible.builtin.template:
+    src: local-storage.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/local-storage.yaml
+    mode: "0644"
+  tags: [k3s, k3s_local_path]
