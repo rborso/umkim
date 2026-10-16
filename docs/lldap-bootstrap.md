@@ -132,11 +132,15 @@ page manages the hub directory, and
 `umkim cluster ingress-auth enable --expose-lldap-webui` puts that directory's
 own UI behind Authelia for exactly this.
 
-Redemption is retried and idempotent: a Job restart completes the remaining
-steps instead of failing on a user the previous attempt already created, so an
-interrupted invite can simply be redeemed again. A failed Job is left in place
-for its TTL so its log can be read; a successful one is removed with the Secret
-that carried the invitee's password.
+Redemption only ever creates a new account. Redeeming for a username that already
+exists in the target directory fails with `user <name> already exists in this
+directory` and changes nothing — no password reset, no group change — on either
+directory. Adopting an existing account would let anyone holding an invite take
+it over by naming it, so it is refused. Adding an existing user to a tenant is a
+separate operation: `umkim tenant add-member <tenant> <user>` (`POST
+/tenants/{name}/members`). A failed Job is left in place for its TTL so its log
+can be read; a successful one is removed with the Secret that carried the
+invitee's password.
 
 LLDAP exposes no GraphQL password mutation (passwords use the OPAQUE protocol),
 so the controller creates the user and group membership over GraphQL and then
