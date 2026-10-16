@@ -92,6 +92,17 @@ owner-tagged), and removes it when the app is deleted. The CLI equivalent is
 `umkim app create --oidc-client '{"clientId":"app","redirectPaths":["/callback"]}'`.
 Apps with native LDAP bind the directory directly instead.
 
+### Route tenant
+
+A chart declares the tenant its route should default to under `umkim.tenant` in
+its values; this is metadata only — the chart does not render or create it. The
+chart publish job reads the block into `FleetChart.status.tenantDefault`, and the
+console pre-fills the route's **Tenant groups** with it (the operator can replace
+it). Every directory is created with a `default-tenant` group at deploy time (see
+[LLDAP bootstrap](../lldap-bootstrap.md)), so it is the one tenant that exists
+everywhere without an operator declaring one. The CLI equivalent is
+`umkim app create --require-auth --require-auth-groups default-tenant`.
+
 The ingress-auth reconciler generates the client secret asynchronously. The
 controller waits for that secret to exist on the cluster before rendering the
 app `valuesYaml`, so `${OIDC_CLIENT_SECRET}` (and `${OIDC_CLIENT_ID}` /

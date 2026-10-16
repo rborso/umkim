@@ -60,6 +60,12 @@ type FleetChartStatus struct {
 	// from the chart's `umkim.oidc` values at publish time. Used to pre-fill the
 	// install prompt.
 	OIDCDefaults string `json:"oidcDefaults,omitempty"`
+	// TenantDefault is the app's recommended route tenant, read from the chart's
+	// `umkim.tenant` values at publish time. Every directory is created with a
+	// `default-tenant` group (see the LLDAP bootstrap), so this is the tenant that
+	// exists everywhere without an operator declaring one. Used to pre-fill the
+	// install prompt's requireAuthGroups.
+	TenantDefault string `json:"tenantDefault,omitempty"`
 	Conditions         []metav1.Condition      `json:"conditions,omitempty"`
 }
 

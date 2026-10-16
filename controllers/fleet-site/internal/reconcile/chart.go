@@ -157,6 +157,9 @@ func (r *ChartReconciler) applyPublishResult(ctx context.Context, ch *fleetv1alp
 	if v := strings.TrimSpace(cm.Data["oidcDefaults.json"]); v != "" && v != "{}" && v != "null" {
 		ch.Status.OIDCDefaults = v
 	}
+	if v := strings.TrimSpace(cm.Data["tenantDefault.txt"]); v != "" {
+		ch.Status.TenantDefault = v
+	}
 }
 
 func (r *ChartReconciler) markHarborReady(ctx context.Context, ch *fleetv1alpha1.FleetChart, hash string) (ctrl.Result, error) {
