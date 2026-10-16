@@ -189,10 +189,14 @@ func buildInviteRedeemSecret(username, password, displayName, email string, grou
 // its password. Values arrive as environment variables so nothing user-supplied
 // is ever interpolated into the shell.
 //
-// Every step is idempotent and retried: the Job restarts on failure, and a
-// restart must complete the work rather than die on a user it already created.
-// A one-shot group lookup is what left a user with no group and no password
-// while the Job still reported failure.
+// Redemption only ever creates a new account: an existing username fails
+// immediately. Carrying on past it would reset that account's password and add
+// it to the invite's groups, so anyone holding an invite could take over an
+// existing account by naming it. Adding an existing user to a tenant is a
+// separate operation (tenant add-member), not redemption.
+//
+// The group lookup and the password set are retried: a transient directory error
+// must not leave the freshly created user with no group or no password.
 const inviteRedeemScript = `set -uo pipefail
 url="${LLDAP_URL}"
 for i in $(seq 1 40); do
@@ -226,8 +230,10 @@ gql_retry() {
 created=$(gql_retry "{\"query\":\"mutation(\$u:CreateUserInput!){createUser(user:\$u){id}}\",\"variables\":{\"u\":{\"id\":\"${INVITE_USERNAME}\",\"displayName\":\"${INVITE_DISPLAY_NAME}\",\"email\":\"${INVITE_EMAIL}\"}}}") || true
 case "${created}" in
   *'"id"'*) echo "==> created directory user ${INVITE_USERNAME}";;
-  # A restart after a partial attempt must carry on, not fail here.
-  *"UNIQUE constraint"*|*"already exists"*) echo "==> ${INVITE_USERNAME} already exists; completing the remaining steps";;
+  # Never touch an existing account: setting its password and adding it to the
+  # invite's groups would be account takeover. The operator adds an existing user
+  # to a tenant with tenant add-member, not by redeeming an invite for it.
+  *"UNIQUE constraint"*|*"already exists"*) echo "user ${INVITE_USERNAME} already exists in this directory"; exit 1;;
   *) echo "createUser failed: ${created}"; exit 1;;
 esac
 

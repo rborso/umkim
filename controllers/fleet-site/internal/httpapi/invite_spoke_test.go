@@ -101,16 +101,21 @@ func TestBuildInviteRedeemJob(t *testing.T) {
 	if !strings.Contains(c.Args[0], "lldap_set_password") {
 		t.Fatal("script must set the password")
 	}
-	// A Job restart must complete the work rather than die on a user the
-	// previous attempt already created, and a transient directory error must not
-	// strand a user with no group and no password.
-	if !strings.Contains(c.Args[0], "UNIQUE constraint") {
-		t.Fatal("script must tolerate an already-created user")
+	// An existing username must fail, never be adopted: continuing would reset
+	// that account's password and add it to the invite's groups, which is account
+	// takeover for anyone who can name an existing user.
+	if !strings.Contains(c.Args[0], "already exists in this directory") {
+		t.Fatal("script must refuse an existing user")
 	}
+	if strings.Contains(c.Args[0], "completing the remaining steps") {
+		t.Fatal("script must not resume on an existing user")
+	}
+	// A transient directory error must not strand a freshly created user with no
+	// group and no password.
 	if !strings.Contains(c.Args[0], "gql_retry") {
 		t.Fatal("script must retry transient directory errors")
 	}
 	if !strings.Contains(c.Args[0], "set -uo pipefail") {
-		t.Fatal("script must not use set -e: a tolerated error is not a failure")
+		t.Fatal("script must not use set -e: retried calls report through their own handling")
 	}
 }
