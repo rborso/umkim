@@ -25,6 +25,10 @@ lldap:
   # deleted out of band.
   managedGroups: []
   managedGroupsSchedule: "*/10 * * * *"
+  # Tenant every own-directory LLDAP gets at deploy time, so an invitation or
+  # `tenant add-user --cluster` has a group to target out of the box. Added to
+  # managedGroups (created by the Job, kept by the CronJob); empty disables it.
+  defaultTenant: default-tenant
   # Shared low-privilege LLDAP bind account for apps (Authelia, Jellyfin, ...).
   # Created by a post-install/upgrade Job and added to lldap_strict_readonly.
   # Set password from the role (per-cluster); empty disables creation.

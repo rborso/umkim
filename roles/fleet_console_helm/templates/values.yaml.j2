@@ -63,6 +63,9 @@ lldap:
   bootstrap:
     enabled: {{ fleet_auth_lldap_bootstrap_enabled | default(true) | bool }}
     groups: {{ fleet_auth_lldap_bootstrap_groups | default(['fleet-admins', 'fleet-site-admins', 'fleet-cluster-admins', 'fleet-viewers']) }}
+    # Tenant the shared directory gets at bootstrap so an invitation has a group
+    # to target out of the box; empty disables it.
+    defaultTenant: {{ fleet_auth_lldap_default_tenant | default('default-tenant') | quote }}
   serviceAccounts:
     enabled: true
     secretName: lldap-service-accounts

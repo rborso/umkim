@@ -240,6 +240,20 @@ echo "==> declared groups reconciled (${created} created)"
 {{- end -}}
 
 {{/*
+The effective set of directory groups this cluster owns: the route-declared
+groups plus the default tenant. Space-joined so it can feed the Job env and,
+through its hash, the Job name (which must change when the set does).
+*/}}
+{{- define "fleet-ingress-auth.managedGroups" -}}
+{{- $groups := .Values.lldap.managedGroups | default list -}}
+{{- $default := .Values.lldap.defaultTenant | default "" -}}
+{{- if and $default (not (has $default $groups)) -}}
+{{- $groups = append $groups $default -}}
+{{- end -}}
+{{- join " " $groups -}}
+{{- end -}}
+
+{{/*
 Pod spec for reconciling declared directory groups. Shared by the hook Job and
 the drift CronJob so both run exactly the same script.
 */}}
@@ -268,7 +282,7 @@ template:
                 name: lldap-credentials
                 key: LLDAP_LDAP_USER_PASS
           - name: MANAGED_GROUPS
-            value: {{ join " " .Values.lldap.managedGroups | quote }}
+            value: {{ include "fleet-ingress-auth.managedGroups" . | quote }}
         resources:
           requests: { cpu: 5m, memory: 32Mi }
           limits: { memory: 128Mi }

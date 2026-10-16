@@ -58,6 +58,9 @@ lldap:
 {% endfor %}
 {% endif %}
   managedGroupsSchedule: {{ fleet_ingress_auth_lldap_managed_groups_schedule | default('*/10 * * * *') | quote }}
+  # Tenant every own-directory LLDAP gets, so an invitation or a tenant
+  # add-user has a group to target out of the box; empty disables it.
+  defaultTenant: {{ fleet_ingress_auth_lldap_default_tenant | default('default-tenant') | quote }}
   bindAccount:
     # Only clusters that run their own LLDAP create the shared bind account.
     enabled: {{ (not _hub_dir) | bool | lower }}
