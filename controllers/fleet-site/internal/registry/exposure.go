@@ -48,7 +48,8 @@ func SpokeACMEEnabled(tlsPolicy string) bool {
 	return tlsPolicy == fleetv1alpha1.TLSPolicyACMECluster
 }
 
-// Legacy aliases for gradual call-site migration.
+// ClusterExposureInput aliases ClusterIngressInput for callers that still use
+// the older exposure naming.
 type ClusterExposureInput = ClusterIngressInput
 
 func EffectiveClusterExposureMode(input ClusterExposureInput, _ string) string {
@@ -59,10 +60,6 @@ func EffectiveClusterExposureMode(input ClusterExposureInput, _ string) string {
 		return fleetv1alpha1.IngressMethodPortForward
 	}
 	return fleetv1alpha1.ExposureModeNone
-}
-
-func DirectIngressFromExposure(mode string) bool {
-	return AllowsDirectSiteIngress(mode)
 }
 
 func EffectiveClusterTLSPolicy(input ClusterExposureInput, _ string) string {
