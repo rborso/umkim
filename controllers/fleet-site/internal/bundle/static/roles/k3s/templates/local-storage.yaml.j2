@@ -98,7 +98,7 @@ metadata:
   name: {{ local_path_storage_class }}
   annotations:
     defaultVolumeType: "local"
-    storageclass.kubernetes.io/is-default-class: {{ local_path_set_default_sc | bool | lower | quote }}
+    storageclass.kubernetes.io/is-default-class: "{{ 'true' if (local_path_set_default_sc | bool) else 'false' }}"
 provisioner: rancher.io/local-path
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
