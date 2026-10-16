@@ -4,7 +4,7 @@
 
 domain: example.local
 
-umkim_version: "0.2.1"
+umkim_version: "0.3.0"
 harbor_fleet_image_tag: "{{ umkim_version }}"
 fleet_site_rocky_major: "10"
 

@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-16 — lab / reference
+
+Subsumes the 0.2.1 work, which was never released as its own cut.
+
 - Cluster bring-up: `FleetClusterJoin.spec.autoProvision` runs provisioning from
   the controller (jumphost bootstrap, per-step history in the site provision
   history), and `umkim cluster create` can declare the cluster's node VMs in the
@@ -30,8 +34,6 @@ All notable changes to this project are documented here.
   ships its own local-path provisioner; NFS export paths are unique per cluster.
 - Console: mobile-friendly layout and tables, a choice of LLDAP web UI exposure,
   and deterministic ordering from the list API.
-
-## [0.2.1] — 2026-10-11 — lab / reference
 
 - FleetApp: create an Authelia OIDC client at install time. Chart `umkim.oidc`
   metadata is published as `FleetChart.status.oidcDefaults`; the console and
