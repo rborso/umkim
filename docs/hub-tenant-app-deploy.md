@@ -52,7 +52,7 @@ umkim tenant add-member newtenant some-existing-user
 
 ```bash
 umkim app create --name immich --cluster lab-ha-0 \
-  --chart oci://10.10.0.1:30443/charts/immich --version 0.1.1 \
+  --chart oci://<hub-overlay>:30443/charts/immich --version 0.1.4 \
   --release immich --namespace immich \
   --route-mode hub --route-host immich.demo.otthol.hu \
   --require-auth --require-auth-groups newtenant \
@@ -84,7 +84,7 @@ ingress:
 
 ```bash
 umkim app create --name paperless --cluster lab-ha-0 \
-  --chart oci://10.10.0.1:30443/charts/paperless --version 0.1.4 \
+  --chart oci://<hub-overlay>:30443/charts/paperless --version 0.1.6 \
   --release paperless --namespace paperless \
   --route-mode hub --route-host paperless.demo.otthol.hu \
   --require-auth --require-auth-groups newtenant \
@@ -128,7 +128,7 @@ umkim app create -f servarr-hub.json
   "version": "0.2.9",
   "releaseName": "servarr",
   "namespace": "servarr",
-  "valuesYaml": "bootstrap:\n  enabled: true\n  image: 10.10.0.1:30443/fleet/servarr-bootstrap:0.8\napps:\n  jellyfin:\n    ldap:\n      enabled: true\n      server: 10.10.0.1\n      port: 30389\n      bindUser: uid=svc-bind,ou=people,dc=otthol,dc=local\n      existingSecret: servarr-lldap-bind\n",
+  "valuesYaml": "bootstrap:\n  enabled: true\n  image: <hub-overlay>:30443/fleet/servarr-bootstrap:0.9\napps:\n  jellyfin:\n    ldap:\n      enabled: true\n      server: <hub-overlay>\n      port: 30389\n      bindUser: uid=svc-bind,ou=people,dc=example,dc=com\n      existingSecret: servarr-lldap-bind\n",
   "routes": [
     {"key": "sonarr", "mode": "hub", "hubHost": "sonarr.demo.otthol.hu", "requireAuth": true, "requireAuthGroups": ["newtenant"], "serviceName": "sonarr", "servicePort": 80}
   ]
@@ -138,7 +138,7 @@ umkim app create -f servarr-hub.json
 Repeat the route object for `radarr`, `prowlarr`, `qbt` (service `qbittorrent`),
 `jellyfin`, `seerr`, `lidarr`, `bazarr`, and `cleanuparr`.
 
-The servarr Jellyfin LDAP plugin points at the **hub** LLDAP (`10.10.0.1:30389`,
+The servarr Jellyfin LDAP plugin points at the **hub** LLDAP (`<hub-overlay>:30389`,
 the hub directory's LDAP NodePort over the overlay) so directory users can sign
 in to Jellyfin. Create the bind secret first (from the hub service-account
 secret) and reference it as `apps.jellyfin.ldap.existingSecret`:

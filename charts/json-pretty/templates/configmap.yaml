@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-content
-  labels:
-    app.kubernetes.io/instance: {{ .Release.Name }}
-data:
-  index.html: |
-{{ .Files.Get "static/index.html" | indent 4 }}

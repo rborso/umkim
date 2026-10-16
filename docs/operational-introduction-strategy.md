@@ -7,7 +7,7 @@
 > **Purpose:** End-to-end learning path from greenfield hub install through YAIDAP
 > metal/VM provisioning, multi-cluster operations, GPU inference, and teardown.
 > This is the **operational** companion to the TLDR
-> [`umkim_yaidap_introduction.md`](../umkim_yaidap_introduction.md).
+> [`umkim_yaidap_introduction.md`](../demo_materials/umkim_yaidap_introduction.md).
 >
 > **Deliverable:** When executed, this strategy becomes an **introduction-style
 > walkthrough** (narrative + commands + proof). Each stage below must be **documented**
@@ -149,7 +149,7 @@ The walkthrough `README.md` (or future `docs.umkim.com` page) should:
 
 - Follow the same **A → B** order as this strategy.
 - Embed or link each asset next to the step it proves.
-- Keep the TLDR [`umkim_yaidap_introduction.md`](../umkim_yaidap_introduction.md) as the
+- Keep the TLDR [`umkim_yaidap_introduction.md`](../demo_materials/umkim_yaidap_introduction.md) as the
   front door; link to the full walkthrough for operators who want proof and click-paths.
 
 **Document** checkpoints in phase sections below refer to this section; add a one-line
@@ -234,7 +234,7 @@ EOF
 umkim site create -f /tmp/site-intro-hub.json
 ```
 
-Reference: [examples/site-profiles/hub-gateway/](site-profiles/hub-gateway/).
+Reference: [examples/site-profiles/hub-gateway/](../examples/site-profiles/hub-gateway/).
 
 **Verify:** `umkim site get intro-hub` shows `hubGateway: true`; DNS for hub zone points at hub WAN.
 
@@ -981,7 +981,7 @@ See [`examples/homelab/rebuild-homelab-cli.md`](../examples/homelab/rebuild-home
 
 | Topic | Document |
 |-------|----------|
-| TLDR intro | [`umkim_yaidap_introduction.md`](../umkim_yaidap_introduction.md) |
+| TLDR intro | [`umkim_yaidap_introduction.md`](../demo_materials/umkim_yaidap_introduction.md) |
 | Hub install | [install.md](install.md) |
 | CLI reference | [components/umkim-cli.md](components/umkim-cli.md) |
 | YAIDAP integration | [components/yaidap-integration.md](components/yaidap-integration.md) |

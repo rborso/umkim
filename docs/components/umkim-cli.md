@@ -515,7 +515,7 @@ umkim node-op history --cluster CLUSTER
 Installs `nfs-server` on the node (`nfs_local`), exports `--dir` (default
 `/srv/fleet-nfs`) with a per-cluster subdirectory, and deploys StorageClass
 `nfs-client`. Single-node only; see
-[fleet-cluster-storage.md](fleet-cluster-storage.md).
+[fleet-cluster-storage.md](../fleet-cluster-storage.md).
 
 ## Install
 
