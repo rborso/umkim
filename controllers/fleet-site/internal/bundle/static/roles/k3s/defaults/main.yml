@@ -18,6 +18,11 @@ k3s_disable_components:
   - traefik
   - servicelb
   - local-storage
+  # metrics-server is disabled too: the fleet's copy must run on hostNetwork
+  # with secure-port 10251, and leaving the addon enabled made k3s merge its
+  # embedded manifest with the fleet's file — invalid duplicate ports, and a
+  # revert on every server start. See tasks/patch_metrics_server.yml.
+  - metrics-server
 k3s_flannel_backend: none
 k3s_disable_network_policy: true
 k3s_kubeconfig: /etc/rancher/k3s/k3s.yaml
