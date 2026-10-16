@@ -36,3 +36,9 @@ controllers/fleet-edge/controller
 controllers/fleet-site/controller
 controllers/fleet-bootstrap/controller
 cmd/umkim/umkim
+
+# Lab-only material: lives in the working tree, never in the release line.
+/examples/homelab/
+/scripts/lab/
+/playbooks/flows/examples/
+/demo_materials/
