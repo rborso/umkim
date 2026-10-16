@@ -95,6 +95,28 @@ func TestSpokeProdRetryAttemptsClearOnIssued(t *testing.T) {
 	}
 }
 
+// The Traefik restart escalation is spent exactly once per issuance episode:
+// past the threshold a host that still cannot validate must not restart the
+// spoke Traefik on every refresh (it interrupts every other router and, when the
+// challenge itself fails, exhausts the CA's per-identifier failure budget).
+func TestProdRetryRestartIsSpentOnce(t *testing.T) {
+	restarts := 0
+	for attempt := 1; attempt <= 6; attempt++ {
+		if prodRetryRestartDue(attempt) {
+			restarts++
+		}
+	}
+	if restarts != 1 {
+		t.Fatalf("restarts = %d over six refreshes, want exactly 1", restarts)
+	}
+	if !prodRetryRestartDue(spokeACMEProdRetryRestartsAfter) {
+		t.Fatalf("restart not due at the threshold %d", spokeACMEProdRetryRestartsAfter)
+	}
+	if prodRetryRestartDue(spokeACMEProdRetryRestartsAfter + 1) {
+		t.Fatal("restart repeated after the threshold")
+	}
+}
+
 // A host whose certificate is already live must not hold the cluster's ACME
 // slot: the queued hostname has to become active.
 func TestAdvanceSpokeACMEQueueReleasesIssuedHost(t *testing.T) {

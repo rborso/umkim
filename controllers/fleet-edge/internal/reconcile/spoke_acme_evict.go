@@ -89,8 +89,9 @@ func (r *RouteReconciler) refreshSpokeProdACMERetry(ctx context.Context, route *
 	logger := log.FromContext(ctx).WithValues("cluster", clusterName, "host", siteHost)
 
 	// Escalate once per host: a fresh token alone may not be enough for Traefik
-	// to re-attempt a domain it has already failed.
-	if r.markProdRetryAttempt(clusterName, siteHost) >= spokeACMEProdRetryRestartsAfter {
+	// to re-attempt a domain it has already failed. The restart is spent exactly
+	// once per issuance episode (see prodRetryRestartDue).
+	if prodRetryRestartDue(r.markProdRetryAttempt(clusterName, siteHost)) {
 		if err := r.restartSpokeTraefik(ctx, clusterName, regCluster.UpstreamHost); err != nil {
 			logger.Error(err, "restarting spoke traefik to retry production issuance")
 		} else {
@@ -114,6 +115,18 @@ func (r *RouteReconciler) markProdRetryAttempt(clusterName, siteHost string) int
 	}
 	r.prodRetryAttempts[key]++
 	return r.prodRetryAttempts[key]
+}
+
+// prodRetryRestartDue reports whether this refresh is the one that should restart
+// the spoke Traefik. The restart is spent exactly once per issuance episode: it
+// is expensive (it interrupts every other router on the spoke for a moment) and
+// repeating it does not help a host whose challenge the CA keeps refusing — it
+// only re-triggers the same failure and can exhaust the CA's per-identifier
+// authorization-failure budget, which then blocks issuance even once the
+// challenge would pass. Later refreshes still re-stamp the ingress reload token,
+// which is enough to make Traefik re-evaluate the router.
+func prodRetryRestartDue(attempt int) bool {
+	return attempt == spokeACMEProdRetryRestartsAfter
 }
 
 // clearProdRetryAttempts forgets a host once its certificate is live, so a
