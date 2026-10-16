@@ -107,6 +107,8 @@ spec:
                         type: string
                 oidcDefaults:
                   type: string
+                tenantDefault:
+                  type: string
                 conditions:
                   type: array
                   items:

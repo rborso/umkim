@@ -560,6 +560,8 @@ export interface FleetChart {
   imagesCopied?: FleetChartCopiedImage[];
   /** Recommended Authelia OIDC client (JSON) from the chart's umkim.oidc. */
   oidcDefaults?: string;
+  /** Recommended route tenant from the chart's umkim.tenant (e.g. default-tenant). */
+  tenantDefault?: string;
 }
 
 export interface FleetAppOIDCClient {

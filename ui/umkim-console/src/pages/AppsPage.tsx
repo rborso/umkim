@@ -61,6 +61,16 @@ function parseOidcDefaults(json?: string): FleetAppOIDCClient | undefined {
     return undefined;
   }
 }
+
+/**
+ * The route tenant a chart recommends (umkim.tenant). Every directory is created
+ * with a `default-tenant` group, so this is the tenant that exists everywhere
+ * without an operator declaring one; it pre-fills the route's tenant groups.
+ */
+function parseTenantDefault(value?: string): string[] | undefined {
+  const v = (value || '').trim();
+  return v ? [v] : undefined;
+}
 import { ErrorAlert } from '../components/ErrorAlert';
 import { FleetModalSelect } from '../components/forms/FleetModalSelect';
 import { LabeledField } from '../components/forms/LabeledField';
@@ -338,6 +348,7 @@ export function AppsPage() {
     const firstProfile = chartInstallProfile(first);
     const rockyDefaults = newRockyForm();
     const firstOidc = parseOidcDefaults(readyCharts[0]?.oidcDefaults);
+    const firstTenant = parseTenantDefault(readyCharts[0]?.tenantDefault);
     setRocky(rockyDefaults);
     setRegisterLiteLLM(false);
     setOidcEnabled(!!firstOidc);
@@ -346,7 +357,7 @@ export function AppsPage() {
       version: readyCharts[0]?.version || '0.1.0',
       namespace: firstProfile.defaultNamespace || 'default',
       valuesYaml: firstProfile.kind === 'kubevirt' ? rockyValuesFromForm(rockyDefaults) : '',
-      route: { mode: 'none' },
+      route: { mode: 'none', requireAuthGroups: firstTenant },
       oidcClient: firstOidc,
       oidcClientId: firstOidc?.clientId,
     });
@@ -484,6 +495,7 @@ export function AppsPage() {
       setRocky(rockyDefaults);
     }
     const oidc = parseOidcDefaults(c?.oidcDefaults);
+    const tenant = parseTenantDefault(c?.tenantDefault);
     setOidcEnabled(!!oidc);
     setForm((f) => ({
       ...f,
@@ -498,7 +510,11 @@ export function AppsPage() {
         : f.chart !== name
           ? ''
           : f.valuesYaml,
-      route: profile.supportsRoute ? f.route : { mode: 'none' },
+      // Pre-fill the route tenant with the chart's recommended one (umkim.tenant,
+      // e.g. default-tenant); the operator can replace it.
+      route: profile.supportsRoute
+        ? { ...f.route, requireAuthGroups: tenant ?? f.route?.requireAuthGroups }
+        : { mode: 'none' },
       oidcClient: oidc,
       oidcClientId: oidc?.clientId,
     }));

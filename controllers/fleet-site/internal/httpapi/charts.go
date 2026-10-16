@@ -45,6 +45,9 @@ type chartResponse struct {
 	// OIDCDefaults is the app's recommended Authelia OIDC client (JSON), used to
 	// pre-fill the install prompt.
 	OIDCDefaults string `json:"oidcDefaults,omitempty"`
+	// TenantDefault is the app's recommended route tenant, used to pre-fill the
+	// install prompt's requireAuthGroups.
+	TenantDefault string `json:"tenantDefault,omitempty"`
 }
 
 type chartsListResponse struct {
@@ -370,6 +373,7 @@ func chartToResponse(ch *fleetv1alpha1.FleetChart) chartResponse {
 		Message:      ch.Status.Message,
 		ImagesCopied: copied,
 		OIDCDefaults: ch.Status.OIDCDefaults,
+		TenantDefault: ch.Status.TenantDefault,
 	}
 }
 
