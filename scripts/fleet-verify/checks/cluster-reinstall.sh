@@ -54,7 +54,7 @@ print(sys.argv[3] + '/' + sf if sf else '')
 }
 
 FLOW_YML="$(resolve_flow)"
-[[ -f "${FLOW_YML}" ]] || fail "flow file not found: ${FLOW_YML}"
+[[ -f "${FLOW_YML}" ]] || fail "flow file not found: ${FLOW_YML}${PRESET:+ (preset '${PRESET}' references it)} — set FLEET_VERIFY_CLUSTER_SPEC to a local flow/extra-vars file"
 
 CLUSTER="$(grep -E '^fleet_flow_cluster_name:' "${FLOW_YML}" | head -1 | sed -E 's/^[^:]*:\s*//' | tr -d ' \"')"
 [[ -n "${CLUSTER}" ]] || fail "fleet_flow_cluster_name missing in ${FLOW_YML}"

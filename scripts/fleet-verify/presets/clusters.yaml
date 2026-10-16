@@ -1,27 +1,40 @@
 # Current topology examples (all addresses in flow files are RFC 5737 placeholders):
-#   lab-sn01 @ 203.0.113.29 — single node, one control
-#   lab-3n01 @ 203.0.113.26–.28 — three controls, no workers
-#   lab-ha01 @ 203.0.113.21–.25 — three controls plus two workers
+#   lab-single-0 @ 203.0.113.29 — single node, one control
+#   lab-single-1 @ 203.0.113.26–.28 — single node (second lab)
+#   lab-ha-0     @ 203.0.113.21–.25 — three controls plus two workers
+#   lab-gpu-0    @ 203.0.113.31 — single node with a GPU
+#
+# Flow fixtures live in playbooks/flows/examples/ (lab-only, gitignored in the
+# release line). Keep these keys in step with the flow files: a preset whose
+# flow does not exist fails at load with the path named.
 
-lab-sn01:
-  flow: playbooks/flows/examples/lab-sn01.yml
-  site_flow: playbooks/flows/examples/homelab-shared-site.yml
+lab-single-0:
+  flow: playbooks/flows/examples/lab-single-0.yml
+  site_flow: playbooks/flows/examples/homelab-site.yml
   post_ready:
     providers: [k8s, helm]
     smoke: whoami-helm
   profiles: [homelab]
 
-lab-3n01:
-  flow: playbooks/flows/examples/lab-3n01.yml
-  site_flow: playbooks/flows/examples/homelab-shared-site.yml
+lab-single-1:
+  flow: playbooks/flows/examples/lab-single-1.yml
+  site_flow: playbooks/flows/examples/homelab-site.yml
   post_ready:
     providers: [k8s, helm]
     smoke: whoami-helm
   profiles: [homelab]
 
-lab-ha01:
-  flow: playbooks/flows/examples/lab-ha01.yml
-  site_flow: playbooks/flows/examples/homelab-shared-site.yml
+lab-ha-0:
+  flow: playbooks/flows/examples/lab-ha-0.yml
+  site_flow: playbooks/flows/examples/homelab-site.yml
+  post_ready:
+    providers: [k8s, helm]
+    smoke: whoami-helm
+  profiles: [homelab]
+
+lab-gpu-0:
+  flow: playbooks/flows/examples/lab-gpu-0.yml
+  site_flow: playbooks/flows/examples/homelab-site.yml
   post_ready:
     providers: [k8s, helm]
     smoke: whoami-helm
