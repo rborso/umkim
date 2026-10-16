@@ -41,7 +41,7 @@ COPY site-validate.yml site-provision.yml site-provision-connector.yml cluster-v
   cluster-provision-local.yml cluster-provision-hub.yml cluster-discover-capabilities.yml cluster-delete-hub.yml \
   cluster-configure-storage.yml cluster-configure-kubevirt.yml \
   cluster-gpu-host-prep.yml cluster-gpu-enable.yml cluster-gpu-firewall.yml cluster-validate-storage.yml \
-  cluster-add-worker.yml cluster-remove-worker.yml cluster-replace-control.yml cluster-kubeconfig-sync.yml \
+  cluster-replace-control.yml cluster-kubeconfig-sync.yml \
   cluster-overlay-recover.yml \
   ingress-auth-reconcile.yml acme-reconcile.yml llm-reconcile.yml wireguard-install.yml /ansible/
 COPY cleanup_node_local.sh /ansible/cleanup_node_local.sh
