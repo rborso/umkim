@@ -1,4 +1,9 @@
 {{- if and .Values.lldap.enabled .Values.lldap.bootstrap.enabled }}
+{{- $groups := .Values.lldap.bootstrap.groups | default list }}
+{{- $defaultTenant := .Values.lldap.bootstrap.defaultTenant | default "" }}
+{{- if and $defaultTenant (not (has $defaultTenant $groups)) }}
+{{- $groups = append $groups $defaultTenant }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,7 +13,7 @@ metadata:
     app: lldap
     app.kubernetes.io/component: bootstrap
 data:
-{{- range .Values.lldap.bootstrap.groups }}
+{{- range $groups }}
   {{ . }}.json: |
     {"name": {{ . | quote }}}
 {{- end }}

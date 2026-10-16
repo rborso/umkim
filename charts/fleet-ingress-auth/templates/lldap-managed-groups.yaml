@@ -1,7 +1,8 @@
-{{- if and .Values.enabled .Values.lldap.deploy .Values.lldap.managedGroups }}
+{{- if and .Values.enabled .Values.lldap.deploy }}
 {{/*
-Reconcile the groups this cluster's routes declare (route.requireAuthGroups) into
-its own directory.
+Reconcile the groups this cluster's own directory must have: the ones its routes
+declare (route.requireAuthGroups) plus the default tenant, so an invitation or a
+tenant add-user has a group to target out of the box.
 
 The Job name is keyed to the declared set: the manifests are applied through a
 ManifestWork rather than by Helm, so the hook annotations below do nothing and a
@@ -12,7 +13,7 @@ out of band.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: lldap-managed-groups-{{ .Values.lldap.managedGroups | join "," | sha256sum | trunc 8 }}
+  name: lldap-managed-groups-{{ include "fleet-ingress-auth.managedGroups" . | sha256sum | trunc 8 }}
   namespace: {{ include "fleet-ingress-auth.namespace" . }}
   labels:
     app.kubernetes.io/name: fleet-ingress-auth

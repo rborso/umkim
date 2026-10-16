@@ -75,6 +75,13 @@ management and from the invitation picker, and cannot be deleted there.
 Per-cluster directory placement is selected in the cluster edge tab (local vs
 shared hub directory).
 
+Every directory is created with a `default-tenant` group, so an invitation or
+`umkim tenant add-user` has a group to target out of the box. The hub's LLDAP
+creates it alongside its bootstrap groups; a cluster's own LLDAP creates it
+through the declared-groups reconcile below (the default tenant is always part of
+that set). Change the name with `fleet_auth_lldap_default_tenant` (hub) or
+`fleet_ingress_auth_lldap_default_tenant` (spoke); an empty value disables it.
+
 ## Declared groups
 
 A cluster that runs its own LLDAP reconciles the groups its **routes declare**
@@ -82,7 +89,7 @@ into that directory. `route.requireAuthGroups` is the declaration, so the group
 an operator needs for an invite already exists because a route references it:
 
 - the `fleet-ingress-auth` chart renders the declared set (deduplicated across
-  the cluster's routes) into its values;
+  the cluster's routes), plus the default tenant, into its values;
 - a Job named for that set runs on the spoke whenever the set changes, creating
   any missing group in the cluster's own directory;
 - a CronJob (every 10 minutes by default) restores a group that is deleted out of
@@ -93,7 +100,9 @@ which the hub manages directly.
 
 The workflow for a new tenant is therefore: give the tenant's route
 `requireAuthGroups: [<tenant>]` first, and the group appears in the cluster's
-directory; then invite users into it.
+directory; then invite users into it. A tenant that no route references is not
+reconciled — create it in the directory's own UI before inviting into it (the
+`default-tenant` group is the exception: it is always reconciled).
 
 ## Invitations
 
@@ -116,10 +125,12 @@ The tenant groups a console invite offers come from the hub directory. A
 cluster's own directory usually has different groups, so a cluster-targeted
 invite names them by hand and each must already exist **in that directory**;
 the redeem fails with `group <name> does not exist in this directory` otherwise
-(the Job log is reported back, so the failure names the group). Create the
-group in the cluster's directory first — the Tenants page manages the hub
-directory, and `umkim cluster ingress-auth enable --expose-lldap-webui` puts
-that directory's own UI behind Authelia for exactly this.
+(the Job log is reported back, so the failure names the group). `default-tenant`
+always exists, so a cluster-targeted invite works out of the box with no route.
+For any other group, create it in the cluster's directory first — the Tenants
+page manages the hub directory, and
+`umkim cluster ingress-auth enable --expose-lldap-webui` puts that directory's
+own UI behind Authelia for exactly this.
 
 Redemption is retried and idempotent: a Job restart completes the remaining
 steps instead of failing on a user the previous attempt already created, so an

@@ -69,6 +69,10 @@ lldap:
       - fleet-site-admins
       - fleet-cluster-admins
       - fleet-viewers
+    # Tenant the shared directory gets at bootstrap, so an invitation has a
+    # group to target out of the box. Kept out of `groups` (which are fleet role
+    # groups) but created the same way; empty disables it.
+    defaultTenant: default-tenant
     # Custom user attributes created in the directory. sshPublicKey is the
     # standard OpenSSH attribute (ldapPublicKey), so any LDAP-aware client can
     # read it — Gitea syncs it into user SSH keys at login.
