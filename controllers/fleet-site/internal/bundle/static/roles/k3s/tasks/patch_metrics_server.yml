@@ -41,11 +41,16 @@
   tags: [k3s, k3s_metrics_server]
 
 # The staged copy under server/umkim and the addon-path overwrite loop are gone
-# with the addon; remove any staging directory a previous release left behind.
-- name: K3s | Remove the retired metrics-server staging directory
+# with the addon; remove the paths a previous release left behind. k3s no longer
+# owns manifests/metrics-server once the addon is disabled, and leaving a stale
+# copy there would define the same Deployment as the fleet's manifest.
+- name: K3s | Remove the retired metrics-server staging and addon paths
   ansible.builtin.file:
-    path: /var/lib/rancher/k3s/server/umkim
+    path: "{{ item }}"
     state: absent
+  loop:
+    - /var/lib/rancher/k3s/server/umkim
+    - /var/lib/rancher/k3s/server/manifests/metrics-server
   when:
     - k3s_role == 'server'
     - k3s_metrics_server_host_network | default(true) | bool
