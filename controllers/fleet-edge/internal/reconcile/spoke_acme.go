@@ -143,8 +143,9 @@ const (
 	// re-stamped, giving Traefik a fresh router revision to retry from.
 	spokeACMEProdRetryRefreshAfter = 3 * time.Minute
 	// spokeACMEProdRetryRestartsAfter is the number of refreshes after which the
-	// spoke Traefik is restarted once for that host. A restart is the retry
-	// Traefik honours when the router configuration itself has not changed.
+	// spoke Traefik is restarted, exactly once, for that host. A restart is the
+	// retry Traefik honours when the router configuration itself has not changed;
+	// later refreshes keep re-stamping the token instead of restarting again.
 	spokeACMEProdRetryRestartsAfter = 2
 )
 

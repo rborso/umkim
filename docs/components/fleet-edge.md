@@ -127,10 +127,17 @@ Two details decide whether a hostname can be stranded:
   `port_forward`), not 443. Probing 443 never observes a spoke certificate, so
   the queue could previously advance only by rotating on staleness.
 - The production reload token (`edge.umkim.com/spoke-acme-prod-retry`) is
-  re-stamped while the certificate is still not live, and after two refreshes
-  the spoke Traefik is restarted once for that hostname. A one-shot token left a
-  hostname that failed a single challenge — for example a connection refusal
-  during TLS-ALPN-01 validation — in `Issuing` with nothing left to retry.
+  re-stamped while the certificate is still not live. Re-stamping changes the
+  router revision, which is enough for Traefik to retry without a restart. After
+  two refreshes the spoke Traefik is restarted **once** for that hostname, as the
+  retry Traefik honours when the router configuration itself has not changed. A
+  one-shot token left a hostname that failed a single challenge — for example a
+  connection refusal during TLS-ALPN-01 validation — in `Issuing` with nothing
+  left to retry; a restart on *every* refresh was worse: it interrupts every other
+  router on the spoke and, when the challenge itself keeps failing, burns through
+  the CA's per-identifier authorization-failure budget, so a hostname that could
+  have been issued is blocked for the next hour. Later refreshes therefore only
+  re-stamp the token.
 
 A route that answers `404` while `status.tlsPhase` is `Queued` is still in this
 queue. A route stuck in `Issuing` for more than a few minutes is a bug.
