@@ -98,13 +98,28 @@ is at least `storage.minDataDiskGi` (default 5 GiB).
 
 ## Default StorageClass
 
-The cluster has exactly one default class. When NFS is configured, `nfs-client`
-owns it: the storage role marks it default and clears the flag from every other
-class, and the Longhorn role installs with `persistence.defaultClass=false` and
-skips its own default patch. Without NFS, Longhorn takes the default when it is
-enabled. A `local_path` cluster keeps the K3s `local-path` class. Charts should
-still set an explicit `storageClassName` per volume so placement does not depend
-on the default.
+The cluster has exactly one default class, and it is never `local-path` while
+another backend is present:
+
+| Backend | Default class |
+|---|---|
+| NFS (`nfs_external` / `nfs_local`) | `nfs-client` |
+| Longhorn, when NFS is not configured (or not left as the default) | `longhorn` |
+| `local_path` | `local-path` |
+
+When NFS is configured it owns the default: the storage role marks `nfs-client`
+default and clears the flag from every other class. Setting
+`fleet_cluster_nfs_set_default_sc` false hands the default to Longhorn instead,
+and Longhorn claims it on its own only when NFS does not. Charts should still set
+an explicit `storageClassName` per volume so placement does not depend on the
+default.
+
+The fleet ships the `local-path` provisioner and StorageClass itself and disables
+the K3s `local-storage` addon. The packaged addon re-applies
+`storageclass.kubernetes.io/is-default-class: "true"` to `local-path` on every
+server start, which would leave the cluster with two defaults — or override the
+backend's choice — after any restart. The fleet's copy keeps that flag under the
+backend's control, so a reinstall lands on one default and it stays there.
 
 ## Verify
 
