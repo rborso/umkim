@@ -1,2 +1,0 @@
-NAME             HUB ACCEPTED   MANAGED CLUSTER URLS   JOINED   AVAILABLE   AGE
-intro-single-0   true                                  True     True        4m33s

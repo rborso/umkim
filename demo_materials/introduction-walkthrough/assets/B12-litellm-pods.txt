@@ -1,6 +1,0 @@
-NAME                      READY   STATUS    RESTARTS   AGE   IP               NODE        NOMINATED NODE   READINESS GATES
-litellm-bdbfbcc4f-lt7nx   1/1     Running   0          71s   10.10.0.1        umkim-hub   <none>           <none>
-redis-76bb846f8b-nz2ms    1/1     Running   0          74s   192.168.24.211   umkim-hub   <none>           <none>
-NAME      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
-litellm   NodePort    10.43.213.165   <none>        4000:30918/TCP   71s
-redis     ClusterIP   10.43.51.43     <none>        6379/TCP         74s

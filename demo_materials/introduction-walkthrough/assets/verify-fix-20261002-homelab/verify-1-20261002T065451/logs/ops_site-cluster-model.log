@@ -1,6 +1,0 @@
-== CHECK ops.site-cluster-model ==
-=== verify-site-cluster-model (FLEET_API=http://10.10.0.1:18080/api/v1alpha1 site=homelab cluster=lab-sn01) ===
-OK   homelab site clusterCount=3
-OK   homelab site wan egress enabled
-SKIP managedcluster lab-sn01 not found
-=== verify-site-cluster-model passed ===

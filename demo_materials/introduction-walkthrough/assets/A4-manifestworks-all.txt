@@ -1,4 +1,0 @@
-NAMESPACE        NAME                        AGE
-intro-single-0   fleet-route-whoami          8s
-intro-single-0   phase4-platform-bootstrap   4m17s
-intro-single-0   phase6-spoke-ingress        4m14s

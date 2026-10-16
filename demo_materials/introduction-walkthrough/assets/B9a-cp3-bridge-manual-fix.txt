@@ -1,7 +1,0 @@
-# Manual bridge fix on lab-ha-0-cp3 during B9a
-# Date: 2026-10-02T01:10:54+02:00
-# Cause: ansible inventory for fleet-cluster-kubevirt-lab-ha-0 included cp1,cp2,cp4 and stale w1,
-#        but NOT cp3. Day-2 Calico IP_AUTODETECTION_METHOD=interface=n0p0_mgmt_nw caused
-#        calico-node CrashLoop on cp3 (no bridge). WG peer 10.10.0.14 was unreachable from hub.
-# Fix: ProxyJump via cp1 (10.10.0.12) to 172.16.10.103; install bridge CNI; run
-#      configure-kubevirt-bridge.sh 172.16.10.103 → n0p0_mgmt_nw UP with 172.16.10.103/24.

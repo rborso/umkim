@@ -1,7 +1,0 @@
-== CHECK auth.admin.lists ==
-OK auth GET /users
-OK auth GET /groups
-OK auth GET /role-bindings
-OK auth GET /service-accounts
-OK auth GET /audit-events
-OK auth GET /llm-api-keys

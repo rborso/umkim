@@ -1,2 +1,0 @@
-active
-K3S_BIN_PRESENT

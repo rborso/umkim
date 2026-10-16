@@ -1,8 +1,0 @@
----
-# Optional hub-only overrides (inventory/group_vars/hub/overlay.yml).
-# Not required when you copy examples/inventory/hub-only/group_vars/hub.yml to
-# inventory/group_vars/hub.yml — use this file only for extra per-site knobs.
-#
-# Example: trim fleet-edge lab defaults after copying inventory/group_vars/fleet_edge.yml.
-# Greenfield FCJ clusters own fleet-edge-clusters (console-managed); do not seed stale upstream_host.
-# fleet_edge_clusters: {}

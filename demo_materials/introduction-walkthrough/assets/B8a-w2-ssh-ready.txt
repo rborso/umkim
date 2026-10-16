@@ -1,3 +1,0 @@
-SSH_OK via jumphost local key at attempt 1
-lab-ha-0-w2
- 22:31:09 up 0 min,  1 user,  load average: 1.30, 0.34, 0.12

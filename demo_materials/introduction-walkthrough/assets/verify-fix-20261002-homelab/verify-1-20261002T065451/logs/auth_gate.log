@@ -1,2 +1,0 @@
-== CHECK auth.gate ==
-OK auth gate: unauthenticated clusters returned 401

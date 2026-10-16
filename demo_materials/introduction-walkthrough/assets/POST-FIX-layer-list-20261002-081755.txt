@@ -1,3 +1,0 @@
-l1-audit.sh
-l2-synthetic.sh
-l3-rebuild.sh

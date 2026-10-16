@@ -1,7 +1,0 @@
-{
-  "clusterName": "intro-single-0",
-  "siteId": "intro-hub",
-  "bootstrapHost": "172.16.10.4",
-  "topology": "single_node",
-  "networkMode": "wireguard"
-}

@@ -1,7 +1,0 @@
-SITE	homelab
-HUB_GATEWAY	no
-ID              METHOD         ADDRESS        ZONE               CLUSTERS    
-homelab-pf      port_forward   172.16.10.100  homelab.otthol.hu  lab-single-0
-homelab-gpu-pf  port_forward   —              homelab.otthol.hu  —           
-edge-rp         reverse_proxy  —              —                  —           
-homelab-ha-pf   port_forward   172.16.10.100  homelab.otthol.hu  lab-ha-0    

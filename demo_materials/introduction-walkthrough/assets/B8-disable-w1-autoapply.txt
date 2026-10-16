@@ -1,4 +1,0 @@
-{
-  "path": "group_vars/lab-ha-0-w1.yml",
-  "syncPhase": "dirty"
-}

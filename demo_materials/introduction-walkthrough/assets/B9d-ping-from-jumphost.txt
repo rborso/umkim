@@ -1,8 +1,0 @@
-PING 172.16.10.150 (172.16.10.150) 56(84) bytes of data.
-64 bytes from 172.16.10.150: icmp_seq=1 ttl=64 time=2.20 ms
-64 bytes from 172.16.10.150: icmp_seq=2 ttl=64 time=1.87 ms
-64 bytes from 172.16.10.150: icmp_seq=3 ttl=64 time=0.894 ms
-
---- 172.16.10.150 ping statistics ---
-3 packets transmitted, 3 received, 0% packet loss, time 2002ms
-rtt min/avg/max/mdev = 0.894/1.654/2.202/0.554 ms

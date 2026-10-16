@@ -1,3 +1,0 @@
-42 /home/linux/yaidap/inventory/homelab/host_vars/virt03.yml
-hypervisors:
-  hosts: {}

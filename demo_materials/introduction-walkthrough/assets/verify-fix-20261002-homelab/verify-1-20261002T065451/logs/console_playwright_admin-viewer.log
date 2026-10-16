@@ -1,2 +1,0 @@
-== CHECK console.playwright.admin-viewer ==
-SKIP playwright admin/viewer.spec.ts (FLEET_VIEWER_USER unset)

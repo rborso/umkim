@@ -1,2 +1,0 @@
-NAME      SITE     PHASE  READY  GPU  KVM  KV   HA   RWX
-lab-ha-0  homelab  Ready  yes    no   yes  yes  yes  no 

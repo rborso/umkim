@@ -1,6 +1,0 @@
-== CHECK core.cluster-labels ==
-=== verify-cluster-labels (hub KUBECONFIG=/etc/rancher/k3s/k3s.yaml) ===
-SKIP virt01 (ManagedCluster not found)
-SKIP virt02 (ManagedCluster not found)
-SKIP virt01-k3s (ManagedCluster not found)
-=== all checks passed ===

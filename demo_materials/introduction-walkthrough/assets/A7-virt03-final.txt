@@ -1,3 +1,0 @@
-inactive
-K3S_INACTIVE
-K3S_BIN_GONE

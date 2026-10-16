@@ -1,8 +1,0 @@
-== CHECK console.playwright.cluster-detail ==
-Error: Cannot find module '/home/linux/umkim/ui/umkim-console/fixtures' imported from /home/linux/umkim/ui/umkim-console/e2e/cluster-detail.spec.ts
-
-Error: No tests found.
-Make sure that arguments are regular expressions matching test files.
-You may need to escape symbols like "$" or "*" and quote the arguments.
-
-[1A[2K

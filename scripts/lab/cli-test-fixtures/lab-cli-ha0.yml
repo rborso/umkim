@@ -1,5 +1,0 @@
-lab-cli-ha0:
-  hosts:
-    cli-test-ha-cp1:
-    cli-test-ha-cp2:
-    cli-test-ha-cp3:

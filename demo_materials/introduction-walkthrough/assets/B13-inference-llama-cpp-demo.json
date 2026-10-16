@@ -1,8 +1,0 @@
-{
-  "error": {
-    "message": "litellm.InternalServerError: InternalServerError: OpenAIException - Connection error.. Received Model Group=llama-cpp-demo\nAvailable Model Group Fallbacks=None",
-    "type": "internal_server_error",
-    "param": null,
-    "code": "500"
-  }
-}

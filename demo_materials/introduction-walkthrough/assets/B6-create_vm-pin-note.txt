@@ -1,4 +1,0 @@
-B6 create_vm: pinned lab-ha-0-cp1/cp2 -> virt01, cp3/w1 -> virt02 to match existing
-libvirt domains after least-utilized placement failed (capacity accounting /
-oversubscribed leftover cli-test-* VMs). See BUG-20261001-B6-create_vm-placement-oversubscribed.md.
-lab-ha-0-w1 already Ready with vm_location virt02 from reference host_vars.

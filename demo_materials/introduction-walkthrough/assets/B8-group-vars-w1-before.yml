@@ -1,3 +1,0 @@
-mode: add_worker
-targetCluster: lab-ha-0
-autoApply: true

@@ -1,8 +1,0 @@
-{
-  "bridgeName": "n0p0_mgmt_nw",
-  "install": true,
-  "jobName": "",
-  "lanBridge": true,
-  "message": "KubeVirt platform installed (LAN Multus NAD)",
-  "phase": "Ready"
-}

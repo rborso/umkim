@@ -1,9 +1,0 @@
-=== B11 final guest GPU 2026-10-02T02:23:03+02:00 ===
-lab-gpu-pt-0-cp1
- 00:23:04 up 11 min,  1 user,  load average: 0.17, 0.31, 0.24
-00:06.0 VGA compatible controller [0300]: NVIDIA Corporation TU117 [GeForce GTX 1650] [10de:1f82] (rev a1)
-00:07.0 Audio device [0403]: NVIDIA Corporation Device [10de:10fa] (rev a1)
-bash: line 4: nvidia-smi: command not found
-NAME               STATUS   ROLES           AGE     VERSION        INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                        KERNEL-VERSION                          CONTAINER-RUNTIME
-lab-gpu-pt-0-cp1   Ready    control-plane   9m26s   v1.36.5+k3s1   172.16.10.141   <none>        Rocky Linux 10.2 (Red Quartz)   6.12.0-211.61.1.el10_2.x86_64 (amd64)   containerd://2.3.4-k3s1.36
-wg-umkim         UNKNOWN        10.10.0.14/32 

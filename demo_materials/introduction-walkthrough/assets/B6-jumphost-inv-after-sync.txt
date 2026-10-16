@@ -1,8 +1,0 @@
-virt01.yml
-virt02.yml
-virt03.yml
-virt04.yml
-ls: cannot access '/home/linux/yaidap/inventory/homelab/group_vars/lab-ha*.yml': No such file or directory
-/home/linux/yaidap/inventory/homelab/lab-ha-0-w1.yml
-/home/linux/yaidap/inventory/homelab/lab-ha-0.yml
-head: cannot open '/home/linux/yaidap/inventory/homelab/host_vars/lab-ha-0-cp1.yml' for reading: No such file or directory

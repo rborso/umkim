@@ -1,3 +1,0 @@
-=== backend health ===
-{"status":"ok"}
-{"status":"ok"}

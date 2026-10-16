@@ -1,3 +1,0 @@
-2026-10-01T20:24:40+02:00
-operator: QA tester via linux@wg.otthol.hu
-scope: teardown-hub.sh --confirm then install-hub.sh

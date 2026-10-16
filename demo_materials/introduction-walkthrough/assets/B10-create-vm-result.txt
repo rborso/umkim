@@ -1,6 +1,0 @@
-current None
-create_vm Failed 2026-10-02T00:05:56Z YAIDAP connector job failed
-prepare_hypervisor Succeeded 2026-10-02T00:03:56Z Hypervisor prepare succeeded (libvirt bridges and packages)
-prepare_hypervisor_gpu Succeeded 2026-10-02T00:03:09Z Hypervisor and GPU passthrough host prepare succeeded
-create_vm Succeeded 2026-10-01T22:43:35Z VM created
-create_vm Succeeded 2026-10-01T22:30:48Z VM created

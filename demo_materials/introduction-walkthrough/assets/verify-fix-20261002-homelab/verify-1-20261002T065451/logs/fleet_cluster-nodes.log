@@ -1,6 +1,0 @@
-== CHECK fleet.cluster-nodes ==
-=== verify-fleet-cluster-nodes ===
-using cluster lab-gpu-pt-0
-capacity fields present
-addresses fields present
-=== verify-fleet-cluster-nodes OK ===

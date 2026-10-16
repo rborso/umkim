@@ -1,2 +1,0 @@
-== CHECK fleet.backup.infra ==
-WARN backup-infrastructure not configured (404), skipping hub-only

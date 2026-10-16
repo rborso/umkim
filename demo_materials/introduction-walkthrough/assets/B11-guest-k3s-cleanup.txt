@@ -1,7 +1,0 @@
-=== B11 guest inject+cleanup via jumphost key 2026-10-02T02:07:18+02:00 ===
-Warning: Permanently added '172.16.10.141' (ED25519) to the list of known hosts.
-JUMP_OK
-lab-gpu-pt-0-cp1
-linux
-bash: line 1: nvidia-smi: command not found
-linux@172.16.10.141: Permission denied (publickey,gssapi-keyex,gssapi-with-mic).

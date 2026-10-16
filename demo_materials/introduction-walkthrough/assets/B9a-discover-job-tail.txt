@@ -1,1 +1,0 @@
-error: error from server (NotFound): jobs.batch "fleet-cluster-discover-lab-ha-0" not found in namespace "fleet-console"

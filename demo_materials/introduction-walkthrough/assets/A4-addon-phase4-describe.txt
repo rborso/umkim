@@ -1,1 +1,0 @@
-Error from server (NotFound): managedclusteraddons.addon.open-cluster-management.io "phase4-platform-bootstrap" not found

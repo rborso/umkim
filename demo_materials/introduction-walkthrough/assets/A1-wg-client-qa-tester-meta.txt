@@ -1,6 +1,0 @@
-conf=/home/linux/umkim/output/wireguard-clients/qa-tester/wg-umkim.conf
-Address=10.10.0.100/32
-Endpoint=wg.otthol.hu:51820
-AllowedIPs=10.10.0.0/16
-Console=http://10.10.0.1:30912/fleet/
-User=localadmin (vault: fleet_console_auth_admin_password_vault)

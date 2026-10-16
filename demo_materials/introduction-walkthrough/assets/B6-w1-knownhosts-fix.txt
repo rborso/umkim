@@ -1,3 +1,0 @@
-# Host 172.16.10.140 found: line 30
-/home/linux/.ssh/known_hosts updated.
-Original contents retained as /home/linux/.ssh/known_hosts.old

@@ -1,9 +1,0 @@
-{
-  "driverBranch": "535",
-  "hostMessage": "NVIDIA host driver installed",
-  "hostPhase": "Ready",
-  "marketingName": "NVIDIA GeForce GTX 1650 / TU117 family",
-  "pciId": "10de:1f82",
-  "recommendedDriverBranch": "535",
-  "runtimePhase": "NotEnabled"
-}

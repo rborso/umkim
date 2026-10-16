@@ -1,2 +1,0 @@
-NAME                         READY   STATUS    RESTARTS   AGE     IP              NODE               NOMINATED NODE   READINESS GATES
-llama-cpp-7598858fc4-6s5wp   1/1     Running   0          4m33s   172.16.10.141   lab-gpu-pt-0-cp1   <none>           <none>

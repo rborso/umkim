@@ -1,3 +1,0 @@
-== CHECK ops.fleet-backup ==
-=== verify-fleet-backup ===
-SKIP: fleet-backup not deployed (ansible-playbook fleet-backup.yml -l hub)

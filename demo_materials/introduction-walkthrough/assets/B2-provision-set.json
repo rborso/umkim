@@ -1,9 +1,0 @@
-{
-  "inventoryPath": "/home/linux/yaidap/inventory/homelab",
-  "jumphost": "linux@jump.otthol.hu:30200",
-  "provider": "yaidap",
-  "sshSecretRef": "fleet-site-homelab-provision-ssh",
-  "yaidapRef": "main",
-  "yaidapRepo": "https://github.com/rborso/yaidap.git",
-  "yaidapRoot": "/home/linux/yaidap"
-}

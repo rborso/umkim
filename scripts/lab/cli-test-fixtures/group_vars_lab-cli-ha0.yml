@@ -1,5 +1,0 @@
-topology: ha_3_node
-autoApply: true
-haGroup: lab-cli-ha0
-controlPlaneVip: 172.16.10.210
-mode: enroll

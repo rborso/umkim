@@ -1,4 +1,0 @@
-== CHECK preflight.hub-inventory ==
-=== preflight-hub-inventory ===
-verify hub reachability via WG: 10.10.0.1
-=== preflight-hub-inventory OK ===

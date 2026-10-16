@@ -1,4 +1,0 @@
-# After B8b remove: keep guest defined but do not auto-readd to lab-ha-0
-mode: none
-targetCluster: lab-ha-0
-autoApply: false

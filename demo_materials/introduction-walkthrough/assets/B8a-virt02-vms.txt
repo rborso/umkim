@@ -1,1 +1,0 @@
-bash: line 1: cli-test: command not found

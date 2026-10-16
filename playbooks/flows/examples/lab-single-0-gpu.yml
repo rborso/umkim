@@ -1,7 +1,0 @@
----
-# GPU flows for lab-single-0 (virt03, GTX 1050 Ti).
-fleet_flow_cluster_name: lab-single-0
-fleet_flow_site_id: homelab
-fleet_flow_bootstrap_host: 172.16.10.4
-fleet_flow_jumphost: linux@jump.otthol.hu:30200
-fleet_flow_ssh_user: linux

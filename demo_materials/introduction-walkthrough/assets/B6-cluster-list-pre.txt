@@ -1,3 +1,0 @@
-NAME          SITE     PHASE         READY
-lab-single-0  homelab  Ready         yes  
-lab-ha-0      homelab  ScriptIssued  no   

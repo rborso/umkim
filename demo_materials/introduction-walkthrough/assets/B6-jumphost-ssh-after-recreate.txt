@@ -1,6 +1,0 @@
-Warning: Permanently added '172.16.10.101' (ED25519) to the list of known hosts.
-lab-ha-0-cp1
-Warning: Permanently added '172.16.10.103' (ED25519) to the list of known hosts.
-lab-ha-0-cp3
-Warning: Permanently added '172.16.10.140' (ED25519) to the list of known hosts.
-lab-ha-0-w1

@@ -1,5 +1,0 @@
-manifestwork.work.open-cluster-management.io/phase4-platform-bootstrap
-manifestwork.work.open-cluster-management.io/phase6-spoke-ingress
-manifestwork.work.open-cluster-management.io "phase4-platform-bootstrap" deleted from intro-single-0 namespace
-manifestwork.work.open-cluster-management.io "phase6-spoke-ingress" deleted from intro-single-0 namespace
-No resources found in intro-single-0 namespace.

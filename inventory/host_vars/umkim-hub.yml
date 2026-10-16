@@ -1,4 +1,0 @@
----
-fleet_hub_public_ipv4: "159.195.137.119"
-fleet_hub_firewall_public_ipv4: "{{ fleet_hub_public_ipv4 }}"
-fleet_gateway_probe_host: "{{ fleet_hub_public_ipv4 }}"

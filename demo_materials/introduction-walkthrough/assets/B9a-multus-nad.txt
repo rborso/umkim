@@ -1,4 +1,0 @@
-NAMESPACE   NAME      AGE
-default     mgmt-l2   9m47s
----
-error: there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. 'kubectl get resource/<resource_name>' instead of 'kubectl get resource resource/<resource_name>'

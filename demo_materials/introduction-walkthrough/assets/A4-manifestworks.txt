@@ -1,3 +1,0 @@
-NAME                        AGE
-phase4-platform-bootstrap   4m4s
-phase6-spoke-ingress        4m1s

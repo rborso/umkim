@@ -1,7 +1,0 @@
-{
-  "message": "Node operation accepted",
-  "node": "lab-ha-0-cp3",
-  "phase": "Pending",
-  "provisioning_phase": "Ready",
-  "type": "replaceControlPlane"
-}
