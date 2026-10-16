@@ -123,7 +123,7 @@ export type CpuQuantityParts = {
   unit: CpuQuantityUnit;
 };
 
-/** Parse k8s CPU quantity into editable parts for CpuQuantityInput. */
+/** Parse a k8s CPU quantity into editable parts (amount + unit). */
 export function parseCpuQuantityParts(q: string): CpuQuantityParts {
   const trimmed = q.trim();
   if (!trimmed) return { amount: 500, unit: 'millicores' };
