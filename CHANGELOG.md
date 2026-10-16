@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- Cluster bring-up: `FleetClusterJoin.spec.autoProvision` runs provisioning from
+  the controller (jumphost bootstrap, per-step history in the site provision
+  history), and `umkim cluster create` can declare the cluster's node VMs in the
+  same call. The console creates a cluster and provisions it in one flow.
+- Cluster delete: optional app uninstall and VM destruction
+  (`--cleanup-apps` / `--cleanup-vms`), VM declarations removed with the cluster,
+  and node detach/reset actually runs on delete.
+- Site hosts: add and remove hosts through the console or `umkim site host`, with
+  read-only verification for hypervisors, additional VM data disks, and a split
+  between infrastructure and workload hosts.
+- Directory and onboarding: every LLDAP directory gets a `default-tenant`; the
+  groups a route declares (`requireAuthGroups`) are reconciled into the cluster's
+  own directory; an invitation can target a cluster's own directory and redeem
+  against it; redeeming an invite no longer takes over an existing account
+  (security fix).
+- Apps: a chart's `umkim.tenant` metadata pre-fills the route's tenant groups;
+  charts can be published with `--force`; Helm installs wait for slow
+  post-install hooks.
+- Ingress: `FleetAppRoute` gains a TCP `protocol` with a hub L4 port forward; the
+  site ingress wildcard is enforced and verified; the spoke ingress render waits
+  for the edge registry, so the in-cluster name override is never dropped; a
+  stalled spoke ACME episode retries once instead of wedging.
+- Storage: one default StorageClass is chosen deterministically and the fleet
+  ships its own local-path provisioner; NFS export paths are unique per cluster.
+- Console: mobile-friendly layout and tables, a choice of LLDAP web UI exposure,
+  and deterministic ordering from the list API.
+
 ## [0.2.1] — 2026-10-11 — lab / reference
 
 - FleetApp: create an Authelia OIDC client at install time. Chart `umkim.oidc`
