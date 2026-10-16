@@ -35,21 +35,47 @@
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
   register: fleet_site_edge_clusters_raw
+  # The registry entry is written by the fleet-site controller, which resolves the
+  # site ingress (method, dns_zone) asynchronously once the cluster has joined.
+  # Rendering before that lands silently drops the in-cluster name override, and a
+  # pod calling one of this site's own public hostnames then leaves the cluster and
+  # is refused by the site router's NAT loopback (that is what broke the
+  # Nextcloud/Collabora WOPI fetch). Wait for a settled entry: either no ingress is
+  # bound, or it is fully resolved.
+  until: >-
+    {{ (((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}).get('ingress_id', '') | length == 0)
+       or ((((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}).get('method', '') | length > 0)
+           and (((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}).get('dns_zone', '') | length > 0)) }}
+  retries: 30
+  delay: 10
   changed_when: false
+
+- name: Fleet site | Parse this cluster's edge registry entry
+  ansible.builtin.set_fact:
+    fleet_site_edge_entry: >-
+      {{ ((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}) }}
 
 - name: Fleet site | Parse cluster ingress method for phase6 ACME
   ansible.builtin.set_fact:
-    fleet_site_spoke_ingress_method: >-
-      {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].method
-         | default('') }}
+    fleet_site_spoke_ingress_method: "{{ fleet_site_edge_entry.method | default('') }}"
     # The site zone this spoke serves. The spoke's CoreDNS answers it with the
     # in-cluster ingress, so a pod calling a public hostname of this site stays
     # inside the cluster instead of hitting the site router's NAT loopback.
-    fleet_site_spoke_ingress_zone: >-
-      {{ (fleet_site_edge_clusters_raw.stdout | from_yaml).clusters[fleet_site_ocm_cluster].dns_zone
-         | default('') }}
+    fleet_site_spoke_ingress_zone: "{{ fleet_site_edge_entry.dns_zone | default('') }}"
     # port_forward ACME: TLS-ALPN (HTTP-01 WAN 404 with websecure-only Ingress).
     fleet_site_spoke_acme_http_challenge: false
+
+- name: Fleet site | Require the site zone when an ingress is bound
+  ansible.builtin.assert:
+    that:
+      - fleet_site_spoke_ingress_method | length > 0
+      - fleet_site_spoke_ingress_zone | length > 0
+    fail_msg: >-
+      Cluster {{ fleet_site_ocm_cluster }} is bound to ingress
+      {{ fleet_site_edge_entry.ingress_id }} but the edge cluster registry has no
+      method/dns_zone; rendering now would drop the spoke's in-cluster name
+      override.
+  when: fleet_site_edge_entry.ingress_id | default('') | length > 0
 
 - name: Fleet site | Render spoke ingress ManifestWork
   ansible.builtin.template:
