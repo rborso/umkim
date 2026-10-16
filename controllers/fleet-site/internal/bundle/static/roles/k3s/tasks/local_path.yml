@@ -14,6 +14,10 @@
 - name: Local-path | Write local-path provisioner and StorageClass manifest
   ansible.builtin.template:
     src: local-storage.yaml.j2
-    dest: /var/lib/rancher/k3s/server/manifests/local-storage.yaml
+    # Deliberately not named local-storage.yaml: k3s removes the file matching
+    # its own (disabled) local-storage addon from this directory on every
+    # server start, which deleted the fleet's manifest and left the cluster with
+    # no StorageClass at all.
+    dest: /var/lib/rancher/k3s/server/manifests/fleet-local-path.yaml
     mode: "0644"
   tags: [k3s, k3s_local_path]
