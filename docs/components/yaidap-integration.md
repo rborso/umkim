@@ -105,8 +105,8 @@ umkim site provision set SITE --provider yaidap \
 4. For libvirt VM create: base OS images and `group_vars/all/all.yml` site
    catalogs (`networks`, `storages`, …) must match what YAIDAP expects.
 
-Lab-specific values and a full rebuild runbook:
-[examples/homelab/rebuild-homelab-cli.md](../../examples/homelab/rebuild-homelab-cli.md).
+Lab-specific values and a full rebuild runbook live with the maintainer lab
+material, which is not in this public tree.
 
 ## Hub inventory store
 
@@ -541,5 +541,5 @@ Historical design notes (superseded by this doc and [fleet-site.md](fleet-site.m
 - [fleet-site.md](fleet-site.md) — FleetSite lifecycle, ingress, post-Ready ops
 - [umkim-cli.md](umkim-cli.md) — CLI examples
 - [ui/umkim-console/README.md](../../ui/umkim-console/README.md) — console workflows
-- [examples/homelab/](../../examples/homelab/) — maintainer lab inventory and rebuild script
+- Maintainer lab inventory and rebuild script — not in this public tree
 - [docs/secrets.md](../secrets.md) — secret handling patterns

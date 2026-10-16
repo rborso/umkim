@@ -432,7 +432,7 @@ into canonical hub paths; `notes.json` stays on the jumphost for reference.
 
 **Hypervisor prepare and GPU passthrough (VFIO)** — hypervisor hosts only; set
 `gpu_passthrough_host` in `host_vars` before GPU prepare (see YAIDAP inventory model).
-Lab walkthrough: [examples/homelab/lab-gpu-passthrough-cli.md](../../examples/homelab/lab-gpu-passthrough-cli.md).
+Lab walkthrough: maintainer lab runbooks are not in this public tree.
 
 ```bash
 umkim site host prepare SITE hv01 --wait
@@ -515,7 +515,7 @@ umkim node-op history --cluster CLUSTER
 Installs `nfs-server` on the node (`nfs_local`), exports `--dir` (default
 `/srv/fleet-nfs`) with a per-cluster subdirectory, and deploys StorageClass
 `nfs-client`. Single-node only; see
-[fleet-cluster-storage.md](fleet-cluster-storage.md).
+[fleet-cluster-storage.md](../fleet-cluster-storage.md).
 
 ## Install
 
@@ -539,7 +539,7 @@ umkim login
 | Unit | `cmd/umkim/internal/.../*_test.go` — client, config, bootstrap SSH args |
 | Integration | `go test ./...` with `httptest` mock auth + fleet API |
 | Lab smoke | `scripts/verify-umkim-cli.sh` — login, list clusters, node-op history |
-| Maintainer homelab rebuild | [`examples/homelab/rebuild-homelab-cli.md`](../../examples/homelab/rebuild-homelab-cli.md) — full CLI runbook with timing logs (site + BM + HA clusters) |
+| Maintainer homelab rebuild | Maintainer lab runbooks are not in this public tree |
 
 ## Roadmap (post v0.2)
 
@@ -553,5 +553,6 @@ umkim login
 - [fleet-site.md](fleet-site.md) — API and FCJ lifecycle
 - [fleet-console-auth.md](../fleet-console-auth.md) — roles and service accounts
 - [install.md](../install.md) — hub install (Ansible)
-- [examples/homelab/rebuild-homelab-cli.md](../../examples/homelab/rebuild-homelab-cli.md) — maintainer lab rebuild via CLI (inventory in `examples/homelab/`)
+- Maintainer lab runbooks are not in this public tree. Hub inventory starts at
+  [examples/inventory/hub-only/](../../examples/inventory/hub-only/) (replace `CHANGE_ME`)
 - [playbooks/flows/README.md](../../playbooks/flows/README.md) — legacy API flow playbooks

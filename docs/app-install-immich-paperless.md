@@ -158,9 +158,9 @@ umkim app create --name paperless --cluster <cluster> \
 ### 2.3 Equivalent JSON
 
 `umkim app create -f <file>` takes the same fields as one object. See
-[examples/umkim/app-create-immich.json](../../examples/umkim/app-create-immich.json)
+[examples/umkim/app-create-immich.json](../examples/umkim/app-create-immich.json)
 and
-[examples/umkim/app-create-paperless.json](../../examples/umkim/app-create-paperless.json).
+[examples/umkim/app-create-paperless.json](../examples/umkim/app-create-paperless.json).
 `valuesYaml` is an embedded YAML string.
 
 ## 3. What UMKIM resolves for you

@@ -19,8 +19,7 @@ their roles and inventory inputs define the active behavior.
 - Site ingress: optional `hubGateway`, plus `ingress[]` methods
   `port_forward` / `reverse_proxy` (clusters bind with `ingressId`).
   Inventory examples: [examples/site-profiles/](../../../examples/site-profiles/).
-- `FleetApp` routing: `none`, `hub`, `site` only. Do not document or add
-  `route.mode: dual` (deprecated).
+- `FleetApp` routing: `none`, `hub`, `site` only.
 - Resolve upstreams, exposure configuration, and access controls from the
   active inventory rather than examples or documentation.
 - Keep controller-driven `FleetAppRoute` resources and Ansible-managed ingress
