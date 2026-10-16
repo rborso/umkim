@@ -4,6 +4,49 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- Cluster bring-up: `FleetClusterJoin.spec.autoProvision` runs provisioning from
+  the controller (jumphost bootstrap, per-step history in the site provision
+  history), and `umkim cluster create` can declare the cluster's node VMs in the
+  same call. The console creates a cluster and provisions it in one flow.
+- Cluster delete: optional app uninstall and VM destruction
+  (`--cleanup-apps` / `--cleanup-vms`), VM declarations removed with the cluster,
+  and node detach/reset actually runs on delete.
+- Site hosts: add and remove hosts through the console or `umkim site host`, with
+  read-only verification for hypervisors, additional VM data disks, and a split
+  between infrastructure and workload hosts.
+- Directory and onboarding: every LLDAP directory gets a `default-tenant`; the
+  groups a route declares (`requireAuthGroups`) are reconciled into the cluster's
+  own directory; an invitation can target a cluster's own directory and redeem
+  against it; redeeming an invite no longer takes over an existing account
+  (security fix).
+- Apps: a chart's `umkim.tenant` metadata pre-fills the route's tenant groups;
+  charts can be published with `--force`; Helm installs wait for slow
+  post-install hooks.
+- Ingress: `FleetAppRoute` gains a TCP `protocol` with a hub L4 port forward; the
+  site ingress wildcard is enforced and verified; the spoke ingress render waits
+  for the edge registry, so the in-cluster name override is never dropped; a
+  stalled spoke ACME episode retries once instead of wedging.
+- Storage: one default StorageClass is chosen deterministically and the fleet
+  ships its own local-path provisioner; NFS export paths are unique per cluster.
+- Console: mobile-friendly layout and tables, a choice of LLDAP web UI exposure,
+  and deterministic ordering from the list API.
+
+## [0.2.1] — 2026-10-11 — lab / reference
+
+- FleetApp: create an Authelia OIDC client at install time. Chart `umkim.oidc`
+  metadata is published as `FleetChart.status.oidcDefaults`; the console and
+  `umkim app create --oidc-client` prompt from it and set
+  `FleetApp.spec.oidcClient`. The controller registers the client on the target
+  cluster's `FleetClusterJoin` (owner-tagged) and removes it on app delete.
+- CLI: `umkim tenant` (list/create/delete/add-member/remove-member/add-user) and
+  `umkim invite` (list/create/delete/redeem); hub tenant app deploy walkthrough.
+- fleet-edge: bound `kubectl` calls so a stuck ManifestWork delete cannot hang
+  reconcile; ACME queue starvation fix (drop route-less hosts, rotate stale
+  hosts, probe before queue); duplicate route host rejected with **409**.
+- WireGuard: pin operator client addresses so adding a client stops renumbering;
+  fix the route task guard.
+- ingress-auth: per-client `requirePkce` override.
+
 ## [0.2.0] — 2026-09-12 — lab / reference
 
 - Rocky Linux 10 only; one management hub. Hub images are tagged from this
