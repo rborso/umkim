@@ -16,14 +16,18 @@ type Catalog struct {
 }
 
 type NetworkRef struct {
-	Name             string `json:"name"`
-	PhysicalNetwork  string `json:"physical_network,omitempty"`
-	Zone             string `json:"zone,omitempty"`
-	BridgeNameSuffix string `json:"bridge_name_suffix,omitempty"`
+	// The inventory spells this `network_name` (see group_vars/all/all.yml).
+	// yaml.v3 does not honour `json` tags, so without the yaml tag the field
+	// stayed empty and every network lookup missed — which silently fell back to
+	// the lab physical network and made a VM on any other network unresolvable.
+	Name             string `json:"network_name" yaml:"network_name"`
+	PhysicalNetwork  string `json:"physical_network,omitempty" yaml:"physical_network,omitempty"`
+	Zone             string `json:"zone,omitempty" yaml:"zone,omitempty"`
+	BridgeNameSuffix string `json:"bridge_name_suffix,omitempty" yaml:"bridge_name_suffix,omitempty"`
 }
 
 type StorageRef struct {
-	Name string `json:"name"`
+	Name string `json:"network_name" yaml:"network_name"`
 	Pool string `json:"pool,omitempty"`
 }
 
@@ -61,7 +65,7 @@ type GuestSpec struct {
 }
 
 type DiskSpec struct {
-	Name     string `json:"name"`
+	Name     string `json:"network_name" yaml:"network_name"`
 	Disk     string `json:"disk,omitempty"`
 	Bootdisk bool   `json:"bootdisk,omitempty"`
 	Device   int    `json:"device,omitempty"`
@@ -71,7 +75,7 @@ type DiskSpec struct {
 }
 
 type UplinkSpec struct {
-	Name            string        `json:"name"`
+	Name            string        `json:"network_name" yaml:"network_name"`
 	PhysicalNetwork string        `json:"physical_network,omitempty"`
 	MACAddress      string        `json:"mac_address,omitempty"`
 	Networks        []NetworkSpec `json:"networks,omitempty"`
