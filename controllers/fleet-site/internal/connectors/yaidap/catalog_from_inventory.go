@@ -1,9 +1,9 @@
 package yaidap
 
 import (
-	"strings"
-
 	"gopkg.in/yaml.v3"
+
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 )
 
 // CatalogFromInventory builds a Catalog from the modern inventory files:
@@ -26,7 +26,9 @@ func CatalogFromInventory(data map[string]string) Catalog {
 		Networks []NetworkRef `yaml:"networks"`
 		Storages []StorageRef `yaml:"storages"`
 	}
-	if raw := strings.TrimSpace(data["group_vars/all/all.yml"]); raw != "" {
+	// The ConfigMap is keyed by connectors.FileKey(path), not by the logical
+	// path, so read through the accessor the rest of the code uses.
+	if raw, ok := connectors.GetInventoryFile(data, "group_vars/all/all.yml"); ok {
 		if err := yaml.Unmarshal([]byte(raw), &gv); err == nil {
 			cat.Networks = gv.Networks
 			cat.Storages = gv.Storages
@@ -41,7 +43,7 @@ func CatalogFromInventory(data map[string]string) Catalog {
 			Hosts map[string]map[string]any `yaml:"hosts"`
 		} `yaml:"hypervisors"`
 	}
-	if raw := strings.TrimSpace(data["hypervisors.yml"]); raw != "" {
+	if raw, ok := connectors.GetInventoryFile(data, "hypervisors.yml"); ok {
 		if err := yaml.Unmarshal([]byte(raw), &hv); err == nil {
 			for name := range hv.Hypervisors.Hosts {
 				cat.Hypervisors = append(cat.Hypervisors, name)
