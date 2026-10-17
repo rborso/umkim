@@ -8,8 +8,8 @@ import (
 
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"gopkg.in/yaml.v3"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ClusterSpec is Fleet cluster intent stored in group_vars/{name}.yml (members come from root {name}.yml).

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 // ImportFileChange describes one file difference between hub and jumphost.
@@ -59,10 +59,10 @@ func CompareImportFiles(localData map[string]string, remoteFiles map[string]stri
 			}))
 		case lok && !rok:
 			out = append(out, attachImportWarnings(ImportFileChange{
-				Path:  p,
+				Path:   p,
 				Status: "deleted",
-				Diff:  unifiedDiff(local, "", p),
-				Local: local,
+				Diff:   unifiedDiff(local, "", p),
+				Local:  local,
 			}))
 		default:
 			out = append(out, attachImportWarnings(ImportFileChange{

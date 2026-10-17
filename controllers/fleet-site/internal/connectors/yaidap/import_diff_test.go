@@ -36,10 +36,10 @@ func TestCompareImportFilesModified(t *testing.T) {
 
 func TestApplyImportFilesPreservesHubOnly(t *testing.T) {
 	local := map[string]string{
-		"file.guests.yml":    "old\n",
+		"file.guests.yml":              "old\n",
 		"file.lab-ha-1.yml":            "lab-ha-1:\n  hosts:\n    a:\n    b:\n    c:\n",
 		"file.group_vars.lab-ha-1.yml": "topology: ha_3_node\ncontrolPlaneVip: 10.0.0.1\n",
-		"_meta.status.json":  `{"guests":{}}`,
+		"_meta.status.json":            `{"guests":{}}`,
 	}
 	remote := map[string]string{
 		"guests.yml": "new\n",
