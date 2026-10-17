@@ -55,6 +55,11 @@ func (s *Server) createSiteInventoryHost(ctx context.Context, w http.ResponseWri
 	if req.Cluster != "" {
 		readPaths = append(readPaths, req.Cluster+".yml")
 	}
+	// The target hypervisor's own host_vars, so the guest can be attached to
+	// the uplink that offers its network rather than to the first one.
+	if req.Kind == "vm" && req.Hypervisor != "" {
+		readPaths = append(readPaths, "host_vars/"+req.Hypervisor+".yml")
+	}
 	for _, p := range readPaths {
 		content, found, err := yaidap.GetInventoryFileContent(ctx, s.Client, s.Cfg.Namespace, siteName, p)
 		if err != nil {
