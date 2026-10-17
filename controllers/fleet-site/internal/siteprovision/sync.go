@@ -24,7 +24,7 @@ import (
 
 const (
 	maxProvisionHistory = 20
-	maxProvisionLogTail   = 65536
+	maxProvisionLogTail = 65536
 )
 
 // RefreshRunningJob polls the connector Job for a site with a running provision action,
@@ -138,6 +138,19 @@ func finalizeSupersededHistory(ctx context.Context, c client.Client, cs kubernet
 		}
 		var job batchv1.Job
 		if err := c.Get(ctx, types.NamespacedName{Namespace: ns, Name: h.JobName}, &job); err != nil {
+			if apierrors.IsNotFound(err) {
+				// The job is gone — deleted out of band, or by a superseding
+				// action. Nothing will ever finalize this entry, and a host left
+				// in Provisioning makes the cluster pipeline wait forever (the
+				// delete path waits on the same phase). Settle it here, the way
+				// RefreshRunningJob settles the current action.
+				end := metav1.NewTime(time.Now().UTC())
+				h.Phase = fleetv1alpha1.ProvisionPhaseFailed
+				h.Message = "provision job missing"
+				h.EndedAt = &end
+				SyncHostInventory(ctx, c, ns, fs.Name, *h)
+				changed = true
+			}
 			continue
 		}
 		switch {

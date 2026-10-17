@@ -118,7 +118,28 @@ func validateGroupVarsYAML(path, content string) error {
 	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
+	// A placeholder cloud-init password is written verbatim into every guest's
+	// user-data, so it is a known credential on every VM the site creates. Key
+	// auth is what is actually used; leave the field out rather than shipping a
+	// value an operator was told to replace.
+	if m, ok := doc.(map[string]interface{}); ok {
+		if pw, ok := m["cloudinit_password"]; ok {
+			if s, ok := pw.(string); ok && isPlaceholderSecret(s) {
+				return fmt.Errorf("%s: cloudinit_password is a placeholder (%q); remove it and use key auth, or set a real password", path, s)
+			}
+		}
+	}
 	return nil
+}
+
+// isPlaceholderSecret reports whether a value is one of the "replace me"
+// placeholders the templates ship.
+func isPlaceholderSecret(v string) bool {
+	switch strings.ToUpper(strings.TrimSpace(v)) {
+	case "CHANGE_ME", "CHANGEME", "REPLACE_ME", "REPLACEME", "CHANGE-ME", "TODO", "PASSWORD":
+		return true
+	}
+	return false
 }
 
 func validateThinGuestEntry(name string, entry GuestEntry, allowed map[string]bool) error {
