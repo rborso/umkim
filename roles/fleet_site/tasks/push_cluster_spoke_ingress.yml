@@ -35,17 +35,41 @@
     KUBECONFIG: "{{ ocm_kubeconfig }}"
     PATH: "{{ k3s_command_path }}"
   register: fleet_site_edge_clusters_raw
-  # The registry entry is written by the fleet-site controller, which resolves the
-  # site ingress (method, dns_zone) asynchronously once the cluster has joined.
-  # Rendering before that lands silently drops the in-cluster name override, and a
-  # pod calling one of this site's own public hostnames then leaves the cluster and
-  # is refused by the site router's NAT loopback (that is what broke the
-  # Nextcloud/Collabora WOPI fetch). Wait for a settled entry: either no ingress is
-  # bound, or it is fully resolved.
-  until: >-
-    {{ (((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}).get('ingress_id', '') | length == 0)
-       or ((((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}).get('method', '') | length > 0)
-           and (((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}).get('dns_zone', '') | length > 0)) }}
+  changed_when: false
+
+# The registry entry is written by the fleet-site controller, which resolves the
+# site ingress (method, dns_zone) asynchronously once the cluster has joined.
+# Rendering before that lands silently drops the in-cluster name override, and a
+# pod calling one of this site's own public hostnames then leaves the cluster and
+# is refused by the site router's NAT loopback (that is what broke the
+# Nextcloud/Collabora WOPI fetch). Wait for a settled entry: either no ingress is
+# bound, or it is fully resolved.
+#
+# Parsed in python rather than Jinja: the registry can carry `clusters: null`,
+# and Ansible's `default` filter only covers undefined, not None — evaluating
+# `.clusters.get(...)` on null failed the provision job outright.
+- name: Fleet site | Wait for the cluster's resolved edge registry entry
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      kubectl -n "{{ fleet_edge_clusters_cm_namespace | default('fleet-system') }}" \
+        get configmap "{{ fleet_edge_clusters_cm_name | default('fleet-edge-clusters') }}" \
+        -o "jsonpath={.data.clusters\\.yaml}" 2>/dev/null \
+      | python3 -c '
+      import sys, yaml
+      try:
+          data = yaml.safe_load(sys.stdin.read() or "{}") or {}
+      except Exception:
+          data = {}
+      entry = (data.get("clusters") or {}).get(sys.argv[1]) or {}
+      settled = (not entry.get("ingress_id")) or bool(entry.get("method") and entry.get("dns_zone"))
+      print("settled" if settled else "waiting")
+      ' "{{ fleet_site_ocm_cluster }}"
+  environment:
+    KUBECONFIG: "{{ ocm_kubeconfig }}"
+    PATH: "{{ k3s_command_path }}"
+  register: fleet_site_edge_registry_state
+  until: "'settled' in fleet_site_edge_registry_state.stdout"
   retries: 30
   delay: 10
   changed_when: false
@@ -53,7 +77,7 @@
 - name: Fleet site | Parse this cluster's edge registry entry
   ansible.builtin.set_fact:
     fleet_site_edge_entry: >-
-      {{ ((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml).clusters | default({})).get(fleet_site_ocm_cluster, {}) }}
+      {{ (((fleet_site_edge_clusters_raw.stdout | default('{}', true) | from_yaml) | default({}, true)).clusters | default({}, true)).get(fleet_site_ocm_cluster, {}) | default({}, true) }}
 
 - name: Fleet site | Parse cluster ingress method for phase6 ACME
   ansible.builtin.set_fact:
