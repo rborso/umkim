@@ -1,6 +1,10 @@
 package yaidap
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
+)
 
 // A modern inventory has no catalog.json, so the controller must read the
 // catalog from group_vars/all/all.yml + hypervisors.yml. Before this bridge the
@@ -8,7 +12,10 @@ import "testing"
 // silently returned the lab fallback.
 func TestCatalogFromInventory(t *testing.T) {
 	data := map[string]string{
-		"group_vars/all/all.yml": `
+		// The ConfigMap is keyed by connectors.FileKey(path); a plain logical
+		// key would silently read nothing, which is exactly how the original
+		// bug hid.
+		connectors.FileKey("group_vars/all/all.yml"): `
 memory: 4096
 cores: 2
 storages:
@@ -25,7 +32,7 @@ networks:
     cidr: 172.16.10.0/24
     physical_network: default_l2
 `,
-		"hypervisors.yml": `
+		connectors.FileKey("hypervisors.yml"): `
 hypervisors:
   hosts:
     virt01:
