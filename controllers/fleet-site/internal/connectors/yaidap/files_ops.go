@@ -227,6 +227,9 @@ func loadLegacyJSONStore(data map[string]string) (Catalog, GuestStore, error) {
 	if err != nil {
 		return Catalog{}, nil, err
 	}
+	if len(catalog.Networks) == 0 {
+		catalog = CatalogFromInventory(data)
+	}
 	guests, err := DecodeGuestStore(data["guests.json"])
 	if err != nil {
 		return Catalog{}, nil, err

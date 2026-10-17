@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	fleetv1alpha1 "github.com/rborso/umkim/controllers/fleet-site/api/v1alpha1"
+	"github.com/rborso/umkim/controllers/fleet-site/internal/connectors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -29,6 +29,13 @@ func LoadBundle(ctx context.Context, c client.Client, ns, siteName string) (Cata
 	catalog, err := DecodeCatalog(data["catalog.json"])
 	if err != nil {
 		return Catalog{}, nil, meta, err
+	}
+	// catalog.json is the legacy key. A modern inventory carries
+	// group_vars/all/all.yml + hypervisors.yml instead, and DecodeCatalog
+	// returns an empty Catalog (not an error) for the absent key — which left
+	// every network lookup taking its fallback. Bridge the modern files in.
+	if len(catalog.Networks) == 0 {
+		catalog = CatalogFromInventory(data)
 	}
 	guests, err := DecodeGuestStore(data["guests.json"])
 	if err != nil {

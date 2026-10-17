@@ -8,10 +8,10 @@ const SchemaVersion = 1
 
 // Catalog holds site-level YAIDAP inventory (networks, storages, defaults).
 type Catalog struct {
-	Networks    []NetworkRef       `json:"networks,omitempty"`
-	Storages    []StorageRef       `json:"storages,omitempty"`
-	Hypervisors []string           `json:"hypervisors,omitempty"`
-	Defaults    GuestDefaults      `json:"defaults,omitempty"`
+	Networks    []NetworkRef               `json:"networks,omitempty"`
+	Storages    []StorageRef               `json:"storages,omitempty"`
+	Hypervisors []string                   `json:"hypervisors,omitempty"`
+	Defaults    GuestDefaults              `json:"defaults,omitempty"`
 	Extra       map[string]json.RawMessage `json:"extra,omitempty"`
 }
 
@@ -49,19 +49,19 @@ type GuestStore map[string]GuestSpec
 
 // GuestSpec mirrors YAIDAP guest host_vars + guests.yml host entry fields.
 type GuestSpec struct {
-	Kind        string                 `json:"kind,omitempty"`
-	AnsibleHost string                 `json:"ansible_host,omitempty"`
-	VmLocation  string                 `json:"vm_location,omitempty"`
-	OS          string                 `json:"os,omitempty"`
-	Memory      int                    `json:"memory,omitempty"`
-	Cores       int                    `json:"cores,omitempty"`
-	Legacy      *bool                  `json:"legacy,omitempty"`
-	ConfigureFirewalld *bool           `json:"configure_firewalld,omitempty"`
-	ProvisioningProvider string         `json:"provisioning_provider,omitempty"`
-	Disks       []DiskSpec             `json:"disks,omitempty"`
-	Uplinks     []UplinkSpec           `json:"uplinks,omitempty"`
-	Absent      bool                   `json:"absent,omitempty"`
-	Extra       map[string]json.RawMessage `json:"extra,omitempty"`
+	Kind                 string                     `json:"kind,omitempty"`
+	AnsibleHost          string                     `json:"ansible_host,omitempty"`
+	VmLocation           string                     `json:"vm_location,omitempty"`
+	OS                   string                     `json:"os,omitempty"`
+	Memory               int                        `json:"memory,omitempty"`
+	Cores                int                        `json:"cores,omitempty"`
+	Legacy               *bool                      `json:"legacy,omitempty"`
+	ConfigureFirewalld   *bool                      `json:"configure_firewalld,omitempty"`
+	ProvisioningProvider string                     `json:"provisioning_provider,omitempty"`
+	Disks                []DiskSpec                 `json:"disks,omitempty"`
+	Uplinks              []UplinkSpec               `json:"uplinks,omitempty"`
+	Absent               bool                       `json:"absent,omitempty"`
+	Extra                map[string]json.RawMessage `json:"extra,omitempty"`
 }
 
 type DiskSpec struct {
